@@ -11,6 +11,7 @@ export interface Pokemon {
   isLegendary?: boolean
   isMythical?: boolean
   generation?: number
+  tier?: string
 }
 
 export interface PokemonType {
