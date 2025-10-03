@@ -6,7 +6,6 @@ import {
   fetchPokemonByType,
   pokemonQueries
 } from '@/lib/pokemon-api'
-import { getDemoPokemon } from '@/lib/demo-data'
 import { Pokemon } from '@/types'
 
 export const usePokemon = (id: string) => {
@@ -26,10 +25,7 @@ export const usePokemonList = (enabled: boolean = true) => {
     enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
-    retry: (failureCount, error) => {
-      // Only retry once, then use demo data
-      return failureCount < 1
-    },
+    retry: 1,
     retryDelay: 2000, // 2 second delay before retry
   })
 }
