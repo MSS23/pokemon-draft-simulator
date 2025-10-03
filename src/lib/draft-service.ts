@@ -6,6 +6,7 @@ import { createFormatRulesEngine as createNewFormatRulesEngine } from '@/domain/
 import { Pokemon } from '@/types'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { generateRoomCode } from '@/lib/room-utils'
+import { fetchPokemon } from '@/lib/pokemon-api'
 
 type Draft = Database['public']['Tables']['drafts']['Row']
 type Team = Database['public']['Tables']['teams']['Row']
@@ -686,9 +687,12 @@ export class DraftService {
         }
       }
 
+      // Fetch the Pokemon object to validate
+      const pokemon = await fetchPokemon(pokemonId)
+
       // Use NEW format rules engine to validate (async)
       const rulesEngine = await createNewFormatRulesEngine(format.id)
-      const validation = await rulesEngine.validatePokemon(pokemonId, pokemonName)
+      const validation = await rulesEngine.validatePokemon(pokemon)
 
       if (!validation.isLegal) {
         return {
