@@ -1,0 +1,16 @@
+{
+  "name": "Pokémon Draft App",
+  "short_name": "PokeDraft",
+  "description": "Real-time Pokémon draft application with snake and auction formats",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}

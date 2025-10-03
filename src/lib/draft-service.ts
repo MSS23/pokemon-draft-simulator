@@ -1,0 +1,1375 @@
+import { supabase } from './supabase'
+import type { Database } from './supabase'
+import { generateSnakeDraftOrder, getCurrentPick } from '@/utils/draft'
+import { getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
+import { createFormatRulesEngine as createNewFormatRulesEngine } from '@/domain/rules'
+import { Pokemon } from '@/types'
+import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
+import { generateRoomCode } from '@/lib/room-utils'
+
+type Draft = Database['public']['Tables']['drafts']['Row']
+type Team = Database['public']['Tables']['teams']['Row']
+type Participant = Database['public']['Tables']['participants']['Row']
+type Pick = Database['public']['Tables']['picks']['Row']
+type Auction = Database['public']['Tables']['auctions']['Row']
+
+export interface DraftSettings {
+  maxTeams: number
+  draftType: 'snake' | 'auction'
+  timeLimit: number
+  pokemonPerTeam: number
+  budgetPerTeam?: number
+  formatId?: string
+  autoStart?: boolean
+}
+
+export interface CreateDraftParams {
+  name: string
+  hostName: string
+  teamName: string
+  settings: DraftSettings
+  isPublic?: boolean
+  description?: string | null
+  tags?: string[] | null
+}
+
+export interface JoinDraftParams {
+  roomCode: string
+  userName: string
+  teamName: string
+}
+
+export interface JoinSpectatorParams {
+  roomCode: string
+  userName: string
+}
+
+export interface DraftState {
+  draft: Draft
+  teams: Team[]
+  participants: Participant[]
+  picks: Pick[]
+  auctions?: Auction[]
+}
+
+export class DraftService {
+  static generateRoomCode(): string {
+    return generateRoomCode()
+  }
+
+  static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
+    if (!supabase) {
+      throw new Error('Supabase not available')
+    }
+
+    const roomCode = this.generateRoomCode()
+    const hostId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    // Create draft
+    const { data: draft, error: draftError } = await (supabase
+      .from('drafts') as any)
+      .insert({
+        id: roomCode.toLowerCase(),
+        name: name || `${hostName}'s Draft`,
+        host_id: hostId,
+        format: settings.draftType,
+        max_teams: settings.maxTeams,
+        budget_per_team: settings.budgetPerTeam || 100,
+        status: 'setup',
+        current_round: 1,
+        settings: {
+          timeLimit: settings.timeLimit,
+          pokemonPerTeam: settings.pokemonPerTeam,
+          formatId: settings.formatId || DEFAULT_FORMAT,
+          autoStart: settings.autoStart || false
+        },
+        is_public: isPublic || false,
+        spectator_count: 0,
+        description: description || null,
+        tags: tags || null
+      })
+      .select()
+      .single()
+
+    if (draftError) {
+      console.error('Error creating draft:', draftError)
+      throw new Error(`Failed to create draft: ${draftError.message || JSON.stringify(draftError)}`)
+    }
+
+    // Create host team
+    const { data: team, error: teamError } = await (supabase
+      .from('teams') as any)
+      .insert({
+        draft_id: (draft as any).id,
+        name: teamName,
+        owner_id: hostId,
+        draft_order: 1,
+        budget_remaining: settings.budgetPerTeam || 100
+      })
+      .select()
+      .single()
+
+    if (teamError) {
+      console.error('Error creating team:', teamError)
+      throw new Error(`Failed to create team: ${teamError.message || JSON.stringify(teamError)}`)
+    }
+
+    // Create host participant
+    const { error: participantError } = await (supabase
+      .from('participants') as any)
+      .insert({
+        draft_id: (draft as any).id,
+        user_id: hostId,
+        display_name: hostName,
+        team_id: team.id,
+        is_host: true,
+        last_seen: new Date().toISOString()
+      })
+
+    if (participantError) {
+      console.error('Error creating participant:', participantError)
+      throw new Error('Failed to create participant')
+    }
+
+    // Record draft participation in user session
+    UserSessionService.recordDraftParticipation({
+      draftId: (draft as any).id,
+      userId: hostId,
+      teamId: team.id,
+      teamName: teamName,
+      displayName: hostName,
+      isHost: true,
+      status: 'active'
+    })
+
+    // Note: Auto-start removed to allow all teams to join before starting
+    // Host must manually start the draft once all teams are ready
+
+    return { roomCode, draftId: (draft as any).id }
+  }
+
+  static async joinDraft({ roomCode, userName, teamName }: JoinDraftParams): Promise<{ draftId: string; teamId: string }> {
+    const draftId = roomCode.toLowerCase()
+    const userId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    // Check if draft exists and is joinable
+    if (!supabase) throw new Error('Supabase not available')
+    
+    const { data: draft, error: draftError } = await supabase
+      .from('drafts')
+      .select('*, teams(*)')
+      .eq('id', draftId)
+      .single()
+
+    if (draftError || !draft) {
+      throw new Error('Draft room not found')
+    }
+
+    if ((draft as any).status !== 'setup') {
+      throw new Error('Draft is no longer accepting new players')
+    }
+
+    if ((draft as any).teams.length >= (draft as any).max_teams) {
+      throw new Error('Draft room is full')
+    }
+
+    // Get next draft order
+    const nextDraftOrder = (draft as any).teams.length + 1
+
+    // Create team
+    const { data: team, error: teamError } = await (supabase
+      .from('teams') as any)
+      .insert({
+        draft_id: draftId,
+        name: teamName,
+        owner_id: userId,
+        draft_order: nextDraftOrder,
+        budget_remaining: (draft as any).budget_per_team
+      })
+      .select()
+      .single()
+
+    if (teamError) {
+      console.error('Error creating team:', teamError)
+      throw new Error('Failed to join draft')
+    }
+
+    // Create participant
+    const { error: participantError } = await (supabase
+      .from('participants') as any)
+      .insert({
+        draft_id: draftId,
+        user_id: userId,
+        display_name: userName,
+        team_id: team.id,
+        is_host: false,
+        last_seen: new Date().toISOString()
+      })
+
+    if (participantError) {
+      console.error('Error creating participant:', participantError)
+      throw new Error('Failed to create participant')
+    }
+
+    // Record draft participation in user session
+    UserSessionService.recordDraftParticipation({
+      draftId: draftId,
+      userId: userId,
+      teamId: team.id,
+      teamName: teamName,
+      displayName: userName,
+      isHost: false,
+      status: 'active'
+    })
+
+    return { draftId, teamId: team.id }
+  }
+
+  static async joinAsSpectator({ roomCode, userName }: JoinSpectatorParams): Promise<{ draftId: string }> {
+    const draftId = roomCode.toLowerCase()
+    const userId = `spectator-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    // Check if draft exists
+    if (!supabase) throw new Error('Supabase not available')
+    
+    const { data: draft, error: draftError } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('id', draftId)
+      .single()
+
+    if (draftError || !draft) {
+      throw new Error('Draft room not found')
+    }
+
+    // Create spectator participant (no team assignment)
+    const { error: participantError } = await (supabase
+      .from('participants') as any)
+      .insert({
+        draft_id: draftId,
+        user_id: userId,
+        display_name: userName,
+        team_id: null, // Spectators have no team
+        is_host: false,
+        last_seen: new Date().toISOString()
+      })
+
+    if (participantError) {
+      console.error('Error creating spectator:', participantError)
+      throw new Error('Failed to join as spectator')
+    }
+
+    // Record spectator participation in user session
+    UserSessionService.recordDraftParticipation({
+      draftId: draftId,
+      userId: userId,
+      teamId: null,
+      teamName: null,
+      displayName: userName,
+      isHost: false,
+      status: 'spectator'
+    })
+
+    return { draftId }
+  }
+
+  static async getDraftState(draftId: string): Promise<DraftState | null> {
+    if (!supabase) return null
+    
+    const { data, error } = await supabase
+      .from('drafts')
+      .select(`
+        *,
+        teams(*),
+        participants(*),
+        picks(*),
+        auctions(*)
+      `)
+      .eq('id', draftId)
+      .single()
+
+    if (error || !data) {
+      console.error('Error fetching draft state:', error)
+      return null
+    }
+
+    return {
+      draft: data,
+      teams: (data as any).teams || [],
+      participants: (data as any).participants || [],
+      picks: (data as any).picks || [],
+      auctions: (data as any).auctions || []
+    }
+  }
+
+  static async startDraft(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+    
+    // First, get all teams for this draft
+    const { data: teams, error: teamsError } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('draft_id', draftId)
+      .order('draft_order')
+
+    if (teamsError || !teams) {
+      console.error('Error fetching teams:', teamsError)
+      throw new Error('Failed to fetch teams')
+    }
+
+    // Randomize draft order
+    const randomizedOrder = teams
+      .map((_, index) => index + 1)
+      .sort(() => Math.random() - 0.5)
+
+    // Update each team with new randomized draft order
+    const updatePromises = teams.map((team, index) =>
+      (supabase as any)
+        .from('teams')
+        .update({ draft_order: randomizedOrder[index] })
+        .eq('id', (team as any).id)
+    )
+
+    await Promise.all(updatePromises)
+
+    // Set draft to active with first turn
+    const { error } = await (supabase as any)
+      .from('drafts')
+      .update({
+        status: 'active',
+        current_turn: 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId)
+
+    if (error) {
+      console.error('Error starting draft:', error)
+      throw new Error('Failed to start draft')
+    }
+  }
+
+  static async makePick(draftId: string, userId: string, pokemonId: string, pokemonName: string, cost: number): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+    
+    // Validate user can pick and get their team
+    const validation = await this.validateUserCanPick(draftId, userId)
+    if (!validation.canPick) {
+      throw new Error(validation.reason || 'Cannot make pick')
+    }
+
+    const teamId = validation.teamId!
+
+    // Get draft state to validate pick against format
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    // Validate Pokemon against format rules
+    const formatValidation = await this.validatePokemonInFormat(draftState.draft, pokemonId, pokemonName, cost)
+    if (!formatValidation.isValid) {
+      throw new Error(formatValidation.reason || 'Pokemon is not legal in this format')
+    }
+
+    // Use the validated cost from format rules
+    const validatedCost = formatValidation.validatedCost
+
+    const totalTeams = draftState.teams.length
+    const maxRounds = draftState.draft.settings?.maxPokemonPerTeam || 10
+    const currentTurn = draftState.draft.current_turn || 1
+
+    // Generate snake draft order for all rounds
+    const draftOrder = generateSnakeDraftOrder(draftState.teams as any, maxRounds)
+
+    // Get current pick info
+    const pickInfo = getCurrentPick(draftOrder, currentTurn)
+
+    const pickOrder = draftState.picks.length + 1
+
+    // Create the pick
+    const { error: pickError } = await (supabase
+      .from('picks') as any)
+      .insert({
+        draft_id: draftId,
+        team_id: teamId,
+        pokemon_id: pokemonId,
+        pokemon_name: pokemonName,
+        cost: validatedCost,
+        pick_order: pickOrder,
+        round: pickInfo.round
+      })
+
+    if (pickError) {
+      console.error('Error making pick:', pickError)
+      throw new Error('Failed to make pick')
+    }
+
+    // Update team budget
+    const { error: teamError } = await (supabase
+      .from('teams') as any)
+      .update({
+        budget_remaining: (supabase as any).sql`budget_remaining - ${validatedCost}`
+      })
+      .eq('id', teamId)
+
+    if (teamError) {
+      console.error('Error updating team budget:', teamError)
+    }
+
+    // Calculate next turn using proper snake draft logic
+    const nextTurn = currentTurn + 1
+    const nextRound = Math.floor((nextTurn - 1) / totalTeams) + 1
+
+    // Check if draft is complete
+    const isComplete = nextTurn > draftOrder.length
+
+    // Update draft turn and round
+    const updateData = isComplete
+      ? {
+          status: 'completed' as const,
+          updated_at: new Date().toISOString()
+        }
+      : {
+          current_turn: nextTurn,
+          current_round: nextRound,
+          updated_at: new Date().toISOString()
+        }
+
+    const { error: draftError } = await (supabase
+      .from('drafts') as any)
+      .update(updateData)
+      .eq('id', draftId)
+
+    if (draftError) {
+      console.error('Error updating draft turn:', draftError)
+    }
+  }
+
+  static async makeProxyPick(draftId: string, hostUserId: string, targetTeamId: string, pokemonId: string, pokemonName: string, cost: number): Promise<void> {
+    // Validate format rules for proxy pick too
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const formatValidation = await this.validatePokemonInFormat(draftState.draft, pokemonId, pokemonName, cost)
+    if (!formatValidation.isValid) {
+      throw new Error(formatValidation.reason || 'Pokemon is not legal in this format')
+    }
+
+    // For production Supabase implementation - verify host permissions and make pick for target team
+    // This would need to be implemented when moving beyond demo mode
+    throw new Error('Proxy picking not yet implemented for production mode')
+  }
+
+  static subscribeToDraft(draftId: string, callback: (payload: { eventType?: string; new?: any; old?: any }) => void) {
+    if (!supabase) throw new Error('Supabase not available')
+    
+    const channels = [
+      supabase.channel(`draft-${draftId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'drafts',
+          filter: `id=eq.${draftId}`
+        }, callback)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'teams',
+          filter: `draft_id=eq.${draftId}`
+        }, callback)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'participants',
+          filter: `draft_id=eq.${draftId}`
+        }, callback)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'picks',
+          filter: `draft_id=eq.${draftId}`
+        }, callback)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'auctions',
+          filter: `draft_id=eq.${draftId}`
+        }, callback)
+        .subscribe()
+    ]
+
+  return () => {
+    if (supabase) {
+      channels.forEach(channel => {
+        if (supabase) {
+          supabase.removeChannel(channel)
+        }
+      })
+    }
+  }
+  }
+
+  static async validateUserTeam(draftId: string, userId: string, teamId: string): Promise<boolean> {
+    if (!supabase) return false
+    
+    const { data: participant } = await supabase
+      .from('participants')
+      .select('team_id')
+      .eq('draft_id', draftId)
+      .eq('user_id', userId)
+      .single()
+
+    return (participant as any)?.team_id === teamId
+  }
+
+  static async getUserTeam(draftId: string, userId: string): Promise<string | null> {
+    if (!supabase) return null
+    
+    const { data: participant } = await supabase
+      .from('participants')
+      .select('team_id')
+      .eq('draft_id', draftId)
+      .eq('user_id', userId)
+      .single()
+
+    return (participant as any)?.team_id || null
+  }
+
+  static async validateUserCanPick(draftId: string, userId: string): Promise<{ canPick: boolean; teamId: string | null; reason?: string }> {
+    // Get draft state
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      return { canPick: false, teamId: null, reason: 'Draft not found' }
+    }
+
+    // Check if draft is active
+    if (draftState.draft.status !== 'active') {
+      return { canPick: false, teamId: null, reason: 'Draft is not active' }
+    }
+
+    // Get user's team
+    const userTeamId = await this.getUserTeam(draftId, userId)
+    if (!userTeamId) {
+      return { canPick: false, teamId: null, reason: 'You are not part of this draft' }
+    }
+
+    // For auction drafts, different validation logic
+    if (draftState.draft.format === 'auction') {
+      return { canPick: false, teamId: userTeamId, reason: 'Use auction bidding for auction drafts' }
+    }
+
+    // Check if it's user's turn (snake draft logic)
+    const maxRounds = draftState.draft.settings?.maxPokemonPerTeam || 10
+    const currentTurn = draftState.draft.current_turn || 1
+
+    const draftOrder = generateSnakeDraftOrder(draftState.teams as any, maxRounds)
+    if (currentTurn > draftOrder.length) {
+      return { canPick: false, teamId: userTeamId, reason: 'Draft is complete' }
+    }
+
+    const currentTeamOrder = draftOrder[currentTurn - 1]
+    const currentTeam = draftState.teams.find(team => team.draft_order === currentTeamOrder)
+
+    if (!currentTeam || currentTeam.id !== userTeamId) {
+      return { canPick: false, teamId: userTeamId, reason: 'It is not your turn' }
+    }
+
+    return { canPick: true, teamId: userTeamId }
+  }
+
+  static async pauseDraft(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { error } = await (supabase
+      .from('drafts') as any)
+      .update({
+        status: 'paused',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId)
+
+    if (error) {
+      console.error('Error pausing draft:', error)
+      throw new Error('Failed to pause draft')
+    }
+  }
+
+
+  static async endDraft(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { error } = await (supabase
+      .from('drafts') as any)
+      .update({
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId)
+
+    if (error) {
+      console.error('Error ending draft:', error)
+      throw new Error('Failed to end draft')
+    }
+  }
+
+  static async advanceTurn(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const totalTeams = draftState.teams.length
+    const maxRounds = draftState.draft.settings?.maxPokemonPerTeam || 10
+    const currentTurn = draftState.draft.current_turn || 1
+    const nextTurn = currentTurn + 1
+    const nextRound = Math.floor((nextTurn - 1) / totalTeams) + 1
+
+    const isComplete = nextTurn > totalTeams * maxRounds
+
+    const updateData = isComplete
+      ? {
+          status: 'completed' as const,
+          updated_at: new Date().toISOString()
+        }
+      : {
+          current_turn: nextTurn,
+          current_round: nextRound,
+          updated_at: new Date().toISOString()
+        }
+
+    const { error } = await (supabase
+      .from('drafts') as any)
+      .update(updateData)
+      .eq('id', draftId)
+
+    if (error) {
+      console.error('Error advancing turn:', error)
+      throw new Error('Failed to advance turn')
+    }
+  }
+
+  static async updateParticipantLastSeen(draftId: string, userId: string): Promise<void> {
+    if (!supabase) return
+    
+    await (supabase
+      .from('participants') as any)
+      .update({
+        last_seen: new Date().toISOString()
+      })
+      .eq('draft_id', draftId)
+      .eq('user_id', userId)
+  }
+
+  /**
+   * Validate a Pokemon pick against the draft's format rules
+   */
+  private static async validatePokemonInFormat(
+    draft: Draft,
+    pokemonId: string,
+    pokemonName: string,
+    proposedCost: number
+  ): Promise<{ isValid: boolean; reason?: string; validatedCost: number }> {
+    try {
+      // Get format from draft settings
+      const formatId = draft.settings?.formatId || DEFAULT_FORMAT
+      const format = getFormatById(formatId)
+
+      if (!format) {
+        return {
+          isValid: false,
+          reason: `Invalid format: ${formatId}`,
+          validatedCost: proposedCost
+        }
+      }
+
+      // Use NEW format rules engine to validate (async)
+      const rulesEngine = await createNewFormatRulesEngine(format.id)
+      const validation = await rulesEngine.validatePokemon(pokemonId, pokemonName)
+
+      if (!validation.isLegal) {
+        return {
+          isValid: false,
+          reason: validation.reason,
+          validatedCost: proposedCost
+        }
+      }
+
+      // Return validated cost from format rules
+      return {
+        isValid: true,
+        validatedCost: validation.cost
+      }
+    } catch (error) {
+      console.error('Error validating Pokemon in format:', error)
+      return {
+        isValid: false,
+        reason: 'Failed to validate Pokemon against format rules',
+        validatedCost: proposedCost
+      }
+    }
+  }
+
+  /**
+   * Get the format for a draft
+   */
+  static async getDraftFormat(draftId: string): Promise<string | null> {
+    if (!supabase) return null
+
+    const { data: draft, error } = await supabase
+      .from('drafts')
+      .select('settings')
+      .eq('id', draftId)
+      .single()
+
+    if (error || !draft) {
+      console.error('Error fetching draft format:', error)
+      return null
+    }
+
+    return (draft as any).settings?.formatId || DEFAULT_FORMAT
+  }
+
+  /**
+   * Get drafts for the current user from their participation history
+   */
+  static getMyDrafts(): DraftParticipation[] {
+    return UserSessionService.getDraftParticipations()
+  }
+
+  /**
+   * Get active drafts for the current user
+   */
+  static getMyActiveDrafts(): DraftParticipation[] {
+    return UserSessionService.getActiveDraftParticipations()
+  }
+
+  /**
+   * Resume a draft by rejoining with stored session data
+   */
+  static async resumeDraft(draftId: string): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+      const participation = UserSessionService.getDraftParticipation(draftId)
+      if (!participation) {
+        return { success: false, error: 'No participation record found for this draft' }
+      }
+
+      // Check if draft still exists and is active
+      const draftState = await this.getDraftState(draftId)
+      if (!draftState) {
+        UserSessionService.updateDraftParticipation(draftId, { status: 'abandoned' })
+        return { success: false, error: 'Draft room no longer exists' }
+      }
+
+      // Update last activity
+      UserSessionService.updateDraftParticipation(draftId, { status: 'active' })
+
+      // Construct the URL with the stored session data
+      const params = new URLSearchParams({
+        userName: participation.displayName,
+        teamName: participation.teamName || '',
+        isHost: participation.isHost.toString()
+      })
+
+      const url = `/draft/${draftId}?${params.toString()}`
+
+      return { success: true, url }
+    } catch (error) {
+      console.error('Error resuming draft:', error)
+      return { success: false, error: 'Failed to resume draft' }
+    }
+  }
+
+  /**
+   * Mark a draft as completed in user session
+   */
+  static markDraftCompleted(draftId: string): void {
+    UserSessionService.updateDraftParticipation(draftId, { status: 'completed' })
+  }
+
+  /**
+   * Mark a draft as abandoned in user session
+   */
+  static markDraftAbandoned(draftId: string): void {
+    UserSessionService.updateDraftParticipation(draftId, { status: 'abandoned' })
+  }
+
+  // =====================
+  // AUCTION DRAFT METHODS
+  // =====================
+
+  /**
+   * Nominate a Pokemon for auction
+   */
+  static async nominatePokemon(
+    draftId: string,
+    userId: string,
+    pokemonId: string,
+    pokemonName: string,
+    startingBid: number = 1,
+    auctionDurationSeconds: number = 60
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Validate user can nominate
+    const validation = await this.validateUserCanNominate(draftId, userId)
+    if (!validation.canNominate) {
+      throw new Error(validation.reason || 'Cannot nominate Pokemon')
+    }
+
+    const teamId = validation.teamId!
+    const auctionEnd = new Date(Date.now() + auctionDurationSeconds * 1000)
+
+    // Get draft state to validate Pokemon against format
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    // Validate Pokemon against format rules
+    const formatValidation = await this.validatePokemonInFormat(
+      draftState.draft,
+      pokemonId,
+      pokemonName,
+      startingBid
+    )
+    if (!formatValidation.isValid) {
+      throw new Error(formatValidation.reason || 'Pokemon is not legal in this format')
+    }
+
+    // Create auction
+    const { error } = await (supabase
+      .from('auctions') as any)
+      .insert({
+        draft_id: draftId,
+        pokemon_id: pokemonId,
+        pokemon_name: pokemonName,
+        nominated_by: teamId,
+        current_bid: startingBid,
+        current_bidder: null,
+        auction_end: auctionEnd.toISOString(),
+        status: 'active'
+      })
+
+    if (error) {
+      console.error('Error creating auction:', error)
+      throw new Error('Failed to nominate Pokemon')
+    }
+  }
+
+  /**
+   * Place a bid on an active auction
+   */
+  static async placeBid(
+    draftId: string,
+    userId: string,
+    auctionId: string,
+    bidAmount: number
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get auction details
+    const { data: auction, error: auctionError } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('id', auctionId)
+      .eq('draft_id', draftId)
+      .single()
+
+    if (auctionError || !auction) {
+      throw new Error('Auction not found')
+    }
+
+    if ((auction as any).status !== 'active') {
+      throw new Error('Auction is not active')
+    }
+
+    // Check if auction has expired
+    if (new Date() > new Date((auction as any).auction_end)) {
+      throw new Error('Auction has expired')
+    }
+
+    // Validate bid amount
+    if (bidAmount <= (auction as any).current_bid) {
+      throw new Error(`Bid must be higher than current bid of $${(auction as any).current_bid}`)
+    }
+
+    // Get user's team and validate budget
+    const userTeamId = await this.getUserTeam(draftId, userId)
+    if (!userTeamId) {
+      throw new Error('You are not part of this draft')
+    }
+
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('budget_remaining')
+      .eq('id', userTeamId)
+      .single()
+
+    if (teamError || !team) {
+      throw new Error('Team not found')
+    }
+
+    if (bidAmount > (team as any).budget_remaining) {
+      throw new Error(`Bid exceeds your remaining budget of $${(team as any).budget_remaining}`)
+    }
+
+    // Update auction with new bid
+    const { error: updateError } = await (supabase as any)
+      .from('auctions')
+      .update({
+        current_bid: bidAmount,
+        current_bidder: userTeamId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', auctionId)
+
+    if (updateError) {
+      console.error('Error placing bid:', updateError)
+      throw new Error('Failed to place bid')
+    }
+  }
+
+  /**
+   * Resolve an expired auction
+   */
+  static async resolveAuction(draftId: string, auctionId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get auction details
+    const { data: auction, error: auctionError } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('id', auctionId)
+      .eq('draft_id', draftId)
+      .single()
+
+    if (auctionError || !auction) {
+      throw new Error('Auction not found')
+    }
+
+    if ((auction as any).status !== 'active') {
+      throw new Error('Auction is not active')
+    }
+
+    // Check if there was a winning bidder
+    if ((auction as any).current_bidder) {
+      // Get draft state for pick order calculation
+      const draftState = await this.getDraftState(draftId)
+      if (!draftState) {
+        throw new Error('Draft not found')
+      }
+
+      const pickOrder = draftState.picks.length + 1
+      const currentRound = Math.floor(pickOrder / draftState.teams.length) + 1
+
+      // Create the pick
+      const { error: pickError } = await (supabase as any)
+        .from('picks')
+        .insert({
+          draft_id: draftId,
+          team_id: (auction as any).current_bidder,
+          pokemon_id: (auction as any).pokemon_id,
+          pokemon_name: (auction as any).pokemon_name,
+          cost: (auction as any).current_bid,
+          pick_order: pickOrder,
+          round: currentRound
+        })
+
+      if (pickError) {
+        console.error('Error creating pick from auction:', pickError)
+        throw new Error('Failed to create pick from auction')
+      }
+
+      // Update team budget
+      const { error: teamError } = await (supabase as any)
+        .from('teams')
+        .update({
+          budget_remaining: (supabase as any).sql`budget_remaining - ${(auction as any).current_bid}`
+        })
+        .eq('id', (auction as any).current_bidder)
+
+      if (teamError) {
+        console.error('Error updating team budget after auction:', teamError)
+      }
+    }
+
+    // Mark auction as completed
+    const { error: updateError } = await (supabase as any)
+      .from('auctions')
+      .update({
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', auctionId)
+
+    if (updateError) {
+      console.error('Error completing auction:', updateError)
+      throw new Error('Failed to complete auction')
+    }
+
+    // Check if draft should advance to next nomination or end
+    await this.checkAuctionDraftProgress(draftId)
+  }
+
+  /**
+   * Extend auction time (host only)
+   */
+  static async extendAuctionTime(
+    draftId: string,
+    auctionId: string,
+    additionalSeconds: number
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { data: auction, error: auctionError } = await supabase
+      .from('auctions')
+      .select('auction_end')
+      .eq('id', auctionId)
+      .eq('draft_id', draftId)
+      .single()
+
+    if (auctionError || !auction) {
+      throw new Error('Auction not found')
+    }
+
+    const newEndTime = new Date(new Date((auction as any).auction_end).getTime() + additionalSeconds * 1000)
+
+    const { error } = await (supabase as any)
+      .from('auctions')
+      .update({
+        auction_end: newEndTime.toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', auctionId)
+
+    if (error) {
+      console.error('Error extending auction time:', error)
+      throw new Error('Failed to extend auction time')
+    }
+  }
+
+  /**
+   * Get current active auction for a draft
+   */
+  static async getCurrentAuction(draftId: string): Promise<Auction | null> {
+    if (!supabase) return null
+
+    const { data: auction, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('draft_id', draftId)
+      .eq('status', 'active')
+      .single()
+
+    if (error) {
+      return null
+    }
+
+    return auction
+  }
+
+  /**
+   * Validate if user can nominate in auction draft
+   */
+  private static async validateUserCanNominate(
+    draftId: string,
+    userId: string
+  ): Promise<{ canNominate: boolean; teamId: string | null; reason?: string }> {
+    // Get draft state
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      return { canNominate: false, teamId: null, reason: 'Draft not found' }
+    }
+
+    // Check if draft is active
+    if (draftState.draft.status !== 'active') {
+      return { canNominate: false, teamId: null, reason: 'Draft is not active' }
+    }
+
+    // Check if this is an auction draft
+    if (draftState.draft.format !== 'auction') {
+      return { canNominate: false, teamId: null, reason: 'This is not an auction draft' }
+    }
+
+    // Get user's team
+    const userTeamId = await this.getUserTeam(draftId, userId)
+    if (!userTeamId) {
+      return { canNominate: false, teamId: null, reason: 'You are not part of this draft' }
+    }
+
+    // Check if there's already an active auction
+    const currentAuction = await this.getCurrentAuction(draftId)
+    if (currentAuction) {
+      return { canNominate: false, teamId: userTeamId, reason: 'There is already an active auction' }
+    }
+
+    // For now, allow any team to nominate when no auction is active
+    // TODO: Implement turn-based nomination logic if desired
+
+    return { canNominate: true, teamId: userTeamId }
+  }
+
+  /**
+   * Check auction draft progress and advance if needed
+   */
+  private static async checkAuctionDraftProgress(draftId: string): Promise<void> {
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) return
+    if (!supabase) return
+
+    const maxPicks = draftState.draft.settings?.pokemonPerTeam || 10
+    const totalPossiblePicks = draftState.teams.length * maxPicks
+    const currentPicks = draftState.picks.length
+
+    // Check if draft is complete
+    if (currentPicks >= totalPossiblePicks) {
+      const { error } = await (supabase as any)
+        .from('drafts')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', draftId)
+
+      if (error) {
+        console.error('Error completing auction draft:', error)
+      }
+    }
+
+    // Update current turn/round for auction drafts
+    const currentTurn = currentPicks + 1
+    const currentRound = Math.floor(currentPicks / draftState.teams.length) + 1
+
+    const { error: turnError } = await (supabase as any)
+      .from('drafts')
+      .update({
+        current_turn: currentTurn,
+        current_round: currentRound,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId)
+
+    if (turnError) {
+      console.error('Error updating auction draft turn:', turnError)
+    }
+  }
+
+  /**
+   * Undo the last pick in a draft (only if allowUndos is enabled in settings)
+   */
+  static async undoLastPick(draftId: string, userId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get draft state and check if undos are allowed
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    if (!draftState.draft.settings?.allowUndos) {
+      throw new Error('Undo is not enabled for this draft')
+    }
+
+    // Check if user is host (only host can undo)
+    const participant = draftState.participants.find(p => p.user_id === userId)
+    if (!participant?.is_host) {
+      throw new Error('Only the host can undo picks')
+    }
+
+    // Get the last pick
+    const lastPick = draftState.picks.sort((a, b) => b.pick_order - a.pick_order)[0]
+    if (!lastPick) {
+      throw new Error('No picks to undo')
+    }
+
+    // Delete the pick
+    const { error: deleteError } = await (supabase
+      .from('picks') as any)
+      .delete()
+      .eq('id', lastPick.id)
+
+    if (deleteError) {
+      console.error('Error deleting pick:', deleteError)
+      throw new Error('Failed to undo pick')
+    }
+
+    // Restore team budget
+    const { error: budgetError } = await (supabase
+      .from('teams') as any)
+      .update({
+        budget_remaining: (supabase as any).sql`budget_remaining + ${lastPick.cost}`
+      })
+      .eq('id', lastPick.team_id)
+
+    if (budgetError) {
+      console.error('Error restoring budget:', budgetError)
+    }
+
+    // Revert draft turn
+    const newTurn = Math.max(1, (draftState.draft.current_turn || 1) - 1)
+    const totalTeams = draftState.teams.length
+    const newRound = Math.floor((newTurn - 1) / totalTeams) + 1
+
+    await (supabase
+      .from('drafts') as any)
+      .update({
+        current_turn: newTurn,
+        current_round: newRound,
+        status: 'active' // Revert from completed if needed
+      })
+      .eq('id', draftId)
+  }
+
+  /**
+   * Undo a specific pick by ID (for more control)
+   */
+  static async undoPickById(draftId: string, userId: string, pickId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get draft state and check if undos are allowed
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    if (!draftState.draft.settings?.allowUndos) {
+      throw new Error('Undo is not enabled for this draft')
+    }
+
+    // Check if user is host
+    const participant = draftState.participants.find(p => p.user_id === userId)
+    if (!participant?.is_host) {
+      throw new Error('Only the host can undo picks')
+    }
+
+    // Get the specific pick
+    const pick = draftState.picks.find(p => p.id === pickId)
+    if (!pick) {
+      throw new Error('Pick not found')
+    }
+
+    // Don't allow undoing old picks that would break the sequence
+    const lastPick = draftState.picks.sort((a, b) => b.pick_order - a.pick_order)[0]
+    if (pick.pick_order !== lastPick.pick_order) {
+      throw new Error('Can only undo the most recent pick')
+    }
+
+    // Use the same logic as undoLastPick
+    await this.undoLastPick(draftId, userId)
+  }
+
+
+  /**
+   * Get draft history/results for browsing past drafts
+   */
+  static async getDraftHistory(limit: number = 20, offset: number = 0): Promise<any[]> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { data, error } = await supabase
+      .from('draft_history')
+      .select('*')
+      .order('completed_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (error) {
+      console.error('Error fetching draft history:', error)
+      throw new Error('Failed to fetch draft history')
+    }
+
+    return data || []
+  }
+
+  /**
+   * Get detailed results for a specific completed draft
+   */
+  static async getDraftResults(draftId: string): Promise<any | null> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { data: result, error } = await supabase
+      .from('draft_results')
+      .select(`
+        *,
+        teams:draft_result_teams(*)
+      `)
+      .eq('draft_id', draftId)
+      .single()
+
+    if (error) {
+      console.error('Error fetching draft results:', error)
+      return null
+    }
+
+    return result
+  }
+
+  /**
+   * Manually save draft results (if auto-save trigger didn't work)
+   */
+  static async saveDraftResults(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get the draft
+    const { data: draft, error: draftError } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('id', draftId)
+      .single()
+
+    if (draftError || !draft) {
+      throw new Error('Draft not found')
+    }
+
+    // Manually trigger the save by updating the draft status
+    // This will trigger the save_draft_results_trigger
+    await supabase
+      .from('drafts')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', draftId)
+  }
+
+  /**
+   * Delete draft results (for cleanup)
+   */
+  static async deleteDraftResults(draftResultId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { error } = await supabase
+      .from('draft_results')
+      .delete()
+      .eq('id', draftResultId)
+
+    if (error) {
+      console.error('Error deleting draft results:', error)
+      throw new Error('Failed to delete draft results')
+    }
+  }
+
+
+  /**
+   * Auto-skip a turn when time expires (AFK handling)
+   */
+  static async autoSkipTurn(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get current draft state
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    if (draftState.draft.status !== 'active') {
+      throw new Error('Draft is not active')
+    }
+
+    // Simply advance to the next turn without making a pick
+    // This effectively skips the current team's turn
+    await this.advanceTurn(draftId)
+
+    console.log(`Auto-skipped turn ${draftState.draft.current_turn} for draft ${draftId}`)
+  }
+
+}
