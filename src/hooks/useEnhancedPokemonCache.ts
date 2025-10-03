@@ -4,7 +4,6 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { pokemonCache, pokemonCacheManager, type CacheStats } from '@/lib/pokemon-cache'
 import { fetchPokemon, fetchPokemonList, pokemonQueries } from '@/lib/pokemon-api'
-import { getDemoPokemon } from '@/lib/demo-data'
 import { Pokemon } from '@/types'
 
 interface CacheHealthMetrics {
@@ -120,17 +119,12 @@ export function useEnhancedPokemonCache() {
         queryClient.setQueryData(pokemonQueries.list({}), pokemon)
         return pokemon
       }
-      
-      // Fallback to demo data
-      const demoPokemon = getDemoPokemon()
-      await pokemonCacheManager.cachePokemonList(demoPokemon, listKey)
-      return demoPokemon
+
+      return []
     } catch (error) {
       metricsRef.current.errors++
-      console.warn('Failed to fetch Pokemon list, using demo data:', error)
-      const demoPokemon = getDemoPokemon()
-      await pokemonCacheManager.cachePokemonList(demoPokemon, listKey)
-      return demoPokemon
+      console.error('Failed to fetch Pokemon list:', error)
+      return []
     }
   }, [queryClient])
 
