@@ -69,16 +69,9 @@ export function HydrationErrorFilter() {
       })
     }
 
-    // Clean immediately and frequently
+    // Clean immediately
     cleanupAttributes()
-    const cleanupInterval = setInterval(cleanupAttributes, 50) // Very frequent cleanup
-
-    // Also use requestAnimationFrame for even more aggressive cleanup
-    const rafCleanup = () => {
-      cleanupAttributes()
-      requestAnimationFrame(rafCleanup)
-    }
-    rafCleanup()
+    const cleanupInterval = setInterval(cleanupAttributes, 100)
 
     // Cleanup function
     return () => {

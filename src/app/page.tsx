@@ -37,12 +37,13 @@ export default function Home() {
   const { data: pokemon, isLoading, error } = usePokemonList()
 
   // Get selected format and create rules engine
-  const [selectedFormat, setSelectedFormat] = useState(() =>
-    getFormatById(selectedFormatId) || getFormatById(DEFAULT_FORMAT)!
-  )
-  const [rulesEngine, setRulesEngine] = useState(() =>
-    new FormatRulesEngine(selectedFormatId || DEFAULT_FORMAT)
-  )
+  const [selectedFormat, setSelectedFormat] = useState(() => {
+    const format = getFormatById(DEFAULT_FORMAT)
+    return format!
+  })
+  const [rulesEngine, setRulesEngine] = useState(() => {
+    return new FormatRulesEngine(DEFAULT_FORMAT)
+  })
   const [filteredPokemon, setFilteredPokemon] = useState<Pokemon[]>([])
 
   // Update format and rules engine when format changes
