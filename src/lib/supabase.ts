@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // Get environment variables with fallbacks
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -19,29 +19,7 @@ function isValidSupabaseConfig(url: string, key: string): boolean {
   }
 }
 
-// Check if we have valid Supabase configuration
-export const isSupabaseConfigured = isValidSupabaseConfig(supabaseUrl, supabaseAnonKey)
-
-// Create Supabase client only if we have valid configuration
-let supabaseClient: ReturnType<typeof createClient> | null = null
-
-if (isSupabaseConfigured) {
-  try {
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey)
-  } catch (error) {
-    console.warn('Failed to create Supabase client:', error)
-    supabaseClient = null
-  }
-}
-
-// Export the client (will be null if not configured)
-export const supabase = supabaseClient
-
-// Helper function to check if Supabase is available
-export function isSupabaseAvailable(): boolean {
-  return supabase !== null
-}
-
+// Database types
 export type Database = {
   public: {
     Tables: {
@@ -382,4 +360,27 @@ export type Database = {
       }
     }
   }
+}
+
+// Check if we have valid Supabase configuration
+export const isSupabaseConfigured = isValidSupabaseConfig(supabaseUrl, supabaseAnonKey)
+
+// Create Supabase client only if we have valid configuration
+let supabaseClient: SupabaseClient<Database> | null = null
+
+if (isSupabaseConfigured) {
+  try {
+    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey)
+  } catch (error) {
+    console.warn('Failed to create Supabase client:', error)
+    supabaseClient = null
+  }
+}
+
+// Export the client (will be null if not configured)
+export const supabase = supabaseClient
+
+// Helper function to check if Supabase is available
+export function isSupabaseAvailable(): boolean {
+  return supabase !== null
 }

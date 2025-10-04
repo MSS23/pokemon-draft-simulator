@@ -1329,10 +1329,16 @@ export class DraftService {
 
     // Manually trigger the save by updating the draft status
     // This will trigger the save_draft_results_trigger
-    await supabase
+    const { error: updateError } = await (supabase as any)
       .from('drafts')
-      .update({ updated_at: new Date().toISOString() })
+      .update({
+        updated_at: new Date().toISOString()
+      })
       .eq('id', draftId)
+
+    if (updateError) {
+      throw new Error(`Failed to trigger save: ${updateError.message}`)
+    }
   }
 
   /**

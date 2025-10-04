@@ -98,7 +98,7 @@ export const useDraftStore = create<DraftState & DraftActions>()(
     addPick: (teamId, pick) => set((state) => ({
       teams: state.teams.map(team =>
         team.id === teamId
-          ? { ...team, picks: [...team.picks, pick] }
+          ? { ...team, picks: [...team.picks, pick as any] }
           : team
       )
     })),

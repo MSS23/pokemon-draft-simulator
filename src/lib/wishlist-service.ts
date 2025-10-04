@@ -305,7 +305,7 @@ export class WishlistService {
     if (!supabase) return []
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('wishlist_items')
         .select('*')
         .eq('draft_id', draftId)
@@ -316,7 +316,7 @@ export class WishlistService {
         return []
       }
 
-      return data.map(item => ({
+      return (data || []).map((item: any) => ({
         id: item.id,
         draftId: item.draft_id,
         participantId: item.participant_id,
@@ -344,7 +344,7 @@ export class WishlistService {
     if (!supabase) return
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('wishlist_items')
         .select('*')
         .eq('draft_id', draftId)
@@ -354,13 +354,13 @@ export class WishlistService {
       if (error || !data) return
 
       // Update priorities to be sequential
-      const updates = data.map((item, index) => ({
+      const updates = (data || []).map((item: any, index: number) => ({
         id: item.id,
         priority: index + 1,
         updated_at: new Date().toISOString()
       }))
 
-      await supabase
+      await (supabase as any)
         .from('wishlist_items')
         .upsert(updates, { onConflict: 'id' })
     } catch (error) {
