@@ -91,7 +91,69 @@ export interface FormatMeta {
 
 // Popular competitive formats
 export const POKEMON_FORMATS: PokemonFormat[] = [
-  // VGC Formats
+  // VGC Regulation A
+  {
+    id: 'vgc-reg-a',
+    name: 'VGC 2023 Regulation A',
+    shortName: 'Reg A',
+    description: 'First VGC format for Scarlet/Violet - Paldea Pokédex #001-375, #388-392 only. No Paradox Pokémon, Treasures of Ruin, or Legendaries.',
+    generation: 9,
+    gameType: 'doubles',
+    category: 'vgc',
+    ruleset: {
+      speciesClause: true,
+      itemClause: true,
+      bannedPokemon: [
+        // Paradox Pokemon
+        'great-tusk', 'scream-tail', 'brute-bonnet', 'flutter-mane', 'slither-wing',
+        'sandy-shocks', 'iron-treads', 'iron-bundle', 'iron-hands', 'iron-jugulis',
+        'iron-moth', 'iron-thorns', 'roaring-moon', 'iron-valiant',
+
+        // Treasures of Ruin
+        'wo-chien', 'chien-pao', 'ting-lu', 'chi-yu',
+
+        // Box Legendaries
+        'koraidon', 'miraidon',
+
+        // Non-Paldean regional variants
+        'rattata-alola', 'raticate-alola', 'raichu-alola', 'sandshrew-alola', 'sandslash-alola',
+        'vulpix-alola', 'ninetales-alola', 'diglett-alola', 'dugtrio-alola', 'meowth-alola',
+        'persian-alola', 'geodude-alola', 'graveler-alola', 'golem-alola', 'grimer-alola',
+        'muk-alola', 'exeggutor-alola', 'marowak-alola',
+
+        // Unobtainable Pokemon
+        'gimmighoul-roaming'
+      ],
+      bannedTiers: [],
+      allowedGenerations: [9],
+      allowedRegions: ['paldea'],
+      legendaryPolicy: 'banned',
+      mythicalPolicy: 'banned',
+      paradoxPolicy: 'banned',
+      bannedAbilities: [],
+      bannedItems: [],
+      bannedMoves: [],
+    },
+    costConfig: {
+      type: 'bst',
+      bstTiers: {
+        600: 30, 550: 25, 500: 20, 450: 15, 400: 10, 350: 8, 300: 5, 0: 3
+      },
+      costMultiplier: 1.0,
+      minCost: 3,
+      maxCost: 30
+    },
+    meta: {
+      isOfficial: true,
+      lastUpdated: '2023-01-02',
+      season: '2023 Regulation A',
+      source: 'The Pokémon Company International - Victory Road',
+      popularity: 3,
+      complexity: 2
+    }
+  },
+
+  // VGC Regulation H
   {
     id: 'vgc-reg-h',
     name: 'VGC 2024 Regulation H',
