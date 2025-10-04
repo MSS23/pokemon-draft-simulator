@@ -12,7 +12,6 @@ import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-servi
 import DraftResults from '@/components/draft/DraftResults'
 import { useNotify } from '@/components/providers/NotificationProvider'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 
 export default function DraftResultsPage() {
   const params = useParams()
@@ -24,6 +23,7 @@ export default function DraftResultsPage() {
   const [error, setError] = useState('')
 
   const { data: pokemon } = usePokemonList()
+  // pokemon is fetched but used in child component DraftResults
   const notify = useNotify()
 
   useEffect(() => {

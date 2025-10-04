@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import FormatSyncPanel from '@/components/admin/FormatSyncPanel'
 import { Shield, Database, Settings } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'

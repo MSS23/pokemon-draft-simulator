@@ -365,7 +365,7 @@ export default function CreateDraftPage() {
                         Make this draft public
                       </Label>
                       <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                        Allow anyone to watch this draft in real-time as a spectator. They won't be able to participate, only observe.
+                        Allow anyone to watch this draft in real-time as a spectator. They won&apos;t be able to participate, only observe.
                       </p>
                     </div>
                   </div>
