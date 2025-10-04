@@ -59,8 +59,8 @@ export default function PokemonGrid({
   showWishlistButton = true,
 }: PokemonGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState<string>('')
-  const [costFilter, setCostFilter] = useState<string>('')
+  const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [costFilter, setCostFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
@@ -74,14 +74,14 @@ export default function PokemonGrid({
   // Clear all filters and sorting
   const clearAllFilters = () => {
     setSearchQuery('')
-    setTypeFilter('')
-    setCostFilter('')
+    setTypeFilter('all')
+    setCostFilter('all')
     setSortBy('name')
     setSortDirection('asc')
   }
 
   // Check if any filters are active
-  const hasActiveFilters = searchQuery || typeFilter || costFilter || sortBy !== 'name' || sortDirection !== 'asc'
+  const hasActiveFilters = searchQuery || (typeFilter !== 'all') || (costFilter !== 'all') || sortBy !== 'name' || sortDirection !== 'asc'
 
   const filteredAndSortedPokemon = useMemo(() => {
     const filtered = pokemon.filter(p => {
@@ -94,14 +94,14 @@ export default function PokemonGrid({
       }
 
       // Type filter
-      if (typeFilter) {
+      if (typeFilter && typeFilter !== 'all') {
         if (!p.types.some(t => t.name === typeFilter)) {
           return false
         }
       }
 
       // Cost filter
-      if (costFilter) {
+      if (costFilter && costFilter !== 'all') {
         const [min, max] = costFilter.split('-').map(Number)
         if (max) {
           if (p.cost < min || p.cost > max) return false
@@ -231,9 +231,9 @@ export default function PokemonGrid({
             >
               <Filter className="h-4 w-4 mr-2" />
               {showFiltersPanel ? 'Hide Filters' : 'Show Filters'}
-              {(typeFilter || costFilter) && (
+              {(typeFilter !== 'all' || costFilter !== 'all') && (
                 <Badge variant="secondary" className="ml-2 text-xs">
-                  {[typeFilter, costFilter].filter(Boolean).length}
+                  {[typeFilter !== 'all', costFilter !== 'all'].filter(Boolean).length}
                 </Badge>
               )}
             </Button>
@@ -315,7 +315,7 @@ export default function PokemonGrid({
                     <SelectValue placeholder="All types" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All types</SelectItem>
+                    <SelectItem value="all">All types</SelectItem>
                     {POKEMON_TYPES.map(type => (
                       <SelectItem key={type} value={type} className="capitalize">
                         <div className="flex items-center gap-2">
@@ -338,7 +338,7 @@ export default function PokemonGrid({
                     <SelectValue placeholder="All costs" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All costs</SelectItem>
+                    <SelectItem value="all">All costs</SelectItem>
                     <SelectItem value="0-5">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-gray-400" />
@@ -434,30 +434,30 @@ export default function PokemonGrid({
             </div>
           </div>
 
-          {(draftedPokemonIds.length > 0 || typeFilter || costFilter) && (
+          {(draftedPokemonIds.length > 0 || typeFilter !== 'all' || costFilter !== 'all') && (
             <div className="flex flex-wrap items-center gap-2">
               {draftedPokemonIds.length > 0 && (
                 <Badge variant="outline" className="text-red-600 border-red-300">
                   {draftedPokemonIds.length} drafted
                 </Badge>
               )}
-              {typeFilter && (
+              {typeFilter !== 'all' && (
                 <Badge variant="outline" className="text-purple-600 border-purple-300 capitalize">
                   Type: {typeFilter}
                 </Badge>
               )}
-              {costFilter && (
+              {costFilter !== 'all' && (
                 <Badge variant="outline" className="text-orange-600 border-orange-300">
                   Cost: {costFilter}
                 </Badge>
               )}
-              {(typeFilter || costFilter) && (
+              {(typeFilter !== 'all' || costFilter !== 'all') && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setTypeFilter('')
-                    setCostFilter('')
+                    setTypeFilter('all')
+                    setCostFilter('all')
                   }}
                   className="text-gray-500 hover:text-gray-700 text-xs h-6 px-2"
                 >
