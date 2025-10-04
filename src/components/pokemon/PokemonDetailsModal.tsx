@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import Image from 'next/image'
-import { Pokemon, Move } from '@/types'
+import { Pokemon } from '@/types'
 import {
   Dialog,
   DialogContent,
@@ -13,10 +13,9 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { getStatColor, getBestPokemonImageUrl, getPokemonAnimatedBackupUrl, getPokemonSpriteUrl, getOfficialArtworkUrl, getTypeColor } from '@/utils/pokemon'
+import { getStatColor, getBestPokemonImageUrl, getPokemonAnimatedBackupUrl, getPokemonSpriteUrl, getOfficialArtworkUrl } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
-import { X, Zap, Shield, Target } from 'lucide-react'
-import { fetchPokemonWithMoves } from '@/lib/pokemon-api'
+import { X } from 'lucide-react'
 
 interface PokemonDetailsModalProps {
   pokemon: Pokemon | null
@@ -39,49 +38,6 @@ export default function PokemonDetailsModal({
   const [showOfficialArt, setShowOfficialArt] = useState(true)
   const [fallbackAttempt, setFallbackAttempt] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'stats' | 'moves'>('stats')
-  const [pokemonWithMoves, setPokemonWithMoves] = useState<Pokemon | null>(null)
-  const [movesLoading, setMovesLoading] = useState(false)
-
-  // Load moves when modal opens and moves tab is accessed
-  useEffect(() => {
-    const loadMoves = async () => {
-      if (!pokemon || !isOpen) return
-
-      // If we already have moves or are currently loading, don't fetch again
-      if (pokemonWithMoves?.id === pokemon.id || movesLoading) return
-
-      setMovesLoading(true)
-      try {
-        const pokemonData = await fetchPokemonWithMoves(pokemon.id)
-        setPokemonWithMoves(pokemonData)
-      } catch (error) {
-        console.error('Failed to load Pokemon moves:', error)
-      } finally {
-        setMovesLoading(false)
-      }
-    }
-
-    // Load moves when switching to moves tab or when modal opens
-    if (activeTab === 'moves') {
-      loadMoves()
-    }
-  }, [pokemon?.id, isOpen, activeTab, pokemonWithMoves?.id, movesLoading])
-
-  // Reset states when modal closes or Pokemon changes
-  useEffect(() => {
-    if (!isOpen) {
-      setActiveTab('stats')
-      setPokemonWithMoves(null)
-      setMovesLoading(false)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (pokemon && pokemonWithMoves && pokemon.id !== pokemonWithMoves.id) {
-      setPokemonWithMoves(null)
-    }
-  }, [pokemon?.id, pokemonWithMoves?.id])
 
   if (!pokemon) return null
 
@@ -251,37 +207,13 @@ export default function PokemonDetailsModal({
             </div>
           </div>
 
-          {/* Right Column - Stats & Moves */}
+          {/* Right Column - Stats */}
           <div className="space-y-4">
-            {/* Tab Navigation */}
-            <div className="flex border-b border-gray-200">
-              <button
-                className={cn(
-                  "px-4 py-2 font-medium text-sm border-b-2 transition-colors",
-                  activeTab === 'stats'
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                )}
-                onClick={() => setActiveTab('stats')}
-              >
-                Base Stats
-              </button>
-              <button
-                className={cn(
-                  "px-4 py-2 font-medium text-sm border-b-2 transition-colors",
-                  activeTab === 'moves'
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                )}
-                onClick={() => setActiveTab('moves')}
-              >
-                Moves
-              </button>
-            </div>
+            {/* Stats Header */}
+            <h3 className="font-semibold text-lg">Base Stats</h3>
 
-            {/* Tab Content */}
-            {activeTab === 'stats' ? (
-              <div className="space-y-3">
+            {/* Stats Content */}
+            <div className="space-y-3">
                 {[
                   { name: 'HP', value: pokemon.stats.hp, key: 'hp' },
                   { name: 'Attack', value: pokemon.stats.attack, key: 'attack' },
@@ -324,118 +256,7 @@ export default function PokemonDetailsModal({
                   />
                 </div>
 
-                {/* Stat Analysis */}
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <h4 className="font-semibold mb-2 text-sm">Analysis</h4>
-                  <div className="text-xs space-y-1">
-                    <div>
-                      <span className="font-medium">Highest stat:</span> {
-                        Object.entries(pokemon.stats)
-                          .filter(([key]) => key !== 'total')
-                          .reduce((a, b) => a[1] > b[1] ? a : b)[0]
-                          .replace(/([A-Z])/g, ' $1')
-                          .trim()
-                      } ({
-                        Math.max(
-                          pokemon.stats.hp,
-                          pokemon.stats.attack,
-                          pokemon.stats.defense,
-                          pokemon.stats.specialAttack,
-                          pokemon.stats.specialDefense,
-                          pokemon.stats.speed
-                        )
-                      })
-                    </div>
-                    <div>
-                      <span className="font-medium">Average:</span> {
-                        Math.round(pokemon.stats.total / 6)
-                      }
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {movesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                    <span className="ml-2 text-gray-600">Loading moves...</span>
-                  </div>
-                ) : pokemonWithMoves?.moves && pokemonWithMoves.moves.length > 0 ? (
-                  <>
-                    {[
-                      { method: 'level-up', label: 'Level Up', icon: Target, color: 'text-green-600' },
-                      { method: 'machine', label: 'TM/TR', icon: Zap, color: 'text-blue-600' },
-                      { method: 'tutor', label: 'Tutor', icon: Shield, color: 'text-purple-600' }
-                    ].map(({ method, label, icon: Icon, color }) => {
-                      const methodMoves = pokemonWithMoves.moves!.filter(move =>
-                        move.learnMethod === method
-                      ).sort((a, b) => {
-                        if (method === 'level-up') {
-                          return (a.levelLearnedAt || 0) - (b.levelLearnedAt || 0)
-                        }
-                        return a.name.localeCompare(b.name)
-                      })
-
-                      if (methodMoves.length === 0) return null
-
-                      return (
-                        <div key={method} className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Icon className={cn("h-4 w-4", color)} />
-                            <h4 className="font-semibold text-sm">{label}</h4>
-                            <Badge variant="outline" className="text-xs">
-                              {methodMoves.length}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-1 gap-1 max-h-32 overflow-y-auto">
-                            {methodMoves.slice(0, 10).map((move) => (
-                              <div
-                                key={`${move.name}-${method}`}
-                                className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs hover:bg-gray-100 transition-colors"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">{move.name}</span>
-                                  {method === 'level-up' && move.levelLearnedAt && (
-                                    <Badge variant="outline" className="text-xs px-1">
-                                      Lv.{move.levelLearnedAt}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Badge
-                                    className="text-xs px-1"
-                                    style={{
-                                      backgroundColor: getTypeColor(move.type),
-                                      color: 'white'
-                                    }}
-                                  >
-                                    {move.type.toUpperCase()}
-                                  </Badge>
-                                  {move.power && (
-                                    <span className="text-gray-500 text-xs">{move.power}</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                            {methodMoves.length > 10 && (
-                              <div className="text-center text-xs text-gray-500 py-1">
-                                +{methodMoves.length - 10} more moves...
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="text-sm">No move data available</div>
-                    <div className="text-xs mt-1">Try switching tabs or reloading</div>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
         </div>
 
