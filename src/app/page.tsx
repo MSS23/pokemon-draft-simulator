@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { usePokemonList } from '@/hooks/usePokemon'
+import { usePokemonListByFormat } from '@/hooks/usePokemon'
 import PokemonGrid from '@/components/pokemon/PokemonGrid'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftConfirmationModal from '@/components/draft/DraftConfirmationModal'
@@ -16,7 +16,6 @@ import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { useRouter } from 'next/navigation'
 import { Clock, Play, Trophy, Users, Sparkles, Crown, TrendingUp, Settings } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
-import { FormatRulesEngine } from '@/domain/rules/format-rules-engine'
 
 export default function Home() {
   const router = useRouter()
@@ -34,49 +33,20 @@ export default function Home() {
   const usedBudget = draftedPokemon.reduce((sum, p) => sum + p.cost, 0)
   const remainingBudget = totalBudget - usedBudget
 
-  const { data: pokemon, isLoading, error } = usePokemonList()
-
-  // Get selected format and create rules engine
+  // Get selected format
   const [selectedFormat, setSelectedFormat] = useState(() => {
     const format = getFormatById(DEFAULT_FORMAT)
     return format!
   })
-  const [rulesEngine, setRulesEngine] = useState(() => {
-    return new FormatRulesEngine(DEFAULT_FORMAT)
-  })
-  const [filteredPokemon, setFilteredPokemon] = useState<Pokemon[]>([])
 
-  // Update format and rules engine when format changes
+  // Use format-specific Pokemon list
+  const { data: pokemon, isLoading, error } = usePokemonListByFormat(selectedFormatId, true)
+
+  // Update selected format when format ID changes
   useEffect(() => {
     const format = getFormatById(selectedFormatId) || getFormatById(DEFAULT_FORMAT)!
     setSelectedFormat(format)
-    setRulesEngine(new FormatRulesEngine(selectedFormatId || DEFAULT_FORMAT))
   }, [selectedFormatId])
-
-  // Filter Pokemon based on selected format (synchronous)
-  useEffect(() => {
-    if (!pokemon || !rulesEngine) {
-      setFilteredPokemon([])
-      return
-    }
-
-    // Initialize the rules engine (synchronous no-op)
-    rulesEngine.initialize()
-
-    // Process all Pokemon synchronously
-    const validatedPokemon = pokemon.map(p => {
-      const legalityResult = rulesEngine.validatePokemon(p)
-      return {
-        ...p,
-        isLegal: legalityResult.isLegal,
-        cost: legalityResult.cost,
-        legalityReason: legalityResult.reason
-      }
-    })
-
-    const filtered = validatedPokemon.filter(p => p.isLegal)
-    setFilteredPokemon(filtered)
-  }, [pokemon, rulesEngine])
 
   const handleViewDetails = (pokemon: Pokemon) => {
     setDetailsPokemon(pokemon)
@@ -171,7 +141,7 @@ export default function Home() {
             Master your strategy in real-time competitive Pokémon drafting with {selectedFormat.name} format
           </p>
 
-          {filteredPokemon && (
+          {pokemon && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
               <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg p-4 text-center shadow-lg">
                 <div className="flex items-center justify-center gap-2 mb-1">
@@ -179,7 +149,7 @@ export default function Home() {
                   <span className="text-xs font-medium uppercase tracking-wide">Available</span>
                 </div>
                 <div className="text-2xl font-bold">
-                  {filteredPokemon.filter(p => !draftedPokemon.find(d => d.id === p.id)).length}
+                  {pokemon.filter(p => !draftedPokemon.find(d => d.id === p.id)).length}
                 </div>
                 <div className="text-xs opacity-90">Pokémon to draft</div>
               </div>
@@ -390,7 +360,7 @@ export default function Home() {
           </div>
 
           <PokemonGrid
-            pokemon={filteredPokemon || []}
+            pokemon={pokemon || []}
             onViewDetails={handleViewDetails}
             draftedPokemonIds={draftedPokemon.map(p => p.id)}
             isLoading={isLoading}
