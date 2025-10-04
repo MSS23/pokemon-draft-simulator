@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import { usePokemonList } from '@/hooks/usePokemon'
+import { usePokemonListByFormat } from '@/hooks/usePokemon'
 import PokemonGrid from '@/components/pokemon/PokemonGrid'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import { Pokemon } from '@/types'
@@ -48,6 +48,7 @@ interface DraftUIState {
     timeLimit: number
     pokemonPerTeam: number
     draftType: 'snake' | 'auction'
+    formatId?: string
   }
   timeRemaining: number
 }
@@ -115,7 +116,9 @@ export default function DraftRoomPage() {
   }>>([])
   const [showNotifications, setShowNotifications] = useState(false)
 
-  const { data: pokemon, isLoading: pokemonLoading } = usePokemonList()
+  // Use format-specific Pokemon list
+  const formatId = draftState?.draftSettings?.formatId
+  const { data: pokemon, isLoading: pokemonLoading } = usePokemonListByFormat(formatId, true)
   const notify = useNotify()
 
   // Demo mode detection - we are always in non-demo mode when connected to the database
@@ -250,7 +253,8 @@ export default function DraftRoomPage() {
         maxTeams: dbState.draft.max_teams,
         timeLimit: dbState.draft.settings?.timeLimit || 60,
         pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
-        draftType: dbState.draft.format
+        draftType: dbState.draft.format,
+        formatId: dbState.draft.settings?.formatId
       },
       timeRemaining: dbState.draft.settings?.timeLimit || 60
     }

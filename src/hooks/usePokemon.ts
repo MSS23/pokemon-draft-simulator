@@ -30,6 +30,18 @@ export const usePokemonList = (enabled: boolean = true) => {
   })
 }
 
+export const usePokemonListByFormat = (formatId?: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: formatId ? pokemonQueries.listByFormat(formatId) : pokemonQueries.list({}),
+    queryFn: () => fetchPokemonList(400, formatId),
+    enabled: enabled && !!formatId,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    retry: 1,
+    retryDelay: 2000, // 2 second delay before retry
+  })
+}
+
 export const usePokemonByType = (typeName: string) => {
   return useQuery({
     queryKey: pokemonQueries.list({ type: typeName }),
