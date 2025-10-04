@@ -1329,12 +1329,9 @@ export class DraftService {
 
     // Manually trigger the save by updating the draft status
     // This will trigger the save_draft_results_trigger
-    const updateData: Database['public']['Tables']['drafts']['Update'] = {
-      updated_at: new Date().toISOString()
-    }
     await supabase
       .from('drafts')
-      .update(updateData)
+      .update({ updated_at: new Date().toISOString() })
       .eq('id', draftId)
   }
 
