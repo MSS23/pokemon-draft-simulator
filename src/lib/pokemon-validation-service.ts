@@ -27,7 +27,7 @@ class PokemonValidationService {
   /**
    * Get or create a rules engine for a format
    */
-  private getRulesEngine(formatId: string = DEFAULT_FORMAT) {
+  private getRulesEngine(formatId: string = DEFAULT_FORMAT): ReturnType<typeof createFormatRulesEngine> {
     if (!this.rulesEngineCache.has(formatId)) {
       try {
         const engine = createFormatRulesEngine(formatId)

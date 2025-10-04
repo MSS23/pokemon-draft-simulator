@@ -146,7 +146,7 @@ export default function DraftRoomPage() {
   })
 
   // Connection management with auto-reconnect
-  const { status: connectionStatus } = useReconnection({
+  const { isConnected: hookConnected, isReconnecting } = useReconnection({
     onReconnect: async () => {
       if (!roomCode) return
       try {
@@ -166,6 +166,11 @@ export default function DraftRoomPage() {
     maxRetries: 5,
     enabled: !isDemoMode && !!roomCode
   })
+
+  // Derive connection status from boolean flags
+  const connectionStatus: 'online' | 'offline' | 'reconnecting' =
+    isReconnecting ? 'reconnecting' :
+    hookConnected ? 'online' : 'offline'
 
   // Determine if this is an auction draft
   const isAuctionDraft = draftState?.draftSettings.draftType === 'auction'
@@ -422,20 +427,6 @@ export default function DraftRoomPage() {
   // Derived state
   const allDraftedIds = draftState?.teams.flatMap(team => team.picks) || []
   const canNominate = isAuctionDraft && !currentAuction && draftState?.status === 'drafting'
-
-  const handleSelectPokemon = useCallback((pokemon: Pokemon) => {
-    if (isAuctionDraft) {
-      // For auction drafts, selection is for nomination
-      if (draftState?.status === 'drafting') {
-        setSelectedPokemon(pokemon)
-      }
-    } else {
-      // Snake draft logic - Allow selection if it's user's turn OR if host has proxy picking enabled
-      const canSelect = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
-      if (!canSelect) return
-      setSelectedPokemon(pokemon)
-    }
-  }, [isAuctionDraft, draftState?.status, isUserTurn, isHost, isProxyPickingEnabled])
 
   const handleViewDetails = (pokemon: Pokemon) => {
     setDetailsPokemon(pokemon)
@@ -1092,7 +1083,6 @@ export default function DraftRoomPage() {
             <PokemonGrid
               pokemon={pokemon?.filter(p => p.isLegal) || []}
               onViewDetails={handleViewDetails}
-              onSelect={handleSelectPokemon}
               draftedPokemonIds={draftState ? allDraftedIds : []}
               isLoading={pokemonLoading}
               cardSize="md"

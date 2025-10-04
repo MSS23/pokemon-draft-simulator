@@ -51,7 +51,7 @@ export default function TeamAnalytics({ pokemon, budget, budgetUsed }: TeamAnaly
     const typeDistribution: Record<string, number> = {}
     pokemon.forEach(p => {
       p.types?.forEach(type => {
-        const typeName = type.name || type
+        const typeName = (typeof type === 'string' ? type : type.name) as string
         typeDistribution[typeName] = (typeDistribution[typeName] || 0) + 1
       })
     })

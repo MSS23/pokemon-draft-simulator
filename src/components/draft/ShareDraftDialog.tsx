@@ -170,7 +170,7 @@ export default function ShareDraftDialog({
                     <Download className="w-4 h-4 mr-2" />
                     Download QR
                   </Button>
-                  {navigator.share && (
+                  {typeof window !== 'undefined' && 'share' in navigator && (
                     <Button
                       size="sm"
                       onClick={handleShare}
