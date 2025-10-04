@@ -146,7 +146,7 @@ export default function DraftRoomPage() {
   })
 
   // Connection management with auto-reconnect
-  const connectionState = useReconnection({
+  const { status: connectionStatus } = useReconnection({
     onReconnect: async () => {
       if (!roomCode) return
       try {
@@ -423,7 +423,7 @@ export default function DraftRoomPage() {
   const allDraftedIds = draftState?.teams.flatMap(team => team.picks) || []
   const canNominate = isAuctionDraft && !currentAuction && draftState?.status === 'drafting'
 
-  const handleSelectPokemon = (pokemon: Pokemon) => {
+  const handleSelectPokemon = useCallback((pokemon: Pokemon) => {
     if (isAuctionDraft) {
       // For auction drafts, selection is for nomination
       if (draftState?.status === 'drafting') {
@@ -435,7 +435,7 @@ export default function DraftRoomPage() {
       if (!canSelect) return
       setSelectedPokemon(pokemon)
     }
-  }
+  }, [isAuctionDraft, draftState?.status, isUserTurn, isHost, isProxyPickingEnabled])
 
   const handleViewDetails = (pokemon: Pokemon) => {
     setDetailsPokemon(pokemon)
@@ -579,11 +579,11 @@ export default function DraftRoomPage() {
     }
   }
 
-  const handleSetTimer = (seconds: number) => {
+  const handleSetTimer = useCallback(() => {
     // In a real implementation, this would update the timer setting
     // For now, we'll just show a notification
     notify.info('Timer Setting', `Timer functionality will be implemented in a future update`)
-  }
+  }, [notify])
 
   const handleEnableProxyPicking = () => {
     setIsProxyPickingEnabled(true)
@@ -843,6 +843,12 @@ export default function DraftRoomPage() {
             <Badge variant={draftState?.status === 'waiting' ? 'secondary' : draftState?.status === 'drafting' ? 'default' : 'outline'}>
               {draftState?.status === 'waiting' ? 'Waiting for players' : draftState?.status === 'drafting' ? 'Draft in progress' : 'Draft completed'}
             </Badge>
+            {connectionStatus === 'reconnecting' && (
+              <Badge variant="destructive" className="animate-pulse">Reconnecting...</Badge>
+            )}
+            {connectionStatus === 'offline' && (
+              <Badge variant="destructive">Offline</Badge>
+            )}
             <Button variant="outline" size="sm" onClick={copyRoomCode} className="h-6 px-2">
               <Copy className="h-3 w-3 mr-1" />
               Copy Code
@@ -1086,6 +1092,7 @@ export default function DraftRoomPage() {
             <PokemonGrid
               pokemon={pokemon?.filter(p => p.isLegal) || []}
               onViewDetails={handleViewDetails}
+              onSelect={handleSelectPokemon}
               draftedPokemonIds={draftState ? allDraftedIds : []}
               isLoading={pokemonLoading}
               cardSize="md"
