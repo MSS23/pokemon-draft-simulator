@@ -4,6 +4,7 @@ import {
   fetchPokemonList,
   searchPokemon,
   fetchPokemonByType,
+  fetchPokemonForFormat,
   pokemonQueries
 } from '@/lib/pokemon-api'
 import { Pokemon } from '@/types'
@@ -33,7 +34,7 @@ export const usePokemonList = (enabled: boolean = true) => {
 export const usePokemonListByFormat = (formatId?: string, enabled: boolean = true) => {
   return useQuery({
     queryKey: formatId ? pokemonQueries.listByFormat(formatId) : pokemonQueries.list({}),
-    queryFn: () => fetchPokemonList(400, formatId),
+    queryFn: () => formatId ? fetchPokemonForFormat(formatId, 400) : fetchPokemonList(400),
     enabled: enabled && !!formatId,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes

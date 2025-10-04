@@ -498,11 +498,10 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
 
   // Special handling for Regulation H format
   if (formatId === 'vgc-reg-h') {
-    // Use official Regulation H Pokédex ranges
+    // Fetch all Gen 9 Pokemon (National Dex 906-1025) plus select returning Pokemon
+    // The rules engine will handle the actual legality filtering
     pokemonRanges = [
-      ...REGULATION_H_POKEDEX_RANGES.paldea,
-      // Note: Kitakami and Blueberry ranges would need specific National Dex mappings
-      // For now, we'll focus on the core Paldea range which covers most legal Pokemon
+      { start: 1, end: 1025 }  // Fetch all Pokemon up to current gen, rules engine filters
     ]
   } else {
     // Get allowed generations for other formats
