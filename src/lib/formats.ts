@@ -498,3 +498,46 @@ export function getPopularFormats(): PokemonFormat[] {
 
 // Default format
 export const DEFAULT_FORMAT = 'vgc-reg-h'
+
+/**
+ * Merge Showdown data with local formats
+ * Showdown data takes precedence for banned Pokemon lists
+ */
+export function mergeWithShowdownData(
+  localFormats: PokemonFormat[],
+  showdownData: Record<string, any>
+): PokemonFormat[] {
+  return localFormats.map(format => {
+    // Try to find matching Showdown format
+    const showdownFormat = Object.entries(showdownData).find(([key]) =>
+      key.toLowerCase().includes(format.id.replace('-', ''))
+    )
+
+    if (!showdownFormat) {
+      // No Showdown data found, return original
+      return format
+    }
+
+    const [, showdownRules] = showdownFormat
+
+    // Merge banned Pokemon from Showdown
+    const showdownBanlist = showdownRules.banlist || []
+    const mergedBannedPokemon = Array.from(new Set([
+      ...format.ruleset.bannedPokemon,
+      ...showdownBanlist
+    ]))
+
+    return {
+      ...format,
+      ruleset: {
+        ...format.ruleset,
+        bannedPokemon: mergedBannedPokemon
+      },
+      meta: {
+        ...format.meta,
+        lastUpdated: new Date().toISOString(),
+        source: `${format.meta.source} + Pokémon Showdown`
+      }
+    }
+  })
+}

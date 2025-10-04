@@ -130,8 +130,17 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="relative text-center mb-8">
-          {/* Theme Toggle */}
-          <div className="absolute top-0 right-0">
+          {/* Theme Toggle & Admin Link */}
+          <div className="absolute top-0 right-0 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/admin')}
+              className="text-xs"
+            >
+              <Settings className="h-4 w-4 mr-1" />
+              Admin
+            </Button>
             <ThemeToggle />
           </div>
           <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
