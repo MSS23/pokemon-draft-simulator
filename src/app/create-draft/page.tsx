@@ -27,7 +27,6 @@ export default function CreateDraftPage() {
     timeLimit: '60',
     pokemonPerTeam: '6',
     formatId: DEFAULT_FORMAT,
-    autoStart: 'false',
     isPublic: false,
     description: '',
     tags: ''
@@ -88,8 +87,7 @@ export default function CreateDraftPage() {
           timeLimit: parseInt(formData.timeLimit),
           pokemonPerTeam: parseInt(formData.pokemonPerTeam),
           budgetPerTeam: formData.draftType === 'auction' ? 100 : undefined,
-          formatId: formData.formatId,
-          autoStart: formData.autoStart === 'true'
+          formatId: formData.formatId
         },
         isPublic: formData.isPublic,
         description: formData.description || null,
@@ -210,26 +208,6 @@ export default function CreateDraftPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="autoStart" className="text-sm font-medium">
-                    Start Mode
-                  </Label>
-                  <Select value={formData.autoStart} onValueChange={(value) => handleInputChange('autoStart', value)}>
-                    <SelectTrigger className="bg-white dark:bg-slate-800">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Auto-start (Begin drafting immediately)</SelectItem>
-                      <SelectItem value="false">Manual start (Recommended - Wait for all teams to join)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-                    {formData.autoStart === 'true'
-                      ? 'Draft will start automatically when you join the room'
-                      : 'You can manually start the draft once all teams have joined and the order is set'
-                    }
-                  </p>
                 </div>
               </div>
 

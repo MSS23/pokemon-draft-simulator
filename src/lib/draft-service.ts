@@ -21,7 +21,6 @@ export interface DraftSettings {
   pokemonPerTeam: number
   budgetPerTeam?: number
   formatId?: string
-  autoStart?: boolean
 }
 
 export interface CreateDraftParams {
@@ -81,8 +80,7 @@ export class DraftService {
         settings: {
           timeLimit: settings.timeLimit,
           pokemonPerTeam: settings.pokemonPerTeam,
-          formatId: settings.formatId || DEFAULT_FORMAT,
-          autoStart: settings.autoStart || false
+          formatId: settings.formatId || DEFAULT_FORMAT
         },
         is_public: isPublic || false,
         spectator_count: 0,
