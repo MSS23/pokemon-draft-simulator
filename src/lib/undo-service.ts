@@ -104,7 +104,7 @@ export class UndoService {
     }
 
     try {
-      const { data, error } = await supabase.rpc('record_draft_action', {
+      const { data, error } = await (supabase.rpc as any)('record_draft_action', {
         p_draft_id: params.draftId,
         p_action_type: params.actionType,
         p_team_id: params.teamId,
