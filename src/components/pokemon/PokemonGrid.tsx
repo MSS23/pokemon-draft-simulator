@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
 import { Search, Filter, SortAsc, SortDesc } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
@@ -65,6 +66,13 @@ export default function PokemonGrid({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
 
+  // Stat range filters
+  const [hpRange, setHpRange] = useState<[number, number]>([0, 255])
+  const [attackRange, setAttackRange] = useState<[number, number]>([0, 255])
+  const [defenseRange, setDefenseRange] = useState<[number, number]>([0, 255])
+  const [speedRange, setSpeedRange] = useState<[number, number]>([0, 255])
+  const [bstRange, setBstRange] = useState<[number, number]>([0, 800])
+
   // Sorting presets
   const applySortPreset = (sort: SortOption, direction: SortDirection) => {
     setSortBy(sort)
@@ -78,17 +86,34 @@ export default function PokemonGrid({
     setCostFilter('all')
     setSortBy('name')
     setSortDirection('asc')
+    setHpRange([0, 255])
+    setAttackRange([0, 255])
+    setDefenseRange([0, 255])
+    setSpeedRange([0, 255])
+    setBstRange([0, 800])
   }
 
   // Check if any filters are active
-  const hasActiveFilters = searchQuery || (typeFilter !== 'all') || (costFilter !== 'all') || sortBy !== 'name' || sortDirection !== 'asc'
+  const hasActiveFilters = searchQuery ||
+    (typeFilter !== 'all') ||
+    (costFilter !== 'all') ||
+    sortBy !== 'name' ||
+    sortDirection !== 'asc' ||
+    hpRange[0] > 0 || hpRange[1] < 255 ||
+    attackRange[0] > 0 || attackRange[1] < 255 ||
+    defenseRange[0] > 0 || defenseRange[1] < 255 ||
+    speedRange[0] > 0 || speedRange[1] < 255 ||
+    bstRange[0] > 0 || bstRange[1] < 800
 
   const filteredAndSortedPokemon = useMemo(() => {
     const filtered = pokemon.filter(p => {
-      // Search filter
+      // Enhanced search filter - includes name and types
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
-        if (!p.name.toLowerCase().includes(query)) {
+        const nameMatch = p.name.toLowerCase().includes(query)
+        const typeMatch = p.types.some(t => t.name.toLowerCase().includes(query))
+
+        if (!nameMatch && !typeMatch) {
           return false
         }
       }
@@ -109,6 +134,13 @@ export default function PokemonGrid({
           if (p.cost < min) return false
         }
       }
+
+      // Stat range filters
+      if (p.stats.hp < hpRange[0] || p.stats.hp > hpRange[1]) return false
+      if (p.stats.attack < attackRange[0] || p.stats.attack > attackRange[1]) return false
+      if (p.stats.defense < defenseRange[0] || p.stats.defense > defenseRange[1]) return false
+      if (p.stats.speed < speedRange[0] || p.stats.speed > speedRange[1]) return false
+      if (p.stats.total < bstRange[0] || p.stats.total > bstRange[1]) return false
 
       return true
     })
@@ -172,7 +204,7 @@ export default function PokemonGrid({
     })
 
     return filtered
-  }, [pokemon, searchQuery, typeFilter, costFilter, sortBy, sortDirection])
+  }, [pokemon, searchQuery, typeFilter, costFilter, sortBy, sortDirection, hpRange, attackRange, defenseRange, speedRange, bstRange])
 
   const availablePokemon = filteredAndSortedPokemon.filter(
     p => !draftedPokemonIds.includes(p.id)
@@ -217,7 +249,7 @@ export default function PokemonGrid({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search Pokémon..."
+                placeholder="Search by name or type (e.g., 'skar' or 'fire')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-12 text-base"
@@ -443,6 +475,88 @@ export default function PokemonGrid({
                     </>
                   )}
                 </Button>
+              </div>
+
+              {/* Stat Range Filters */}
+              <div className="lg:col-span-4 space-y-4 border-t pt-4 mt-4">
+                <h4 className="font-semibold text-gray-700 mb-3">Filter by Stats</h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* HP Filter */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      HP: {hpRange[0]} - {hpRange[1]}
+                    </label>
+                    <Slider
+                      min={0}
+                      max={255}
+                      step={5}
+                      value={hpRange}
+                      onValueChange={(value) => setHpRange(value as [number, number])}
+                      className="cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Attack Filter */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Attack: {attackRange[0]} - {attackRange[1]}
+                    </label>
+                    <Slider
+                      min={0}
+                      max={255}
+                      step={5}
+                      value={attackRange}
+                      onValueChange={(value) => setAttackRange(value as [number, number])}
+                      className="cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Defense Filter */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Defense: {defenseRange[0]} - {defenseRange[1]}
+                    </label>
+                    <Slider
+                      min={0}
+                      max={255}
+                      step={5}
+                      value={defenseRange}
+                      onValueChange={(value) => setDefenseRange(value as [number, number])}
+                      className="cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Speed Filter */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Speed: {speedRange[0]} - {speedRange[1]}
+                    </label>
+                    <Slider
+                      min={0}
+                      max={255}
+                      step={5}
+                      value={speedRange}
+                      onValueChange={(value) => setSpeedRange(value as [number, number])}
+                      className="cursor-pointer"
+                    />
+                  </div>
+
+                  {/* BST Filter */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Base Stat Total: {bstRange[0]} - {bstRange[1]}
+                    </label>
+                    <Slider
+                      min={0}
+                      max={800}
+                      step={10}
+                      value={bstRange}
+                      onValueChange={(value) => setBstRange(value as [number, number])}
+                      className="cursor-pointer"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
