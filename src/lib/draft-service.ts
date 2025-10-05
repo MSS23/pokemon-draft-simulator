@@ -31,6 +31,11 @@ export interface CreateDraftParams {
   isPublic?: boolean
   description?: string | null
   tags?: string[] | null
+  customFormat?: {
+    name: string
+    description: string
+    pokemonPricing: Record<string, number>
+  }
 }
 
 export interface JoinDraftParams {
@@ -57,13 +62,37 @@ export class DraftService {
     return generateRoomCode()
   }
 
-  static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
+  static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
     if (!supabase) {
       throw new Error('Supabase not available')
     }
 
     const roomCode = this.generateRoomCode()
     const hostId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    let customFormatId: string | null = null
+
+    // If custom format is provided, create it in the database first
+    if (customFormat) {
+      const { data: formatData, error: formatError } = await (supabase
+        .from('custom_formats') as any)
+        .insert({
+          name: customFormat.name,
+          description: customFormat.description,
+          created_by_display_name: hostName,
+          is_public: false,
+          pokemon_pricing: customFormat.pokemonPricing
+        })
+        .select()
+        .single()
+
+      if (formatError) {
+        console.error('Error creating custom format:', formatError)
+        throw new Error(`Failed to create custom format: ${formatError.message}`)
+      }
+
+      customFormatId = formatData.id
+    }
 
     // Create draft
     const { data: draft, error: draftError } = await (supabase
@@ -85,7 +114,8 @@ export class DraftService {
         is_public: isPublic || false,
         spectator_count: 0,
         description: description || null,
-        tags: tags || null
+        tags: tags || null,
+        custom_format_id: customFormatId
       })
       .select()
       .single()

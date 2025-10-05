@@ -14,6 +14,8 @@ import { useNotify } from '@/components/providers/NotificationProvider'
 import { POKEMON_FORMATS, getFormatById, getPopularFormats, DEFAULT_FORMAT } from '@/lib/formats'
 // import { generateRoomCode } from '@/lib/room-utils'
 import { useHydrationFix } from '@/lib/hydration-fix'
+import CSVUpload from '@/components/draft/CSVUpload'
+import type { ParsedCSVResult } from '@/lib/csv-parser'
 
 export default function CreateDraftPage() {
   const router = useRouter()
@@ -29,8 +31,12 @@ export default function CreateDraftPage() {
     formatId: DEFAULT_FORMAT,
     isPublic: false,
     description: '',
-    tags: ''
+    tags: '',
+    useCustomFormat: false
   })
+
+  const [customPricing, setCustomPricing] = useState<Record<string, number> | null>(null)
+  const [customPricingStats, setCustomPricingStats] = useState<ParsedCSVResult['stats'] | null>(null)
 
   // Apply hydration fix for browser extensions
   useHydrationFix()
@@ -73,6 +79,11 @@ export default function CreateDraftPage() {
       return
     }
 
+    if (formData.useCustomFormat && !customPricing) {
+      notify.warning('Missing Custom Pricing', 'Please upload a CSV file with custom Pokemon pricing')
+      return
+    }
+
     setIsCreating(true)
     try {
       const { DraftService } = await import('@/lib/draft-service')
@@ -87,11 +98,16 @@ export default function CreateDraftPage() {
           timeLimit: parseInt(formData.timeLimit),
           pokemonPerTeam: parseInt(formData.pokemonPerTeam),
           budgetPerTeam: formData.draftType === 'auction' ? 100 : undefined,
-          formatId: formData.formatId
+          formatId: formData.useCustomFormat ? 'custom' : formData.formatId
         },
         isPublic: formData.isPublic,
         description: formData.description || null,
-        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : null
+        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : null,
+        customFormat: formData.useCustomFormat && customPricing ? {
+          name: `${formData.userName}'s Custom Format`,
+          description: formData.description || 'Custom Pokemon pricing format',
+          pokemonPricing: customPricing
+        } : undefined
       })
 
       notify.success('Draft Created!', `Room ${roomCode} is ready for players`)
@@ -219,49 +235,84 @@ export default function CreateDraftPage() {
                 </h3>
 
                 <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="format" className="text-sm font-medium">
-                      Competitive Format
-                    </Label>
-                    <Select value={formData.formatId} onValueChange={(value) => handleInputChange('formatId', value)}>
-                      <SelectTrigger className="bg-white dark:bg-slate-800">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <div className="p-2 text-xs text-slate-600 dark:text-slate-400 border-b">
-                          Popular Formats
-                        </div>
-                        {popularFormats.map((format) => (
-                          <SelectItem key={format.id} value={format.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{getCategoryIcon(format.category)}</span>
-                              <span>{format.shortName}</span>
-                              {format.meta.isOfficial && (
-                                <Badge variant="outline" className="text-xs">Official</Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                        <div className="p-2 text-xs text-slate-600 dark:text-slate-400 border-b border-t">
-                          All Formats
-                        </div>
-                        {POKEMON_FORMATS.filter(f => !popularFormats.some(p => p.id === f.id)).map((format) => (
-                          <SelectItem key={format.id} value={format.id}>
-                            <div className="flex items-center gap-2">
-                              <span>{getCategoryIcon(format.category)}</span>
-                              <span>{format.shortName}</span>
-                              {format.meta.isOfficial && (
-                                <Badge variant="outline" className="text-xs">Official</Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Toggle for custom format */}
+                  <div className="flex items-start gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                    <input
+                      type="checkbox"
+                      id="useCustomFormat"
+                      checked={formData.useCustomFormat}
+                      onChange={(e) => handleInputChange('useCustomFormat', e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="useCustomFormat" className="text-sm font-medium cursor-pointer">
+                        Use Custom Pricing (CSV)
+                      </Label>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                        Upload your own Pokemon pricing instead of using a preset format
+                      </p>
+                    </div>
                   </div>
 
+                  {/* Show CSV upload if custom format is selected */}
+                  {formData.useCustomFormat ? (
+                    <CSVUpload
+                      onPricingParsed={(pricing, stats) => {
+                        setCustomPricing(pricing)
+                        setCustomPricingStats(stats)
+                      }}
+                      onClear={() => {
+                        setCustomPricing(null)
+                        setCustomPricingStats(null)
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="format" className="text-sm font-medium">
+                          Competitive Format
+                        </Label>
+                        <Select value={formData.formatId} onValueChange={(value) => handleInputChange('formatId', value)}>
+                          <SelectTrigger className="bg-white dark:bg-slate-800">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <div className="p-2 text-xs text-slate-600 dark:text-slate-400 border-b">
+                              Popular Formats
+                            </div>
+                            {popularFormats.map((format) => (
+                              <SelectItem key={format.id} value={format.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{getCategoryIcon(format.category)}</span>
+                                  <span>{format.shortName}</span>
+                                  {format.meta.isOfficial && (
+                                    <Badge variant="outline" className="text-xs">Official</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                            <div className="p-2 text-xs text-slate-600 dark:text-slate-400 border-b border-t">
+                              All Formats
+                            </div>
+                            {POKEMON_FORMATS.filter(f => !popularFormats.some(p => p.id === f.id)).map((format) => (
+                              <SelectItem key={format.id} value={format.id}>
+                                <div className="flex items-center gap-2">
+                                  <span>{getCategoryIcon(format.category)}</span>
+                                  <span>{format.shortName}</span>
+                                  {format.meta.isOfficial && (
+                                    <Badge variant="outline" className="text-xs">Official</Badge>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+
                   {/* Format Information Display */}
-                  {selectedFormat && (
+                  {selectedFormat && !formData.useCustomFormat && (
                     <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">

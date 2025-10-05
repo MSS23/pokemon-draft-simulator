@@ -102,6 +102,7 @@ export interface Participant {
   displayName: string
   teamId: string | null
   isHost: boolean
+  isAdmin: boolean
   lastSeen: string
 }
 
@@ -145,6 +146,21 @@ export interface WishlistItem {
   priority: number
   isAvailable: boolean
   cost: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CustomFormat {
+  id: string
+  name: string
+  description: string | null
+  createdByUserId: string | null
+  createdByDisplayName: string
+  isPublic: boolean
+  pokemonPricing: Record<string, number>
+  minCost: number | null
+  maxCost: number | null
+  timesUsed: number
   createdAt: string
   updatedAt: string
 }
