@@ -272,7 +272,20 @@ class ErrorHandler {
 
     // In production, send to error tracking service (e.g., Sentry)
     if (process.env.NODE_ENV === 'production' && error.severity === ErrorSeverity.CRITICAL) {
-      // TODO: Send to error tracking service
+      // Send to Sentry in production (async, fire and forget)
+      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+        const reportData = { error, context }
+        import('@sentry/nextjs')
+          .then((Sentry) => {
+            Sentry.captureException(error, {
+              extra: reportData,
+              level: 'error',
+            })
+          })
+          .catch((sentryError) => {
+            console.error('Failed to send error to Sentry:', sentryError)
+          })
+      }
     }
   }
 

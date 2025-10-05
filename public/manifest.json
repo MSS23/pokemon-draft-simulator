@@ -1,16 +1,58 @@
 {
-  "name": "Pokémon Draft App",
+  "name": "Pokémon Draft League",
   "short_name": "PokeDraft",
-  "description": "Real-time Pokémon draft application with snake and auction formats",
+  "description": "Multiplayer Pokémon draft platform with real-time auctions and snake drafts",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#667eea",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/favicon.ico",
       "sizes": "any",
       "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Create Draft",
+      "short_name": "Create",
+      "description": "Start a new Pokémon draft",
+      "url": "/create-draft",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "any",
+          "type": "image/x-icon"
+        }
+      ]
+    },
+    {
+      "name": "Join Draft",
+      "short_name": "Join",
+      "description": "Join an existing draft room",
+      "url": "/join-draft",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "any",
+          "type": "image/x-icon"
+        }
+      ]
     }
   ]
 }

@@ -66,9 +66,9 @@ export default function PokemonCard({
   })
 
   const sizeClasses = {
-    sm: 'w-32 h-44 sm:w-36 sm:h-48',
-    md: 'w-44 h-56 sm:w-48 sm:h-60 md:w-52 md:h-64',
-    lg: 'w-56 h-72 sm:w-60 sm:h-76 md:w-64 md:h-80'
+    sm: 'w-full min-w-[120px] max-w-[140px] h-44 sm:w-36 sm:h-48',
+    md: 'w-full min-w-[160px] max-w-[200px] h-56 sm:w-48 sm:h-60 md:w-52 md:h-64',
+    lg: 'w-full min-w-[200px] max-w-[256px] h-72 sm:w-60 sm:h-76 md:w-64 md:h-80'
   }
 
   const imageSizes = {
@@ -102,7 +102,9 @@ export default function PokemonCard({
         'pokemon-entrance pokemon-hover',
         'transition-all duration-300 ease-out',
         'hover:scale-[1.02] hover:shadow-xl hover:shadow-gray-200/50',
+        'active:scale-[0.98]', // Better touch feedback on mobile
         'focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2',
+        'touch-manipulation', // Improves mobile touch response
         isPokemonShiny(pokemon) && getPokemonRarityClass(pokemon.cost),
         isPokemonShiny(pokemon) && 'pokemon-sparkle',
         isDrafted && 'opacity-60 grayscale',
@@ -190,9 +192,10 @@ export default function PokemonCard({
               className={cn(
                 "h-8 w-8 p-0 rounded-full transition-all duration-300",
                 "shadow-lg border border-white/20 backdrop-blur-sm",
+                "touch-manipulation active:scale-90", // Better mobile interaction
                 isInWishlist
                   ? "bg-gradient-to-r from-pink-500 to-red-500 text-white hover:from-pink-600 hover:to-red-600"
-                  : "bg-white/80 text-gray-600 hover:bg-white hover:text-pink-500 opacity-0 group-hover:opacity-100"
+                  : "bg-white/80 text-gray-600 hover:bg-white hover:text-pink-500 opacity-0 sm:group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"
               )}
               title={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
             >
@@ -286,24 +289,24 @@ export default function PokemonCard({
 
         {/* Enhanced Stats Display */}
         {showStats && size !== 'sm' && (
-          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600 rounded-lg p-3 border-2 border-gray-200 dark:border-slate-600 shadow-inner stat-reveal">
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <div className="text-center bg-red-50 dark:bg-red-900/20 rounded-lg p-2 transition-all duration-300 hover:scale-105 hover:shadow-md border border-red-100 dark:border-red-800">
-                <div className="text-red-600 dark:text-red-400 font-semibold text-xs mb-1">HP</div>
-                <div className="font-bold text-red-700 dark:text-red-300 text-lg leading-none">{pokemon.stats.hp}</div>
+          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600 rounded-lg p-2 sm:p-3 border-2 border-gray-200 dark:border-slate-600 shadow-inner stat-reveal">
+            <div className="grid grid-cols-3 gap-1 sm:gap-2 mb-2 sm:mb-3">
+              <div className="text-center bg-red-50 dark:bg-red-900/20 rounded-lg p-1 sm:p-2 transition-all duration-300 active:scale-95 sm:hover:scale-105 sm:hover:shadow-md border border-red-100 dark:border-red-800 touch-manipulation">
+                <div className="text-red-600 dark:text-red-400 font-semibold text-[10px] sm:text-xs mb-0.5 sm:mb-1">HP</div>
+                <div className="font-bold text-red-700 dark:text-red-300 text-base sm:text-lg leading-none">{pokemon.stats.hp}</div>
               </div>
-              <div className="text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg p-2 transition-all duration-300 hover:scale-105 hover:shadow-md border border-orange-100 dark:border-orange-800">
-                <div className="text-orange-600 dark:text-orange-400 font-semibold text-xs mb-1">ATK</div>
-                <div className="font-bold text-orange-700 dark:text-orange-300 text-lg leading-none">{pokemon.stats.attack}</div>
+              <div className="text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg p-1 sm:p-2 transition-all duration-300 active:scale-95 sm:hover:scale-105 sm:hover:shadow-md border border-orange-100 dark:border-orange-800 touch-manipulation">
+                <div className="text-orange-600 dark:text-orange-400 font-semibold text-[10px] sm:text-xs mb-0.5 sm:mb-1">ATK</div>
+                <div className="font-bold text-orange-700 dark:text-orange-300 text-base sm:text-lg leading-none">{pokemon.stats.attack}</div>
               </div>
-              <div className="text-center bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 transition-all duration-300 hover:scale-105 hover:shadow-md border border-blue-100 dark:border-blue-800">
-                <div className="text-blue-600 dark:text-blue-400 font-semibold text-xs mb-1">DEF</div>
-                <div className="font-bold text-blue-700 dark:text-blue-300 text-lg leading-none">{pokemon.stats.defense}</div>
+              <div className="text-center bg-blue-50 dark:bg-blue-900/20 rounded-lg p-1 sm:p-2 transition-all duration-300 active:scale-95 sm:hover:scale-105 sm:hover:shadow-md border border-blue-100 dark:border-blue-800 touch-manipulation">
+                <div className="text-blue-600 dark:text-blue-400 font-semibold text-[10px] sm:text-xs mb-0.5 sm:mb-1">DEF</div>
+                <div className="font-bold text-blue-700 dark:text-blue-300 text-base sm:text-lg leading-none">{pokemon.stats.defense}</div>
               </div>
             </div>
-            <div className="text-center pt-2 border-t-2 border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+            <div className="text-center pt-1.5 sm:pt-2 border-t-2 border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
               <div className="text-sm font-bold text-purple-700 dark:text-purple-300 transition-all duration-300 group-hover:animate-pulse">
-                <span className="text-xs opacity-75">BST:</span> <span className="text-lg">{pokemon.stats.total}</span>
+                <span className="text-[10px] sm:text-xs opacity-75">BST:</span> <span className="text-base sm:text-lg">{pokemon.stats.total}</span>
               </div>
             </div>
           </div>

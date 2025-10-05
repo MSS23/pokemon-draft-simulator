@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,7 @@ interface AuthFormProps {
   onSuccess?: () => void
 }
 
-export default function AuthForm({ mode, onSuccess }: AuthFormProps) {
+function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -319,5 +319,17 @@ export default function AuthForm({ mode, onSuccess }: AuthFormProps) {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function AuthForm(props: AuthFormProps) {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    }>
+      <AuthFormContent {...props} />
+    </Suspense>
   )
 }

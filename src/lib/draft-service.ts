@@ -1111,8 +1111,36 @@ export class DraftService {
       return { canNominate: false, teamId: userTeamId, reason: 'There is already an active auction' }
     }
 
-    // For now, allow any team to nominate when no auction is active
-    // TODO: Implement turn-based nomination logic if desired
+    // Implement turn-based nomination logic for auction drafts
+    const { draft, teams, picks } = draftState
+
+    // Calculate whose turn it is to nominate
+    const totalPicks = picks.length
+    const totalTeams = teams.length
+
+    if (totalTeams === 0) {
+      return { canNominate: false, teamId: userTeamId, reason: 'No teams in draft' }
+    }
+
+    // Determine current nominating team using round-robin
+    // Each team nominates once per round in order
+    const currentNominatorIndex = totalPicks % totalTeams
+    const sortedTeams = [...teams].sort((a, b) => a.draft_order - b.draft_order)
+    const currentNominatingTeam = sortedTeams[currentNominatorIndex]
+
+    if (!currentNominatingTeam) {
+      return { canNominate: false, teamId: userTeamId, reason: 'Could not determine current turn' }
+    }
+
+    const isUserTurn = currentNominatingTeam.id === userTeamId
+
+    if (!isUserTurn) {
+      return {
+        canNominate: false,
+        teamId: userTeamId,
+        reason: `It's ${currentNominatingTeam.name}'s turn to nominate`
+      }
+    }
 
     return { canNominate: true, teamId: userTeamId }
   }

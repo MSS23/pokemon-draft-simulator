@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getBestPokemonImageUrl, getTypeColor } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
 import { Sparkles, Zap, Shield, Crown, AlertTriangle } from 'lucide-react'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
