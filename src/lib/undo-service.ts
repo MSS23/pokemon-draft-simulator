@@ -148,7 +148,7 @@ export class UndoService {
         return 0
       }
 
-      return data.undos_remaining || 0
+      return (data as { undos_remaining: number }).undos_remaining || 0
     } catch (error) {
       console.error('Error getting undos remaining:', error)
       return 0
