@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from '@sentry/nextjs';
+import withPWA from 'next-pwa';
 
 const nextConfig: NextConfig = {
   images: {
@@ -66,6 +67,9 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['@supabase/supabase-js', 'lucide-react'],
   },
+
+  // PWA configuration
+  reactStrictMode: true,
 };
 
 // Sentry configuration options
@@ -81,7 +85,56 @@ const sentryWebpackPluginOptions = {
   // https://github.com/getsentry/sentry-webpack-plugin#options
 };
 
+// PWA configuration
+const pwaConfig = withPWA({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development',
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/raw\.githubusercontent\.com\/PokeAPI\/sprites\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'pokemon-sprites',
+        expiration: {
+          maxEntries: 1000,
+          maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    {
+      urlPattern: /^https:\/\/pokeapi\.co\/api\/v2\/.*/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'pokemon-api',
+        expiration: {
+          maxEntries: 100,
+          maxAgeSeconds: 60 * 60, // 1 hour
+        },
+        networkTimeoutSeconds: 10,
+      },
+    },
+    {
+      urlPattern: /\.(?:js|css|woff2?)$/i,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'static-resources',
+        expiration: {
+          maxEntries: 50,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+        },
+      },
+    },
+  ],
+});
+
 // Make sure adding Sentry options is the last code to run before exporting
+const configWithPWA = pwaConfig(nextConfig);
+
 export default process.env.NEXT_PUBLIC_SENTRY_DSN
-  ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
-  : nextConfig;
+  ? withSentryConfig(configWithPWA, sentryWebpackPluginOptions)
+  : configWithPWA;

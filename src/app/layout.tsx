@@ -21,8 +21,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Pokémon Draft App",
-  description: "Real-time Pokémon draft application with snake and auction formats",
+  title: "Pokémon Draft League",
+  description: "Real-time Pokémon drafting platform with VGC 2024 Regulation H compliance, supporting competitive snake and auction formats",
+  applicationName: "Pokémon Draft League",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Draft League",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Pokémon Draft League",
+    title: "Pokémon Draft League",
+    description: "Real-time Pokémon drafting platform with VGC 2024 compliance",
+  },
+  twitter: {
+    card: "summary",
+    title: "Pokémon Draft League",
+    description: "Real-time Pokémon drafting platform",
+  },
+  manifest: "/manifest.json",
+  themeColor: "#3b82f6",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
 };
 
 export default function RootLayout({

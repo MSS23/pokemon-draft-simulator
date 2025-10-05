@@ -1,18 +1,13 @@
 {
   "name": "Pokémon Draft League",
-  "short_name": "PokeDraft",
-  "description": "Multiplayer Pokémon draft platform with real-time auctions and snake drafts",
+  "short_name": "Draft League",
+  "description": "Real-time Pokémon drafting platform with VGC 2024 compliance",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#667eea",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "/favicon.ico",
-      "sizes": "any",
-      "type": "image/x-icon"
-    },
     {
       "src": "/icon-192x192.png",
       "sizes": "192x192",
@@ -26,31 +21,18 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["games", "entertainment"],
+  "categories": ["games", "sports"],
   "shortcuts": [
     {
       "name": "Create Draft",
-      "short_name": "Create",
+      "short_name": "New Draft",
       "description": "Start a new Pokémon draft",
       "url": "/create-draft",
       "icons": [
         {
-          "src": "/favicon.ico",
-          "sizes": "any",
-          "type": "image/x-icon"
-        }
-      ]
-    },
-    {
-      "name": "Join Draft",
-      "short_name": "Join",
-      "description": "Join an existing draft room",
-      "url": "/join-draft",
-      "icons": [
-        {
-          "src": "/favicon.ico",
-          "sizes": "any",
-          "type": "image/x-icon"
+          "src": "/icon-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     }

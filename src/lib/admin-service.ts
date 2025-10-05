@@ -27,7 +27,7 @@ export class AdminService {
     }
 
     try {
-      const { error } = await supabase.rpc('promote_to_admin', {
+      const { error } = await (supabase.rpc as any)('promote_to_admin', {
         p_draft_id: draftId,
         p_participant_id: participantId,
         p_promoting_user_id: promotingUserId
@@ -63,7 +63,7 @@ export class AdminService {
     }
 
     try {
-      const { error } = await supabase.rpc('demote_from_admin', {
+      const { error } = await (supabase.rpc as any)('demote_from_admin', {
         p_draft_id: draftId,
         p_participant_id: participantId,
         p_demoting_user_id: demotingUserId
@@ -104,7 +104,7 @@ export class AdminService {
         return false
       }
 
-      return data.is_host || data.is_admin
+      return (data as any).is_host || (data as any).is_admin
     } catch (error) {
       console.error('Error checking admin status:', error)
       return false
@@ -131,8 +131,8 @@ export class AdminService {
         return { host: null, admins: [] }
       }
 
-      const host = data?.find(p => p.is_host) || null
-      const admins = data?.filter(p => !p.is_host && p.is_admin) || []
+      const host = (data as any)?.find((p: any) => p.is_host) || null
+      const admins = (data as any)?.filter((p: any) => !p.is_host && p.is_admin) || []
 
       return { host, admins }
     } catch (error) {
