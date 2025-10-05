@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS public.custom_formats (
   -- Format metadata
   name TEXT NOT NULL,
   description TEXT,
-  created_by_user_id UUID REFERENCES public.user_profiles(id),
+  created_by_user_id UUID, -- Optional: references user_profiles(id) if auth is enabled
   created_by_display_name TEXT NOT NULL, -- For guest users who create drafts
 
   -- Format settings
