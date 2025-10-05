@@ -1,7 +1,94 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// ============================================================================
+// RATE LIMITING
+// ============================================================================
+
+class RateLimiter {
+  private requests = new Map<string, number[]>()
+
+  isAllowed(key: string, limit: number, windowMs: number): boolean {
+    const now = Date.now()
+    const timestamps = this.requests.get(key) || []
+    const validTimestamps = timestamps.filter(t => now - t < windowMs)
+
+    if (validTimestamps.length >= limit) {
+      return false
+    }
+
+    validTimestamps.push(now)
+    this.requests.set(key, validTimestamps)
+    return true
+  }
+
+  getRemainingRequests(key: string, limit: number, windowMs: number): number {
+    const now = Date.now()
+    const timestamps = this.requests.get(key) || []
+    const validTimestamps = timestamps.filter(t => now - t < windowMs)
+    return Math.max(0, limit - validTimestamps.length)
+  }
+}
+
+const rateLimiter = new RateLimiter()
+
+const RATE_LIMITS: Record<string, { limit: number; window: number }> = {
+  '/api/drafts': { limit: 10, window: 3600000 }, // 10 drafts per hour
+  '/api/picks': { limit: 60, window: 60000 },    // 60 picks per minute
+  '/api/bids': { limit: 120, window: 60000 },    // 120 bids per minute
+  '/api/': { limit: 100, window: 60000 },        // 100 requests per minute (default)
+}
+
+function getClientId(request: NextRequest): string {
+  const userId = request.cookies.get('user_id')?.value
+  if (userId) return `user:${userId}`
+
+  const ip = request.headers.get('x-forwarded-for') ||
+             request.headers.get('x-real-ip') ||
+             'unknown'
+  return `ip:${ip}`
+}
+
+// ============================================================================
+// MIDDLEWARE
+// ============================================================================
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Apply rate limiting to API routes
+  if (pathname.startsWith('/api/')) {
+    const clientId = getClientId(request)
+
+    // Find matching rate limit config
+    let rateLimit = RATE_LIMITS['/api/']
+    for (const [path, config] of Object.entries(RATE_LIMITS)) {
+      if (pathname.startsWith(path) && path !== '/api/') {
+        rateLimit = config
+        break
+      }
+    }
+
+    const { limit, window } = rateLimit
+    if (!rateLimiter.isAllowed(clientId, limit, window)) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          message: 'Too many requests. Please try again later.',
+          retryAfter: Math.ceil(window / 1000),
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil(window / 1000)),
+            'X-RateLimit-Limit': String(limit),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      )
+    }
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })

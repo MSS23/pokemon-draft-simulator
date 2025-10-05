@@ -249,7 +249,7 @@ class ErrorHandler {
   }
 
   /**
-   * Log error (in production, this would send to error tracking service)
+   * Log error and send to error tracking service
    */
   private logError(error: AppError, context?: ErrorContext): void {
     // Add to in-memory log
@@ -270,22 +270,36 @@ class ErrorHandler {
       context
     })
 
-    // In production, send to error tracking service (e.g., Sentry)
-    if (process.env.NODE_ENV === 'production' && error.severity === ErrorSeverity.CRITICAL) {
-      // Send to Sentry in production (async, fire and forget)
-      if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-        const reportData = { error, context }
-        import('@sentry/nextjs')
-          .then((Sentry) => {
-            Sentry.captureException(error, {
-              extra: reportData,
-              level: 'error',
-            })
+    // Send to Sentry (production and development for testing)
+    if (error.severity === ErrorSeverity.CRITICAL || error.severity === ErrorSeverity.ERROR) {
+      this.sendToSentry(error, context)
+    }
+  }
+
+  /**
+   * Send error to Sentry
+   */
+  private sendToSentry(error: AppError, context?: ErrorContext): void {
+    if (typeof window !== 'undefined') {
+      // Client-side
+      import('@sentry/nextjs')
+        .then((Sentry) => {
+          Sentry.captureException(new Error(error.message), {
+            extra: {
+              ...error,
+              context,
+            },
+            level: error.severity === ErrorSeverity.CRITICAL ? 'fatal' : 'error',
+            tags: {
+              category: error.category,
+              code: error.code,
+              recoverable: error.recoverable.toString(),
+            },
           })
-          .catch((sentryError) => {
-            console.error('Failed to send error to Sentry:', sentryError)
-          })
-      }
+        })
+        .catch((sentryError) => {
+          console.error('Failed to send error to Sentry:', sentryError)
+        })
     }
   }
 
