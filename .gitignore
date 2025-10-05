@@ -43,5 +43,14 @@ next-env.d.ts
 # misc files
 nul
 *.log
+build-output*.txt
+build-test*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 .vercel
