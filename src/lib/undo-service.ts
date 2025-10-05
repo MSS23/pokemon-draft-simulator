@@ -29,7 +29,7 @@ export class UndoService {
     }
 
     try {
-      const { data, error } = await supabase.rpc('undo_last_pick', {
+      const { data, error } = await (supabase.rpc as any)('undo_last_pick', {
         p_draft_id: draftId,
         p_team_id: teamId,
         p_participant_id: participantId
@@ -68,7 +68,7 @@ export class UndoService {
     }
 
     try {
-      const { data, error } = await supabase.rpc('get_draft_history', {
+      const { data, error } = await (supabase.rpc as any)('get_draft_history', {
         p_draft_id: draftId
       })
 

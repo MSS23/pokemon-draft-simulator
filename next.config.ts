@@ -135,6 +135,9 @@ const pwaConfig = withPWA({
 // Make sure adding Sentry options is the last code to run before exporting
 const configWithPWA = pwaConfig(nextConfig);
 
-export default process.env.NEXT_PUBLIC_SENTRY_DSN
+// Only use Sentry in production if DSN is set
+const finalConfig = process.env.NEXT_PUBLIC_SENTRY_DSN && process.env.NODE_ENV === 'production'
   ? withSentryConfig(configWithPWA, sentryWebpackPluginOptions)
   : configWithPWA;
+
+export default finalConfig;
