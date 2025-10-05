@@ -277,7 +277,15 @@ export default function PokemonGrid({
                 onClick={() => applySortPreset('total', 'desc')}
                 className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
               >
-                ⭐ Highest Stats
+                ⭐ Highest BST
+              </Button>
+              <Button
+                variant={sortBy === 'hp' && sortDirection === 'desc' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => applySortPreset('hp', 'desc')}
+                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              >
+                ❤️ Highest HP
               </Button>
               <Button
                 variant={sortBy === 'attack' && sortDirection === 'desc' ? 'default' : 'outline'}
@@ -288,12 +296,28 @@ export default function PokemonGrid({
                 ⚔️ Strongest Attack
               </Button>
               <Button
+                variant={sortBy === 'defense' && sortDirection === 'desc' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => applySortPreset('defense', 'desc')}
+                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              >
+                🛡️ Best Defense
+              </Button>
+              <Button
                 variant={sortBy === 'speed' && sortDirection === 'desc' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => applySortPreset('speed', 'desc')}
                 className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
               >
                 ⚡ Fastest
+              </Button>
+              <Button
+                variant={sortBy === 'speed' && sortDirection === 'asc' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => applySortPreset('speed', 'asc')}
+                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
+              >
+                🐌 Slowest
               </Button>
               <Button
                 variant={sortBy === 'name' && sortDirection === 'asc' ? 'default' : 'outline'}

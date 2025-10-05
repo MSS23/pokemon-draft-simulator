@@ -287,42 +287,6 @@ export default function PokemonCard({
           ))}
         </div>
 
-        {/* Enhanced Stats Display */}
-        {showStats && size !== 'sm' && (
-          <div className="bg-gradient-to-br from-white via-gray-50 to-gray-100 dark:from-slate-800 dark:via-slate-700 dark:to-slate-600 rounded-lg p-2 sm:p-3 border-2 border-gray-200 dark:border-slate-600 shadow-inner stat-reveal">
-            <div className="grid grid-cols-3 gap-1 sm:gap-2 mb-2 sm:mb-3">
-              <div className="text-center bg-red-50 dark:bg-red-900/20 rounded-lg p-1 sm:p-2 transition-all duration-300 active:scale-95 sm:hover:scale-105 sm:hover:shadow-md border border-red-100 dark:border-red-800 touch-manipulation">
-                <div className="text-red-600 dark:text-red-400 font-semibold text-[10px] sm:text-xs mb-0.5 sm:mb-1">HP</div>
-                <div className="font-bold text-red-700 dark:text-red-300 text-base sm:text-lg leading-none">{pokemon.stats.hp}</div>
-              </div>
-              <div className="text-center bg-orange-50 dark:bg-orange-900/20 rounded-lg p-1 sm:p-2 transition-all duration-300 active:scale-95 sm:hover:scale-105 sm:hover:shadow-md border border-orange-100 dark:border-orange-800 touch-manipulation">
-                <div className="text-orange-600 dark:text-orange-400 font-semibold text-[10px] sm:text-xs mb-0.5 sm:mb-1">ATK</div>
-                <div className="font-bold text-orange-700 dark:text-orange-300 text-base sm:text-lg leading-none">{pokemon.stats.attack}</div>
-              </div>
-              <div className="text-center bg-blue-50 dark:bg-blue-900/20 rounded-lg p-1 sm:p-2 transition-all duration-300 active:scale-95 sm:hover:scale-105 sm:hover:shadow-md border border-blue-100 dark:border-blue-800 touch-manipulation">
-                <div className="text-blue-600 dark:text-blue-400 font-semibold text-[10px] sm:text-xs mb-0.5 sm:mb-1">DEF</div>
-                <div className="font-bold text-blue-700 dark:text-blue-300 text-base sm:text-lg leading-none">{pokemon.stats.defense}</div>
-              </div>
-            </div>
-            <div className="text-center pt-1.5 sm:pt-2 border-t-2 border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-              <div className="text-sm font-bold text-purple-700 dark:text-purple-300 transition-all duration-300 group-hover:animate-pulse">
-                <span className="text-[10px] sm:text-xs opacity-75">BST:</span> <span className="text-base sm:text-lg">{pokemon.stats.total}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Interactive Call-to-Action */}
-        {!isDrafted && !isDisabled && size !== 'sm' && (
-          <div className="mt-3">
-            <div className="w-full text-center py-2.5 px-3 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800 group-hover:from-blue-100 group-hover:to-purple-100 dark:group-hover:from-blue-800/30 dark:group-hover:to-purple-800/30 transition-all duration-300 ease-out hover:shadow-sm hover:scale-[1.01]">
-              <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 group-hover:text-blue-800 dark:group-hover:text-blue-200 transition-colors duration-200 flex items-center justify-center gap-1.5">
-                <Eye className="h-3 w-3" />
-                <span>View Details & Draft</span>
-              </span>
-            </div>
-          </div>
-        )}
 
         {/* Drafted indicator - TCG Style */}
         {isDrafted && (
