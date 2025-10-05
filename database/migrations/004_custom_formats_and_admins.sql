@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS public.custom_formats (
   pokemon_pricing JSONB NOT NULL, -- { "pokemon-id": cost, ... } or { "pokemon-name": cost, ... }
 
   -- Metadata
-  total_pokemon INTEGER GENERATED ALWAYS AS (jsonb_object_keys(pokemon_pricing)) STORED,
+  total_pokemon INTEGER,
   min_cost INTEGER,
   max_cost INTEGER,
 
@@ -57,7 +57,7 @@ CREATE TRIGGER handle_custom_formats_updated_at
   BEFORE UPDATE ON public.custom_formats
   FOR EACH ROW EXECUTE FUNCTION public.update_custom_format_timestamp();
 
--- Function to calculate min/max costs
+-- Function to calculate min/max costs and total pokemon
 CREATE OR REPLACE FUNCTION public.update_custom_format_costs()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -69,9 +69,10 @@ BEGIN
     FROM jsonb_each(NEW.pokemon_pricing)
   ) INTO costs;
 
-  -- Set min and max
+  -- Set min, max, and total
   NEW.min_cost := (SELECT MIN(cost) FROM unnest(costs) AS cost);
   NEW.max_cost := (SELECT MAX(cost) FROM unnest(costs) AS cost);
+  NEW.total_pokemon := array_length(costs, 1);
 
   RETURN NEW;
 END;
