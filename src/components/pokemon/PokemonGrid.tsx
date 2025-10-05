@@ -18,6 +18,7 @@ import { Search, Filter, SortAsc, SortDesc } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
+import PokemonComparison from './PokemonComparison'
 
 interface PokemonGridProps {
   pokemon: Pokemon[]
@@ -256,20 +257,26 @@ export default function PokemonGrid({
                 className="pl-10 h-12 text-base"
               />
             </div>
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => setShowFiltersPanel(!showFiltersPanel)}
-              className="h-12 px-6 text-base whitespace-nowrap"
-            >
-              <Filter className="h-4 w-4 mr-2" />
-              {showFiltersPanel ? 'Hide Filters' : 'Show Filters'}
-              {(typeFilter !== 'all' || costFilter !== 'all') && (
-                <Badge variant="secondary" className="ml-2 text-xs">
-                  {[typeFilter !== 'all', costFilter !== 'all'].filter(Boolean).length}
-                </Badge>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <PokemonComparison
+                availablePokemon={availablePokemon}
+                maxCompare={4}
+              />
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                className="h-12 px-6 text-base whitespace-nowrap"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                {showFiltersPanel ? 'Hide Filters' : 'Show Filters'}
+                {(typeFilter !== 'all' || costFilter !== 'all') && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {[typeFilter !== 'all', costFilter !== 'all'].filter(Boolean).length}
+                  </Badge>
+                )}
+              </Button>
+            </div>
           </div>
 
           {/* Sorting Presets */}

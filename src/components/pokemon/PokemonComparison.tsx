@@ -78,11 +78,11 @@ export default function PokemonComparison({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        <Button variant="outline" size="lg" className="gap-2 h-12 px-6 text-base whitespace-nowrap">
           <ArrowUpDown className="h-4 w-4" />
-          Compare Pokémon
+          <span className="hidden sm:inline">Compare</span>
           {selectedPokemon.length > 0 && (
-            <Badge variant="secondary" className="ml-1">
+            <Badge variant="secondary" className="ml-1 text-xs">
               {selectedPokemon.length}
             </Badge>
           )}

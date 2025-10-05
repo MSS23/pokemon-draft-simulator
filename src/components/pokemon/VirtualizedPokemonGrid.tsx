@@ -27,12 +27,12 @@ const getColumnCount = (cardSize: 'sm' | 'md' | 'lg'): number => {
   const width = window.innerWidth
 
   if (cardSize === 'sm') {
-    if (width >= 1536) return 9 // 2xl
-    if (width >= 1280) return 8 // xl
-    if (width >= 1024) return 7 // lg
-    if (width >= 768) return 6 // md
-    if (width >= 640) return 5 // sm
-    return 4 // default
+    if (width >= 1536) return 8 // 2xl
+    if (width >= 1280) return 7 // xl
+    if (width >= 1024) return 6 // lg
+    if (width >= 768) return 5 // md
+    if (width >= 640) return 4 // sm
+    return 3 // default
   }
 
   if (cardSize === 'md') {
@@ -55,10 +55,10 @@ const getColumnCount = (cardSize: 'sm' | 'md' | 'lg'): number => {
 
 const getEstimatedCardHeight = (cardSize: 'sm' | 'md' | 'lg'): number => {
   switch (cardSize) {
-    case 'sm': return 200
-    case 'md': return 280
-    case 'lg': return 360
-    default: return 280
+    case 'sm': return 220
+    case 'md': return 300
+    case 'lg': return 380
+    default: return 300
   }
 }
 
@@ -94,7 +94,7 @@ export default function VirtualizedPokemonGrid({
   })
 
   const gridCols = {
-    sm: 'grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 2xl:grid-cols-9',
+    sm: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8',
     md: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7',
     lg: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
   }
@@ -127,8 +127,9 @@ export default function VirtualizedPokemonGrid({
               }}
             >
               <div className={cn(
-                'grid gap-2 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6',
-                'auto-rows-max',
+                'grid gap-4 sm:gap-4 md:gap-5 lg:gap-6',
+                'auto-rows-fr',
+                'items-stretch',
                 gridCols[cardSize]
               )}>
                 {rowPokemon.map((p) => (

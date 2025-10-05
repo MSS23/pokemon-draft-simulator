@@ -66,9 +66,9 @@ export default function PokemonCard({
   })
 
   const sizeClasses = {
-    sm: 'w-full min-w-[120px] max-w-[140px] h-44 sm:w-36 sm:h-48',
-    md: 'w-full min-w-[160px] max-w-[200px] h-56 sm:w-48 sm:h-60 md:w-52 md:h-64',
-    lg: 'w-full min-w-[200px] max-w-[256px] h-72 sm:w-60 sm:h-76 md:w-64 md:h-80'
+    sm: 'w-full h-full min-h-[200px]',
+    md: 'w-full h-full min-h-[280px]',
+    lg: 'w-full h-full min-h-[360px]'
   }
 
   const imageSizes = {
@@ -127,27 +127,24 @@ export default function PokemonCard({
       {/* Inner card content */}
       <CardContent className="relative p-3 h-full flex flex-col bg-white/90 backdrop-blur-sm rounded-lg m-1">
         {/* TCG-style header */}
-        <div className="flex justify-between items-start mb-2 sm:mb-3">
-          <div className="flex-1 pr-2">
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex-1 pr-2 min-w-0">
             <h3 className={cn(
-              "font-bold text-gray-900 leading-tight mb-1",
-              size === 'sm' ? "text-xs" : "text-sm"
+              "font-bold text-gray-900 leading-tight mb-1 truncate",
+              size === 'sm' ? "text-xs" : size === 'md' ? "text-sm" : "text-base"
             )}>
               {pokemon.name}
             </h3>
-            <div className={cn(
-              "text-gray-600",
-              size === 'sm' ? "text-xs" : "text-xs"
-            )}>
+            <div className="text-xs text-gray-600">
               #{pokemon.id.padStart(3, '0')}
             </div>
           </div>
           {showCost && (
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col items-end flex-shrink-0">
               <Badge
                 className={cn(
-                  "font-bold px-2 py-1 rounded-full shadow-sm",
-                  size === 'sm' ? "text-xs" : "text-xs",
+                  "font-bold px-2 py-1 rounded-full shadow-sm whitespace-nowrap",
+                  size === 'sm' ? "text-[10px]" : "text-xs",
                   pokemon.cost >= 25 ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" :
                   pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-400 to-pink-500 text-white" :
                   pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-400 to-cyan-500 text-white" :
@@ -157,7 +154,7 @@ export default function PokemonCard({
               >
                 {pokemon.cost}
               </Badge>
-              <span className="text-xs text-gray-500 mt-1">pts</span>
+              <span className="text-[10px] text-gray-500 mt-1">pts</span>
             </div>
           )}
         </div>
@@ -195,7 +192,7 @@ export default function PokemonCard({
                 "touch-manipulation active:scale-90", // Better mobile interaction
                 isInWishlist
                   ? "bg-gradient-to-r from-pink-500 to-red-500 text-white hover:from-pink-600 hover:to-red-600"
-                  : "bg-white/80 text-gray-600 hover:bg-white hover:text-pink-500 opacity-0 sm:group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                  : "bg-white/80 text-gray-600 hover:bg-white hover:text-pink-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
               )}
               title={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
             >
@@ -206,7 +203,7 @@ export default function PokemonCard({
 
         {/* Quick Draft Indicator */}
         {!isDrafted && !isDisabled && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out transform translate-y-1 group-hover:translate-y-0 z-10">
+          <div className="absolute top-2 right-2 opacity-0 sm:group-hover:opacity-100 transition-all duration-300 ease-out transform translate-y-1 sm:group-hover:translate-y-0 z-10 hidden sm:block">
             <Badge className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs px-3 py-1.5 shadow-lg border border-white/20 backdrop-blur-sm">
               <span className="flex items-center gap-1">
                 <span>Click to Draft</span>
@@ -267,14 +264,14 @@ export default function PokemonCard({
         </div>
 
         {/* Types - TCG Style */}
-        <div className="flex gap-1 mb-2 sm:mb-3 justify-center flex-wrap">
+        <div className="flex gap-1 mb-2 justify-center flex-wrap">
           {pokemon.types.map((type, index) => (
             <Badge
               key={type.name}
               className={cn(
                 "text-white font-semibold tracking-wide shadow-lg border border-white/30",
                 "transition-all duration-300 hover:scale-110 hover:shadow-xl",
-                size === 'sm' ? "text-xs px-2 py-0.5" : "text-xs px-3 py-1"
+                size === 'sm' ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5"
               )}
               style={{
                 backgroundColor: type.color,
