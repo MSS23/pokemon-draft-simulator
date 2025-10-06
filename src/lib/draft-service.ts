@@ -64,7 +64,11 @@ export class DraftService {
 
   static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
     if (!supabase) {
-      throw new Error('Supabase not available')
+      console.error('Supabase configuration error:', {
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      })
+      throw new Error('Supabase is not properly configured. Please check your environment variables and restart the dev server.')
     }
 
     const roomCode = this.generateRoomCode()
