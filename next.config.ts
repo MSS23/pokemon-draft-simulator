@@ -91,6 +91,9 @@ const pwaConfig = withPWA({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
+  fallbacks: {
+    document: '/offline.html',
+  },
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/raw\.githubusercontent\.com\/PokeAPI\/sprites\/.*/i,
@@ -127,6 +130,18 @@ const pwaConfig = withPWA({
           maxEntries: 50,
           maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
         },
+      },
+    },
+    {
+      urlPattern: /^https?.*/,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'offlineCache',
+        expiration: {
+          maxEntries: 200,
+          maxAgeSeconds: 24 * 60 * 60, // 24 hours
+        },
+        networkTimeoutSeconds: 10,
       },
     },
   ],

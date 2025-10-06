@@ -132,11 +132,12 @@ export default function PokemonDetailsModal({
               </Badge>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={onClose}
-                className="h-8 w-8 p-0 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="h-8 w-8 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
+                aria-label="Close"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4 text-slate-600 dark:text-slate-400" />
               </Button>
             </div>
           </div>

@@ -1,11 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
-import PokemonGrid from '@/components/pokemon/PokemonGrid'
-import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
-import DraftConfirmationModal from '@/components/draft/DraftConfirmationModal'
-import DraftSummaryPanel from '@/components/draft/DraftSummaryPanel'
 import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +13,24 @@ import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { useRouter } from 'next/navigation'
 import { Clock, Play, Trophy, Users, Sparkles, Crown, TrendingUp, Settings } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
+
+// Lazy load heavy components for better initial load performance
+const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), {
+  loading: () => <div className="flex justify-center p-8"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>,
+  ssr: false
+})
+
+const PokemonDetailsModal = dynamic(() => import('@/components/pokemon/PokemonDetailsModal'), {
+  ssr: false
+})
+
+const DraftConfirmationModal = dynamic(() => import('@/components/draft/DraftConfirmationModal'), {
+  ssr: false
+})
+
+const DraftSummaryPanel = dynamic(() => import('@/components/draft/DraftSummaryPanel'), {
+  ssr: false
+})
 
 export default function Home() {
   const router = useRouter()

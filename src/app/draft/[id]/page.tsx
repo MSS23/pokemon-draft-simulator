@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
-import PokemonGrid from '@/components/pokemon/PokemonGrid'
-import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,21 +12,25 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Copy, Share2 } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
-import TeamRoster from '@/components/team/TeamRoster'
-import TeamStatus from '@/components/team/TeamStatus'
-import DraftProgress from '@/components/team/DraftProgress'
 import { useNotify } from '@/components/providers/NotificationProvider'
-import DraftControls from '@/components/draft/DraftControls'
-import DraftResults from '@/components/draft/DraftResults'
-import AuctionBiddingInterface from '@/components/draft/AuctionBiddingInterface'
-import AuctionTimer from '@/components/draft/AuctionTimer'
-import AuctionNomination from '@/components/draft/AuctionNomination'
-import SpectatorMode from '@/components/draft/SpectatorMode'
-import AuctionNotifications from '@/components/draft/AuctionNotifications'
 import { DraftRoomLoading, TeamStatusSkeleton } from '@/components/ui/loading-states'
 import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 import { useTurnNotifications } from '@/hooks/useTurnNotifications'
 import { useReconnection } from '@/hooks/useReconnection'
+
+// Lazy load heavy draft components for code splitting
+const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), { ssr: false })
+const PokemonDetailsModal = dynamic(() => import('@/components/pokemon/PokemonDetailsModal'), { ssr: false })
+const TeamRoster = dynamic(() => import('@/components/team/TeamRoster'), { ssr: false })
+const TeamStatus = dynamic(() => import('@/components/team/TeamStatus'), { ssr: false })
+const DraftProgress = dynamic(() => import('@/components/team/DraftProgress'), { ssr: false })
+const DraftControls = dynamic(() => import('@/components/draft/DraftControls'), { ssr: false })
+const DraftResults = dynamic(() => import('@/components/draft/DraftResults'), { ssr: false })
+const AuctionBiddingInterface = dynamic(() => import('@/components/draft/AuctionBiddingInterface'), { ssr: false })
+const AuctionTimer = dynamic(() => import('@/components/draft/AuctionTimer'), { ssr: false })
+const AuctionNomination = dynamic(() => import('@/components/draft/AuctionNomination'), { ssr: false })
+const SpectatorMode = dynamic(() => import('@/components/draft/SpectatorMode'), { ssr: false })
+const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNotifications'), { ssr: false })
 
 interface DraftUIState {
   roomCode: string
