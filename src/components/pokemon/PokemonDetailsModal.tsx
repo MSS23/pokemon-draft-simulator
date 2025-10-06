@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { getStatColor, getBestPokemonImageUrl, getPokemonAnimatedBackupUrl, getPokemonSpriteUrl, getOfficialArtworkUrl } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
-import { X } from 'lucide-react'
 
 interface PokemonDetailsModalProps {
   pokemon: Pokemon | null
@@ -114,32 +113,21 @@ export default function PokemonDetailsModal({
                 )}
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge
-                className={cn(
-                  "text-lg px-4 py-2 font-bold shadow-lg",
-                  pokemon.cost >= 25 ? "bg-gradient-to-r from-red-500 to-orange-600 text-white" :
-                  pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white" :
-                  pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-500 to-cyan-600 text-white" :
-                  pokemon.cost >= 10 ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" :
-                  "bg-gradient-to-r from-gray-500 to-slate-600 text-white"
-                )}
-                style={{
-                  boxShadow: `0 4px 12px ${pokemon.cost >= 25 ? '#f56565' : pokemon.cost >= 20 ? '#9f7aea' : pokemon.cost >= 15 ? '#4299e1' : pokemon.cost >= 10 ? '#48bb78' : '#718096'}40`
-                }}
-              >
-                {pokemon.cost} pts
-              </Badge>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8 rounded-full hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-              </Button>
-            </div>
+            <Badge
+              className={cn(
+                "text-lg px-4 py-2 font-bold shadow-lg",
+                pokemon.cost >= 25 ? "bg-gradient-to-r from-red-500 to-orange-600 text-white" :
+                pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white" :
+                pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-500 to-cyan-600 text-white" :
+                pokemon.cost >= 10 ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" :
+                "bg-gradient-to-r from-gray-500 to-slate-600 text-white"
+              )}
+              style={{
+                boxShadow: `0 4px 12px ${pokemon.cost >= 25 ? '#f56565' : pokemon.cost >= 20 ? '#9f7aea' : pokemon.cost >= 15 ? '#4299e1' : pokemon.cost >= 10 ? '#48bb78' : '#718096'}40`
+              }}
+            >
+              {pokemon.cost} pts
+            </Badge>
           </div>
         </DialogHeader>
 
