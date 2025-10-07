@@ -62,6 +62,13 @@ export class DraftService {
     return generateRoomCode()
   }
 
+  /**
+   * Helper to query drafts by room code (which is used as the logical draft ID)
+   */
+  private static getDraftQuery(roomCode: string) {
+    return { room_code: roomCode.toLowerCase() }
+  }
+
   static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
     if (!supabase) {
       console.error('Supabase configuration error:', {
@@ -98,29 +105,32 @@ export class DraftService {
       customFormatId = formatData.id
     }
 
-    // Create draft
+    // Create draft - build insert object conditionally based on table columns
+    const draftInsert: any = {
+      room_code: roomCode.toLowerCase(),
+      name: name || `${hostName}'s Draft`,
+      host_id: hostId,
+      format: settings.draftType,
+      max_teams: settings.maxTeams,
+      budget_per_team: settings.budgetPerTeam || 100,
+      status: 'setup',
+      current_round: 1,
+      settings: {
+        timeLimit: settings.timeLimit,
+        pokemonPerTeam: settings.pokemonPerTeam,
+        formatId: settings.formatId || DEFAULT_FORMAT
+      }
+    }
+
+    // Add optional columns only if they're supported (spectator mode migration)
+    if (isPublic !== undefined) draftInsert.is_public = isPublic || false
+    if (description) draftInsert.description = description
+    if (tags) draftInsert.tags = tags
+    if (customFormatId) draftInsert.custom_format_id = customFormatId
+
     const { data: draft, error: draftError } = await (supabase
       .from('drafts') as any)
-      .insert({
-        id: roomCode.toLowerCase(),
-        name: name || `${hostName}'s Draft`,
-        host_id: hostId,
-        format: settings.draftType,
-        max_teams: settings.maxTeams,
-        budget_per_team: settings.budgetPerTeam || 100,
-        status: 'setup',
-        current_round: 1,
-        settings: {
-          timeLimit: settings.timeLimit,
-          pokemonPerTeam: settings.pokemonPerTeam,
-          formatId: settings.formatId || DEFAULT_FORMAT
-        },
-        is_public: isPublic || false,
-        spectator_count: 0,
-        description: description || null,
-        tags: tags || null,
-        custom_format_id: customFormatId
-      })
+      .insert(draftInsert)
       .select()
       .single()
 
@@ -166,7 +176,7 @@ export class DraftService {
 
     // Record draft participation in user session
     UserSessionService.recordDraftParticipation({
-      draftId: (draft as any).id,
+      draftId: roomCode.toLowerCase(),
       userId: hostId,
       teamId: team.id,
       teamName: teamName,
@@ -178,7 +188,7 @@ export class DraftService {
     // Note: Auto-start removed to allow all teams to join before starting
     // Host must manually start the draft once all teams are ready
 
-    return { roomCode, draftId: (draft as any).id }
+    return { roomCode, draftId: roomCode.toLowerCase() }
   }
 
   static async joinDraft({ roomCode, userName, teamName }: JoinDraftParams): Promise<{ draftId: string; teamId: string }> {
@@ -187,11 +197,11 @@ export class DraftService {
 
     // Check if draft exists and is joinable
     if (!supabase) throw new Error('Supabase not available')
-    
+
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
       .select('*, teams(*)')
-      .eq('id', draftId)
+      .eq('room_code', draftId)
       .single()
 
     if (draftError || !draft) {
@@ -208,12 +218,13 @@ export class DraftService {
 
     // Get next draft order
     const nextDraftOrder = (draft as any).teams.length + 1
+    const draftUuid = (draft as any).id  // Actual UUID from database
 
     // Create team
     const { data: team, error: teamError } = await (supabase
       .from('teams') as any)
       .insert({
-        draft_id: draftId,
+        draft_id: draftUuid,
         name: teamName,
         owner_id: userId,
         draft_order: nextDraftOrder,
@@ -231,7 +242,7 @@ export class DraftService {
     const { error: participantError } = await (supabase
       .from('participants') as any)
       .insert({
-        draft_id: draftId,
+        draft_id: draftUuid,
         user_id: userId,
         display_name: userName,
         team_id: team.id,
@@ -244,7 +255,7 @@ export class DraftService {
       throw new Error('Failed to create participant')
     }
 
-    // Record draft participation in user session
+    // Record draft participation in user session (use room code as logical draft ID)
     UserSessionService.recordDraftParticipation({
       draftId: draftId,
       userId: userId,
@@ -264,22 +275,24 @@ export class DraftService {
 
     // Check if draft exists
     if (!supabase) throw new Error('Supabase not available')
-    
+
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
       .select('*')
-      .eq('id', draftId)
+      .eq('room_code', draftId)
       .single()
 
     if (draftError || !draft) {
       throw new Error('Draft room not found')
     }
 
+    const draftUuid = (draft as any).id
+
     // Create spectator participant (no team assignment)
     const { error: participantError } = await (supabase
       .from('participants') as any)
       .insert({
-        draft_id: draftId,
+        draft_id: draftUuid,
         user_id: userId,
         display_name: userName,
         team_id: null, // Spectators have no team
@@ -306,10 +319,10 @@ export class DraftService {
     return { draftId }
   }
 
-  static async getDraftState(draftId: string): Promise<DraftState | null> {
+  static async getDraftState(roomCodeOrDraftId: string): Promise<DraftState | null> {
     if (!supabase) return null
-    
-    const { data, error } = await supabase
+
+    const { data, error} = await supabase
       .from('drafts')
       .select(`
         *,
@@ -318,7 +331,7 @@ export class DraftService {
         picks(*),
         auctions(*)
       `)
-      .eq('id', draftId)
+      .eq('room_code', roomCodeOrDraftId.toLowerCase())
       .single()
 
     if (error || !data) {
@@ -335,19 +348,22 @@ export class DraftService {
     }
   }
 
-  static async startDraft(draftId: string): Promise<void> {
+  static async startDraft(roomCodeOrDraftId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
-    
-    // First, get all teams for this draft
-    const { data: teams, error: teamsError } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('draft_id', draftId)
-      .order('draft_order')
 
-    if (teamsError || !teams) {
-      console.error('Error fetching teams:', teamsError)
-      throw new Error('Failed to fetch teams')
+    // Get draft by room code
+    const draftState = await this.getDraftState(roomCodeOrDraftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const draftUuid = draftState.draft.id
+
+    // Get all teams for this draft
+    const teams = draftState.teams
+
+    if (!teams || teams.length === 0) {
+      throw new Error('No teams in draft')
     }
 
     // Randomize draft order
@@ -373,7 +389,7 @@ export class DraftService {
         current_turn: 1,
         updated_at: new Date().toISOString()
       })
-      .eq('id', draftId)
+      .eq('id', draftUuid)
 
     if (error) {
       console.error('Error starting draft:', error)

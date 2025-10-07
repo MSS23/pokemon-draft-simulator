@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
 import { Copy, Share2 } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
@@ -748,7 +749,8 @@ export default function DraftRoomPage() {
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
           <div className="relative text-center mb-6">
-            <div className="absolute top-0 right-0">
+            <div className="absolute top-0 right-0 flex gap-2">
+              <ImageTypeToggle />
               <ThemeToggle />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-2">
@@ -831,7 +833,8 @@ export default function DraftRoomPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="relative text-center mb-6">
-          <div className="absolute top-0 right-0">
+          <div className="absolute top-0 right-0 flex gap-2">
+            <ImageTypeToggle />
             <ThemeToggle />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-2">

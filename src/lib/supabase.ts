@@ -38,6 +38,7 @@ export type Database = {
           current_turn: number | null
           current_round: number
           settings: Record<string, any> | null
+          room_code: string | null
           is_public: boolean
           spectator_count: number
           description: string | null
@@ -57,6 +58,7 @@ export type Database = {
           current_turn?: number | null
           current_round?: number
           settings?: Record<string, any> | null
+          room_code?: string | null
           is_public?: boolean
           spectator_count?: number
           description?: string | null
@@ -76,6 +78,7 @@ export type Database = {
           current_turn?: number | null
           current_round?: number
           settings?: Record<string, any> | null
+          room_code?: string | null
           is_public?: boolean
           spectator_count?: number
           description?: string | null
@@ -336,6 +339,62 @@ export type Database = {
           spectator_id?: string | null
           metadata?: Record<string, any>
           created_at?: string
+        }
+      }
+      custom_formats: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          name: string
+          description: string | null
+          pokemon_pricing: Record<string, number>
+          total_pokemon: number
+          min_cost: number
+          max_cost: number
+          avg_cost: number
+          created_by_user_id: string | null
+          created_by_display_name: string
+          is_public: boolean
+          times_used: number
+          last_used_at: string | null
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          name: string
+          description?: string | null
+          pokemon_pricing: Record<string, number>
+          total_pokemon?: number
+          min_cost?: number
+          max_cost?: number
+          avg_cost?: number
+          created_by_user_id?: string | null
+          created_by_display_name: string
+          is_public?: boolean
+          times_used?: number
+          last_used_at?: string | null
+          deleted_at?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          name?: string
+          description?: string | null
+          pokemon_pricing?: Record<string, number>
+          total_pokemon?: number
+          min_cost?: number
+          max_cost?: number
+          avg_cost?: number
+          created_by_user_id?: string | null
+          created_by_display_name?: string
+          is_public?: boolean
+          times_used?: number
+          last_used_at?: string | null
+          deleted_at?: string | null
         }
       }
     }

@@ -7,6 +7,7 @@ import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DraftService } from '@/lib/draft-service'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
@@ -156,6 +157,7 @@ export default function Home() {
               <Settings className="h-4 w-4 mr-1" />
               Admin
             </Button>
+            <ImageTypeToggle />
             <ThemeToggle />
           </div>
           <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">

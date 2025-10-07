@@ -10,6 +10,7 @@ import {
   getPokemonSpriteUrl,
   getOfficialArtworkUrl
 } from '@/utils/pokemon'
+import { useImagePreference } from '@/contexts/ImagePreferenceContext'
 
 export interface PokemonImageConfig {
   pokemonId: string
@@ -35,18 +36,32 @@ export interface PokemonImageActions {
 /**
  * Hook for managing Pokemon image state with automatic fallbacks
  */
-export function usePokemonImage({ 
-  pokemonId, 
-  pokemonName, 
-  preferOfficialArt = false 
+export function usePokemonImage({
+  pokemonId,
+  pokemonName,
+  preferOfficialArt = false
 }: PokemonImageConfig): PokemonImageState & PokemonImageActions {
+  const { imageType } = useImagePreference()
   const [fallbackAttempt, setFallbackAttempt] = useState(0)
   const [imageError, setImageError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [showOfficialArt, setShowOfficialArt] = useState(preferOfficialArt)
 
-  // Get image URL based on current state
+  // Get image URL based on current state and global preference
   const getImageUrl = useCallback(() => {
+    // If user prefers PNG, always use official artwork or static sprite
+    if (imageType === 'png') {
+      switch (fallbackAttempt) {
+        case 0:
+          return getOfficialArtworkUrl(pokemonId)
+        case 1:
+          return getPokemonSpriteUrl(pokemonId)
+        default:
+          return getBestPokemonImageUrl(pokemonId, pokemonName)
+      }
+    }
+
+    // If user prefers GIF (animated)
     if (showOfficialArt) {
       switch (fallbackAttempt) {
         case 0:
@@ -68,7 +83,7 @@ export function usePokemonImage({
           return getOfficialArtworkUrl(pokemonId)
       }
     }
-  }, [pokemonId, pokemonName, showOfficialArt, fallbackAttempt])
+  }, [pokemonId, pokemonName, showOfficialArt, fallbackAttempt, imageType])
 
   // Handle image loading error
   const handleImageError = useCallback(() => {

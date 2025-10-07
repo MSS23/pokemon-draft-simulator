@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { NotificationProvider } from "@/components/providers/NotificationProvider";
 import { HydrationFixProvider } from "@/components/providers/HydrationFixProvider";
 import { ErrorBoundaryProvider } from "@/components/providers/ErrorBoundaryProvider";
+import { ImagePreferenceProvider } from "@/contexts/ImagePreferenceContext";
 import { HydrationErrorFilter } from "./hydration-error-filter";
 // import ErrorBoundary from "@/components/ui/error-boundary";
 
@@ -76,11 +77,13 @@ export default function RootLayout({
               defaultTheme="system"
               storageKey="pokemon-draft-theme"
             >
-              <NotificationProvider>
-                <QueryProvider>
-                  {children}
-                </QueryProvider>
-              </NotificationProvider>
+              <ImagePreferenceProvider>
+                <NotificationProvider>
+                  <QueryProvider>
+                    {children}
+                  </QueryProvider>
+                </NotificationProvider>
+              </ImagePreferenceProvider>
             </ThemeProvider>
           </HydrationFixProvider>
         </ErrorBoundaryProvider>
