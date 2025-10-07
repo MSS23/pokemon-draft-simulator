@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server'
 
 export async function GET() {
-  return NextResponse.json({ status: 'ok', timestamp: new Date().toISOString() })
-}
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const hasAnonKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export async function HEAD() {
-  return new NextResponse(null, { status: 200 })
+  return NextResponse.json({
+    status: 'ok',
+    supabaseConfigured: !!supabaseUrl && hasAnonKey,
+    supabaseUrl: supabaseUrl || 'NOT_SET',
+    hasAnonKey: hasAnonKey,
+    timestamp: new Date().toISOString()
+  })
 }
