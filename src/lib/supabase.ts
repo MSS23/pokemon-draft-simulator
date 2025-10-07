@@ -423,7 +423,13 @@ export type Database = {
 }
 
 // Create and export the Supabase client
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+// Build timestamp: Force new bundle hash
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
+  }
+})
 
 // Helper to check if Supabase is configured
 export const isSupabaseConfigured = true
