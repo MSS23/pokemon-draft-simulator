@@ -1,22 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// Get environment variables with fallbacks
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// Get environment variables - these are embedded at build time for NEXT_PUBLIC_ prefixed vars
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Function to validate Supabase credentials
-function isValidSupabaseConfig(url: string, key: string): boolean {
-  // Check if values exist and are not placeholder text
-  if (!url || !key) return false
-  if (url === 'your-supabase-project-url' || key === 'your-supabase-anon-key') return false
-
-  // Basic URL validation
-  try {
-    const urlObj = new URL(url)
-    return urlObj.protocol === 'https:' && urlObj.hostname.includes('supabase')
-  } catch {
-    return false
-  }
+// Validate configuration
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.')
 }
 
 // Database types
@@ -421,25 +411,9 @@ export type Database = {
   }
 }
 
-// Check if we have valid Supabase configuration
-export const isSupabaseConfigured = isValidSupabaseConfig(supabaseUrl, supabaseAnonKey)
+// Create and export the Supabase client
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
-// Create Supabase client only if we have valid configuration
-let supabaseClient: SupabaseClient<Database> | null = null
-
-if (isSupabaseConfigured) {
-  try {
-    supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey)
-  } catch (error) {
-    console.warn('Failed to create Supabase client:', error)
-    supabaseClient = null
-  }
-}
-
-// Export the client (will be null if not configured)
-export const supabase = supabaseClient
-
-// Helper function to check if Supabase is available
-export function isSupabaseAvailable(): boolean {
-  return supabase !== null
-}
+// Helper to check if Supabase is configured
+export const isSupabaseConfigured = true
+export const isSupabaseAvailable = () => true
