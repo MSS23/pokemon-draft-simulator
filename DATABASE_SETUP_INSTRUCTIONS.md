@@ -35,7 +35,7 @@ You should see a success message like:
 
 ### Step 5: Test Your App
 
-1. Go to: **https://pokemon-draft.vercel.app**
+1. Go to: **https://pokemon-draft-simulator.vercel.app**
 2. Clear your browser cache (Ctrl+Shift+Delete)
 3. Click **"Create Draft"**
 4. Fill in your details

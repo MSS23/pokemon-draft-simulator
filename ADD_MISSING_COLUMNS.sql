@@ -123,5 +123,5 @@ DO $$
 BEGIN
   RAISE NOTICE '✅ Missing columns and tables added successfully!';
   RAISE NOTICE '📊 Your database is now fully updated';
-  RAISE NOTICE '🎮 Try creating a draft at: https://pokemon-draft.vercel.app';
+  RAISE NOTICE '🎮 Try creating a draft at: https://pokemon-draft-simulator.vercel.app';
 END $$;
