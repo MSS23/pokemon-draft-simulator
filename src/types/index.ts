@@ -165,6 +165,9 @@ export interface CustomFormat {
   updatedAt: string
 }
 
+// Re-export Format from formats lib for compatibility
+export type { PokemonFormat as Format } from '@/lib/formats'
+
 export type DraftPhase = 'setup' | 'drafting' | 'auction' | 'completed'
 
 export interface DraftState {

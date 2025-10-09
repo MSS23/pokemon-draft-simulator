@@ -57,6 +57,13 @@ export interface DraftState {
   auctions?: Auction[]
 }
 
+export interface ServerTime {
+  serverTime: number
+  pickEndsAt: number | null
+  auctionEndsAt: number | null
+  turnStartedAt: number | null
+}
+
 export class DraftService {
   static generateRoomCode(): string {
     return generateRoomCode()
@@ -67,6 +74,48 @@ export class DraftService {
    */
   private static getDraftQuery(roomCode: string) {
     return { room_code: roomCode.toLowerCase() }
+  }
+
+  /**
+   * Get server-authoritative time with draft timing information
+   * This prevents client-side timer drift
+   */
+  static async getServerTime(roomCode: string): Promise<ServerTime> {
+    try {
+      const { data: draft } = await supabase
+        .from('drafts')
+        .select('settings, updated_at')
+        .eq('room_code', roomCode.toLowerCase())
+        .single()
+
+      if (!draft) {
+        return {
+          serverTime: Date.now(),
+          pickEndsAt: null,
+          auctionEndsAt: null,
+          turnStartedAt: null
+        }
+      }
+
+      // Use database updated_at as server time reference
+      const serverTime = new Date(draft.updated_at).getTime()
+      const settings = draft.settings as any
+
+      return {
+        serverTime,
+        pickEndsAt: null, // Will be calculated on client with server offset
+        auctionEndsAt: null,
+        turnStartedAt: null
+      }
+    } catch (error) {
+      console.error('Error fetching server time:', error)
+      return {
+        serverTime: Date.now(),
+        pickEndsAt: null,
+        auctionEndsAt: null,
+        turnStartedAt: null
+      }
+    }
   }
 
   static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {

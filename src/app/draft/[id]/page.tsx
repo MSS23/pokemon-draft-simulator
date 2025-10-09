@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
@@ -32,6 +32,7 @@ const AuctionTimer = dynamic(() => import('@/components/draft/AuctionTimer'), { 
 const AuctionNomination = dynamic(() => import('@/components/draft/AuctionNomination'), { ssr: false })
 const SpectatorMode = dynamic(() => import('@/components/draft/SpectatorMode'), { ssr: false })
 const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNotifications'), { ssr: false })
+const AIDraftAssistant = dynamic(() => import('@/components/draft/AIDraftAssistant').then(mod => ({ default: mod.AIDraftAssistant })), { ssr: false })
 
 interface DraftUIState {
   roomCode: string
@@ -108,6 +109,12 @@ export default function DraftRoomPage() {
   // Pick timer state
   const [pickTimeRemaining, setPickTimeRemaining] = useState<number>(0)
   const [turnStartTime, setTurnStartTime] = useState<number | null>(null)
+
+  // Server time synchronization state
+  const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
+  const getServerTime = useCallback(() => {
+    return Date.now() + serverTimeOffset
+  }, [serverTimeOffset])
 
   // Spectator mode state
   const [recentActivity] = useState<Array<{
@@ -266,12 +273,18 @@ export default function DraftRoomPage() {
 
   // Load initial draft state
   useEffect(() => {
+    let mounted = true
+    const abortController = new AbortController()
+
     const loadDraftState = async () => {
       if (!roomCode) return
 
       try {
         setIsLoading(true)
         const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
+
+        // Check if component is still mounted
+        if (!mounted || abortController.signal.aborted) return
 
         if (!dbState) {
           setError('Draft room not found')
@@ -281,15 +294,50 @@ export default function DraftRoomPage() {
         setDraftState(transformDraftState(dbState, userId))
         setIsConnected(true)
       } catch (err) {
+        if (!mounted || abortController.signal.aborted) return
         console.error('Error loading draft state:', err)
         setError('Failed to load draft room')
       } finally {
-        setIsLoading(false)
+        if (mounted) {
+          setIsLoading(false)
+        }
       }
     }
 
     loadDraftState()
+
+    return () => {
+      mounted = false
+      abortController.abort()
+    }
   }, [roomCode, userId, transformDraftState])
+
+  // Server time synchronization - prevents timer drift
+  useEffect(() => {
+    if (!roomCode || isDemoMode) return
+
+    const syncTime = async () => {
+      try {
+        const start = performance.now()
+        const serverTimeData = await DraftService.getServerTime(roomCode.toLowerCase())
+        const latency = (performance.now() - start) / 2 // Estimate one-way latency
+
+        // Calculate offset between server and client time
+        const offset = serverTimeData.serverTime - Date.now() + latency
+        setServerTimeOffset(offset)
+      } catch (error) {
+        console.error('Failed to sync server time:', error)
+      }
+    }
+
+    // Initial sync
+    syncTime()
+
+    // Re-sync every 5 minutes to account for clock drift
+    const interval = setInterval(syncTime, 300000)
+
+    return () => clearInterval(interval)
+  }, [roomCode, isDemoMode])
 
   // Update session activity periodically
   useEffect(() => {
@@ -310,10 +358,17 @@ export default function DraftRoomPage() {
   useEffect(() => {
     if (!roomCode || !isConnected) return
 
+    let mounted = true
+    const abortController = new AbortController()
+
     const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async () => {
       // Reload draft state when changes occur
       try {
         const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
+
+        // Check if component is still mounted before updating state
+        if (!mounted || abortController.signal.aborted) return
+
         if (dbState) {
           const newState = transformDraftState(dbState, userId)
 
@@ -365,12 +420,17 @@ export default function DraftRoomPage() {
           setDraftState(newState)
         }
       } catch (err) {
+        if (!mounted || abortController.signal.aborted) return
         console.error('Error updating draft state:', err)
         notify.error('Connection Error', 'Failed to sync draft updates')
       }
     })
 
-    return unsubscribe
+    return () => {
+      mounted = false
+      abortController.abort()
+      unsubscribe()
+    }
   }, [roomCode, isConnected, userId, transformDraftState, draftState, notify, isAuctionDraft])
 
   // Load current auction for auction drafts
@@ -399,49 +459,76 @@ export default function DraftRoomPage() {
     loadCurrentAuction()
   }, [isAuctionDraft, roomCode, draftState])
 
-  // Pick timer countdown for snake drafts
+  // Pick timer countdown for snake drafts - using server-authoritative time
   useEffect(() => {
     if (isAuctionDraft || !draftState || draftState.status !== 'drafting') {
       setPickTimeRemaining(0)
+      setTurnStartTime(null)
       return
     }
 
     // Reset timer when turn changes
     if (draftState.currentTurn !== turnStartTime) {
-      setTurnStartTime(draftState.currentTurn)
+      const serverNow = getServerTime()
+      setTurnStartTime(serverNow)
       setPickTimeRemaining(draftState.draftSettings.timeLimit)
     }
 
     // Calculate if it's user's turn for the notification
     const checkIsUserTurn = draftState?.userTeamId === draftState?.currentTeam
 
-    // Countdown timer
-    const interval = setInterval(() => {
-      setPickTimeRemaining(prev => {
-        if (prev <= 0) {
-          // Time expired - show warning if it was user's turn
-          if (checkIsUserTurn) {
-            notify.warning('Time Expired!', 'Your turn has been skipped', { duration: 3000 })
-          }
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
+    // Countdown timer - use requestAnimationFrame for smoother updates
+    let animationFrameId: number | null = null
 
-    return () => clearInterval(interval)
-  }, [isAuctionDraft, draftState, turnStartTime, notify])
+    const updateTimer = () => {
+      if (!turnStartTime) return
 
-  // Derived state
-  const allDraftedIds = draftState?.teams.flatMap(team => team.picks) || []
-  const canNominate = isAuctionDraft && !currentAuction && draftState?.status === 'drafting'
+      const now = getServerTime()
+      const elapsed = Math.floor((now - turnStartTime) / 1000)
+      const remaining = Math.max(0, draftState.draftSettings.timeLimit - elapsed)
 
-  const handleViewDetails = (pokemon: Pokemon) => {
+      setPickTimeRemaining(remaining)
+
+      if (remaining === 0 && checkIsUserTurn) {
+        // Time expired - show warning if it was user's turn
+        notify.warning('Time Expired!', 'Your turn has been skipped', { duration: 3000 })
+      }
+
+      // Continue updating if time remains
+      if (remaining > 0) {
+        animationFrameId = requestAnimationFrame(updateTimer)
+      }
+    }
+
+    // Start the timer
+    animationFrameId = requestAnimationFrame(updateTimer)
+
+    return () => {
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId)
+      }
+    }
+  }, [isAuctionDraft, draftState, turnStartTime, notify, getServerTime])
+
+  // Derived state - memoized to prevent unnecessary recalculations
+  const allDraftedIds = useMemo(() => {
+    return draftState?.teams.flatMap(team => team.picks) || []
+  }, [draftState?.teams])
+
+  const canNominate = useMemo(() => {
+    return isAuctionDraft && !currentAuction && draftState?.status === 'drafting'
+  }, [isAuctionDraft, currentAuction, draftState?.status])
+
+  const availablePokemon = useMemo(() => {
+    return pokemon?.filter(p => p.isLegal && !allDraftedIds.includes(p.id)) || []
+  }, [pokemon, allDraftedIds])
+
+  const handleViewDetails = useCallback((pokemon: Pokemon) => {
     setDetailsPokemon(pokemon)
     setIsDetailsOpen(true)
-  }
+  }, [])
 
-  const handleDraftPokemon = async (pokemon: Pokemon) => {
+  const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)
     const canDraft = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
     if (!canDraft) return
@@ -510,20 +597,20 @@ export default function DraftRoomPage() {
         { duration: 5000 }
       )
     }
-  }
+  }, [isUserTurn, isHost, isProxyPickingEnabled, draftState?.status, currentTeam, userTeam, userId, roomCode, notify])
 
-  const copyRoomCode = () => {
+  const copyRoomCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode)
     notify.success('Room Code Copied!', `${roomCode} copied to clipboard`)
-  }
+  }, [roomCode, notify])
 
-  const shareRoom = () => {
+  const shareRoom = useCallback(() => {
     const shareUrl = `${window.location.origin}/join-draft?code=${roomCode}`
     navigator.clipboard.writeText(shareUrl)
     notify.success('Share Link Copied!', 'Invite link copied to clipboard')
-  }
+  }, [roomCode, notify])
 
-  const startDraft = async () => {
+  const startDraft = useCallback(async () => {
     if (!draftState || !draftState.teams || draftState.teams.length < 2) {
       notify.warning('Cannot Start Draft', 'Need at least 2 teams to start the draft')
       return
@@ -539,44 +626,44 @@ export default function DraftRoomPage() {
         err instanceof Error ? err.message : 'Failed to start draft. Please try again.'
       )
     }
-  }
+  }, [draftState, roomCode, notify])
 
   // Draft Control Functions
-  const handlePauseDraft = async () => {
+  const handlePauseDraft = useCallback(async () => {
     try {
       await DraftService.pauseDraft(roomCode.toLowerCase())
     } catch (err) {
       console.error('Error pausing draft:', err)
       notify.error('Failed to Pause', err instanceof Error ? err.message : 'Failed to pause draft')
     }
-  }
+  }, [roomCode, notify])
 
-  const handleResumeDraft = async () => {
+  const handleResumeDraft = useCallback(async () => {
     try {
       await DraftService.resumeDraft(roomCode.toLowerCase())
     } catch (err) {
       console.error('Error resuming draft:', err)
       notify.error('Failed to Resume', err instanceof Error ? err.message : 'Failed to resume draft')
     }
-  }
+  }, [roomCode, notify])
 
-  const handleEndDraft = async () => {
+  const handleEndDraft = useCallback(async () => {
     try {
       await DraftService.endDraft(roomCode.toLowerCase())
     } catch (err) {
       console.error('Error ending draft:', err)
       notify.error('Failed to End Draft', err instanceof Error ? err.message : 'Failed to end draft')
     }
-  }
+  }, [roomCode, notify])
 
-  const handleAdvanceTurn = async () => {
+  const handleAdvanceTurn = useCallback(async () => {
     try {
       await DraftService.advanceTurn(roomCode.toLowerCase())
     } catch (err) {
       console.error('Error advancing turn:', err)
       notify.error('Failed to Advance Turn', err instanceof Error ? err.message : 'Failed to advance turn')
     }
-  }
+  }, [roomCode, notify])
 
   const handleSetTimer = useCallback(() => {
     // In a real implementation, this would update the timer setting
@@ -584,16 +671,16 @@ export default function DraftRoomPage() {
     notify.info('Timer Setting', `Timer functionality will be implemented in a future update`)
   }, [notify])
 
-  const handleEnableProxyPicking = () => {
+  const handleEnableProxyPicking = useCallback(() => {
     setIsProxyPickingEnabled(true)
-  }
+  }, [])
 
-  const handleDisableProxyPicking = () => {
+  const handleDisableProxyPicking = useCallback(() => {
     setIsProxyPickingEnabled(false)
-  }
+  }, [])
 
   // Auction-specific handlers
-  const handleNominatePokemon = async (pokemon: Pokemon, startingBid: number, duration: number) => {
+  const handleNominatePokemon = useCallback(async (pokemon: Pokemon, startingBid: number, duration: number) => {
     try {
       await DraftService.nominatePokemon(
         roomCode.toLowerCase(),
@@ -619,9 +706,9 @@ export default function DraftRoomPage() {
         { duration: 5000 }
       )
     }
-  }
+  }, [roomCode, userId, notify])
 
-  const handlePlaceBid = async (amount: number) => {
+  const handlePlaceBid = useCallback(async (amount: number) => {
     if (!currentAuction) return
 
     try {
@@ -641,9 +728,9 @@ export default function DraftRoomPage() {
       console.error('Error placing bid:', err)
       notify.error('Bid Failed', err instanceof Error ? err.message : 'Failed to place bid')
     }
-  }
+  }, [currentAuction, roomCode, userId, notify])
 
-  const handleUndoLastPick = async () => {
+  const handleUndoLastPick = useCallback(async () => {
     if (!roomCode || !draftState) return
 
     try {
@@ -657,13 +744,13 @@ export default function DraftRoomPage() {
         { duration: 5000 }
       )
     }
-  }
+  }, [roomCode, draftState, userId, notify])
 
-  const handleRequestNotificationPermission = () => {
+  const handleRequestNotificationPermission = useCallback(() => {
     requestBrowserNotificationPermission()
-  }
+  }, [requestBrowserNotificationPermission])
 
-  const handleAuctionTimeExpired = async () => {
+  const handleAuctionTimeExpired = useCallback(async () => {
     if (!currentAuction) return
 
     try {
@@ -676,9 +763,9 @@ export default function DraftRoomPage() {
     } catch (err) {
       console.error('Error resolving auction:', err)
     }
-  }
+  }, [currentAuction, roomCode, notify])
 
-  const handleExtendAuctionTime = async (seconds: number) => {
+  const handleExtendAuctionTime = useCallback(async (seconds: number) => {
     if (!currentAuction) return
 
     try {
@@ -695,7 +782,7 @@ export default function DraftRoomPage() {
     } catch (err) {
       console.error('Error extending auction:', err)
     }
-  }
+  }, [currentAuction, roomCode, notify])
 
 
   if (!userName || !teamName) {
@@ -1079,11 +1166,53 @@ export default function DraftRoomPage() {
                   Connecting to Draft Room
                 </h3>
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  You can browse and select Pokemon while we load the team information. 
+                  You can browse and select Pokemon while we load the team information.
                   The draft order will be determined once all teams have joined.
                 </p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* AI Draft Assistant - Show during active draft for user's team */}
+        {draftState && draftState.status === 'drafting' && draftState.userTeamId && !isSpectator && formatId && (
+          <div className="mb-6">
+            <EnhancedErrorBoundary>
+              <AIDraftAssistant
+                availablePokemon={availablePokemon}
+                currentTeam={userTeam?.picks.map(id => pokemon?.find(p => p.id === id)).filter(Boolean) as Pokemon[] || []}
+                opponentTeams={draftState.teams.filter(t => t.id !== draftState.userTeamId).map(t => ({
+                  id: t.id,
+                  draftId: roomCode?.toLowerCase() || '',
+                  name: t.name,
+                  ownerId: null,
+                  budgetRemaining: t.budgetRemaining,
+                  draftOrder: t.draftOrder,
+                  picks: t.picks.map(pokemonId => ({
+                    id: pokemonId,
+                    draftId: roomCode?.toLowerCase() || '',
+                    teamId: t.id,
+                    pokemonId,
+                    pokemonName: pokemon?.find(p => p.id === pokemonId)?.name || 'Unknown',
+                    cost: pokemon?.find(p => p.id === pokemonId)?.cost || 0,
+                    pickOrder: 0,
+                    round: 1,
+                    createdAt: new Date().toISOString()
+                  }))
+                }))}
+                remainingBudget={userTeam?.budgetRemaining || 0}
+                remainingPicks={(draftState.draftSettings.pokemonPerTeam || 6) - (userTeam?.picks.length || 0)}
+                format={{ id: formatId, name: formatId } as any}
+                onSelectPokemon={(pokemon) => {
+                  setSelectedPokemon(pokemon)
+                  // Auto-scroll to selection area
+                  if (!isAuctionDraft && isUserTurn) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }
+                }}
+                isYourTurn={isUserTurn}
+              />
+            </EnhancedErrorBoundary>
           </div>
         )}
 
