@@ -78,12 +78,12 @@ export function classifyRole(pokemon: Pokemon): string[] {
   const roles: string[] = []
   const stats = pokemon.stats
 
-  const totalOffense = stats.attack + stats.special_attack
-  const totalDefense = stats.defense + stats.special_defense + stats.hp
+  const totalOffense = stats.attack + stats.specialAttack
+  const totalDefense = stats.defense + stats.specialDefense + stats.hp
 
   if (stats.speed >= 100) roles.push('Speed Sweeper')
   if (stats.attack >= 120) roles.push('Physical Attacker')
-  if (stats.special_attack >= 120) roles.push('Special Attacker')
+  if (stats.specialAttack >= 120) roles.push('Special Attacker')
   if (totalDefense >= 300) roles.push('Tank')
   if (stats.hp >= 100 && totalDefense >= 250) roles.push('Wall')
   if (totalOffense >= 200 && stats.speed >= 80) roles.push('Mixed Attacker')

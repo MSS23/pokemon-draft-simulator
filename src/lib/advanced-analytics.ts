@@ -281,7 +281,7 @@ function calculateTypeCoverageRating(team: Pokemon[]): number {
   const defensiveTypes = new Set<string>()
 
   team.forEach(p => {
-    p.types.forEach(t => defensiveTypes.add(t))
+    p.types.forEach(t => defensiveTypes.add(typeof t === 'string' ? t : t.name))
     p.moves?.forEach(m => offensiveTypes.add(m.type))
   })
 
@@ -296,13 +296,13 @@ function calculateSynergyRating(team: Pokemon[]): number {
 
   // Check for weather synergy
   const weatherSetters = team.filter(p =>
-    p.abilities?.some(a =>
-      ['Drought', 'Drizzle', 'Sand Stream', 'Snow Warning'].includes(a.name)
+    p.abilities?.some((a: any) =>
+      ['Drought', 'Drizzle', 'Sand Stream', 'Snow Warning'].includes(typeof a === 'string' ? a : a.name)
     )
   )
   const weatherAbusers = team.filter(p =>
-    p.abilities?.some(a =>
-      ['Swift Swim', 'Chlorophyll', 'Sand Rush', 'Slush Rush'].includes(a.name)
+    p.abilities?.some((a: any) =>
+      ['Swift Swim', 'Chlorophyll', 'Sand Rush', 'Slush Rush'].includes(typeof a === 'string' ? a : a.name)
     )
   )
 
@@ -449,7 +449,8 @@ function calculateMatchupScore(attacker: Pokemon, defender: Pokemon): number {
 
   // Type advantage
   attacker.moves?.forEach(move => {
-    const effectiveness = getTypeEffectiveness(move.type, defender.types)
+    const defenderTypes = defender.types.map((t: any) => typeof t === 'string' ? t : t.name)
+    const effectiveness = getTypeEffectiveness(move.type, defenderTypes)
     if (effectiveness >= 2) score += 15
     if (effectiveness <= 0.5) score -= 15
   })
