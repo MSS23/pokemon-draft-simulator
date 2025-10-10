@@ -122,7 +122,7 @@ export default function DraftRoomPage() {
   }, [serverTimeOffset])
 
   // Spectator mode state
-  const [recentActivity] = useState<Array<{
+  const [recentActivity, setRecentActivity] = useState<Array<{
     id: string
     type: 'pick' | 'bid' | 'auction_start' | 'auction_end' | 'join' | 'leave'
     teamName: string
@@ -370,6 +370,37 @@ export default function DraftRoomPage() {
       UserSessionService.updateDraftParticipation(roomCode, { status: 'completed' })
     }
   }, [draftState?.status, roomCode])
+
+  // Track picks and populate recent activity for spectator mode
+  useEffect(() => {
+    if (!draftState?.teams || !pokemon) return
+
+    const newActivities: typeof recentActivity = []
+
+    // Process all picks from all teams
+    draftState.teams.forEach(team => {
+      team.picks.forEach((pokemonId, index) => {
+        const pokemonData = pokemon.find(p => p.id === pokemonId)
+        if (pokemonData) {
+          newActivities.push({
+            id: `${team.id}-pick-${index}`,
+            type: 'pick',
+            teamName: team.name,
+            pokemonName: pokemonData.name,
+            timestamp: new Date(Date.now() - (draftState.teams.reduce((sum, t) => sum + t.picks.length, 0) - index) * 1000).toISOString()
+          })
+        }
+      })
+    })
+
+    // Sort by timestamp descending (most recent first)
+    newActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+    // Only update if the activity has actually changed
+    if (JSON.stringify(newActivities.map(a => a.id)) !== JSON.stringify(recentActivity.map(a => a.id))) {
+      setRecentActivity(newActivities)
+    }
+  }, [draftState?.teams, pokemon, recentActivity])
 
   // Subscribe to real-time updates
   useEffect(() => {
