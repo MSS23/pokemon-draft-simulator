@@ -361,6 +361,9 @@ export default function DraftRoomPage() {
     let mounted = true
     const abortController = new AbortController()
 
+    let errorCount = 0
+    const MAX_ERRORS = 5
+
     const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async () => {
       // Reload draft state when changes occur
       try {
@@ -368,6 +371,9 @@ export default function DraftRoomPage() {
 
         // Check if component is still mounted before updating state
         if (!mounted || abortController.signal.aborted) return
+
+        // Reset error count on successful fetch
+        errorCount = 0
 
         if (dbState) {
           const newState = transformDraftState(dbState, userId)
@@ -418,11 +424,27 @@ export default function DraftRoomPage() {
           }
 
           setDraftState(newState)
+        } else {
+          // Draft not found - increment error count
+          errorCount++
+          if (errorCount >= MAX_ERRORS) {
+            console.error('Draft not found after multiple attempts, stopping updates')
+            setError('Draft room not found or has been deleted')
+            mounted = false // Stop further updates
+            return
+          }
         }
       } catch (err) {
         if (!mounted || abortController.signal.aborted) return
-        console.error('Error updating draft state:', err)
-        notify.error('Connection Error', 'Failed to sync draft updates')
+
+        errorCount++
+        console.error('Error updating draft state:', err, `(${errorCount}/${MAX_ERRORS})`)
+
+        if (errorCount >= MAX_ERRORS) {
+          notify.error('Connection Error', 'Unable to connect to draft. Please refresh the page.')
+          setError('Failed to connect to draft after multiple attempts')
+          mounted = false // Stop further updates
+        }
       }
     })
 

@@ -641,14 +641,22 @@ export class DraftService {
     // We need to get the actual UUID for the subscription
     // The subscription will be set up asynchronously after resolving the ID
     const channels: any[] = []
+    let retryCount = 0
+    const MAX_RETRIES = 3
+    let setupAttempted = false
 
     // Async function to setup subscriptions
     const setupSubscriptions = async () => {
+      // Prevent multiple setup attempts
+      if (setupAttempted) return
+      setupAttempted = true
+
       try {
         // Get the draft state to find the UUID
         const draftState = await this.getDraftState(roomCodeOrDraftId)
         if (!draftState) {
           console.error('Draft not found for subscription:', roomCodeOrDraftId)
+          // Don't retry if draft doesn't exist
           return
         }
 
