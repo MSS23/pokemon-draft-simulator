@@ -239,7 +239,7 @@ export class DraftService {
     return { roomCode, draftId: roomCode.toLowerCase() }
   }
 
-  static async joinDraft({ roomCode, userName, teamName }: JoinDraftParams): Promise<{ draftId: string; teamId: string }> {
+  static async joinDraft({ roomCode, userName, teamName }: JoinDraftParams): Promise<{ draftId: string; teamId: string; asSpectator?: boolean }> {
     const draftId = roomCode.toLowerCase()
     const userId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
@@ -256,12 +256,15 @@ export class DraftService {
       throw new Error('Draft room not found')
     }
 
-    if ((draft as any).status !== 'setup') {
-      throw new Error('Draft is no longer accepting new players')
-    }
-
-    if ((draft as any).teams.length >= (draft as any).max_teams) {
-      throw new Error('Draft room is full')
+    // If draft is full or already started, join as spectator instead
+    if ((draft as any).teams.length >= (draft as any).max_teams || (draft as any).status !== 'setup') {
+      console.log('Draft is full or started, joining as spectator instead')
+      const result = await this.joinAsSpectator({ roomCode, userName })
+      return {
+        draftId: result.draftId,
+        teamId: '', // No team for spectators
+        asSpectator: true
+      }
     }
 
     // Get next draft order
@@ -1701,6 +1704,61 @@ export class DraftService {
     await this.advanceTurn(draftId)
 
     console.log(`Auto-skipped turn ${draftState.draft.current_turn} for draft ${draftId}`)
+  }
+
+  /**
+   * Get all public drafts
+   */
+  static async getPublicDrafts(options?: {
+    status?: 'setup' | 'active' | 'completed' | 'paused'
+    limit?: number
+    offset?: number
+  }): Promise<Array<{
+    roomCode: string
+    name: string
+    status: string
+    maxTeams: number
+    currentTeams: number
+    format: string
+    createdAt: string
+    description: string | null
+    tags: string[] | null
+    spectatorCount: number
+  }>> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { status, limit = 20, offset = 0 } = options || {}
+
+    let query = supabase
+      .from('drafts')
+      .select('*, teams(count)')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (status) {
+      query = query.eq('status', status)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching public drafts:', error)
+      throw new Error('Failed to fetch public drafts')
+    }
+
+    return (data || []).map((draft: any) => ({
+      roomCode: draft.room_code,
+      name: draft.name,
+      status: draft.status,
+      maxTeams: draft.max_teams,
+      currentTeams: draft.teams?.[0]?.count || 0,
+      format: draft.format,
+      createdAt: draft.created_at,
+      description: draft.description,
+      tags: draft.tags,
+      spectatorCount: draft.spectator_count || 0
+    }))
   }
 
 }

@@ -89,17 +89,22 @@ function JoinDraftForm() {
           roomCode: formData.roomCode,
           userName: formData.userName
         })
-        
+
         router.push(`/draft/${formData.roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&spectator=true`)
       } else {
         // Join as participant with team
-        await DraftService.joinDraft({
+        const result = await DraftService.joinDraft({
           roomCode: formData.roomCode,
           userName: formData.userName,
           teamName: formData.teamName
         })
 
-        router.push(`/draft/${formData.roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&teamName=${encodeURIComponent(formData.teamName)}`)
+        // Check if auto-joined as spectator (draft was full/started)
+        if (result.asSpectator) {
+          router.push(`/draft/${formData.roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&spectator=true`)
+        } else {
+          router.push(`/draft/${formData.roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&teamName=${encodeURIComponent(formData.teamName)}`)
+        }
       }
     } catch (error) {
       console.error('Failed to join draft:', error)
