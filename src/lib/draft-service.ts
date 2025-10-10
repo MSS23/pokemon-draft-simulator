@@ -640,7 +640,7 @@ export class DraftService {
 
     // We need to get the actual UUID for the subscription
     // The subscription will be set up asynchronously after resolving the ID
-    let channels: any[] = []
+    const channels: any[] = []
 
     // Async function to setup subscriptions
     const setupSubscriptions = async () => {
