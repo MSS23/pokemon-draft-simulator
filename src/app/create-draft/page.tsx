@@ -68,7 +68,7 @@ export default function CreateDraftPage() {
       if (user.user_metadata?.display_name) {
         setFormData(prev => ({ ...prev, userName: user.user_metadata.display_name }))
       } else if (user.email) {
-        setFormData(prev => ({ ...prev, userName: user.email.split('@')[0] }))
+        setFormData(prev => ({ ...prev, userName: user.email?.split('@')[0] || 'User' }))
       }
 
       setIsCheckingAuth(false)
