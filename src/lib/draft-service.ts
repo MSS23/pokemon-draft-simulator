@@ -711,6 +711,123 @@ export class DraftService {
     }
   }
 
+  static async resetDraft(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get the draft to verify it exists
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    // Delete all picks
+    const { error: picksError } = await (supabase
+      .from('picks') as any)
+      .delete()
+      .eq('draft_id', draftState.draft.id)
+
+    if (picksError) {
+      console.error('Error deleting picks:', picksError)
+      throw new Error('Failed to delete picks')
+    }
+
+    // Delete all auctions if any
+    const { error: auctionsError } = await (supabase
+      .from('auctions') as any)
+      .delete()
+      .eq('draft_id', draftState.draft.id)
+
+    if (auctionsError) {
+      console.error('Error deleting auctions:', auctionsError)
+      // Don't throw - auctions might not exist
+    }
+
+    // Delete all bid history if any
+    const { error: bidsError } = await (supabase
+      .from('bid_history') as any)
+      .delete()
+      .eq('draft_id', draftState.draft.id)
+
+    if (bidsError) {
+      console.error('Error deleting bids:', bidsError)
+      // Don't throw - bids might not exist
+    }
+
+    // Reset team budgets and picks
+    const { error: teamsError } = await (supabase
+      .from('teams') as any)
+      .update({
+        budget_remaining: draftState.draft.budget_per_team
+      })
+      .eq('draft_id', draftState.draft.id)
+
+    if (teamsError) {
+      console.error('Error resetting teams:', teamsError)
+      throw new Error('Failed to reset teams')
+    }
+
+    // Reset draft status
+    const { error: draftError } = await (supabase
+      .from('drafts') as any)
+      .update({
+        status: 'setup',
+        current_turn: null,
+        current_round: 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftState.draft.id)
+
+    if (draftError) {
+      console.error('Error resetting draft:', draftError)
+      throw new Error('Failed to reset draft')
+    }
+  }
+
+  static async deleteDraft(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get the draft to verify it exists and get the internal ID
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const internalId = draftState.draft.id
+
+    // Delete in order due to foreign key constraints
+    // 1. Delete picks
+    await (supabase.from('picks') as any).delete().eq('draft_id', internalId)
+
+    // 2. Delete bid history
+    await (supabase.from('bid_history') as any).delete().eq('draft_id', internalId)
+
+    // 3. Delete auctions
+    await (supabase.from('auctions') as any).delete().eq('draft_id', internalId)
+
+    // 4. Delete wishlists
+    await (supabase.from('wishlists') as any).delete().eq('draft_id', internalId)
+
+    // 5. Delete participants
+    await (supabase.from('participants') as any).delete().eq('draft_id', internalId)
+
+    // 6. Delete teams
+    await (supabase.from('teams') as any).delete().eq('draft_id', internalId)
+
+    // 7. Delete draft results if any
+    await (supabase.from('draft_results') as any).delete().eq('draft_id', internalId)
+
+    // 8. Finally, delete the draft itself
+    const { error: draftError } = await (supabase
+      .from('drafts') as any)
+      .delete()
+      .eq('id', internalId)
+
+    if (draftError) {
+      console.error('Error deleting draft:', draftError)
+      throw new Error('Failed to delete draft')
+    }
+  }
+
   static async advanceTurn(draftId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 

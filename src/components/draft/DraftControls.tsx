@@ -16,7 +16,9 @@ import {
   Users,
   AlertCircle,
   Undo,
-  Bell
+  Bell,
+  RotateCcw,
+  Trash2
 } from 'lucide-react'
 import { useNotify } from '@/components/providers/NotificationProvider'
 
@@ -38,6 +40,8 @@ interface DraftControlsProps {
   onPauseDraft: () => void
   onResumeDraft: () => void
   onEndDraft: () => void
+  onResetDraft?: () => void
+  onDeleteDraft?: () => void
   onAdvanceTurn: () => void
   onSetTimer: (seconds: number) => void
   onEnableProxyPicking?: () => void
@@ -61,6 +65,8 @@ export default function DraftControls({
   onPauseDraft,
   onResumeDraft,
   onEndDraft,
+  onResetDraft,
+  onDeleteDraft,
   onAdvanceTurn,
   onSetTimer,
   onEnableProxyPicking,
@@ -132,6 +138,31 @@ export default function DraftControls({
   const handleRequestNotifications = () => {
     if (onRequestNotificationPermission) {
       onRequestNotificationPermission()
+    }
+  }
+
+  const handleResetDraft = () => {
+    if (window.confirm('Are you sure you want to RESET this draft? This will delete all picks and teams will keep their positions. This action cannot be undone!')) {
+      if (onResetDraft) {
+        onResetDraft()
+        notify.warning('Draft Reset', 'All picks have been cleared. Teams remain but draft is back to setup.')
+      }
+    }
+  }
+
+  const handleDeleteDraft = () => {
+    const confirmed = window.confirm('⚠️ DANGER: Are you sure you want to DELETE this entire draft?\n\nThis will permanently delete:\n- All teams\n- All picks\n- All participants\n- The entire draft room\n\nThis action CANNOT be undone!')
+
+    if (confirmed) {
+      const doubleConfirm = window.prompt('Type "DELETE" to confirm permanent deletion:')
+      if (doubleConfirm === 'DELETE') {
+        if (onDeleteDraft) {
+          onDeleteDraft()
+          notify.error('Draft Deleted', 'The draft has been permanently deleted')
+        }
+      } else {
+        notify.info('Cancelled', 'Draft deletion cancelled')
+      }
     }
   }
 
@@ -347,6 +378,47 @@ export default function DraftControls({
                   </SelectContent>
                 </Select>
                 <span className="text-xs text-gray-500">Time limit per turn</span>
+              </div>
+            </div>
+
+            {/* Danger Zone - Admin Controls */}
+            <div className="space-y-3 pt-3 border-t-2 border-red-200 dark:border-red-800">
+              <h4 className="font-medium text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                Danger Zone
+              </h4>
+
+              {/* Reset Draft */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleResetDraft}
+                    variant="outline"
+                    size="sm"
+                    className="border-orange-400 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-400"
+                    disabled={!onResetDraft}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-1" />
+                    Reset Draft
+                  </Button>
+                  <span className="text-xs text-gray-500">Clear all picks, keep teams</span>
+                </div>
+              </div>
+
+              {/* Delete Draft */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleDeleteDraft}
+                    variant="destructive"
+                    size="sm"
+                    disabled={!onDeleteDraft}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete Draft Permanently
+                  </Button>
+                  <span className="text-xs text-gray-500">Remove entire draft and all data</span>
+                </div>
               </div>
             </div>
 

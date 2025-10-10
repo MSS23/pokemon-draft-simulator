@@ -656,6 +656,32 @@ export default function DraftRoomPage() {
     }
   }, [roomCode, notify])
 
+  const handleResetDraft = useCallback(async () => {
+    try {
+      await DraftService.resetDraft(roomCode.toLowerCase())
+      notify.success('Draft Reset', 'All picks have been cleared. Teams remain intact.')
+      // Refresh the page to show the reset state
+      window.location.reload()
+    } catch (err) {
+      console.error('Error resetting draft:', err)
+      notify.error('Failed to Reset Draft', err instanceof Error ? err.message : 'Failed to reset draft')
+    }
+  }, [roomCode, notify])
+
+  const handleDeleteDraft = useCallback(async () => {
+    try {
+      await DraftService.deleteDraft(roomCode.toLowerCase())
+      notify.success('Draft Deleted', 'The draft has been permanently deleted')
+      // Redirect to home page after deletion
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 2000)
+    } catch (err) {
+      console.error('Error deleting draft:', err)
+      notify.error('Failed to Delete Draft', err instanceof Error ? err.message : 'Failed to delete draft')
+    }
+  }, [roomCode, notify])
+
   const handleAdvanceTurn = useCallback(async () => {
     try {
       await DraftService.advanceTurn(roomCode.toLowerCase())
@@ -1058,6 +1084,8 @@ export default function DraftRoomPage() {
               onPauseDraft={handlePauseDraft}
               onResumeDraft={handleResumeDraft}
               onEndDraft={handleEndDraft}
+              onResetDraft={handleResetDraft}
+              onDeleteDraft={handleDeleteDraft}
               onAdvanceTurn={handleAdvanceTurn}
               onSetTimer={handleSetTimer}
               onEnableProxyPicking={handleEnableProxyPicking}
