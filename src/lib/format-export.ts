@@ -3,7 +3,7 @@
  * Exports Pokemon formats as CSV files for easy editing and custom format creation
  */
 
-import { fetchPokemon } from './pokemon-api'
+import { fetchPokemonForFormat } from './pokemon-api'
 import { getFormatById } from './formats'
 import { createFormatRulesEngine } from '@/domain/rules'
 
@@ -41,7 +41,7 @@ export async function exportFormatToCSV(
   }
 
   // Load all Pokemon for the format
-  const allPokemon = await fetchPokemon(formatId)
+  const allPokemon = await fetchPokemonForFormat(formatId, 1025) // Fetch all Pokemon
 
   // Create rules engine to check legality
   const rulesEngine = createFormatRulesEngine(format.id)
@@ -113,7 +113,6 @@ export async function exportFormatToCSV(
  * Download format as CSV file
  */
 export function downloadFormatCSV(formatId: string, csvContent: string): void {
-  const format = getFormatById(formatId)
   const fileName = `${formatId}-pokemon-pricing.csv`
 
   // Create blob and download
