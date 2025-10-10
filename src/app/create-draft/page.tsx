@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,10 +17,13 @@ import { useHydrationFix } from '@/lib/hydration-fix'
 import CSVUpload from '@/components/draft/CSVUpload'
 import type { ParsedCSVResult } from '@/lib/csv-parser'
 import { exportFormatWithProgress, downloadFormatCSV, createCustomFormatTemplate } from '@/lib/format-export'
+import { supabase } from '@/lib/supabase'
 
 export default function CreateDraftPage() {
   const router = useRouter()
   const [isCreating, setIsCreating] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const notify = useNotify()
   const [formData, setFormData] = useState({
     userName: '',
@@ -43,6 +46,36 @@ export default function CreateDraftPage() {
 
   // Apply hydration fix for browser extensions
   useHydrationFix()
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (!supabase) {
+        setIsCheckingAuth(false)
+        return
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        notify.warning('Authentication Required', 'Please sign in to create a draft')
+        router.push(`/auth/login?redirectTo=/create-draft`)
+        return
+      }
+
+      setUserEmail(user.email || null)
+
+      // Pre-fill userName with display name if available
+      if (user.user_metadata?.display_name) {
+        setFormData(prev => ({ ...prev, userName: user.user_metadata.display_name }))
+      } else if (user.email) {
+        setFormData(prev => ({ ...prev, userName: user.email.split('@')[0] }))
+      }
+
+      setIsCheckingAuth(false)
+    }
+
+    checkAuth()
+  }, [router, notify])
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => {
@@ -184,6 +217,18 @@ export default function CreateDraftPage() {
 
   const isFormValid = formData.userName.trim() && formData.teamName.trim()
 
+  // Show loading state while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pokemon-bg transition-colors duration-500">
       <div className="container mx-auto px-4 py-8">
@@ -192,6 +237,11 @@ export default function CreateDraftPage() {
           <div className="absolute top-0 right-0">
             <ThemeToggle />
           </div>
+          {userEmail && (
+            <div className="absolute top-0 left-0 text-sm text-muted-foreground">
+              Signed in as: {userEmail}
+            </div>
+          )}
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
             Create Draft Room
           </h1>

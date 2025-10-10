@@ -29,20 +29,19 @@ CREATE POLICY "Anyone can create drafts"
   WITH CHECK (true);
 
 -- Only draft host can update their draft
--- Supports both authenticated users and guest IDs
+-- Only allows authenticated users who own the draft
 CREATE POLICY "Draft host can update their draft"
   ON drafts FOR UPDATE
   USING (
-    host_id = COALESCE(auth.uid()::text, current_setting('request.jwt.claims', true)::json->>'sub')
-    OR host_id LIKE 'guest-%'
+    host_id = auth.uid()::text
   );
 
 -- Only draft host can delete their draft
+-- Only allows authenticated users who own the draft
 CREATE POLICY "Draft host can delete their draft"
   ON drafts FOR DELETE
   USING (
-    host_id = COALESCE(auth.uid()::text, current_setting('request.jwt.claims', true)::json->>'sub')
-    OR host_id LIKE 'guest-%'
+    host_id = auth.uid()::text
   );
 
 -- =====================================================
@@ -63,23 +62,18 @@ CREATE POLICY "Anyone can create teams"
 CREATE POLICY "Team owners can update their teams"
   ON teams FOR UPDATE
   USING (
-    owner_id = COALESCE(auth.uid()::text, current_setting('request.jwt.claims', true)::json->>'sub')
-    OR owner_id LIKE 'guest-%'
+    owner_id = auth.uid()::text
   );
 
 -- Team owners and draft hosts can delete teams
 CREATE POLICY "Team owners can delete their teams"
   ON teams FOR DELETE
   USING (
-    owner_id = COALESCE(auth.uid()::text, current_setting('request.jwt.claims', true)::json->>'sub')
-    OR owner_id LIKE 'guest-%'
+    owner_id = auth.uid()::text
     OR EXISTS (
       SELECT 1 FROM drafts
       WHERE drafts.id = teams.draft_id
-      AND (
-        drafts.host_id = COALESCE(auth.uid()::text, current_setting('request.jwt.claims', true)::json->>'sub')
-        OR drafts.host_id LIKE 'guest-%'
-      )
+      AND drafts.host_id = auth.uid()::text
     )
   );
 

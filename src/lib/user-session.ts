@@ -1,11 +1,16 @@
 // User Session Management - Persistent sessions across browser restarts
 // Handles user identification, draft participation tracking, and session recovery
+// Now integrated with Supabase authentication
+
+import { supabase } from './supabase'
 
 export interface UserSession {
   userId: string
   displayName: string
   createdAt: string
   lastActivity: string
+  isAuthenticated: boolean
+  email?: string
 }
 
 export interface DraftParticipation {
@@ -26,29 +31,58 @@ const DRAFT_PARTICIPATION_KEY = 'pokemon-draft-participation'
 export class UserSessionService {
   /**
    * Get or create a persistent user session
+   * Now prioritizes Supabase authenticated users
    */
-  static getOrCreateSession(displayName?: string): UserSession {
+  static async getOrCreateSession(displayName?: string): Promise<UserSession> {
     if (typeof window === 'undefined') {
       // Server-side fallback
       return {
         userId: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         displayName: displayName || 'Guest',
         createdAt: new Date().toISOString(),
-        lastActivity: new Date().toISOString()
+        lastActivity: new Date().toISOString(),
+        isAuthenticated: false
       }
     }
 
+    // Check if user is authenticated with Supabase
+    if (supabase) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const session: UserSession = {
+            userId: user.id,
+            displayName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+            email: user.email,
+            createdAt: user.created_at,
+            lastActivity: new Date().toISOString(),
+            isAuthenticated: true
+          }
+
+          // Store in localStorage for caching
+          try {
+            localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
+          } catch (error) {
+            console.warn('Failed to save authenticated session to localStorage:', error)
+          }
+
+          return session
+        }
+      } catch (error) {
+        console.warn('Failed to get authenticated user:', error)
+      }
+    }
+
+    // Fallback to localStorage session (no longer creates new guest sessions)
     try {
       const stored = localStorage.getItem(USER_SESSION_KEY)
       if (stored) {
         const session = JSON.parse(stored) as UserSession
-
-        // Update last activity
         session.lastActivity = new Date().toISOString()
 
-        // Update display name if provided
-        if (displayName && displayName !== session.displayName) {
-          session.displayName = displayName
+        // Mark as not authenticated if it's a guest session
+        if (!session.isAuthenticated) {
+          session.isAuthenticated = false
         }
 
         localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
@@ -58,21 +92,14 @@ export class UserSessionService {
       console.warn('Failed to load user session from localStorage:', error)
     }
 
-    // Create new session
-    const newSession: UserSession = {
-      userId: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    // No authenticated user and no stored session - return unauthenticated session
+    return {
+      userId: '',
       displayName: displayName || 'Guest',
       createdAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString()
+      lastActivity: new Date().toISOString(),
+      isAuthenticated: false
     }
-
-    try {
-      localStorage.setItem(USER_SESSION_KEY, JSON.stringify(newSession))
-    } catch (error) {
-      console.warn('Failed to save user session to localStorage:', error)
-    }
-
-    return newSession
   }
 
   /**

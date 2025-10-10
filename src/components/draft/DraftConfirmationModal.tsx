@@ -39,11 +39,13 @@ export default function DraftConfirmationModal({
   const {
     imageUrl,
     isLoading: imageLoading,
-    hasError: imageError
+    hasError: imageError,
+    handleImageError,
+    handleImageLoad
   } = usePokemonImage({
     pokemonId: pokemon?.id || '',
     pokemonName: pokemon?.name || '',
-    preferOfficialArt: true
+    preferOfficialArt: false // Use animated GIF
   })
 
   if (!pokemon) return null
@@ -56,42 +58,55 @@ export default function DraftConfirmationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        {/* Header with Pokemon Image */}
-        <div className="relative p-6 pb-4 text-center">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(120,119,198,0.1),transparent)]" />
+      <DialogContent className="max-w-md p-0 overflow-hidden border-0 shadow-2xl">
+        {/* Modern gradient background */}
+        <div className="relative bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+          {/* Header with Pokemon Image */}
+          <div className="relative p-8 text-center">
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(96,165,250,0.1),transparent_50%)]" />
 
-          <div className="relative z-10">
-            <DialogHeader className="space-y-2">
-              <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 bg-clip-text text-transparent flex items-center justify-center gap-2">
-                <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />
-                Draft Confirmation
-                <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />
-              </DialogTitle>
-              <DialogDescription className="text-slate-600 dark:text-slate-400">
-                Add this Pokémon to your draft team?
-              </DialogDescription>
-            </DialogHeader>
+            <div className="relative z-10">
+              <DialogHeader className="space-y-3 mb-6">
+                <DialogTitle className="text-3xl font-bold text-slate-900 dark:text-white flex items-center justify-center gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                  Draft Confirmation
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                </DialogTitle>
+                <DialogDescription className="text-base text-slate-600 dark:text-slate-400">
+                  Add this Pokémon to your draft team?
+                </DialogDescription>
+              </DialogHeader>
 
-            {/* Pokemon Image */}
-            <div className="flex justify-center my-6">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-400 via-purple-500 to-cyan-400 rounded-full blur-2xl opacity-30 animate-pulse" />
-                <div className="relative bg-white/90 dark:bg-slate-800/90 rounded-full p-4 border-4 border-white/50 shadow-2xl">
-                  {!imageError && !imageLoading ? (
+            {/* Pokemon Image - Animated GIF */}
+            <div className="flex justify-center my-8">
+              <div className="relative group">
+                {/* Animated glow effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full blur-xl opacity-20 group-hover:opacity-30 transition-opacity duration-300" />
+
+                {/* Image container */}
+                <div className="relative bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-full p-8 border-2 border-slate-200 dark:border-slate-600 shadow-xl">
+                  {!imageError ? (
                     <Image
                       src={imageUrl}
                       alt={pokemon.name}
-                      width={120}
-                      height={120}
-                      className="relative z-10 drop-shadow-lg"
+                      width={140}
+                      height={140}
+                      className="relative z-10 drop-shadow-2xl pixelated"
                       unoptimized
+                      onError={handleImageError}
+                      onLoad={handleImageLoad}
                     />
                   ) : (
-                    <div className="w-32 h-32 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-slate-600 dark:to-slate-700 rounded-full flex items-center justify-center">
-                      <span className="text-2xl">🔮</span>
+                    <div className="w-[140px] h-[140px] flex items-center justify-center">
+                      <span className="text-6xl">✨</span>
+                    </div>
+                  )}
+
+                  {/* Loading spinner */}
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-800/50 rounded-full">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
                     </div>
                   )}
                 </div>
@@ -99,52 +114,54 @@ export default function DraftConfirmationModal({
             </div>
 
             {/* Pokemon Info */}
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-200 mb-2">
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-3 capitalize">
                   {pokemon.name}
                 </h3>
-                <div className="flex justify-center gap-2 mb-3">
+                <div className="flex justify-center gap-2">
                   {pokemon.types.map((type) => (
                     <Badge
                       key={type.name}
-                      className="text-white font-semibold px-3 py-1 shadow-lg"
+                      className="text-white font-bold px-4 py-1.5 text-sm uppercase tracking-wide shadow-lg hover:scale-105 transition-transform"
                       style={{
                         backgroundColor: type.color,
-                        boxShadow: `0 4px 8px ${type.color}40`
+                        boxShadow: `0 4px 12px ${type.color}50`
                       }}
                     >
-                      {type.name.toUpperCase()}
+                      {type.name}
                     </Badge>
                   ))}
                 </div>
               </div>
 
               {/* Cost Analysis */}
-              <div className="bg-white/80 dark:bg-slate-800/80 rounded-lg p-4 space-y-3 backdrop-blur-sm border border-white/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Draft Cost:</span>
+              <div className="bg-white dark:bg-slate-800 rounded-xl p-5 space-y-3 shadow-lg border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Draft Cost:</span>
                   <div className="flex items-center gap-2">
                     <Badge
                       className={cn(
-                        "font-bold px-3 py-1",
-                        pokemon.cost >= 25 ? "bg-gradient-to-r from-red-500 to-orange-600 text-white" :
-                        pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-500 to-pink-600 text-white" :
-                        pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-500 to-cyan-600 text-white" :
-                        pokemon.cost >= 10 ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" :
-                        "bg-gradient-to-r from-gray-500 to-slate-600 text-white"
+                        "font-bold px-4 py-1.5 text-sm shadow-md",
+                        pokemon.cost >= 25 ? "bg-gradient-to-r from-red-500 to-orange-500 text-white" :
+                        pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white" :
+                        pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white" :
+                        pokemon.cost >= 10 ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white" :
+                        "bg-gradient-to-r from-slate-500 to-slate-600 text-white"
                       )}
                     >
                       {pokemon.cost} pts
                     </Badge>
-                    {isExpensive && <Crown className="h-4 w-4 text-yellow-500" />}
+                    {isExpensive && <Crown className="h-5 w-5 text-amber-500" />}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Remaining Budget:</span>
+                <div className="h-px bg-slate-200 dark:bg-slate-700" />
+
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Remaining Budget:</span>
                   <span className={cn(
-                    "font-bold",
+                    "font-bold text-lg",
                     isOverBudget ? "text-red-600 dark:text-red-400" :
                     wouldExhaustBudget ? "text-orange-600 dark:text-orange-400" :
                     "text-green-600 dark:text-green-400"
@@ -153,9 +170,9 @@ export default function DraftConfirmationModal({
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Team Slots:</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-300">
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Team Slots:</span>
+                  <span className="font-bold text-lg text-slate-900 dark:text-white">
                     {draftedCount + 1}/{maxDrafts}
                   </span>
                 </div>
@@ -188,23 +205,23 @@ export default function DraftConfirmationModal({
               </div>
 
               {/* Key Stats Preview */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
+              <div className="bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-xl p-5 border border-slate-200 dark:border-slate-600 shadow-md">
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-4 flex items-center justify-center gap-2">
+                  <Zap className="h-5 w-5 text-amber-500" />
                   Key Stats
                 </h4>
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div>
-                    <div className="text-lg font-bold text-red-600 dark:text-red-400">{pokemon.stats.hp}</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">HP</div>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">{pokemon.stats.hp}</div>
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">HP</div>
                   </div>
-                  <div>
-                    <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{pokemon.stats.attack}</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">ATK</div>
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{pokemon.stats.attack}</div>
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">ATK</div>
                   </div>
-                  <div>
-                    <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{pokemon.stats.total}</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">TOTAL</div>
+                  <div className="space-y-1">
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{pokemon.stats.total}</div>
+                    <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">TOTAL</div>
                   </div>
                 </div>
               </div>
@@ -213,11 +230,11 @@ export default function DraftConfirmationModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3 p-6 pt-0">
+        <div className="flex gap-3 p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
           <Button
             variant="outline"
             onClick={onClose}
-            className="flex-1 border-slate-300 dark:border-slate-600"
+            className="flex-1 h-12 font-semibold border-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </Button>
@@ -225,13 +242,13 @@ export default function DraftConfirmationModal({
             onClick={() => onConfirm(pokemon)}
             disabled={isOverBudget}
             className={cn(
-              "flex-1 font-semibold shadow-lg transition-all",
+              "flex-1 h-12 font-bold shadow-lg transition-all duration-200",
               isOverBudget
-                ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 hover:from-blue-700 hover:via-purple-700 hover:to-cyan-700 text-white transform hover:scale-105"
+                ? "bg-slate-400 hover:bg-slate-400 cursor-not-allowed opacity-60"
+                : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white hover:shadow-xl hover:scale-[1.02]"
             )}
           >
-            <Crown className="h-4 w-4 mr-2" />
+            <Crown className="h-5 w-5 mr-2" />
             {isOverBudget ? "Over Budget" : `Draft ${pokemon.name}`}
           </Button>
         </div>

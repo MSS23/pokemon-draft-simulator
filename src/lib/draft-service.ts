@@ -126,13 +126,19 @@ export class DraftService {
       throw new Error('Supabase is not properly configured. Please check your environment variables and restart the dev server.')
     }
 
+    // Require authentication to create drafts
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      throw new Error('You must be logged in to create a draft. Please sign in or create an account.')
+    }
+
     // Validate minimum Pokemon count for snake drafts
     if (settings.draftType === 'snake' && settings.pokemonPerTeam < 6) {
       throw new Error('Snake drafts require at least 6 Pokémon per team for points-based gameplay')
     }
 
     const roomCode = this.generateRoomCode()
-    const hostId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const hostId = user.id
 
     let customFormatId: string | null = null
 
@@ -1002,12 +1008,15 @@ export class DraftService {
 
     const internalId = draftState.draft.id
     const currentSettings = draftState.draft.settings || {}
+    const draftStatus = draftState.draft.status
 
-    // Store the new timer value as a pending change that will apply on the next turn
+    // If draft hasn't started yet, apply immediately
+    // Otherwise, apply on next turn
     const updatedSettings = {
       ...currentSettings,
       pickTimeLimitSeconds: timerSeconds,
-      pendingTimerChange: timerSeconds // Flag for UI to show pending change
+      // Only mark as pending if draft is already active
+      ...(draftStatus === 'active' && { pendingTimerChange: timerSeconds })
     }
 
     const { error } = await (supabase

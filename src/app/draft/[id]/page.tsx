@@ -789,8 +789,16 @@ export default function DraftRoomPage() {
 
   const handleSetTimer = useCallback(async (seconds: number) => {
     try {
+      const draftState = useDraftStore.getState()
+      const isActive = draftState.draft?.status === 'active'
+
       await DraftService.updateTimerSetting(roomCode.toLowerCase(), seconds)
-      notify.info('Timer Updated', `Turn timer will be set to ${seconds} seconds after the current pick completes`)
+
+      if (isActive) {
+        notify.info('Timer Updated', `Turn timer will be set to ${seconds} seconds after the current pick completes`)
+      } else {
+        notify.success('Timer Updated', `Turn timer set to ${seconds} seconds`)
+      }
     } catch (err) {
       console.error('Error updating timer:', err)
       notify.error('Failed to Update Timer', err instanceof Error ? err.message : 'Failed to update timer')
