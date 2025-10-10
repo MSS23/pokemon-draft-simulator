@@ -18,7 +18,8 @@ import {
   Undo,
   Bell,
   RotateCcw,
-  Trash2
+  Trash2,
+  Shuffle
 } from 'lucide-react'
 import { useNotify } from '@/components/providers/NotificationProvider'
 
@@ -37,6 +38,7 @@ interface DraftControlsProps {
   isHost: boolean
   timeRemaining?: number
   onStartDraft: () => void
+  onShuffleDraftOrder?: () => void
   onPauseDraft: () => void
   onResumeDraft: () => void
   onEndDraft: () => void
@@ -62,6 +64,7 @@ export default function DraftControls({
   isHost,
   timeRemaining = 60,
   onStartDraft,
+  onShuffleDraftOrder,
   onPauseDraft,
   onResumeDraft,
   onEndDraft,
@@ -141,6 +144,13 @@ export default function DraftControls({
     }
   }
 
+  const handleShuffleDraftOrder = () => {
+    if (onShuffleDraftOrder) {
+      onShuffleDraftOrder()
+      notify.success('Draft Order Shuffled', 'Team draft order has been randomized')
+    }
+  }
+
   const handleResetDraft = () => {
     if (window.confirm('Are you sure you want to RESET this draft? This will delete all picks and teams will keep their positions. This action cannot be undone!')) {
       if (onResetDraft) {
@@ -185,14 +195,25 @@ export default function DraftControls({
         {/* Primary Controls */}
         <div className="flex gap-2 flex-wrap">
           {draftStatus === 'waiting' && (
-            <Button
-              onClick={onStartDraft}
-              disabled={teams.length < 2}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Start Draft ({teams.length} teams)
-            </Button>
+            <>
+              <Button
+                onClick={handleShuffleDraftOrder}
+                disabled={teams.length < 2 || !onShuffleDraftOrder}
+                variant="outline"
+                className="border-purple-300 text-purple-700 hover:bg-purple-50"
+              >
+                <Shuffle className="h-4 w-4 mr-2" />
+                Shuffle Draft Order
+              </Button>
+              <Button
+                onClick={onStartDraft}
+                disabled={teams.length < 2}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Start Draft ({teams.length} teams)
+              </Button>
+            </>
           )}
 
           {draftStatus === 'drafting' && (

@@ -682,6 +682,16 @@ export default function DraftRoomPage() {
     }
   }, [roomCode, notify])
 
+  const handleShuffleDraftOrder = useCallback(async () => {
+    try {
+      await DraftService.shuffleDraftOrder(roomCode.toLowerCase())
+      notify.success('Draft Order Shuffled', 'Team draft order has been randomized!')
+    } catch (err) {
+      console.error('Error shuffling draft order:', err)
+      notify.error('Failed to Shuffle', err instanceof Error ? err.message : 'Failed to shuffle draft order')
+    }
+  }, [roomCode, notify])
+
   const handleAdvanceTurn = useCallback(async () => {
     try {
       await DraftService.advanceTurn(roomCode.toLowerCase())
@@ -1081,6 +1091,7 @@ export default function DraftRoomPage() {
               isHost={isHost}
               timeRemaining={pickTimeRemaining}
               onStartDraft={startDraft}
+              onShuffleDraftOrder={handleShuffleDraftOrder}
               onPauseDraft={handlePauseDraft}
               onResumeDraft={handleResumeDraft}
               onEndDraft={handleEndDraft}

@@ -396,6 +396,53 @@ export class DraftService {
     }
   }
 
+  static async shuffleDraftOrder(roomCodeOrDraftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get draft by room code
+    const draftState = await this.getDraftState(roomCodeOrDraftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const draftUuid = draftState.draft.id
+
+    // Only allow shuffle in setup status
+    if (draftState.draft.status !== 'setup') {
+      throw new Error('Can only shuffle draft order before draft starts')
+    }
+
+    // Get all teams for this draft
+    const teams = draftState.teams
+
+    if (!teams || teams.length === 0) {
+      throw new Error('No teams in draft')
+    }
+
+    // Randomize draft order using Fisher-Yates shuffle
+    const randomizedOrder = teams.map((_, index) => index + 1)
+    for (let i = randomizedOrder.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [randomizedOrder[i], randomizedOrder[j]] = [randomizedOrder[j], randomizedOrder[i]]
+    }
+
+    // Update each team with new randomized draft order
+    const updatePromises = teams.map((team, index) =>
+      (supabase as any)
+        .from('teams')
+        .update({ draft_order: randomizedOrder[index] })
+        .eq('id', (team as any).id)
+    )
+
+    await Promise.all(updatePromises)
+
+    // Update draft timestamp to trigger refresh
+    await (supabase as any)
+      .from('drafts')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', draftUuid)
+  }
+
   static async startDraft(roomCodeOrDraftId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 
@@ -414,20 +461,28 @@ export class DraftService {
       throw new Error('No teams in draft')
     }
 
-    // Randomize draft order
-    const randomizedOrder = teams
-      .map((_, index) => index + 1)
-      .sort(() => Math.random() - 0.5)
+    // Check if draft order has been set (shuffled)
+    // If all teams have draft_order = their index + 1, it hasn't been shuffled
+    const needsShuffle = teams.every((team, index) => team.draftOrder === index + 1)
 
-    // Update each team with new randomized draft order
-    const updatePromises = teams.map((team, index) =>
-      (supabase as any)
-        .from('teams')
-        .update({ draft_order: randomizedOrder[index] })
-        .eq('id', (team as any).id)
-    )
+    if (needsShuffle) {
+      // Auto-shuffle if not done manually
+      const randomizedOrder = teams.map((_, index) => index + 1)
+      for (let i = randomizedOrder.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [randomizedOrder[i], randomizedOrder[j]] = [randomizedOrder[j], randomizedOrder[i]]
+      }
 
-    await Promise.all(updatePromises)
+      // Update each team with new randomized draft order
+      const updatePromises = teams.map((team, index) =>
+        (supabase as any)
+          .from('teams')
+          .update({ draft_order: randomizedOrder[index] })
+          .eq('id', (team as any).id)
+      )
+
+      await Promise.all(updatePromises)
+    }
 
     // Set draft to active with first turn
     const { error } = await (supabase as any)
