@@ -54,8 +54,13 @@ interface DraftUIState {
     pokemonPerTeam: number
     draftType: 'snake' | 'auction'
     formatId?: string
+    customFormatId?: string
   }
   timeRemaining: number
+  draft: {
+    id: string
+    custom_format_id?: string
+  }
 }
 
 export default function DraftRoomPage() {
@@ -270,9 +275,14 @@ export default function DraftRoomPage() {
         timeLimit: dbState.draft.settings?.timeLimit || 60,
         pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
         draftType: dbState.draft.format,
-        formatId: dbState.draft.settings?.formatId
+        formatId: dbState.draft.settings?.formatId,
+        customFormatId: (dbState.draft as any).custom_format_id
       },
-      timeRemaining: dbState.draft.settings?.timeLimit || 60
+      timeRemaining: dbState.draft.settings?.timeLimit || 60,
+      draft: {
+        id: dbState.draft.id,
+        custom_format_id: (dbState.draft as any).custom_format_id
+      }
     }
   }, [roomCode])
 
