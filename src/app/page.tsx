@@ -113,6 +113,22 @@ export default function Home() {
     }
   }
 
+  const handleDeleteDraft = async (draftId: string, event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (confirm('Delete this draft permanently? This will remove the draft for all participants and cannot be undone.')) {
+      try {
+        await DraftService.deleteDraft(draftId)
+        // Also remove from local history
+        UserSessionService.removeDraftParticipation(draftId)
+        setMyDrafts(UserSessionService.getDraftParticipations())
+        alert('Draft deleted successfully')
+      } catch (error) {
+        console.error('Error deleting draft:', error)
+        alert('Failed to delete draft. You may not have permission to delete this draft.')
+      }
+    }
+  }
+
   // Load user's drafts on component mount
   useEffect(() => {
     const drafts = UserSessionService.getDraftParticipations()
@@ -327,9 +343,9 @@ export default function Home() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={(e) => handleRemoveDraft(draft.draftId, e)}
+                      onClick={(e) => handleDeleteDraft(draft.draftId, e)}
                       className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                      title="Remove from list"
+                      title="Delete draft permanently"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
