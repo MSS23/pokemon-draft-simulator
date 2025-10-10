@@ -105,14 +105,6 @@ export default function Home() {
     }
   }
 
-  const handleRemoveDraft = (draftId: string, event: React.MouseEvent) => {
-    event.stopPropagation()
-    if (confirm('Remove this draft from your list? This will only remove it from your local history.')) {
-      UserSessionService.removeDraftParticipation(draftId)
-      setMyDrafts(UserSessionService.getDraftParticipations())
-    }
-  }
-
   const handleDeleteDraft = async (draftId: string, event: React.MouseEvent) => {
     event.stopPropagation()
     if (confirm('Delete this draft permanently? This will remove the draft for all participants and cannot be undone.')) {

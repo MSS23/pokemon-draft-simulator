@@ -641,8 +641,6 @@ export class DraftService {
     // We need to get the actual UUID for the subscription
     // The subscription will be set up asynchronously after resolving the ID
     const channels: any[] = []
-    let retryCount = 0
-    const MAX_RETRIES = 3
     let setupAttempted = false
 
     // Async function to setup subscriptions
