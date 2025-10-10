@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Users, Clock, Zap, Trophy, Shield, Info, Eye, Tag } from 'lucide-react'
+import { Users, Clock, Zap, Trophy, Shield, Info, Eye, Tag, Download } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useNotify } from '@/components/providers/NotificationProvider'
 import { POKEMON_FORMATS, getFormatById, getPopularFormats, DEFAULT_FORMAT } from '@/lib/formats'
@@ -16,6 +16,7 @@ import { POKEMON_FORMATS, getFormatById, getPopularFormats, DEFAULT_FORMAT } fro
 import { useHydrationFix } from '@/lib/hydration-fix'
 import CSVUpload from '@/components/draft/CSVUpload'
 import type { ParsedCSVResult } from '@/lib/csv-parser'
+import { exportFormatWithProgress, downloadFormatCSV, createCustomFormatTemplate } from '@/lib/format-export'
 
 export default function CreateDraftPage() {
   const router = useRouter()
@@ -37,12 +38,54 @@ export default function CreateDraftPage() {
 
   const [customPricing, setCustomPricing] = useState<Record<string, number> | null>(null)
   const [customPricingStats, setCustomPricingStats] = useState<ParsedCSVResult['stats'] | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0)
 
   // Apply hydration fix for browser extensions
   useHydrationFix()
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleExportFormat = async () => {
+    if (!selectedFormat) return
+
+    setIsExporting(true)
+    setExportProgress(0)
+
+    try {
+      const csvContent = await exportFormatWithProgress(
+        formData.formatId,
+        (loaded, total) => {
+          setExportProgress(Math.round((loaded / total) * 100))
+        }
+      )
+
+      downloadFormatCSV(formData.formatId, csvContent)
+      notify.success('Export Complete', `${selectedFormat.shortName} format exported successfully!`)
+    } catch (error) {
+      console.error('Export error:', error)
+      notify.error('Export Failed', error instanceof Error ? error.message : 'Failed to export format')
+    } finally {
+      setIsExporting(false)
+      setExportProgress(0)
+    }
+  }
+
+  const handleDownloadTemplate = () => {
+    const template = createCustomFormatTemplate()
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', 'custom-format-template.csv')
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    notify.success('Template Downloaded', 'Edit the CSV and upload it to create your custom format')
   }
 
   // Room code generation moved to centralized utility
@@ -369,6 +412,49 @@ export default function CreateDraftPage() {
                           </div>
                         )}
                       </div>
+
+                      {/* Export Format Button */}
+                      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
+                        <Button
+                          onClick={handleExportFormat}
+                          disabled={isExporting}
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          {isExporting ? `Exporting... ${exportProgress}%` : 'Export Pokemon List (CSV)'}
+                        </Button>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+                          Download this format's Pokemon list with draft points. Edit it to create your own custom format!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Format Template Download */}
+                  {formData.useCustomFormat && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-start gap-2 mb-2">
+                        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                            Need a template?
+                          </h4>
+                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                            Download a template CSV file with example Pokemon to get started
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleDownloadTemplate}
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-400"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download Custom Format Template
+                      </Button>
                     </div>
                   )}
                 </div>
