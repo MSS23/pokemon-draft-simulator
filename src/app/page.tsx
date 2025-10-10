@@ -107,17 +107,27 @@ export default function Home() {
 
   const handleDeleteDraft = async (draftId: string, event: React.MouseEvent) => {
     event.stopPropagation()
-    if (confirm('Delete this draft permanently? This will remove the draft for all participants and cannot be undone.')) {
-      try {
-        await DraftService.deleteDraft(draftId)
-        // Also remove from local history
-        UserSessionService.removeDraftParticipation(draftId)
-        setMyDrafts(UserSessionService.getDraftParticipations())
-        alert('Draft deleted successfully')
-      } catch (error) {
-        console.error('Error deleting draft:', error)
-        alert('Failed to delete draft. You may not have permission to delete this draft.')
-      }
+
+    const confirmed = window.confirm('Delete this draft permanently? This will remove the draft for all participants and cannot be undone.')
+    if (!confirmed) return
+
+    try {
+      // Optimistically remove from UI first
+      setMyDrafts(prev => prev.filter(d => d.draftId !== draftId))
+
+      // Delete from database
+      await DraftService.deleteDraft(draftId)
+
+      // Remove from local storage
+      UserSessionService.removeDraftParticipation(draftId)
+
+    } catch (error) {
+      console.error('Error deleting draft:', error)
+
+      // Revert UI on error by reloading from storage
+      setMyDrafts(UserSessionService.getDraftParticipations())
+
+      alert('Failed to delete draft. You may not have permission to delete this draft.')
     }
   }
 
