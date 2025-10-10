@@ -56,7 +56,7 @@ export default function Home() {
   })
 
   // Use format-specific Pokemon list
-  const { data: pokemon, isLoading, error } = usePokemonListByFormat(selectedFormatId, true)
+  const { data: pokemon, isLoading, error } = usePokemonListByFormat(selectedFormatId, undefined, true)
 
   // Update selected format when format ID changes
   useEffect(() => {
