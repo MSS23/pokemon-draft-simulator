@@ -484,7 +484,7 @@ export class DraftService {
 
     // Check if draft order has been set (shuffled)
     // If all teams have draft_order = their index + 1, it hasn't been shuffled
-    const needsShuffle = teams.every((team, index) => team.draftOrder === index + 1)
+    const needsShuffle = teams.every((team, index) => (team as any).draft_order === index + 1)
 
     if (needsShuffle) {
       // Auto-shuffle if not done manually
