@@ -533,12 +533,11 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
 
   for (const range of pokemonRanges) {
     const rangeSize = range.end - range.start + 1
-    const actualLimit = Math.min(limit, rangeSize)
-    const batches = Math.ceil(actualLimit / batchSize)
+    const batches = Math.ceil(rangeSize / batchSize)
 
     for (let batch = 0; batch < batches; batch++) {
       const start = range.start + (batch * batchSize)
-      const end = Math.min(start + batchSize - 1, range.start + actualLimit - 1)
+      const end = Math.min(start + batchSize - 1, range.end)
 
       const promises = []
       for (let i = start; i <= end; i++) {
@@ -552,13 +551,26 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
         )
 
         pokemonList.push(...validPokemon)
+
+        // Stop if we've collected enough legal Pokemon
+        if (pokemonList.length >= limit) {
+          break
+        }
       } catch (error) {
         console.warn(`Failed to fetch batch ${batch + 1} for range ${range.start}-${range.end}:`, error)
       }
     }
+
+    // Stop if we've collected enough legal Pokemon across ranges
+    if (pokemonList.length >= limit) {
+      break
+    }
   }
 
-  return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
+  // Sort and trim to limit
+  return pokemonList
+    .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+    .slice(0, limit)
 }
 
 // React Query helpers

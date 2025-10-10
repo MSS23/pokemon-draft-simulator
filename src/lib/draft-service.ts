@@ -126,6 +126,11 @@ export class DraftService {
       throw new Error('Supabase is not properly configured. Please check your environment variables and restart the dev server.')
     }
 
+    // Validate minimum Pokemon count for snake drafts
+    if (settings.draftType === 'snake' && settings.pokemonPerTeam < 6) {
+      throw new Error('Snake drafts require at least 6 Pokémon per team for points-based gameplay')
+    }
+
     const roomCode = this.generateRoomCode()
     const hostId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
@@ -596,16 +601,29 @@ export class DraftService {
     // Check if draft is complete
     const isComplete = nextTurn > draftOrder.length
 
+    // Apply any pending timer changes when advancing to next turn
+    const currentSettings = draftState.draft.settings || {}
+    let updatedSettings = currentSettings
+    if (currentSettings.pendingTimerChange !== undefined) {
+      updatedSettings = {
+        ...currentSettings,
+        pickTimeLimitSeconds: currentSettings.pendingTimerChange,
+        pendingTimerChange: undefined // Clear the pending flag
+      }
+    }
+
     // Update draft turn and round
     const updateData = isComplete
       ? {
           status: 'completed' as const,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          settings: updatedSettings
         }
       : {
           current_turn: nextTurn,
           current_round: nextRound,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          settings: updatedSettings
         }
 
     const { error: draftError } = await (supabase
@@ -917,28 +935,48 @@ export class DraftService {
     const internalId = draftState.draft.id
 
     // Delete in order due to foreign key constraints
+    // Note: Some tables may not exist or may be empty - that's okay
     // 1. Delete picks
     await (supabase.from('picks') as any).delete().eq('draft_id', internalId)
 
-    // 2. Delete bid history
-    await (supabase.from('bid_history') as any).delete().eq('draft_id', internalId)
+    // 2. Delete bid history (may not exist)
+    try {
+      await (supabase.from('bid_history') as any).delete().eq('draft_id', internalId)
+    } catch (error) {
+      console.debug('No bid_history table or no records to delete')
+    }
 
     // 3. Delete auctions
     await (supabase.from('auctions') as any).delete().eq('draft_id', internalId)
 
-    // 4. Delete wishlists
-    await (supabase.from('wishlists') as any).delete().eq('draft_id', internalId)
+    // 4. Delete wishlists (may not exist)
+    try {
+      await (supabase.from('wishlists') as any).delete().eq('draft_id', internalId)
+    } catch (error) {
+      console.debug('No wishlists table or no records to delete')
+    }
 
-    // 5. Delete participants
+    // 5. Delete wishlist_items (actual table name)
+    try {
+      await (supabase.from('wishlist_items') as any).delete().eq('draft_id', internalId)
+    } catch (error) {
+      console.debug('No wishlist_items to delete')
+    }
+
+    // 6. Delete participants
     await (supabase.from('participants') as any).delete().eq('draft_id', internalId)
 
-    // 6. Delete teams
+    // 7. Delete teams
     await (supabase.from('teams') as any).delete().eq('draft_id', internalId)
 
-    // 7. Delete draft results if any
-    await (supabase.from('draft_results') as any).delete().eq('draft_id', internalId)
+    // 8. Delete draft results if any (may not exist)
+    try {
+      await (supabase.from('draft_results') as any).delete().eq('draft_id', internalId)
+    } catch (error) {
+      console.debug('No draft_results table or no records to delete')
+    }
 
-    // 8. Finally, delete the draft itself
+    // 9. Finally, delete the draft itself
     const { error: draftError } = await (supabase
       .from('drafts') as any)
       .delete()
@@ -947,6 +985,38 @@ export class DraftService {
     if (draftError) {
       console.error('Error deleting draft:', draftError)
       throw new Error('Failed to delete draft')
+    }
+  }
+
+  static async updateTimerSetting(draftId: string, timerSeconds: number): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const internalId = draftState.draft.id
+    const currentSettings = draftState.draft.settings || {}
+
+    // Store the new timer value as a pending change that will apply on the next turn
+    const updatedSettings = {
+      ...currentSettings,
+      pickTimeLimitSeconds: timerSeconds,
+      pendingTimerChange: timerSeconds // Flag for UI to show pending change
+    }
+
+    const { error } = await (supabase
+      .from('drafts') as any)
+      .update({
+        settings: updatedSettings,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', internalId)
+
+    if (error) {
+      console.error('Error updating timer setting:', error)
+      throw new Error('Failed to update timer setting')
     }
   }
 
@@ -966,15 +1036,28 @@ export class DraftService {
 
     const isComplete = nextTurn > totalTeams * maxRounds
 
+    // Apply any pending timer changes when advancing turn
+    const currentSettings = draftState.draft.settings || {}
+    let updatedSettings = currentSettings
+    if (currentSettings.pendingTimerChange !== undefined) {
+      updatedSettings = {
+        ...currentSettings,
+        pickTimeLimitSeconds: currentSettings.pendingTimerChange,
+        pendingTimerChange: undefined // Clear the pending flag
+      }
+    }
+
     const updateData = isComplete
       ? {
           status: 'completed' as const,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          settings: updatedSettings
         }
       : {
           current_turn: nextTurn,
           current_round: nextRound,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          settings: updatedSettings
         }
 
     const { error } = await (supabase

@@ -730,11 +730,15 @@ export default function DraftRoomPage() {
     }
   }, [roomCode, notify])
 
-  const handleSetTimer = useCallback(() => {
-    // In a real implementation, this would update the timer setting
-    // For now, we'll just show a notification
-    notify.info('Timer Setting', `Timer functionality will be implemented in a future update`)
-  }, [notify])
+  const handleSetTimer = useCallback(async (seconds: number) => {
+    try {
+      await DraftService.updateTimerSetting(roomCode.toLowerCase(), seconds)
+      notify.info('Timer Updated', `Turn timer will be set to ${seconds} seconds after the current pick completes`)
+    } catch (err) {
+      console.error('Error updating timer:', err)
+      notify.error('Failed to Update Timer', err instanceof Error ? err.message : 'Failed to update timer')
+    }
+  }, [roomCode, notify])
 
   const handleEnableProxyPicking = useCallback(() => {
     setIsProxyPickingEnabled(true)

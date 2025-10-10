@@ -45,7 +45,16 @@ export default function CreateDraftPage() {
   useHydrationFix()
 
   const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value }
+
+      // If switching to snake draft and pokemonPerTeam is less than 6, set it to 6
+      if (field === 'draftType' && value === 'snake' && parseInt(prev.pokemonPerTeam) < 6) {
+        newData.pokemonPerTeam = '6'
+      }
+
+      return newData
+    })
   }
 
   const handleExportFormat = async () => {
@@ -124,6 +133,13 @@ export default function CreateDraftPage() {
 
     if (formData.useCustomFormat && !customPricing) {
       notify.warning('Missing Custom Pricing', 'Please upload a CSV file with custom Pokemon pricing')
+      return
+    }
+
+    // Enforce minimum Pokemon limit for snake drafts
+    const pokemonCount = parseInt(formData.pokemonPerTeam)
+    if (formData.draftType === 'snake' && pokemonCount < 6) {
+      notify.warning('Invalid Pokemon Count', 'Snake drafts require at least 6 Pokémon per team for points-based gameplay')
       return
     }
 
@@ -553,19 +569,28 @@ export default function CreateDraftPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="pokemonPerTeam" className="text-sm font-medium">
-                      Pokémon per Team
+                      Pokémon per Team {formData.draftType === 'snake' && <span className="text-xs text-slate-500">(min 6 for points-based)</span>}
                     </Label>
                     <Select value={formData.pokemonPerTeam} onValueChange={(value) => handleInputChange('pokemonPerTeam', value)}>
                       <SelectTrigger className="bg-white dark:bg-slate-800">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="3">3 Pokémon</SelectItem>
+                        {formData.draftType === 'auction' && (
+                          <SelectItem value="3">3 Pokémon</SelectItem>
+                        )}
                         <SelectItem value="6">6 Pokémon</SelectItem>
                         <SelectItem value="9">9 Pokémon</SelectItem>
+                        <SelectItem value="11">11 Pokémon</SelectItem>
                         <SelectItem value="12">12 Pokémon</SelectItem>
+                        <SelectItem value="15">15 Pokémon</SelectItem>
                       </SelectContent>
                     </Select>
+                    {formData.draftType === 'snake' && parseInt(formData.pokemonPerTeam) < 6 && (
+                      <p className="text-xs text-orange-600 dark:text-orange-400">
+                        ⚠️ Snake drafts are typically points-based and require at least 6 Pokémon
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
