@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DraftService } from '@/lib/draft-service'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { useRouter } from 'next/navigation'
-import { Clock, Play, Trophy, Users, Sparkles, Crown, TrendingUp, Settings } from 'lucide-react'
+import { Clock, Play, Trophy, Users, Sparkles, Crown, TrendingUp, Settings, Trash2 } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 
 // Lazy load heavy components for better initial load performance
@@ -102,6 +102,14 @@ export default function Home() {
     } catch (error) {
       console.error('Error resuming draft:', error)
       alert('Failed to resume draft')
+    }
+  }
+
+  const handleRemoveDraft = (draftId: string, event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (confirm('Remove this draft from your list? This will only remove it from your local history.')) {
+      UserSessionService.removeDraftParticipation(draftId)
+      setMyDrafts(UserSessionService.getDraftParticipations())
     }
   }
 
@@ -315,6 +323,15 @@ export default function Home() {
                       className="flex-1"
                     >
                       Share
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => handleRemoveDraft(draft.draftId, e)}
+                      className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                      title="Remove from list"
+                    >
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>

@@ -244,6 +244,25 @@ export class UserSessionService {
   }
 
   /**
+   * Remove a specific draft participation from local storage
+   */
+  static removeDraftParticipation(draftId: string): void {
+    if (typeof window === 'undefined') return
+
+    try {
+      const stored = localStorage.getItem(DRAFT_PARTICIPATION_KEY)
+      if (!stored) return
+
+      const participations = JSON.parse(stored) as DraftParticipation[]
+      const filtered = participations.filter(p => p.draftId !== draftId)
+
+      localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(filtered))
+    } catch (error) {
+      console.warn('Failed to remove draft participation:', error)
+    }
+  }
+
+  /**
    * Clean up old draft participations (remove ones older than 30 days)
    */
   static cleanupOldParticipations(): void {
