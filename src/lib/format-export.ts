@@ -9,7 +9,7 @@ import { createFormatRulesEngine } from '@/domain/rules'
 
 interface PokemonExportRow {
   pokemonName: string
-  pokemonId: number
+  pokemonId: string | number
   draftPoints: number
   types: string
   bst: number
