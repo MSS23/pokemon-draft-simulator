@@ -642,16 +642,21 @@ export class DraftService {
     // The subscription will be set up asynchronously after resolving the ID
     const channels: any[] = []
     let setupAttempted = false
+    let isCleanedUp = false
 
     // Async function to setup subscriptions
     const setupSubscriptions = async () => {
       // Prevent multiple setup attempts
-      if (setupAttempted) return
+      if (setupAttempted || isCleanedUp) return
       setupAttempted = true
 
       try {
         // Get the draft state to find the UUID
         const draftState = await this.getDraftState(roomCodeOrDraftId)
+
+        // Check if cleanup happened while we were waiting
+        if (isCleanedUp) return
+
         if (!draftState) {
           console.error('Draft not found for subscription:', roomCodeOrDraftId)
           // Don't retry if draft doesn't exist
@@ -659,6 +664,9 @@ export class DraftService {
         }
 
         const draftUuid = draftState.draft.id
+
+        // Check again if cleanup happened
+        if (isCleanedUp) return
 
         // Now subscribe using the UUID
         const channel = supabase.channel(`draft-${roomCodeOrDraftId}`)
@@ -692,8 +700,11 @@ export class DraftService {
             table: 'auctions',
             filter: `draft_id=eq.${draftUuid}`
           }, callback)
-          .subscribe()
 
+        // Don't subscribe if cleanup already happened
+        if (isCleanedUp) return
+
+        channel.subscribe()
         channels.push(channel)
       } catch (error) {
         console.error('Error setting up draft subscriptions:', error)
@@ -705,10 +716,14 @@ export class DraftService {
 
     // Return cleanup function
     return () => {
-      if (supabase) {
+      isCleanedUp = true
+      if (supabase && channels.length > 0) {
         channels.forEach(channel => {
-          if (supabase) {
+          try {
             supabase.removeChannel(channel)
+          } catch (error) {
+            // Ignore errors during cleanup
+            console.debug('Error removing channel during cleanup:', error)
           }
         })
       }
