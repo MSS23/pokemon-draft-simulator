@@ -83,12 +83,16 @@ export default function TeamStatus({
                   </div>
                 </div>
               </div>
-              {timeRemaining > 0 && (
-                <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                  <Clock className="h-4 w-4" />
-                  <span className="font-mono text-sm">{timeRemaining}s</span>
-                </div>
-              )}
+              <div className={`flex items-center gap-1 px-3 py-1 rounded-full font-mono text-sm ${
+                timeRemaining <= 10 && timeRemaining > 0
+                  ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300 animate-pulse'
+                  : timeRemaining > 0
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+              }`}>
+                <Clock className="h-4 w-4" />
+                <span className="font-bold">{timeRemaining > 0 ? `${timeRemaining}s` : '--'}</span>
+              </div>
             </div>
           </div>
         )}

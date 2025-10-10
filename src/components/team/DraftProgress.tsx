@@ -123,17 +123,33 @@ export default function DraftProgress({
             </div>
             <div className="text-xs text-green-600 dark:text-green-400">Pick in Round</div>
           </div>
-          {timeRemaining > 0 && (
-            <div className="text-center p-3 bg-orange-50 dark:bg-orange-950 rounded-lg">
-              <div className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono">
-                {timeRemaining}s
-              </div>
-              <div className="text-xs text-orange-600 dark:text-orange-400 flex items-center justify-center gap-1">
-                <Clock className="h-3 w-3" />
-                Time Left
-              </div>
+          <div className={`text-center p-3 rounded-lg transition-all ${
+            timeRemaining <= 10 && timeRemaining > 0
+              ? 'bg-red-100 dark:bg-red-950 animate-pulse'
+              : timeRemaining > 0
+              ? 'bg-orange-50 dark:bg-orange-950'
+              : 'bg-gray-50 dark:bg-gray-800'
+          }`}>
+            <div className={`text-xl font-bold font-mono ${
+              timeRemaining <= 10 && timeRemaining > 0
+                ? 'text-red-600 dark:text-red-400'
+                : timeRemaining > 0
+                ? 'text-orange-600 dark:text-orange-400'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}>
+              {timeRemaining > 0 ? `${timeRemaining}s` : '--'}
             </div>
-          )}
+            <div className={`text-xs flex items-center justify-center gap-1 ${
+              timeRemaining <= 10 && timeRemaining > 0
+                ? 'text-red-600 dark:text-red-400'
+                : timeRemaining > 0
+                ? 'text-orange-600 dark:text-orange-400'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}>
+              <Clock className="h-3 w-3" />
+              Time Left
+            </div>
+          </div>
         </div>
 
         {/* Round Progress */}
