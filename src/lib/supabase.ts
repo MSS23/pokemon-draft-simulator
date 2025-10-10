@@ -4,8 +4,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 // Get environment variables - these are embedded at build time for NEXT_PUBLIC_ prefixed vars
 // Environment variables are provided by Vercel at build time
 // Force read from process.env to ensure fresh values
-const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || '')
-const supabaseAnonKey = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '')
+const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
+const supabaseAnonKey = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
 
 // Debug logging for production troubleshooting
 if (typeof window !== 'undefined') {

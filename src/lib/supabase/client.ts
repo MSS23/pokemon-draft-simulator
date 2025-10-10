@@ -1,8 +1,8 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-// Get environment variables with fallbacks
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// Get environment variables with fallbacks and trim whitespace
+const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
 
 // Function to validate Supabase credentials
 function isValidSupabaseConfig(url: string, key: string): boolean {
