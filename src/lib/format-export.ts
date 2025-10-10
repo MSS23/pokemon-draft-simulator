@@ -50,7 +50,7 @@ export async function exportFormatToCSV(
   const rows: PokemonExportRow[] = []
 
   for (const pokemon of allPokemon) {
-    const isLegal = rulesEngine.isPokemonLegal(pokemon)
+    const isLegal = rulesEngine.isLegal(pokemon)
 
     // Skip illegal Pokemon unless requested
     if (!isLegal && !includeIllegal) {
@@ -148,14 +148,14 @@ export async function exportFormatWithProgress(
 
   // Load Pokemon
   if (onProgress) onProgress(25, 100)
-  const allPokemon = await fetchPokemon(formatId)
+  const allPokemon = await fetchPokemonForFormat(formatId, 1025)
 
   // Process data
   if (onProgress) onProgress(50, 100)
-  const rulesEngine = createFormatRulesEngine(format)
+  const rulesEngine = createFormatRulesEngine(format.id)
 
   const rows: PokemonExportRow[] = allPokemon
-    .filter(p => rulesEngine.isPokemonLegal(p))
+    .filter(p => rulesEngine.isLegal(p))
     .map(pokemon => {
       const bst = pokemon.stats.hp +
                   pokemon.stats.attack +
