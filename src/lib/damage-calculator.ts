@@ -186,7 +186,7 @@ export function calculateDamage(
 
   // Calculate attacker's attack stat
   const attackerStat = calculateStat(
-    isPhysical ? attacker.stats.attack : attacker.stats.special_attack,
+    isPhysical ? attacker.stats.attack : attacker.stats.specialAttack,
     attackerLevel,
     isPhysical ? (attackerIVs.attack || 31) : (attackerIVs.special_attack || 31),
     isPhysical ? (attackerEVs.attack || 0) : (attackerEVs.special_attack || 0),
@@ -195,7 +195,7 @@ export function calculateDamage(
 
   // Calculate defender's defense stat
   const defenderStat = calculateStat(
-    isPhysical ? defender.stats.defense : defender.stats.special_defense,
+    isPhysical ? defender.stats.defense : defender.stats.specialDefense,
     defenderLevel,
     isPhysical ? (defenderIVs.defense || 31) : (defenderIVs.special_defense || 31),
     isPhysical ? (defenderEVs.defense || 0) : (defenderEVs.special_defense || 0),
@@ -222,10 +222,12 @@ export function calculateDamage(
   const effectiveDefense = Math.floor(defenderStat * defenseMultiplier)
 
   // Type effectiveness
-  const effectiveness = getTypeEffectiveness(move.type, defender.types)
+  const defenderTypeNames = defender.types.map(t => typeof t === 'string' ? t : t.name)
+  const effectiveness = getTypeEffectiveness(move.type, defenderTypeNames)
 
   // STAB (Same Type Attack Bonus)
-  const stab = attacker.types.includes(move.type) ? 1.5 : 1
+  const attackerTypeNames = attacker.types.map(t => typeof t === 'string' ? t : t.name)
+  const stab = attackerTypeNames.includes(move.type) ? 1.5 : 1
 
   // Base damage calculation
   const baseDamage = Math.floor(
@@ -400,8 +402,8 @@ export function getRecommendedEVSpread(
   speed: number
   description: string
 } {
-  const isPhysical = pokemon.stats.attack > pokemon.stats.special_attack
-  const isSpecial = pokemon.stats.special_attack > pokemon.stats.attack
+  const isPhysical = pokemon.stats.attack > pokemon.stats.specialAttack
+  const isSpecial = pokemon.stats.specialAttack > pokemon.stats.attack
 
   switch (role) {
     case 'sweeper':

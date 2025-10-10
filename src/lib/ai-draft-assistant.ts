@@ -105,6 +105,7 @@ function calculateTypeCoverage(
 ): number {
   let score = 0
   const teamTypes = new Set(currentTeam.flatMap(p => p.types))
+  const teamTypeNames = new Set(currentTeam.flatMap(p => p.types.map(t => typeof t === 'string' ? t : t.name)))
   const pokemonTypes = new Set(pokemon.types)
 
   // Bonus for new type coverage
@@ -115,20 +116,21 @@ function calculateTypeCoverage(
   // Check offensive coverage
   const offensiveTypes = new Set(
     pokemon.moves
-      ?.filter(m => m.damage_class !== 'status')
+      ?.filter(m => m.damageClass !== 'status')
       .map(m => m.type) || []
   )
 
   // Bonus for diverse offensive coverage
   const uniqueOffensiveTypes = Array.from(offensiveTypes).filter(
-    type => !teamTypes.has(type)
+    type => !teamTypeNames.has(type)
   )
   score += uniqueOffensiveTypes.length * 10
 
   // Check if this Pokemon covers team weaknesses
   const teamWeaknesses = calculateTeamWeaknesses(currentTeam)
   pokemon.types.forEach(defenseType => {
-    const resistances = TYPE_EFFECTIVENESS[defenseType]?.strong || []
+    const typeName = typeof defenseType === 'string' ? defenseType : defenseType.name
+    const resistances = TYPE_EFFECTIVENESS[typeName]?.strong || []
     teamWeaknesses.forEach(weakness => {
       if (resistances.includes(weakness)) score += 20
     })
@@ -145,7 +147,8 @@ function calculateTeamWeaknesses(team: Pokemon[]): string[] {
 
   team.forEach(pokemon => {
     pokemon.types.forEach(type => {
-      const weaknesses = TYPE_EFFECTIVENESS[type]?.weak || []
+      const typeName = typeof type === 'string' ? type : type.name
+      const weaknesses = TYPE_EFFECTIVENESS[typeName]?.weak || []
       weaknesses.forEach(weakness => {
         weaknessCount[weakness] = (weaknessCount[weakness] || 0) + 1
       })
@@ -167,7 +170,7 @@ function calculateBudgetValue(
 ): number {
   const cost = pokemon.cost || 0
   const bst = pokemon.stats.hp + pokemon.stats.attack + pokemon.stats.defense +
-              pokemon.stats.special_attack + pokemon.stats.special_defense + pokemon.stats.speed
+              pokemon.stats.specialAttack + pokemon.stats.specialDefense + pokemon.stats.speed
 
   // BST per cost point
   const efficiency = cost > 0 ? bst / cost : bst
@@ -205,8 +208,8 @@ function calculateStatBalance(pokemon: Pokemon, currentTeam: Pokemon[]): number 
     hp: 0,
     attack: 0,
     defense: 0,
-    special_attack: 0,
-    special_defense: 0,
+    specialAttack: 0,
+    specialDefense: 0,
     speed: 0,
   }
 
@@ -214,8 +217,8 @@ function calculateStatBalance(pokemon: Pokemon, currentTeam: Pokemon[]): number 
     teamAvg.hp += p.stats.hp
     teamAvg.attack += p.stats.attack
     teamAvg.defense += p.stats.defense
-    teamAvg.special_attack += p.stats.special_attack
-    teamAvg.special_defense += p.stats.special_defense
+    teamAvg.specialAttack += p.stats.specialAttack
+    teamAvg.specialDefense += p.stats.specialDefense
     teamAvg.speed += p.stats.speed
   })
 
@@ -229,9 +232,9 @@ function calculateStatBalance(pokemon: Pokemon, currentTeam: Pokemon[]): number 
   // Identify weak stats
   if (teamAvg.speed < 80 && pokemon.stats.speed >= 100) score += 20
   if (teamAvg.attack < 90 && pokemon.stats.attack >= 110) score += 15
-  if (teamAvg.special_attack < 90 && pokemon.stats.special_attack >= 110) score += 15
+  if (teamAvg.specialAttack < 90 && pokemon.stats.specialAttack >= 110) score += 15
   if (teamAvg.defense < 80 && pokemon.stats.defense >= 100) score += 10
-  if (teamAvg.special_defense < 80 && pokemon.stats.special_defense >= 100) score += 10
+  if (teamAvg.specialDefense < 80 && pokemon.stats.specialDefense >= 100) score += 10
   if (teamAvg.hp < 85 && pokemon.stats.hp >= 100) score += 10
 
   return Math.min(score, 100)
@@ -271,10 +274,10 @@ function calculateSynergy(pokemon: Pokemon, currentTeam: Pokemon[]): number {
 
   // Check ability synergies (basic check)
   const hasWeatherSetter = currentTeam.some(p =>
-    p.abilities?.some(a => ['Drought', 'Drizzle', 'Sand Stream', 'Snow Warning'].includes(a.name))
+    p.abilities?.some(a => ['Drought', 'Drizzle', 'Sand Stream', 'Snow Warning'].includes(a))
   )
   const benefitsFromWeather = pokemon.abilities?.some(a =>
-    ['Swift Swim', 'Chlorophyll', 'Sand Rush', 'Slush Rush'].includes(a.name)
+    ['Swift Swim', 'Chlorophyll', 'Sand Rush', 'Slush Rush'].includes(a)
   )
 
   if (hasWeatherSetter && benefitsFromWeather) score += 20
@@ -289,41 +292,9 @@ function calculateCounterPicks(
   pokemon: Pokemon,
   opponentTeams: Team[]
 ): number {
-  if (opponentTeams.length === 0) return 50
-
-  let score = 50
-  let counters = 0
-
-  opponentTeams.forEach(team => {
-    team.picks?.forEach(pick => {
-      const opponentPokemon = pick.pokemon
-
-      // Check if this Pokemon can counter opponent Pokemon
-      opponentPokemon.types.forEach(opType => {
-        const weakTo = TYPE_EFFECTIVENESS[opType]?.weak || []
-
-        // Check if we have moves that are super effective
-        const hasSuperEffective = pokemon.moves?.some(move =>
-          weakTo.includes(move.type) && move.damage_class !== 'status'
-        )
-
-        if (hasSuperEffective) {
-          counters += 1
-          score += 5
-        }
-      })
-
-      // Check if we resist their moves
-      const resists = pokemon.types.some(myType => {
-        const strong = TYPE_EFFECTIVENESS[myType]?.strong || []
-        return opponentPokemon.types.some(oppType => strong.includes(oppType))
-      })
-
-      if (resists) score += 3
-    })
-  })
-
-  return Math.min(score, 100)
+  // TODO: Implement counter picks calculation by looking up opponent Pokemon
+  // Currently returning default score as Pick objects don't include full Pokemon data
+  return 50
 }
 
 /**
@@ -451,7 +422,7 @@ function generateTags(
   if (pokemon.stats.speed <= 50) tags.push('Trick Room')
 
   const bst = pokemon.stats.hp + pokemon.stats.attack + pokemon.stats.defense +
-              pokemon.stats.special_attack + pokemon.stats.special_defense + pokemon.stats.speed
+              pokemon.stats.specialAttack + pokemon.stats.specialDefense + pokemon.stats.speed
   if (bst >= 600) tags.push('Legendary Stats')
 
   return tags.slice(0, 4)
@@ -522,8 +493,8 @@ function calculateStatGaps(team: Pokemon[]): { stat: string; priority: 'high' | 
     hp: team.reduce((sum, p) => sum + p.stats.hp, 0) / team.length,
     attack: team.reduce((sum, p) => sum + p.stats.attack, 0) / team.length,
     defense: team.reduce((sum, p) => sum + p.stats.defense, 0) / team.length,
-    special_attack: team.reduce((sum, p) => sum + p.stats.special_attack, 0) / team.length,
-    special_defense: team.reduce((sum, p) => sum + p.stats.special_defense, 0) / team.length,
+    specialAttack: team.reduce((sum, p) => sum + p.stats.specialAttack, 0) / team.length,
+    specialDefense: team.reduce((sum, p) => sum + p.stats.specialDefense, 0) / team.length,
     speed: team.reduce((sum, p) => sum + p.stats.speed, 0) / team.length,
   }
 
@@ -574,28 +545,12 @@ function analyzeOpponents(opponentTeams: Team[]): AssistantAnalysis['opponentAna
   const weaknessCount: Record<string, number> = {}
   const threatPokemon: { name: string; threat: number }[] = []
 
-  opponentTeams.forEach(team => {
-    team.picks?.forEach(pick => {
-      const pokemon = pick.pokemon
-
-      // Count weaknesses
-      pokemon.types.forEach(type => {
-        const weaknesses = TYPE_EFFECTIVENESS[type]?.weak || []
-        weaknesses.forEach(w => {
-          weaknessCount[w] = (weaknessCount[w] || 0) + 1
-        })
-      })
-
-      // Calculate threat level
-      const bst = pokemon.stats.hp + pokemon.stats.attack + pokemon.stats.defense +
-                  pokemon.stats.special_attack + pokemon.stats.special_defense + pokemon.stats.speed
-      const threat = Math.round(bst / 6)
-
-      if (bst >= 500) {
-        threatPokemon.push({ name: pokemon.name, threat })
-      }
-    })
-  })
+  // TODO: Implement opponent analysis - currently picks don't include full Pokemon data
+  // opponentTeams.forEach(team => {
+  //   team.picks?.forEach(pick => {
+  //     // Would need to look up Pokemon by pick.pokemonId from availablePokemon
+  //   })
+  // })
 
   const commonWeaknesses = Object.entries(weaknessCount)
     .sort((a, b) => b[1] - a[1])

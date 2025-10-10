@@ -98,8 +98,7 @@ export class DraftService {
       }
 
       // Use database updated_at as server time reference
-      const serverTime = new Date(draft.updated_at).getTime()
-      const settings = draft.settings as any
+      const serverTime = new Date((draft as any).updated_at).getTime()
 
       return {
         serverTime,

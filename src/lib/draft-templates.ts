@@ -56,7 +56,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'snake',
       teamSize: 6,
@@ -87,7 +87,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'auction',
       teamSize: 6,
@@ -118,7 +118,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'snake',
       teamSize: 6,
@@ -152,7 +152,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'auction',
       teamSize: 6,
@@ -187,7 +187,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'snake',
       teamSize: 4,
@@ -218,7 +218,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'snake',
       teamSize: 6,
@@ -249,7 +249,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'snake',
       teamSize: 6,
@@ -280,7 +280,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       generation: 9,
       rules: [],
       banlist: [],
-    } as Format,
+    } as unknown as Format,
     settings: {
       draftType: 'auction',
       teamSize: 8,
