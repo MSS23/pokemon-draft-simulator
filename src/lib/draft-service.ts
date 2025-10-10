@@ -614,53 +614,78 @@ export class DraftService {
     throw new Error('Proxy picking not yet implemented for production mode')
   }
 
-  static subscribeToDraft(draftId: string, callback: (payload: { eventType?: string; new?: any; old?: any }) => void) {
+  static subscribeToDraft(roomCodeOrDraftId: string, callback: (payload: { eventType?: string; new?: any; old?: any }) => void) {
     if (!supabase) throw new Error('Supabase not available')
-    
-    const channels = [
-      supabase.channel(`draft-${draftId}`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'drafts',
-          filter: `id=eq.${draftId}`
-        }, callback)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'teams',
-          filter: `draft_id=eq.${draftId}`
-        }, callback)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'participants',
-          filter: `draft_id=eq.${draftId}`
-        }, callback)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'picks',
-          filter: `draft_id=eq.${draftId}`
-        }, callback)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'auctions',
-          filter: `draft_id=eq.${draftId}`
-        }, callback)
-        .subscribe()
-    ]
 
-  return () => {
-    if (supabase) {
-      channels.forEach(channel => {
-        if (supabase) {
-          supabase.removeChannel(channel)
+    // We need to get the actual UUID for the subscription
+    // The subscription will be set up asynchronously after resolving the ID
+    let channels: any[] = []
+
+    // Async function to setup subscriptions
+    const setupSubscriptions = async () => {
+      try {
+        // Get the draft state to find the UUID
+        const draftState = await this.getDraftState(roomCodeOrDraftId)
+        if (!draftState) {
+          console.error('Draft not found for subscription:', roomCodeOrDraftId)
+          return
         }
-      })
+
+        const draftUuid = draftState.draft.id
+
+        // Now subscribe using the UUID
+        const channel = supabase.channel(`draft-${roomCodeOrDraftId}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'drafts',
+            filter: `id=eq.${draftUuid}`
+          }, callback)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'teams',
+            filter: `draft_id=eq.${draftUuid}`
+          }, callback)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'participants',
+            filter: `draft_id=eq.${draftUuid}`
+          }, callback)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'picks',
+            filter: `draft_id=eq.${draftUuid}`
+          }, callback)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'auctions',
+            filter: `draft_id=eq.${draftUuid}`
+          }, callback)
+          .subscribe()
+
+        channels.push(channel)
+      } catch (error) {
+        console.error('Error setting up draft subscriptions:', error)
+      }
     }
-  }
+
+    // Start setup
+    setupSubscriptions()
+
+    // Return cleanup function
+    return () => {
+      if (supabase) {
+        channels.forEach(channel => {
+          if (supabase) {
+            supabase.removeChannel(channel)
+          }
+        })
+      }
+    }
   }
 
   static async validateUserTeam(draftId: string, userId: string, teamId: string): Promise<boolean> {
