@@ -129,7 +129,12 @@ export default function DraftRoomPage() {
 
   // Use format-specific Pokemon list
   const formatId = draftState?.draftSettings?.formatId
-  const { data: pokemon, isLoading: pokemonLoading } = usePokemonListByFormat(formatId, true)
+  const customFormatId = draftState?.draft?.custom_format_id
+  const { data: pokemon, isLoading: pokemonLoading } = usePokemonListByFormat(
+    formatId === 'custom' ? undefined : formatId,
+    customFormatId,
+    true
+  )
   const notify = useNotify()
 
   // Demo mode detection - we are always in non-demo mode when connected to the database

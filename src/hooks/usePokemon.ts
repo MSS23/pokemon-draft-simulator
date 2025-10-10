@@ -5,6 +5,7 @@ import {
   searchPokemon,
   fetchPokemonByType,
   fetchPokemonForFormat,
+  fetchPokemonForCustomFormat,
   pokemonQueries
 } from '@/lib/pokemon-api'
 import { Pokemon } from '@/types'
@@ -31,11 +32,25 @@ export const usePokemonList = (enabled: boolean = true) => {
   })
 }
 
-export const usePokemonListByFormat = (formatId?: string, enabled: boolean = true) => {
+export const usePokemonListByFormat = (formatId?: string, customFormatId?: string, enabled: boolean = true) => {
   return useQuery({
-    queryKey: formatId ? pokemonQueries.listByFormat(formatId) : pokemonQueries.list({}),
-    queryFn: () => formatId ? fetchPokemonForFormat(formatId, 400) : fetchPokemonList(400),
-    enabled: enabled && !!formatId,
+    queryKey: customFormatId
+      ? ['pokemon', 'custom-format', customFormatId]
+      : formatId
+      ? pokemonQueries.listByFormat(formatId)
+      : pokemonQueries.list({}),
+    queryFn: () => {
+      // If custom format ID is provided, fetch from database
+      if (customFormatId) {
+        return fetchPokemonForCustomFormat(customFormatId)
+      }
+      // Otherwise use regular format-based fetching
+      if (formatId) {
+        return fetchPokemonForFormat(formatId, 400)
+      }
+      return fetchPokemonList(400)
+    },
+    enabled: enabled && (!!formatId || !!customFormatId),
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
     retry: 1,

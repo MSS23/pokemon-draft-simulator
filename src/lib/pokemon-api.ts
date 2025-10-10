@@ -2,6 +2,7 @@ import { Pokemon, PokemonType, PokemonStats, Move } from '@/types'
 import { getTypeColor } from '@/utils/pokemon'
 import { PokemonFormat, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { createFormatRulesEngine } from '@/domain/rules'
+import { supabase } from '@/lib/supabase'
 
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2'
 
@@ -607,6 +608,60 @@ export const validatePokemonInFormat = (pokemon: Pokemon, formatId: string): { i
   } catch (error) {
     console.error(`Error validating Pokemon ${pokemon.id} in format ${formatId}:`, error)
     return { isLegal: false, cost: 0, reason: 'Validation error' }
+  }
+}
+
+// Fetch Pokemon for custom formats from database
+export const fetchPokemonForCustomFormat = async (customFormatId: string): Promise<Pokemon[]> => {
+  if (!supabase) {
+    throw new Error('Supabase not available')
+  }
+
+  try {
+    // Fetch the custom format from database
+    const { data: customFormat, error } = await (supabase
+      .from('custom_formats') as any)
+      .select('pokemon_pricing')
+      .eq('id', customFormatId)
+      .single()
+
+    if (error || !customFormat) {
+      console.error('Error fetching custom format:', error)
+      throw new Error('Custom format not found')
+    }
+
+    const pokemonPricing: Record<string, number> = customFormat.pokemon_pricing || {}
+    const pokemonList: Pokemon[] = []
+
+    // Helper to normalize Pokemon names for matching
+    const normalizeName = (name: string) =>
+      name.toLowerCase().replace(/[.\s-]+/g, '').replace(/♀/g, 'f').replace(/♂/g, 'm')
+
+    // Fetch Pokemon by normalized names from the pricing data
+    const pokemonNames = Object.keys(pokemonPricing)
+
+    for (const pokemonName of pokemonNames) {
+      try {
+        // Try to fetch by name (PokeAPI accepts normalized names)
+        const normalizedName = normalizeName(pokemonName)
+        const pokemon = await fetchPokemon(normalizedName)
+
+        if (pokemon) {
+          // Override the cost with custom pricing
+          pokemon.cost = pokemonPricing[pokemonName]
+          pokemon.isLegal = true
+          pokemonList.push(pokemon)
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch Pokemon "${pokemonName}" for custom format:`, error)
+        // Continue with other Pokemon
+      }
+    }
+
+    return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
+  } catch (error) {
+    console.error('Error fetching Pokemon for custom format:', error)
+    throw error
   }
 }
 
