@@ -248,7 +248,7 @@ export class DraftService {
 
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
-      .select('*, teams(*)')
+      .select('*, teams(*), participants(*)')
       .eq('room_code', draftId)
       .single()
 
@@ -265,6 +265,24 @@ export class DraftService {
         teamId: '', // No team for spectators
         asSpectator: true
       }
+    }
+
+    // Check for duplicate userName + teamName combination
+    const existingTeams = (draft as any).teams || []
+    const existingParticipants = (draft as any).participants || []
+
+    for (const team of existingTeams) {
+      const teamParticipant = existingParticipants.find((p: any) => p.team_id === team.id)
+      if (teamParticipant &&
+          team.name.toLowerCase() === teamName.toLowerCase() &&
+          teamParticipant.display_name.toLowerCase() === userName.toLowerCase()) {
+        throw new Error(`A team named "${teamName}" with trainer "${userName}" already exists in this draft. Please choose a different name.`)
+      }
+    }
+
+    // Also check for duplicate team name alone (to prevent confusion)
+    if (existingTeams.some((team: any) => team.name.toLowerCase() === teamName.toLowerCase())) {
+      throw new Error(`Team name "${teamName}" is already taken. Please choose a different team name.`)
     }
 
     // Get next draft order
