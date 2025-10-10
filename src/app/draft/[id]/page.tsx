@@ -369,8 +369,10 @@ export default function DraftRoomPage() {
     let errorCount = 0
     const MAX_ERRORS = 5
 
-    const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async () => {
+    const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async (payload) => {
       // Reload draft state when changes occur
+      console.log('[Draft Subscription] Change detected:', payload?.eventType, payload?.new || payload?.old)
+
       try {
         const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
 
@@ -382,6 +384,7 @@ export default function DraftRoomPage() {
 
         if (dbState) {
           const newState = transformDraftState(dbState, userId)
+          console.log('[Draft Subscription] State updated, teams:', newState.teams.map(t => ({ name: t.name, order: t.draftOrder })))
 
           // Check for pick notifications (only if not the user's own pick)
           if (draftState && newState.teams) {

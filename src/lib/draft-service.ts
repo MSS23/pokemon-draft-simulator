@@ -453,20 +453,24 @@ export class DraftService {
     }
 
     // Update each team with new randomized draft order
-    const updatePromises = teams.map((team, index) =>
-      (supabase as any)
+    const updatePromises = teams.map((team, index) => {
+      console.log(`[Shuffle] Updating team ${(team as any).name} to draft_order ${randomizedOrder[index]}`)
+      return (supabase as any)
         .from('teams')
         .update({ draft_order: randomizedOrder[index] })
         .eq('id', (team as any).id)
-    )
+    })
 
-    await Promise.all(updatePromises)
+    const results = await Promise.all(updatePromises)
+    console.log('[Shuffle] Team updates completed:', results.map(r => ({ error: r.error, count: r.count })))
 
     // Update draft timestamp to trigger refresh
-    await (supabase as any)
+    const { error: draftUpdateError } = await (supabase as any)
       .from('drafts')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', draftUuid)
+
+    console.log('[Shuffle] Draft timestamp update:', { error: draftUpdateError, draftId: draftUuid })
   }
 
   static async startDraft(roomCodeOrDraftId: string): Promise<void> {
