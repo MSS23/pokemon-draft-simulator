@@ -94,6 +94,7 @@ export default function DraftRoomPage() {
   const [, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isProxyPickingEnabled, setIsProxyPickingEnabled] = useState(false)
+  const [isShuffling, setIsShuffling] = useState(false)
 
   // Real draft state from Supabase
   const [draftState, setDraftState] = useState<DraftUIState | null>(null)
@@ -756,7 +757,10 @@ export default function DraftRoomPage() {
   }, [roomCode, notify])
 
   const handleShuffleDraftOrder = useCallback(async () => {
+    if (isShuffling) return // Prevent double-clicks
+
     try {
+      setIsShuffling(true)
       await DraftService.shuffleDraftOrder(roomCode.toLowerCase())
 
       // Immediately refresh the draft state to show the new order
@@ -769,8 +773,10 @@ export default function DraftRoomPage() {
     } catch (err) {
       console.error('Error shuffling draft order:', err)
       notify.error('Failed to Shuffle', err instanceof Error ? err.message : 'Failed to shuffle draft order')
+    } finally {
+      setIsShuffling(false)
     }
-  }, [roomCode, notify, userId, transformDraftState])
+  }, [roomCode, notify, userId, transformDraftState, isShuffling])
 
   const handleAdvanceTurn = useCallback(async () => {
     try {
@@ -1186,6 +1192,7 @@ export default function DraftRoomPage() {
               onEnableProxyPicking={handleEnableProxyPicking}
               onDisableProxyPicking={handleDisableProxyPicking}
               isProxyPickingEnabled={isProxyPickingEnabled}
+              isShuffling={isShuffling}
               onUndoLastPick={handleUndoLastPick}
               onRequestNotificationPermission={handleRequestNotificationPermission}
               canUndo={draftState?.teams?.some(team => team.picks.length > 0) || false}

@@ -49,6 +49,7 @@ interface DraftControlsProps {
   onEnableProxyPicking?: () => void
   onDisableProxyPicking?: () => void
   isProxyPickingEnabled?: boolean
+  isShuffling?: boolean
   onUndoLastPick?: () => void
   onRequestNotificationPermission?: () => void
   canUndo?: boolean
@@ -75,6 +76,7 @@ export default function DraftControls({
   onEnableProxyPicking,
   onDisableProxyPicking,
   isProxyPickingEnabled = false,
+  isShuffling = false,
   onUndoLastPick,
   onRequestNotificationPermission,
   canUndo = false,
@@ -198,12 +200,12 @@ export default function DraftControls({
             <>
               <Button
                 onClick={handleShuffleDraftOrder}
-                disabled={teams.length < 2 || !onShuffleDraftOrder}
+                disabled={teams.length < 2 || !onShuffleDraftOrder || isShuffling}
                 variant="outline"
                 className="border-purple-300 text-purple-700 hover:bg-purple-50"
               >
-                <Shuffle className="h-4 w-4 mr-2" />
-                Shuffle Draft Order
+                <Shuffle className={`h-4 w-4 mr-2 ${isShuffling ? 'animate-spin' : ''}`} />
+                {isShuffling ? 'Shuffling...' : 'Shuffle Draft Order'}
               </Button>
               <Button
                 onClick={onStartDraft}
