@@ -44,7 +44,7 @@ export async function exportFormatToCSV(
   const allPokemon = await fetchPokemon(formatId)
 
   // Create rules engine to check legality
-  const rulesEngine = createFormatRulesEngine(format)
+  const rulesEngine = createFormatRulesEngine(format.id)
 
   // Build export rows
   const rows: PokemonExportRow[] = []
