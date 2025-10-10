@@ -75,17 +75,41 @@ export default function DraftRoomPage() {
   const isSpectator = searchParams.get('spectator') === 'true'
 
   // Get or create persistent user session
-  const [userId] = useState<string>(() => {
+  const [userId, setUserId] = useState<string>(() => {
     // Try to get from existing participation first
     const participation = UserSessionService.getDraftParticipation(roomCode?.toLowerCase() || '')
     if (participation) {
       return participation.userId
     }
 
-    // Get or create user session with display name if available
-    const session = UserSessionService.getOrCreateSession(userName)
-    return session.userId
+    // Try to get current session (synchronous)
+    const currentSession = UserSessionService.getCurrentSession()
+    if (currentSession && currentSession.userId) {
+      return currentSession.userId
+    }
+
+    // Fallback to temporary ID - will be replaced by async call
+    return `temp-${Date.now()}`
   })
+
+  // Async initialization of user session
+  useEffect(() => {
+    const initializeSession = async () => {
+      // Skip if we already have a valid user ID from participation or current session
+      if (!userId.startsWith('temp-')) return
+
+      try {
+        const session = await UserSessionService.getOrCreateSession(userName)
+        if (session.userId && session.userId !== userId) {
+          setUserId(session.userId)
+        }
+      } catch (error) {
+        console.error('Failed to initialize user session:', error)
+      }
+    }
+
+    initializeSession()
+  }, [userName, userId])
 
   const [selectedPokemon, setSelectedPokemon] = useState<Pokemon | null>(null)
   const [detailsPokemon, setDetailsPokemon] = useState<Pokemon | null>(null)

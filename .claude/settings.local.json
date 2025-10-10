@@ -5,7 +5,11 @@
       "Bash(git pull:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Modernize UI and add authentication requirements\n\n## UI Improvements\n- Modernized draft confirmation modal with animated Pokemon GIFs\n- Added pixelated CSS class for crisp sprite rendering\n- Enhanced visual design with modern gradients and spacing\n- Improved typography and color contrast in dark mode\n- Added smooth hover animations and transitions\n\n## Authentication\n- Draft creation now requires user authentication\n- Updated RLS policies to enforce authenticated user ownership\n- Added auth guards to create-draft page\n- Integrated user session service with Supabase auth\n- Created migration for auth-required RLS policies\n\n## Bug Fixes\n- Fixed draft control timing - settings now apply immediately when set before draft starts\n- Smart notification messages based on draft status\n- Timer settings apply immediately in setup, pending during active draft\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "Bash(dir)"
     ],
     "deny": [],
     "ask": []
