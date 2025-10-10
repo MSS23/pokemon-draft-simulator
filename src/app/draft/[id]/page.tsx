@@ -253,15 +253,10 @@ export default function DraftRoomPage() {
       }
     }
 
-    const status: 'waiting' | 'drafting' | 'completed' | 'paused' = 
+    const status: 'waiting' | 'drafting' | 'completed' | 'paused' =
       dbState.draft.status === 'setup' ? 'waiting' :
       dbState.draft.status === 'active' ? 'drafting' :
       dbState.draft.status === 'paused' ? 'paused' : 'completed'
-
-    // Update draft participation status if completed
-    if (status === 'completed') {
-      UserSessionService.updateDraftParticipation(roomCode, { status: 'completed' })
-    }
 
     return {
       roomCode,
@@ -368,6 +363,13 @@ export default function DraftRoomPage() {
 
     return () => clearInterval(interval)
   }, [roomCode])
+
+  // Update draft participation status when draft completes
+  useEffect(() => {
+    if (draftState?.status === 'completed' && roomCode) {
+      UserSessionService.updateDraftParticipation(roomCode, { status: 'completed' })
+    }
+  }, [draftState?.status, roomCode])
 
   // Subscribe to real-time updates
   useEffect(() => {
