@@ -813,8 +813,7 @@ export default function DraftRoomPage() {
 
   const handleSetTimer = useCallback(async (seconds: number) => {
     try {
-      const draftState = useDraftStore.getState()
-      const isActive = draftState.draft?.status === 'active'
+      const isActive = draftState?.status === 'drafting'
 
       await DraftService.updateTimerSetting(roomCode.toLowerCase(), seconds)
 
@@ -827,7 +826,7 @@ export default function DraftRoomPage() {
       console.error('Error updating timer:', err)
       notify.error('Failed to Update Timer', err instanceof Error ? err.message : 'Failed to update timer')
     }
-  }, [roomCode, notify])
+  }, [roomCode, notify, draftState?.status])
 
   const handleEnableProxyPicking = useCallback(() => {
     setIsProxyPickingEnabled(true)
