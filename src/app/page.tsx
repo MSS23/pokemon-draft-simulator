@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import { Clock, Play, Trophy, Users, Sparkles, Crown, TrendingUp, Settings, Trash2 } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { useAuth } from '@/contexts/AuthContext'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 // Lazy load heavy components for better initial load performance
 const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), {
@@ -42,6 +43,7 @@ export default function Home() {
   const [draftedPokemon, setDraftedPokemon] = useState<Pokemon[]>([])
   const [myDrafts, setMyDrafts] = useState<DraftParticipation[]>([])
   const [selectedFormatId, setSelectedFormatId] = useState<string>(DEFAULT_FORMAT)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
 
   // Draft settings
   const totalBudget = 100
@@ -245,7 +247,7 @@ export default function Home() {
             <Button
               onClick={() => {
                 if (!user) {
-                  alert('Please sign in to create a draft room')
+                  setAuthModalOpen(true)
                   return
                 }
                 window.location.href = '/create-draft'
@@ -519,6 +521,13 @@ export default function Home() {
           </ol>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        mode="signin"
+      />
     </div>
   )
 }
