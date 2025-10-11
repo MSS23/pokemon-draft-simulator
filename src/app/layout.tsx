@@ -8,6 +8,8 @@ import { NotificationProvider } from "@/components/providers/NotificationProvide
 import { HydrationFixProvider } from "@/components/providers/HydrationFixProvider";
 import { ErrorBoundaryProvider } from "@/components/providers/ErrorBoundaryProvider";
 import { ImagePreferenceProvider } from "@/contexts/ImagePreferenceContext";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { Header } from "@/components/layout/Header";
 import { HydrationErrorFilter } from "./hydration-error-filter";
 // import ErrorBoundary from "@/components/ui/error-boundary";
 
@@ -78,11 +80,14 @@ export default function RootLayout({
               storageKey="pokemon-draft-theme"
             >
               <ImagePreferenceProvider>
-                <NotificationProvider>
-                  <QueryProvider>
-                    {children}
-                  </QueryProvider>
-                </NotificationProvider>
+                <AuthProvider>
+                  <NotificationProvider>
+                    <QueryProvider>
+                      <Header />
+                      {children}
+                    </QueryProvider>
+                  </NotificationProvider>
+                </AuthProvider>
               </ImagePreferenceProvider>
             </ThemeProvider>
           </HydrationFixProvider>

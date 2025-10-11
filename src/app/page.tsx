@@ -6,14 +6,13 @@ import { usePokemonListByFormat } from '@/hooks/usePokemon'
 import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DraftService } from '@/lib/draft-service'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { useRouter } from 'next/navigation'
 import { Clock, Play, Trophy, Users, Sparkles, Crown, TrendingUp, Settings, Trash2 } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
+import { useAuth } from '@/contexts/AuthContext'
 
 // Lazy load heavy components for better initial load performance
 const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), {
@@ -35,6 +34,7 @@ const DraftSummaryPanel = dynamic(() => import('@/components/draft/DraftSummaryP
 
 export default function Home() {
   const router = useRouter()
+  const { user } = useAuth()
   const [detailsPokemon, setDetailsPokemon] = useState<Pokemon | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [confirmationPokemon, setConfirmationPokemon] = useState<Pokemon | null>(null)
@@ -172,7 +172,7 @@ export default function Home() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="relative text-center mb-8">
-          {/* Theme Toggle & Admin Link */}
+          {/* Admin Link */}
           <div className="absolute top-0 right-0 flex items-center gap-2">
             <Button
               variant="ghost"
@@ -183,8 +183,6 @@ export default function Home() {
               <Settings className="h-4 w-4 mr-1" />
               Admin
             </Button>
-            <ImageTypeToggle />
-            <ThemeToggle />
           </div>
           <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
             Pokémon Draft League
@@ -245,7 +243,13 @@ export default function Home() {
           </p>
           <div className="flex gap-3 flex-wrap">
             <Button
-              onClick={() => window.location.href = '/create-draft'}
+              onClick={() => {
+                if (!user) {
+                  alert('Please sign in to create a draft room')
+                  return
+                }
+                window.location.href = '/create-draft'
+              }}
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
             >
               Create Draft Room
