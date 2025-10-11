@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { User, LogOut } from 'lucide-react'
+import { User, LogOut, Eye } from 'lucide-react'
 
 export function Header() {
   const { user, signOut, loading } = useAuth()
@@ -42,9 +42,15 @@ export function Header() {
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
-          <div className="mr-4 flex">
-            <Link href="/" className="mr-6 flex items-center space-x-2">
+          <div className="mr-4 flex items-center gap-6">
+            <Link href="/" className="flex items-center space-x-2">
               <span className="font-bold text-xl">Pokémon Draft League</span>
+            </Link>
+            <Link href="/watch-drafts">
+              <Button variant="ghost" size="sm" className="gap-2">
+                <Eye className="h-4 w-4" />
+                Watch Drafts
+              </Button>
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-2">

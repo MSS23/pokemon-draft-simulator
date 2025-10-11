@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DraftService } from '@/lib/draft-service'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { useRouter } from 'next/navigation'
-import { Clock, Play, Trophy, Users, Trash2 } from 'lucide-react'
+import { Clock, Play, Trophy, Users, Trash2, Eye } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -212,6 +212,15 @@ export default function Home() {
           >
             <Play className="h-5 w-5 mr-2" />
             Join Draft Room
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => router.push('/watch-drafts')}
+            className="px-8"
+          >
+            <Eye className="h-5 w-5 mr-2" />
+            Watch Public Drafts
           </Button>
         </div>
 
