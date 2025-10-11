@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,6 +47,9 @@ export default function CreateDraftPage() {
   // Apply hydration fix for browser extensions
   useHydrationFix()
 
+  // Track if notification was shown to prevent spam
+  const hasShownAuthNotification = useRef(false)
+
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -57,7 +60,11 @@ export default function CreateDraftPage() {
 
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) {
-        notify.warning('Authentication Required', 'Please sign in to create a draft')
+        // Only show notification once
+        if (!hasShownAuthNotification.current) {
+          notify.warning('Authentication Required', 'Please sign in to create a draft')
+          hasShownAuthNotification.current = true
+        }
         router.push('/')
         return
       }
@@ -76,7 +83,7 @@ export default function CreateDraftPage() {
     }
 
     checkAuth()
-  }, [router, notify])
+  }, [router])
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => {
