@@ -20,9 +20,11 @@ function JoinDraftForm() {
   const [formData, setFormData] = useState({
     userName: '',
     teamName: '',
-    roomCode: searchParams.get('code') || ''
+    roomCode: searchParams.get('code') || '',
+    password: ''
   })
   const [joinAsSpectator, setJoinAsSpectator] = useState(false)
+  const [requiresPassword, setRequiresPassword] = useState(false)
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -49,7 +51,9 @@ function JoinDraftForm() {
       }
 
       const hostParticipant = draftState.participants.find(p => p.is_host)
+      const hasPassword = !!(draftState.draft as any).password
 
+      setRequiresPassword(hasPassword)
       setDraftInfo({
         roomCode: formData.roomCode.toUpperCase(),
         maxTeams: draftState.draft.max_teams,
@@ -58,7 +62,8 @@ function JoinDraftForm() {
         timeLimit: draftState.draft.settings?.timeLimit || 60,
         pokemonPerTeam: draftState.draft.settings?.pokemonPerTeam || 6,
         createdBy: hostParticipant?.display_name || 'Unknown',
-        status: draftState.draft.status === 'setup' ? 'waiting' : draftState.draft.status
+        status: draftState.draft.status === 'setup' ? 'waiting' : draftState.draft.status,
+        hasPassword
       })
     } catch (error) {
       console.error('Failed to lookup draft:', error)
@@ -79,9 +84,28 @@ function JoinDraftForm() {
       return
     }
 
+    if (requiresPassword && !formData.password.trim()) {
+      setError('This draft requires a password')
+      return
+    }
+
     setIsJoining(true)
     try {
       const { DraftService } = await import('@/lib/draft-service')
+
+      // Verify password if required
+      if (requiresPassword) {
+        const passwordValid = await DraftService.verifyDraftPassword({
+          roomCode: formData.roomCode,
+          password: formData.password
+        })
+
+        if (!passwordValid) {
+          setError('Incorrect password')
+          setIsJoining(false)
+          return
+        }
+      }
 
       if (joinAsSpectator) {
         // Join as spectator (no team)
@@ -256,7 +280,27 @@ function JoinDraftForm() {
                       )}
                     </div>
                   </div>
-                  
+
+                  {/* Password Field */}
+                  {requiresPassword && (
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm font-medium text-red-700 dark:text-red-400">
+                        Password Required *
+                      </Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Enter draft password"
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        className="bg-white dark:bg-slate-800 border-red-300 dark:border-red-700"
+                      />
+                      <p className="text-xs text-red-600 dark:text-red-400">
+                        This is a private draft and requires a password to join
+                      </p>
+                    </div>
+                  )}
+
                   {/* Spectator Mode Toggle */}
                   <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
                     <div className="flex items-center justify-between">

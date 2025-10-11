@@ -31,6 +31,7 @@ export interface CreateDraftParams {
   isPublic?: boolean
   description?: string | null
   tags?: string[] | null
+  password?: string | null
   customFormat?: {
     name: string
     description: string
@@ -67,6 +68,33 @@ export interface ServerTime {
 export class DraftService {
   static generateRoomCode(): string {
     return generateRoomCode()
+  }
+
+  /**
+   * Verify draft password
+   */
+  static async verifyDraftPassword({ roomCode, password }: { roomCode: string; password: string }): Promise<boolean> {
+    if (!supabase) {
+      throw new Error('Supabase is not configured')
+    }
+
+    const { data: draft, error } = await (supabase
+      .from('drafts') as any)
+      .select('password')
+      .eq('room_code', roomCode.toLowerCase())
+      .single()
+
+    if (error || !draft) {
+      throw new Error('Draft not found')
+    }
+
+    // If draft has no password, allow access
+    if (!draft.password) {
+      return true
+    }
+
+    // Compare passwords (simple string comparison for now)
+    return draft.password === password
   }
 
   /**
@@ -117,7 +145,7 @@ export class DraftService {
     }
   }
 
-  static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
+  static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, password, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
     if (!supabase) {
       console.error('Supabase configuration error:', {
         url: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -185,6 +213,7 @@ export class DraftService {
     if (isPublic !== undefined) draftInsert.is_public = isPublic || false
     if (description) draftInsert.description = description
     if (tags) draftInsert.tags = tags
+    if (password) draftInsert.password = password
     if (customFormatId) draftInsert.custom_format_id = customFormatId
 
     const { data: draft, error: draftError } = await (supabase

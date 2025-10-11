@@ -36,6 +36,7 @@ export default function CreateDraftPage() {
     isPublic: false,
     description: '',
     tags: '',
+    password: '',
     useCustomFormat: false
   })
 
@@ -203,6 +204,7 @@ export default function CreateDraftPage() {
         isPublic: formData.isPublic,
         description: formData.description || null,
         tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : null,
+        password: !formData.isPublic && formData.password ? formData.password : null,
         customFormat: formData.useCustomFormat && customPricing ? {
           name: `${formData.userName}'s Custom Format`,
           description: formData.description || 'Custom Pokemon pricing format',
@@ -558,6 +560,25 @@ export default function CreateDraftPage() {
                       </p>
                     </div>
                   </div>
+
+                  {!formData.isPublic && (
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm font-medium">
+                        Password (Optional)
+                      </Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Set a password to protect this private draft"
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        className="bg-white dark:bg-slate-800"
+                      />
+                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                        If set, users will need this password to join your private draft
+                      </p>
+                    </div>
+                  )}
 
                   {formData.isPublic && (
                     <>
