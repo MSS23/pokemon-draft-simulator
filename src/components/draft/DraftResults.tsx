@@ -19,6 +19,7 @@ import {
   Share2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import TournamentSchedule from '@/components/tournament/TournamentSchedule'
 
 interface Team {
   id: string
@@ -202,9 +203,10 @@ export default function DraftResults({
       </Card>
 
       <div className="w-full">
-        <div className="grid w-full grid-cols-2 sm:grid-cols-4 mb-6">
+        <div className="grid w-full grid-cols-2 sm:grid-cols-5 mb-6 gap-1">
           {[
             { id: 'standings', label: 'Final Standings' },
+            { id: 'tournament', label: 'Tournament' },
             { id: 'analytics', label: 'Analytics' },
             { id: 'timeline', label: 'Draft Timeline' },
             { id: 'insights', label: 'Insights' }
@@ -212,7 +214,7 @@ export default function DraftResults({
             <Button
               key={tab.id}
               variant={activeTab === tab.id ? "default" : "outline"}
-              className="rounded-none first:rounded-l-lg last:rounded-r-lg"
+              className="text-xs sm:text-sm"
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
@@ -273,6 +275,17 @@ export default function DraftResults({
             ))
           }
           </div>
+        )}
+
+        {/* Tournament */}
+        {activeTab === 'tournament' && (
+          <TournamentSchedule
+            teams={teams.map(team => ({
+              id: team.id,
+              name: team.name,
+              userName: team.userName
+            }))}
+          />
         )}
 
         {/* Analytics */}
