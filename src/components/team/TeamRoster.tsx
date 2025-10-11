@@ -64,6 +64,32 @@ export default function TeamRoster({
           <User className="h-3 w-3" />
           {team.userName} • Draft Order #{team.draftOrder}
         </CardDescription>
+
+        {/* Pokemon Party Icons */}
+        {teamPokemon.length > 0 && (
+          <div className="flex items-center gap-1 mt-3 flex-wrap">
+            {teamPokemon.map((pokemon) => (
+              <div
+                key={pokemon.id}
+                className="relative group"
+                title={pokemon.name}
+              >
+                <img
+                  src={pokemon.sprite}
+                  alt={pokemon.name}
+                  className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 transition-all duration-200 hover:scale-110"
+                />
+              </div>
+            ))}
+            {/* Empty slots */}
+            {Array.from({ length: maxPokemonPerTeam - teamPokemon.length }).map((_, index) => (
+              <div
+                key={`empty-${index}`}
+                className="w-10 h-10 bg-gray-50 dark:bg-gray-900 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-700"
+              />
+            ))}
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">
