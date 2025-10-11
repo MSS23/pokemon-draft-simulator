@@ -93,6 +93,23 @@ export default function ProfilePage() {
     try {
       setSaving(true)
 
+      // Check if display name is already taken by another user (globally)
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('user_profiles')
+        .select('id, display_name')
+        .ilike('display_name', displayName.trim())
+
+      if (checkError) throw checkError
+
+      // Filter out the current user
+      const otherUsers = existingUsers?.filter(u => u.id !== user.id) || []
+
+      if (otherUsers.length > 0) {
+        notify.error('Username Taken', `The username "${displayName.trim()}" is already taken. Please choose a different name.`)
+        setSaving(false)
+        return
+      }
+
       const { error } = await supabase
         .from('user_profiles')
         .update({
@@ -101,7 +118,15 @@ export default function ProfilePage() {
         })
         .eq('id', user.id)
 
-      if (error) throw error
+      if (error) {
+        // Handle unique constraint violation
+        if (error.code === '23505') {
+          notify.error('Username Taken', `The username "${displayName.trim()}" is already taken. Please choose a different name.`)
+        } else {
+          throw error
+        }
+        return
+      }
 
       setOriginalName(displayName.trim())
       notify.success('Profile Updated', 'Your display name has been updated successfully')
@@ -220,8 +245,8 @@ export default function ProfilePage() {
                 About Display Names
               </h4>
               <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                <li>• Display names must be unique within each draft room</li>
-                <li>• You can use the same display name across different drafts</li>
+                <li>• Display names must be <strong>globally unique</strong> across the entire platform</li>
+                <li>• No two users can have the same display name (case-insensitive)</li>
                 <li>• Changes take effect immediately for new drafts you join</li>
                 <li>• Existing drafts will show your old name until you rejoin</li>
               </ul>

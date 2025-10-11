@@ -41,13 +41,13 @@ export interface CreateDraftParams {
 
 export interface JoinDraftParams {
   roomCode: string
-  userName: string
+  userId: string
   teamName: string
 }
 
 export interface JoinSpectatorParams {
   roomCode: string
-  userName: string
+  userId: string
 }
 
 export interface DraftState {
@@ -279,12 +279,24 @@ export class DraftService {
     return { roomCode, draftId: roomCode.toLowerCase() }
   }
 
-  static async joinDraft({ roomCode, userName, teamName }: JoinDraftParams): Promise<{ draftId: string; teamId: string; asSpectator?: boolean }> {
+  static async joinDraft({ roomCode, userId, teamName }: JoinDraftParams): Promise<{ draftId: string; teamId: string; asSpectator?: boolean }> {
     const draftId = roomCode.toLowerCase()
-    const userId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
     // Check if draft exists and is joinable
     if (!supabase) throw new Error('Supabase not available')
+
+    // Fetch user's display name from user_profiles
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('id', userId)
+      .single()
+
+    if (profileError || !userProfile) {
+      throw new Error('User profile not found. Please ensure you have a profile set up.')
+    }
+
+    const displayName = userProfile.display_name
 
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
@@ -299,7 +311,7 @@ export class DraftService {
     // If draft is full or already started, join as spectator instead
     if ((draft as any).teams.length >= (draft as any).max_teams || (draft as any).status !== 'setup') {
       console.log('Draft is full or started, joining as spectator instead')
-      const result = await this.joinAsSpectator({ roomCode, userName })
+      const result = await this.joinAsSpectator({ roomCode, userId })
       return {
         draftId: result.draftId,
         teamId: '', // No team for spectators
@@ -307,16 +319,9 @@ export class DraftService {
       }
     }
 
-    // Check for duplicate names in this draft
+    // Check for duplicate team name only (username is globally unique now)
     const existingTeams = (draft as any).teams || []
-    const existingParticipants = (draft as any).participants || []
 
-    // Check for duplicate username (display_name)
-    if (existingParticipants.some((p: any) => p.display_name.toLowerCase() === userName.toLowerCase())) {
-      throw new Error(`Username "${userName}" is already taken in this draft. Please choose a different username.`)
-    }
-
-    // Check for duplicate team name
     if (existingTeams.some((team: any) => team.name.toLowerCase() === teamName.toLowerCase())) {
       throw new Error(`Team name "${teamName}" is already taken in this draft. Please choose a different team name.`)
     }
@@ -349,7 +354,7 @@ export class DraftService {
       .insert({
         draft_id: draftUuid,
         user_id: userId,
-        display_name: userName,
+        display_name: displayName,
         team_id: team.id,
         is_host: false,
         last_seen: new Date().toISOString()
@@ -366,7 +371,7 @@ export class DraftService {
       userId: userId,
       teamId: team.id,
       teamName: teamName,
-      displayName: userName,
+      displayName: displayName,
       isHost: false,
       status: 'active'
     })
@@ -374,16 +379,28 @@ export class DraftService {
     return { draftId, teamId: team.id }
   }
 
-  static async joinAsSpectator({ roomCode, userName }: JoinSpectatorParams): Promise<{ draftId: string }> {
+  static async joinAsSpectator({ roomCode, userId }: JoinSpectatorParams): Promise<{ draftId: string }> {
     const draftId = roomCode.toLowerCase()
-    const userId = `spectator-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
     // Check if draft exists
     if (!supabase) throw new Error('Supabase not available')
 
+    // Fetch user's display name from user_profiles
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('display_name')
+      .eq('id', userId)
+      .single()
+
+    if (profileError || !userProfile) {
+      throw new Error('User profile not found. Please ensure you have a profile set up.')
+    }
+
+    const displayName = userProfile.display_name
+
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
-      .select('*, participants(*)')
+      .select('*')
       .eq('room_code', draftId)
       .single()
 
@@ -392,12 +409,6 @@ export class DraftService {
     }
 
     const draftUuid = (draft as any).id
-    const existingParticipants = (draft as any).participants || []
-
-    // Check for duplicate username (including spectators)
-    if (existingParticipants.some((p: any) => p.display_name.toLowerCase() === userName.toLowerCase())) {
-      throw new Error(`Username "${userName}" is already taken in this draft. Please choose a different username.`)
-    }
 
     // Create spectator participant (no team assignment)
     const { error: participantError } = await (supabase
@@ -405,7 +416,7 @@ export class DraftService {
       .insert({
         draft_id: draftUuid,
         user_id: userId,
-        display_name: userName,
+        display_name: displayName,
         team_id: null, // Spectators have no team
         is_host: false,
         last_seen: new Date().toISOString()
@@ -422,7 +433,7 @@ export class DraftService {
       userId: userId,
       teamId: null,
       teamName: null,
-      displayName: userName,
+      displayName: displayName,
       isHost: false,
       status: 'spectator'
     })

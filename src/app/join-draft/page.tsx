@@ -9,16 +9,20 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge'
 import { Users, Clock, Zap, Trophy, AlertCircle, Eye } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 function JoinDraftForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, loading: authLoading } = useAuth()
   const [isJoining, setIsJoining] = useState(false)
   const [draftInfo, setDraftInfo] = useState<any>(null)
   const [error, setError] = useState('')
+  const [userDisplayName, setUserDisplayName] = useState('')
+  const [loadingProfile, setLoadingProfile] = useState(true)
 
   const [formData, setFormData] = useState({
-    userName: '',
     teamName: '',
     roomCode: searchParams.get('code') || '',
     password: ''
@@ -74,8 +78,8 @@ function JoinDraftForm() {
   }
 
   const handleJoinDraft = async () => {
-    if (!formData.userName.trim()) {
-      setError('Please enter your name')
+    if (!userDisplayName.trim()) {
+      setError('Please wait for your profile to load')
       return
     }
 
@@ -115,23 +119,23 @@ function JoinDraftForm() {
         // Join as spectator (no team)
         await DraftService.joinAsSpectator({
           roomCode: formData.roomCode,
-          userName: formData.userName
+          userId: user!.id
         })
 
-        router.push(`/draft/${formData.roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&spectator=true`)
+        router.push(`/draft/${formData.roomCode.toLowerCase()}?spectator=true`)
       } else {
         // Join as participant with team
         const result = await DraftService.joinDraft({
           roomCode: formData.roomCode,
-          userName: formData.userName,
+          userId: user!.id,
           teamName: formData.teamName
         })
 
         // Check if auto-joined as spectator (draft was full/started)
         if (result.asSpectator) {
-          router.push(`/draft/${formData.roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&spectator=true`)
+          router.push(`/draft/${formData.roomCode.toLowerCase()}?spectator=true`)
         } else {
-          router.push(`/draft/${formData.roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&teamName=${encodeURIComponent(formData.teamName)}`)
+          router.push(`/draft/${formData.roomCode.toLowerCase()}`)
         }
       }
     } catch (error) {
@@ -142,13 +146,47 @@ function JoinDraftForm() {
     }
   }
 
+  // Load user profile on mount
   useEffect(() => {
-    if (formData.roomCode) {
+    async function loadUserProfile() {
+      if (authLoading) return
+
+      if (!user) {
+        setError('You must be signed in to join a draft')
+        setLoadingProfile(false)
+        return
+      }
+
+      try {
+        if (!supabase) throw new Error('Supabase not configured')
+
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('display_name')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError) throw profileError
+
+        setUserDisplayName(profile.display_name || '')
+      } catch (error) {
+        console.error('Error loading profile:', error)
+        setError('Failed to load your profile. Please try again.')
+      } finally {
+        setLoadingProfile(false)
+      }
+    }
+
+    loadUserProfile()
+  }, [user, authLoading])
+
+  useEffect(() => {
+    if (formData.roomCode && !authLoading && user) {
       lookupDraft()
     }
-  }, [])
+  }, [formData.roomCode, authLoading, user])
 
-  const isFormValid = formData.userName.trim() && formData.roomCode.trim() && (joinAsSpectator || formData.teamName.trim())
+  const isFormValid = userDisplayName.trim() && formData.roomCode.trim() && (joinAsSpectator || formData.teamName.trim())
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pokemon-bg transition-colors duration-500">
@@ -252,15 +290,20 @@ function JoinDraftForm() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="userName" className="text-sm font-medium">
-                        Your Name
+                        Your Username
                       </Label>
-                      <Input
-                        id="userName"
-                        placeholder="Enter your name"
-                        value={formData.userName}
-                        onChange={(e) => handleInputChange('userName', e.target.value)}
-                        className="bg-white dark:bg-slate-800"
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="userName"
+                          value={userDisplayName}
+                          disabled
+                          className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                        />
+                        <Badge variant="secondary" className="text-xs">From Profile</Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Your display name from your profile settings
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="teamName" className="text-sm font-medium">
