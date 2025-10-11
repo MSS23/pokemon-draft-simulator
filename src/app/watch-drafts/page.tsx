@@ -99,8 +99,15 @@ export default function WatchDraftsPage() {
   const canJoinDraft = (draft: PublicDraft) => {
     // Only authenticated users can join drafts
     if (!user) return false
-    // Can only join if there are available team slots
+    // Can only join if there are available team slots and draft is in setup
     return draft.currentTeams < draft.maxTeams && draft.status === 'setup'
+  }
+
+  const canSpectateDraft = (draft: PublicDraft) => {
+    // Authenticated users can spectate full drafts or ongoing drafts
+    if (!user) return false
+    // Can spectate if draft is full or already active
+    return draft.currentTeams >= draft.maxTeams || draft.status === 'active' || draft.status === 'drafting'
   }
 
   const formatTimeAgo = (dateString: string) => {
@@ -242,16 +249,32 @@ export default function WatchDraftsPage() {
                         <Badge variant="secondary" className="font-mono">
                           {draft.roomCode}
                         </Badge>
-                        {canJoinDraft(draft) && (
-                          <Button
-                            size="sm"
-                            onClick={(e) => handleJoinDraft(draft.roomCode, e)}
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            <UserPlus className="h-3 w-3 mr-1" />
-                            Join Draft
-                          </Button>
-                        )}
+                        <div className="flex gap-2">
+                          {canJoinDraft(draft) && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => handleJoinDraft(draft.roomCode, e)}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <UserPlus className="h-3 w-3 mr-1" />
+                              Join
+                            </Button>
+                          )}
+                          {canSpectateDraft(draft) && (
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleWatchDraft(draft.roomCode)
+                              }}
+                              variant="outline"
+                              className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Spectate
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -303,9 +326,10 @@ export default function WatchDraftsPage() {
                 <div className="flex items-start gap-3">
                   <UserPlus className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
                   <div className="text-sm text-green-900 dark:text-green-100">
-                    <p className="font-medium mb-1">Join as Participant</p>
+                    <p className="font-medium mb-1">Join as Participant or Spectate</p>
                     <p className="text-green-700 dark:text-green-300">
-                      As an authenticated user, you can join drafts that have available team slots. Look for the "Join Draft" button on drafts in setup phase.
+                      As an authenticated user, you can join drafts with available team slots using the "Join" button.
+                      For full or active drafts, use the "Spectate" button to watch as a spectator.
                     </p>
                   </div>
                 </div>
