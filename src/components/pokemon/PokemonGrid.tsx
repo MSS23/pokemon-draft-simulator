@@ -108,14 +108,15 @@ export default function PokemonGrid({
 
   const filteredAndSortedPokemon = useMemo(() => {
     const filtered = pokemon.filter(p => {
-      // Enhanced search filter - includes name, types, and abilities
+      // Enhanced search filter - includes name, types, abilities, and moves
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         const nameMatch = p.name.toLowerCase().includes(query)
         const typeMatch = p.types.some(t => t.name.toLowerCase().includes(query))
         const abilityMatch = p.abilities.some(a => a.toLowerCase().includes(query))
+        const moveMatch = p.moves?.some(m => m.name.toLowerCase().includes(query)) || false
 
-        if (!nameMatch && !typeMatch && !abilityMatch) {
+        if (!nameMatch && !typeMatch && !abilityMatch && !moveMatch) {
           return false
         }
       }
@@ -251,7 +252,7 @@ export default function PokemonGrid({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search by name, type, or ability (e.g., 'skar', 'fire', 'levitate')..."
+                placeholder="Search by name, type, ability, or move (e.g., 'skar', 'fire', 'levitate', 'earthquake')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-12 text-base"

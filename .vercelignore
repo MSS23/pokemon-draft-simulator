@@ -1,0 +1,14 @@
+# Ignore documentation changes
+*.md
+README.md
+CLAUDE.md
+
+# Ignore config that doesn't affect builds
+.vscode/
+.claude/
+.git/
+
+# Ignore test files
+**/*.test.ts
+**/*.test.tsx
+tests/
