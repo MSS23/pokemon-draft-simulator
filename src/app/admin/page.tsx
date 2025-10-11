@@ -1,7 +1,8 @@
 'use client'
 
 import FormatSyncPanel from '@/components/admin/FormatSyncPanel'
-import { Shield, Database, Settings } from 'lucide-react'
+import DraftManagementPanel from '@/components/admin/DraftManagementPanel'
+import { Shield, Database, Settings, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
@@ -23,8 +24,12 @@ export default function AdminPage() {
         </div>
 
         {/* Content */}
-        <Tabs defaultValue="formats" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+        <Tabs defaultValue="drafts" className="w-full">
+          <TabsList className="grid w-full max-w-2xl grid-cols-3 mb-6">
+            <TabsTrigger value="drafts" className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4" />
+              Draft Management
+            </TabsTrigger>
             <TabsTrigger value="formats" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
               Format Data
@@ -34,6 +39,11 @@ export default function AdminPage() {
               Settings
             </TabsTrigger>
           </TabsList>
+
+          {/* Draft Management Tab */}
+          <TabsContent value="drafts" className="space-y-6">
+            <DraftManagementPanel />
+          </TabsContent>
 
           {/* Format Data Tab */}
           <TabsContent value="formats" className="space-y-6">
