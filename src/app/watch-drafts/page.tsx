@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { Eye, Users, Clock, Tag, Search, RefreshCw } from 'lucide-react'
+import { Eye, Users, Clock, Tag, Search, RefreshCw, UserPlus } from 'lucide-react'
 import { DraftService } from '@/lib/draft-service'
 import { useNotify } from '@/components/providers/NotificationProvider'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface PublicDraft {
   roomCode: string
@@ -27,6 +28,7 @@ interface PublicDraft {
 export default function WatchDraftsPage() {
   const router = useRouter()
   const notify = useNotify()
+  const { user } = useAuth()
   const [drafts, setDrafts] = useState<PublicDraft[]>([])
   const [filteredDrafts, setFilteredDrafts] = useState<PublicDraft[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -87,6 +89,18 @@ export default function WatchDraftsPage() {
 
   const handleWatchDraft = (roomCode: string) => {
     router.push(`/spectate/${roomCode}`)
+  }
+
+  const handleJoinDraft = (roomCode: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/join-draft?code=${roomCode}`)
+  }
+
+  const canJoinDraft = (draft: PublicDraft) => {
+    // Only authenticated users can join drafts
+    if (!user) return false
+    // Can only join if there are available team slots
+    return draft.currentTeams < draft.maxTeams && draft.status === 'setup'
   }
 
   const formatTimeAgo = (dateString: string) => {
@@ -206,7 +220,7 @@ export default function WatchDraftsPage() {
                             </Badge>
                           )}
                         </div>
-                        <CardDescription className="flex items-center gap-4 text-sm">
+                        <CardDescription className="flex items-center gap-4 text-sm flex-wrap">
                           <span className="flex items-center gap-1">
                             <Users className="h-3 w-3" />
                             {draft.currentTeams}/{draft.maxTeams} teams
@@ -228,6 +242,16 @@ export default function WatchDraftsPage() {
                         <Badge variant="secondary" className="font-mono">
                           {draft.roomCode}
                         </Badge>
+                        {canJoinDraft(draft) && (
+                          <Button
+                            size="sm"
+                            onClick={(e) => handleJoinDraft(draft.roomCode, e)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <UserPlus className="h-3 w-3 mr-1" />
+                            Join Draft
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -258,7 +282,7 @@ export default function WatchDraftsPage() {
         </div>
 
         {/* Help Text */}
-        <div className="max-w-4xl mx-auto mt-8">
+        <div className="max-w-4xl mx-auto mt-8 space-y-4">
           <Card className="bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
             <CardContent className="py-4">
               <div className="flex items-start gap-3">
@@ -272,6 +296,36 @@ export default function WatchDraftsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {user ? (
+            <Card className="bg-green-50/50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <UserPlus className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                  <div className="text-sm text-green-900 dark:text-green-100">
+                    <p className="font-medium mb-1">Join as Participant</p>
+                    <p className="text-green-700 dark:text-green-300">
+                      As an authenticated user, you can join drafts that have available team slots. Look for the "Join Draft" button on drafts in setup phase.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-amber-50/50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <Users className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div className="text-sm text-amber-900 dark:text-amber-100">
+                    <p className="font-medium mb-1">Sign In to Join Drafts</p>
+                    <p className="text-amber-700 dark:text-amber-300">
+                      Guests can spectate any public draft. To join as a participant, please sign in or create an account.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
