@@ -92,6 +92,7 @@ function JoinDraftForm() {
     setIsJoining(true)
     try {
       const { DraftService } = await import('@/lib/draft-service')
+      const { grantDraftAccess } = await import('@/lib/draft-access')
 
       // Verify password if required
       if (requiresPassword) {
@@ -106,6 +107,9 @@ function JoinDraftForm() {
           return
         }
       }
+
+      // Grant access to this draft in the user's session
+      grantDraftAccess(formData.roomCode, false)
 
       if (joinAsSpectator) {
         // Join as spectator (no team)

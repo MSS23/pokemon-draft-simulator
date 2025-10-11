@@ -212,6 +212,10 @@ export default function CreateDraftPage() {
         } : undefined
       })
 
+      // Grant access to the draft for the host
+      const { grantDraftAccess } = await import('@/lib/draft-access')
+      grantDraftAccess(roomCode, true)
+
       notify.success('Draft Created!', `Room ${roomCode} is ready for players`)
       router.push(`/draft/${roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&teamName=${encodeURIComponent(formData.teamName)}&isHost=true`)
     } catch (error) {

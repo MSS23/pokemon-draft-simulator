@@ -326,6 +326,22 @@ export default function DraftRoomPage() {
           return
         }
 
+        // Check if draft is private and requires access verification
+        const isPublic = (dbState.draft as any).is_public
+        const hasPassword = !!(dbState.draft as any).password
+
+        if (!isPublic || hasPassword) {
+          // Private or password-protected draft - verify access
+          const { hasVerifiedAccess } = await import('@/lib/draft-access')
+
+          if (!hasVerifiedAccess(roomCode)) {
+            // User hasn't verified access - redirect to join page
+            setError('Access denied: You must join this private draft through the proper join flow')
+            router.push(`/join-draft?code=${roomCode.toUpperCase()}`)
+            return
+          }
+        }
+
         setDraftState(transformDraftState(dbState, userId))
         setIsConnected(true)
       } catch (err) {
