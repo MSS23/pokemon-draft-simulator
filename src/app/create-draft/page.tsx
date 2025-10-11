@@ -55,13 +55,14 @@ export default function CreateDraftPage() {
         return
       }
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
         notify.warning('Authentication Required', 'Please sign in to create a draft')
-        router.push(`/auth/login?redirectTo=/create-draft`)
+        router.push('/')
         return
       }
 
+      const user = session.user
       setUserEmail(user.email || null)
 
       // Pre-fill userName with display name if available
