@@ -495,6 +495,21 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
     throw new Error(`Format ${formatId} not found`)
   }
 
+  // Try to load from pre-built format pack first (much faster!)
+  try {
+    const manifest = await fetch('/data/format-manifest.json').then(res => res.json())
+    const formatEntry = manifest.formats.find((f: any) => f.id === formatId)
+
+    if (formatEntry) {
+      const formatPack = await fetch(`/data/format_${formatId}_${formatEntry.hash}.json`).then(res => res.json())
+      console.log(`✨ Loaded ${formatPack.pokemon.length} Pokemon from pre-built format pack for ${formatId}`)
+      return formatPack.pokemon.slice(0, limit)
+    }
+  } catch (error) {
+    console.warn('Could not load pre-built format pack, falling back to API fetching:', error)
+  }
+
+  // Fallback: Fetch from PokeAPI (slower)
   let pokemonRanges: { start: number, end: number }[] = []
 
   // Special handling for Regulation H format

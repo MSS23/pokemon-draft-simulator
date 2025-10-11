@@ -139,39 +139,26 @@ export default function Home() {
     setMyDrafts(drafts)
   }, [])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
-          <h1 className="text-2xl font-bold text-gray-900">Loading Pokémon...</h1>
-          <p className="text-gray-600">
-            Fetching the latest Pokémon data from PokéAPI...
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Could not load live data</h1>
-          <p className="text-gray-600 mb-4">
-            There was an issue connecting to the Pokémon API. The app will continue with demo data.
-          </p>
-          <Button onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">Connection Error</h3>
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  Could not load Pokemon data. Please check your internet connection.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => window.location.reload()} className="border-red-300 text-red-700">
+                Retry
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-3">

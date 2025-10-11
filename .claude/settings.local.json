@@ -10,7 +10,10 @@
       "Bash(cat:*)",
       "Bash(npm run build:*)",
       "Bash(dir)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(timeout:*)",
+      "Bash(git checkout:*)",
+      "Bash(npm run build:formats:*)"
     ],
     "deny": [],
     "ask": []
