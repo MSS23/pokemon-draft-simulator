@@ -1073,52 +1073,55 @@ export default function DraftRoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pokemon-bg transition-colors duration-500">
-      <div className="container mx-auto px-4 py-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+      <div className="container mx-auto px-4 py-4 max-w-screen-2xl">
         {/* Header */}
-        <div className="relative text-center mb-6">
-          <div className="absolute top-0 right-0 flex gap-2">
-            <ImageTypeToggle />
-            <ThemeToggle />
-          </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-2">
-            Draft Room: {roomCode}
-          </h1>
-          <div className="flex justify-center gap-2 mb-4">
-            <Badge variant={draftState?.status === 'waiting' ? 'secondary' : draftState?.status === 'drafting' ? 'default' : 'outline'}>
-              {draftState?.status === 'waiting' ? 'Waiting for players' : draftState?.status === 'drafting' ? 'Draft in progress' : 'Draft completed'}
-            </Badge>
-            {connectionStatus === 'reconnecting' && (
-              <Badge variant="destructive" className="animate-pulse">Reconnecting...</Badge>
-            )}
-            {connectionStatus === 'offline' && (
-              <Badge variant="destructive">Offline</Badge>
-            )}
-            <Button variant="outline" size="sm" onClick={copyRoomCode} className="h-6 px-2">
-              <Copy className="h-3 w-3 mr-1" />
-              Copy Code
-            </Button>
-            <Button variant="outline" size="sm" onClick={shareRoom} className="h-6 px-2">
-              <Share2 className="h-3 w-3 mr-1" />
-              Share
-            </Button>
-            {draftState && ['completed'].includes(draftState.status) && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => router.push(`/draft/${roomCode}/results`)}
-                className="h-6 px-2 bg-green-600 hover:bg-green-700"
-              >
-                View Results
+        <div className="mb-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+                {roomCode}
+              </h1>
+              <div className="flex items-center gap-2">
+                <Badge variant={draftState?.status === 'waiting' ? 'secondary' : draftState?.status === 'drafting' ? 'default' : 'outline'}>
+                  {draftState?.status === 'waiting' ? 'Waiting' : draftState?.status === 'drafting' ? 'In Progress' : 'Completed'}
+                </Badge>
+                {connectionStatus === 'reconnecting' && (
+                  <Badge variant="destructive" className="animate-pulse">Reconnecting</Badge>
+                )}
+                {connectionStatus === 'offline' && (
+                  <Badge variant="destructive">Offline</Badge>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={copyRoomCode}>
+                <Copy className="h-4 w-4 mr-1" />
+                Copy
               </Button>
-            )}
+              <Button variant="outline" size="sm" onClick={shareRoom}>
+                <Share2 className="h-4 w-4 mr-1" />
+                Share
+              </Button>
+              {draftState && ['completed'].includes(draftState.status) && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => router.push(`/draft/${roomCode}/results`)}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Results
+                </Button>
+              )}
+              <ImageTypeToggle />
+              <ThemeToggle />
+            </div>
           </div>
         </div>
 
         {/* Draft Progress and Team Status */}
-        <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Draft Progress */}
-          {draftState?.status === 'drafting' && (
+        {draftState?.status === 'drafting' && (
+          <div className="mb-4">
             <DraftProgress
               currentTurn={draftState?.currentTurn}
               totalTeams={draftState?.teams?.length || 0}
@@ -1127,23 +1130,11 @@ export default function DraftRoomPage() {
               timeRemaining={pickTimeRemaining}
               teams={draftState?.teams || []}
             />
-          )}
-
-          {/* Team Status */}
-          <EnhancedErrorBoundary>
-            <TeamStatus
-              teams={draftState?.teams || []}
-              currentTeamId={draftState?.currentTeam || null}
-              userTeamId={draftState?.userTeamId || null}
-              maxPokemonPerTeam={draftState?.draftSettings?.pokemonPerTeam || 6}
-              timeRemaining={pickTimeRemaining}
-              draftStatus={draftState?.status || 'waiting'}
-            />
-          </EnhancedErrorBoundary>
-        </div>
+          </div>
+        )}
 
         {/* Team Rosters */}
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {draftState ? (
             // Show actual teams when draft state is loaded
             (draftState?.teams || []).map((team) => (

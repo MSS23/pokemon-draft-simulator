@@ -48,21 +48,25 @@ export default function TeamRoster({
   }
 
   return (
-    <Card className={`w-full ${isUserTeam ? 'ring-2 ring-blue-500' : ''} ${isCurrentTeam ? 'border-yellow-400 shadow-lg' : ''}`}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          {isCurrentTeam && showTurnIndicator && (
-            <Crown className="h-4 w-4 text-yellow-500" />
-          )}
-          {team.name}
+    <Card className={`w-full transition-all ${isUserTeam ? 'ring-2 ring-blue-500 shadow-md' : 'shadow-sm'} ${isCurrentTeam ? 'border-yellow-400 border-2 shadow-lg' : ''}`}>
+      <CardHeader className="pb-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            {isCurrentTeam && showTurnIndicator && (
+              <Crown className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+            )}
+            <span className="truncate">{team.name}</span>
+          </CardTitle>
           <div className="flex gap-1">
             {isUserTeam && <Badge variant="secondary" className="text-xs">You</Badge>}
-            {isCurrentTeam && <Badge variant="default" className="text-xs">Current Turn</Badge>}
+            {isCurrentTeam && <Badge className="text-xs bg-yellow-500 text-yellow-950">Active</Badge>}
           </div>
-        </CardTitle>
-        <CardDescription className="flex items-center gap-2">
+        </div>
+        <CardDescription className="flex items-center gap-1.5 text-xs">
           <User className="h-3 w-3" />
-          {team.userName} • Draft Order #{team.draftOrder}
+          <span className="truncate">{team.userName}</span>
+          <span className="text-slate-400">•</span>
+          <span>#{team.draftOrder}</span>
         </CardDescription>
 
         {/* Pokemon Party Icons */}
@@ -92,59 +96,46 @@ export default function TeamRoster({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Team Stats */}
-        <div className="grid grid-cols-3 gap-2 text-sm">
-          <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            <div className="font-semibold">{team.picks.length}</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Picks</div>
-          </div>
-          <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            <div className="font-semibold">{totalValue}</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Total Cost</div>
-          </div>
-          <div className="text-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            <div className="font-semibold">{averageCost}</div>
-            <div className="text-xs text-gray-600 dark:text-gray-400">Avg Cost</div>
-          </div>
+      <CardContent className="space-y-3 p-4">
+        {/* Team Stats - Compact */}
+        <div className="flex justify-between text-xs text-slate-600 dark:text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-700">
+          <span>{team.picks.length}/{maxPokemonPerTeam} Picks</span>
+          <span>Cost: {totalValue}</span>
+          <span>Avg: {averageCost}</span>
         </div>
 
         {/* Pokemon List */}
         {teamPokemon.length > 0 ? (
-          <div className="space-y-2">
-            <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Pokemon Roster</h4>
-            <div className="space-y-1">
-              {teamPokemon.map((pokemon, index) => (
-                <div
-                  key={pokemon.id}
-                  className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded"
-                >
-                  <img
-                    src={pokemon.sprite}
-                    alt={pokemon.name}
-                    className="w-8 h-8"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{pokemon.name}</div>
-                    <div className="flex items-center gap-1">
-                      {pokemon.types.map((type, typeIndex) => (
-                        <Badge
-                          key={typeIndex}
-                          variant="secondary"
-                          className={`text-xs px-1 py-0 ${getPokemonTypeColors(pokemon.types)}`}
-                        >
-                          {type.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">#{index + 1}</div>
-                    <div className="text-xs text-gray-500">Cost: {pokemon.cost || 1}</div>
+          <div className="space-y-1.5">
+            {teamPokemon.map((pokemon, index) => (
+              <div
+                key={pokemon.id}
+                className="flex items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+              >
+                <img
+                  src={pokemon.sprite}
+                  alt={pokemon.name}
+                  className="w-7 h-7"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-xs truncate">{pokemon.name}</div>
+                  <div className="flex items-center gap-0.5">
+                    {pokemon.types.slice(0, 2).map((type, typeIndex) => (
+                      <Badge
+                        key={typeIndex}
+                        variant="secondary"
+                        className="text-[10px] px-1 py-0 h-4"
+                      >
+                        {type.name}
+                      </Badge>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="text-right text-xs text-slate-500">
+                  {pokemon.cost || 1}
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-4 text-gray-500 dark:text-gray-400">

@@ -11,7 +11,6 @@ import {
   Coins,
   Users,
   Target,
-  TrendingUp,
   RotateCcw,
   Crown,
   Zap
@@ -40,22 +39,8 @@ export default function DraftSummaryPanel({
   const remainingSlots = maxTeamSize - draftedCount
   const averageCost = draftedCount > 0 ? Math.round(usedBudget / draftedCount) : 0
 
-  // Calculate budget efficiency
-  const budgetUsedPercent = (usedBudget / totalBudget) * 100
+  // Calculate progress
   const slotsUsedPercent = (draftedCount / maxTeamSize) * 100
-  const efficiency = slotsUsedPercent > 0 ? budgetUsedPercent / slotsUsedPercent : 0
-
-  const getEfficiencyColor = (efficiency: number) => {
-    if (efficiency < 80) return 'text-green-600 dark:text-green-400'
-    if (efficiency < 100) return 'text-yellow-600 dark:text-yellow-400'
-    return 'text-red-600 dark:text-red-400'
-  }
-
-  const getEfficiencyLabel = (efficiency: number) => {
-    if (efficiency < 80) return 'Efficient'
-    if (efficiency < 100) return 'Balanced'
-    return 'Premium'
-  }
 
   if (draftedCount === 0) {
     return (
@@ -124,7 +109,7 @@ export default function DraftSummaryPanel({
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
             <div className="flex items-center gap-2 mb-1">
               <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -161,22 +146,6 @@ export default function DraftSummaryPanel({
             </div>
             <div className="text-xs text-purple-600 dark:text-purple-400">
               points per pick
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-              <span className="text-xs font-medium text-orange-700 dark:text-orange-300">Strategy</span>
-            </div>
-            <div className={cn(
-              "text-lg font-bold",
-              getEfficiencyColor(efficiency)
-            )}>
-              {getEfficiencyLabel(efficiency)}
-            </div>
-            <div className="text-xs text-orange-600 dark:text-orange-400">
-              {Math.round(efficiency)}% efficiency
             </div>
           </div>
         </div>
