@@ -424,14 +424,22 @@ export type Database = {
   }
 }
 
-// Create and export the Supabase client
-// Build timestamp: Force new bundle hash
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false
+// Create singleton Supabase client
+let supabaseInstance: SupabaseClient<Database> | null = null
+
+export const supabase = (() => {
+  if (!supabaseInstance) {
+    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'pokemon-draft-auth'
+      }
+    })
   }
-})
+  return supabaseInstance
+})()
 
 // Helper to check if Supabase is configured
 export const isSupabaseConfigured = true
