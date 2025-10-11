@@ -307,22 +307,18 @@ export class DraftService {
       }
     }
 
-    // Check for duplicate userName + teamName combination
+    // Check for duplicate names in this draft
     const existingTeams = (draft as any).teams || []
     const existingParticipants = (draft as any).participants || []
 
-    for (const team of existingTeams) {
-      const teamParticipant = existingParticipants.find((p: any) => p.team_id === team.id)
-      if (teamParticipant &&
-          team.name.toLowerCase() === teamName.toLowerCase() &&
-          teamParticipant.display_name.toLowerCase() === userName.toLowerCase()) {
-        throw new Error(`A team named "${teamName}" with trainer "${userName}" already exists in this draft. Please choose a different name.`)
-      }
+    // Check for duplicate username (display_name)
+    if (existingParticipants.some((p: any) => p.display_name.toLowerCase() === userName.toLowerCase())) {
+      throw new Error(`Username "${userName}" is already taken in this draft. Please choose a different username.`)
     }
 
-    // Also check for duplicate team name alone (to prevent confusion)
+    // Check for duplicate team name
     if (existingTeams.some((team: any) => team.name.toLowerCase() === teamName.toLowerCase())) {
-      throw new Error(`Team name "${teamName}" is already taken. Please choose a different team name.`)
+      throw new Error(`Team name "${teamName}" is already taken in this draft. Please choose a different team name.`)
     }
 
     // Get next draft order
@@ -387,7 +383,7 @@ export class DraftService {
 
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
-      .select('*')
+      .select('*, participants(*)')
       .eq('room_code', draftId)
       .single()
 
@@ -396,6 +392,12 @@ export class DraftService {
     }
 
     const draftUuid = (draft as any).id
+    const existingParticipants = (draft as any).participants || []
+
+    // Check for duplicate username (including spectators)
+    if (existingParticipants.some((p: any) => p.display_name.toLowerCase() === userName.toLowerCase())) {
+      throw new Error(`Username "${userName}" is already taken in this draft. Please choose a different username.`)
+    }
 
     // Create spectator participant (no team assignment)
     const { error: participantError } = await (supabase

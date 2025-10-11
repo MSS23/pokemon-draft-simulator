@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ import {
 import { User, LogOut, Eye } from 'lucide-react'
 
 export function Header() {
+  const router = useRouter()
   const { user, signOut, loading } = useAuth()
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
@@ -79,6 +81,10 @@ export function Header() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push('/profile')}>
+                    <User className="h-4 w-4 mr-2" />
+                    Profile Settings
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut()}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
