@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DraftService } from '@/lib/draft-service'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { useRouter } from 'next/navigation'
-import { Clock, Play, Trophy, Users, Sparkles, Crown, TrendingUp, Settings, Trash2 } from 'lucide-react'
+import { Clock, Play, Trophy, Users, Trash2 } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -170,117 +170,58 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pokemon-bg transition-colors duration-500">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
-        <div className="relative text-center mb-8">
-          {/* Admin Link */}
-          <div className="absolute top-0 right-0 flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/admin')}
-              className="text-xs"
-            >
-              <Settings className="h-4 w-4 mr-1" />
-              Admin
-            </Button>
-          </div>
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-3">
             Pokémon Draft League
           </h1>
-          <p className="text-xl text-slate-700 dark:text-slate-300 mb-6 max-w-2xl mx-auto transition-colors duration-300">
-            Master your strategy in real-time competitive Pokémon drafting with {selectedFormat.name} format
+          <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+            Real-time competitive Pokémon drafting with friends
           </p>
-
-          {pokemon && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-              <div className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg p-4 text-center shadow-lg">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-wide">Available</span>
-                </div>
-                <div className="text-2xl font-bold">
-                  {pokemon.filter(p => !draftedPokemon.find(d => d.id === p.id)).length}
-                </div>
-                <div className="text-xs opacity-90">Pokémon to draft</div>
-              </div>
-
-              <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg p-4 text-center shadow-lg">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <Crown className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-wide">Drafted</span>
-                </div>
-                <div className="text-2xl font-bold">
-                  {draftedPokemon.length}/{maxTeamSize}
-                </div>
-                <div className="text-xs opacity-90">Team slots used</div>
-              </div>
-
-              <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg p-4 text-center shadow-lg">
-                <div className="flex items-center justify-center gap-2 mb-1">
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="text-xs font-medium uppercase tracking-wide">Budget</span>
-                </div>
-                <div className="text-2xl font-bold">
-                  {remainingBudget}
-                </div>
-                <div className="text-xs opacity-90">Points remaining</div>
-              </div>
-            </div>
-          )}
         </div>
 
 
-        {/* Multiplayer Section */}
-        <div className="mb-6 p-6 bg-gradient-to-r from-purple-500/10 via-blue-500/10 to-cyan-500/10 dark:from-purple-500/20 dark:via-blue-500/20 dark:to-cyan-500/20 rounded-lg border border-purple-200 dark:border-purple-700">
-          <h2 className="text-xl font-bold mb-3 text-slate-800 dark:text-slate-200 flex items-center gap-2">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            Multiplayer Draft
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-4">
-            Create or join a real-time multiplayer draft with your friends. Experience competitive Pokémon drafting with turn-based selection and live updates.
-          </p>
-          <div className="flex gap-3 flex-wrap">
-            <Button
-              onClick={() => {
-                if (!user) {
-                  setAuthModalOpen(true)
-                  return
-                }
-                window.location.href = '/create-draft'
-              }}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
-            >
-              Create Draft Room
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                const code = prompt('Enter room code:')
-                if (code) {
-                  window.location.href = `/join-draft?code=${code.toUpperCase()}`
-                }
-              }}
-              className="border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-            >
-              Join Draft Room
-            </Button>
-          </div>
+        {/* Quick Actions */}
+        <div className="mb-8 flex gap-4 justify-center flex-wrap">
+          <Button
+            onClick={() => {
+              if (!user) {
+                setAuthModalOpen(true)
+                return
+              }
+              window.location.href = '/create-draft'
+            }}
+            size="lg"
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8"
+          >
+            <Users className="h-5 w-5 mr-2" />
+            Create Draft Room
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => {
+              const code = prompt('Enter room code:')
+              if (code) {
+                window.location.href = `/join-draft?code=${code.toUpperCase()}`
+              }
+            }}
+            className="px-8"
+          >
+            <Play className="h-5 w-5 mr-2" />
+            Join Draft Room
+          </Button>
         </div>
 
         {/* My Drafts Section */}
         {myDrafts.length > 0 && (
-          <div className="mb-6 p-6 bg-gradient-to-r from-green-500/10 via-blue-500/10 to-purple-500/10 dark:from-green-500/20 dark:via-blue-500/20 dark:to-purple-500/20 rounded-lg border border-green-200 dark:border-green-700">
-            <h2 className="text-xl font-bold mb-3 text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Trophy className="h-6 w-6" />
-              My Draft Rooms
+              My Drafts
             </h2>
-            <p className="text-slate-600 dark:text-slate-400 mb-4">
-              Resume your active drafts or view completed games. Your draft history is saved locally.
-            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {myDrafts.slice(0, 6).map((draft) => (
                 <div
@@ -372,57 +313,40 @@ export default function Home() {
         )}
 
         {/* Format Selector & Pokemon Grid */}
-        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-xl shadow-xl border border-white/50 dark:border-slate-700/50 p-6">
+        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
           {/* Format Selector */}
-          <div className="mb-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">
-                  Draft Format
-                </h3>
-              </div>
-              <div className="flex-1 max-w-md">
-                <Select value={selectedFormatId} onValueChange={setSelectedFormatId}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a format" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {POKEMON_FORMATS.map((format) => (
-                      <SelectItem key={format.id} value={format.id}>
-                        <div className="flex flex-col items-start">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{format.name}</span>
-                            <Badge 
-                              variant={format.meta.isOfficial ? "default" : "secondary"}
-                              className="text-xs"
-                            >
-                              {format.category.toUpperCase()}
-                            </Badge>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{format.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-purple-700 dark:text-purple-300">
-                <Badge variant="outline">
-                  {selectedFormat.gameType === 'doubles' ? 'VGC Doubles' : 'Smogon Singles'}
-                </Badge>
-                <Badge variant="outline">
-                  Gen {selectedFormat.generation}
-                </Badge>
-              </div>
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Format:
+              </h3>
             </div>
-            <div className="mt-3 text-sm text-purple-800 dark:text-purple-200">
-              <p>{selectedFormat.description}</p>
-              {selectedFormat.meta.isOfficial && (
-                <p className="mt-1 text-xs text-purple-600 dark:text-purple-400">
-                  ✓ Official {selectedFormat.meta.season || 'Tournament'} Format
-                </p>
-              )}
+            <div className="flex-1 max-w-md">
+              <Select value={selectedFormatId} onValueChange={setSelectedFormatId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a format" />
+                </SelectTrigger>
+                <SelectContent>
+                  {POKEMON_FORMATS.map((format) => (
+                    <SelectItem key={format.id} value={format.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{format.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {format.category.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">
+                {selectedFormat.gameType === 'doubles' ? 'VGC Doubles' : 'Smogon Singles'}
+              </Badge>
+              <Badge variant="outline">
+                Gen {selectedFormat.generation}
+              </Badge>
             </div>
           </div>
 
@@ -467,59 +391,6 @@ export default function Home() {
           onResetDraft={handleResetDraft}
         />
 
-        {/* Instructions */}
-        <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-          <h3 className="text-lg font-semibold mb-3 text-blue-900 dark:text-blue-100 flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            How to Draft Pokémon
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-blue-800 dark:text-blue-200">
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 dark:text-blue-400">1.</span>
-                <span>Click any Pokémon card to view detailed stats and moves</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 dark:text-blue-400">2.</span>
-                <span>Review the Pokémon&apos;s abilities, moves, and draft cost</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 dark:text-blue-400">3.</span>
-                <span>Click &quot;🔥 Draft [Pokemon]&quot; to add to your team</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 dark:text-blue-400">4.</span>
-                <span>Confirm your choice in the draft confirmation modal</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 dark:text-blue-400">5.</span>
-                <span>Track your progress in the floating draft panel</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="font-bold text-blue-600 dark:text-blue-400">6.</span>
-                <span>Use filters to find Pokémon by type, cost, or stats</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Next Steps */}
-        <div className="mt-6 p-6 bg-green-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2 text-green-900">
-            Next: Set Up Supabase
-          </h3>
-          <p className="text-green-800 mb-3">
-            To enable real-time drafting features, you&apos;ll need to configure Supabase:
-          </p>
-          <ol className="space-y-1 text-green-800 list-decimal list-inside">
-            <li>Create a Supabase project at supabase.com</li>
-            <li>Update your .env.local file with your project credentials</li>
-            <li>Run the database schema from the README</li>
-            <li>Start creating and joining draft rooms!</li>
-          </ol>
-        </div>
       </div>
 
       {/* Auth Modal */}
