@@ -110,11 +110,30 @@ export default function PokemonGrid({
     const filtered = pokemon.filter(p => {
       // Enhanced search filter - includes name, types, abilities, and moves
       if (searchQuery) {
-        const query = searchQuery.toLowerCase()
+        const query = searchQuery.toLowerCase().trim()
+
+        // Name matching (exact and partial)
         const nameMatch = p.name.toLowerCase().includes(query)
+
+        // Type matching
         const typeMatch = p.types.some(t => t.name.toLowerCase().includes(query))
-        const abilityMatch = p.abilities.some(a => a.toLowerCase().includes(query))
-        const moveMatch = p.moves?.some(m => m.name.toLowerCase().includes(query)) || false
+
+        // Ability matching (supports partial names)
+        const abilityMatch = p.abilities?.some(a =>
+          a.toLowerCase().includes(query) ||
+          a.toLowerCase().replace(/[^a-z0-9]/g, '').includes(query.replace(/[^a-z0-9]/g, ''))
+        ) || false
+
+        // Move matching (supports partial names and removes special characters)
+        const moveMatch = p.moves?.some(m => {
+          const moveName = m.name.toLowerCase()
+          const normalizedMoveName = moveName.replace(/[^a-z0-9]/g, '')
+          const normalizedQuery = query.replace(/[^a-z0-9]/g, '')
+
+          return moveName.includes(query) ||
+                 normalizedMoveName.includes(normalizedQuery) ||
+                 moveName.replace(/\s+/g, '').includes(query.replace(/\s+/g, ''))
+        }) || false
 
         if (!nameMatch && !typeMatch && !abilityMatch && !moveMatch) {
           return false
@@ -252,7 +271,7 @@ export default function PokemonGrid({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search by name, type, ability, or move (e.g., 'skar', 'fire', 'levitate', 'earthquake')..."
+                placeholder="Search by name, type, ability, or move (e.g., 'Pikachu', 'Fire', 'Levitate', 'Trick Room', 'Earthquake')..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-12 text-base"
@@ -678,40 +697,52 @@ export default function PokemonGrid({
       )}
 
       {/* Results info */}
-      <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="text-sm font-medium text-gray-700">
-              Showing <span className="font-bold text-blue-600">{availablePokemon.length}</span> of <span className="font-bold">{pokemon.length}</span> Pokémon
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Showing <span className="font-bold text-blue-600 dark:text-blue-400">{availablePokemon.length}</span> of <span className="font-bold">{pokemon.length}</span> Pokémon
+              {searchQuery && (
+                <span className="ml-2 text-slate-600 dark:text-slate-400">
+                  matching "{searchQuery}"
+                </span>
+              )}
             </div>
           </div>
 
-          {(draftedPokemonIds.length > 0 || typeFilter !== 'all' || costFilter !== 'all') && (
+          {(draftedPokemonIds.length > 0 || typeFilter !== 'all' || costFilter !== 'all' || searchQuery) && (
             <div className="flex flex-wrap items-center gap-2">
+              {searchQuery && (
+                <Badge variant="outline" className="text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600">
+                  <Search className="h-3 w-3 mr-1" />
+                  Search: {searchQuery}
+                </Badge>
+              )}
               {draftedPokemonIds.length > 0 && (
-                <Badge variant="outline" className="text-red-600 border-red-300">
+                <Badge variant="outline" className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-600">
                   {draftedPokemonIds.length} drafted
                 </Badge>
               )}
               {typeFilter !== 'all' && (
-                <Badge variant="outline" className="text-purple-600 border-purple-300 capitalize">
+                <Badge variant="outline" className="text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600 capitalize">
                   Type: {typeFilter}
                 </Badge>
               )}
               {costFilter !== 'all' && (
-                <Badge variant="outline" className="text-orange-600 border-orange-300">
+                <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
                   Cost: {costFilter}
                 </Badge>
               )}
-              {(typeFilter !== 'all' || costFilter !== 'all') && (
+              {(searchQuery || typeFilter !== 'all' || costFilter !== 'all') && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
+                    setSearchQuery('')
                     setTypeFilter('all')
                     setCostFilter('all')
                   }}
-                  className="text-gray-500 hover:text-gray-700 text-xs h-6 px-2"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xs h-6 px-2"
                 >
                   Clear filters
                 </Button>
