@@ -184,7 +184,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.user_profiles (user_id, display_name, avatar_url)
   VALUES (
-    NEW.id,
+    NEW.id::text,  -- Cast UUID to text
     COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
     NEW.raw_user_meta_data->>'avatar_url'
   );

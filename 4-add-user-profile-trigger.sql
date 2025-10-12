@@ -12,7 +12,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.user_profiles (user_id, display_name, avatar_url)
   VALUES (
-    NEW.id,
+    NEW.id::text,  -- Cast UUID to text
     COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
     NEW.raw_user_meta_data->>'avatar_url'
   );
@@ -40,11 +40,11 @@ CREATE TRIGGER on_auth_user_created
 
 INSERT INTO public.user_profiles (user_id, display_name, avatar_url)
 SELECT
-  id,
+  id::text,  -- Cast UUID to text
   COALESCE(raw_user_meta_data->>'display_name', split_part(email, '@', 1)),
   raw_user_meta_data->>'avatar_url'
 FROM auth.users
-WHERE id NOT IN (SELECT user_id FROM public.user_profiles)
+WHERE id::text NOT IN (SELECT user_id FROM public.user_profiles)
 ON CONFLICT (user_id) DO NOTHING;
 
 -- =====================================================
