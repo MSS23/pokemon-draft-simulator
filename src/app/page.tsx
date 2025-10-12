@@ -285,15 +285,17 @@ export default function Home() {
                     >
                       Share
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => handleDeleteDraft(draft.draftId, e)}
-                      className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                      title="Delete draft permanently"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    {draft.isHost && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => handleDeleteDraft(draft.draftId, e)}
+                        className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                        title="Delete draft permanently (Host only)"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
