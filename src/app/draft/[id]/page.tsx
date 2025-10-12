@@ -1084,25 +1084,8 @@ export default function DraftRoomPage() {
   }, [currentAuction, roomCode, notify])
 
 
-  if (!userName || !teamName) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Invalid Access</CardTitle>
-            <CardDescription>
-              You need to join the draft properly with your name and team name.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => router.push('/join-draft')} className="w-full">
-              Join Draft Properly
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  // Removed userName/teamName check - authenticated users are automatically joined
+  // The draft state will handle whether they're a participant or spectator
 
   // Show error state
   if (error) {
