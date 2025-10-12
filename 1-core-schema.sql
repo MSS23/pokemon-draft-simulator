@@ -175,6 +175,32 @@ CREATE INDEX IF NOT EXISTS idx_wishlist_items_participant_id ON wishlist_items(p
 CREATE INDEX IF NOT EXISTS idx_spectator_events_draft_id ON spectator_events(draft_id);
 
 -- =====================================================
+-- FUNCTIONS AND TRIGGERS
+-- =====================================================
+
+-- Function to automatically create user profile on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.user_profiles (user_id, display_name, avatar_url)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
+    NEW.raw_user_meta_data->>'avatar_url'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop trigger if exists (for idempotency)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Trigger to create profile when user signs up
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =====================================================
 -- SCHEMA COMPLETE
 -- =====================================================
 -- Next: Run 2-rls-policies.sql to set up security

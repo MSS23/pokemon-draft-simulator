@@ -172,7 +172,33 @@ CREATE INDEX IF NOT EXISTS idx_wishlist_items_participant_id ON wishlist_items(p
 CREATE INDEX IF NOT EXISTS idx_spectator_events_draft_id ON spectator_events(draft_id);
 
 -- =====================================================
--- PART 3: ROW LEVEL SECURITY (RLS)
+-- PART 3: FUNCTIONS AND TRIGGERS
+-- =====================================================
+
+-- Function to automatically create user profile on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.user_profiles (user_id, display_name, avatar_url)
+  VALUES (
+    NEW.id,
+    COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
+    NEW.raw_user_meta_data->>'avatar_url'
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop trigger if exists (for idempotency)
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Trigger to create profile when user signs up
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- =====================================================
+-- PART 4: ROW LEVEL SECURITY (RLS)
 -- =====================================================
 
 -- Enable RLS on all tables
@@ -290,7 +316,7 @@ CREATE POLICY "Spectator events are viewable by everyone" ON spectator_events FO
 CREATE POLICY "Spectator events can be created by anyone" ON spectator_events FOR INSERT WITH CHECK (true);
 
 -- =====================================================
--- PART 4: ENABLE REALTIME SUBSCRIPTIONS
+-- PART 5: ENABLE REALTIME SUBSCRIPTIONS
 -- =====================================================
 
 DO $$
