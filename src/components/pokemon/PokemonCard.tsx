@@ -72,9 +72,9 @@ export default function PokemonCard({
   }
 
   const imageSizes = {
-    sm: 56,
-    md: 80,
-    lg: 96
+    sm: 96,   // Increased from 56 to 96
+    md: 120,  // Increased from 80 to 120
+    lg: 144   // Increased from 96 to 144
   }
 
   // Image click handler for switching modes
@@ -130,14 +130,11 @@ export default function PokemonCard({
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1 pr-2 min-w-0">
             <h3 className={cn(
-              "font-bold text-gray-900 leading-tight mb-1 truncate",
+              "font-bold text-gray-900 leading-tight truncate",
               size === 'sm' ? "text-xs" : size === 'md' ? "text-sm" : "text-base"
             )}>
               {pokemon.name}
             </h3>
-            <div className="text-xs text-gray-600">
-              #{pokemon.id.padStart(3, '0')}
-            </div>
           </div>
           {showCost && (
             <div className="flex flex-col items-end flex-shrink-0">
