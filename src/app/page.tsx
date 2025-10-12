@@ -126,16 +126,20 @@ export default function Home() {
     } catch (error) {
       console.error('Error deleting draft:', error)
 
-      // Revert UI on error by reloading from storage
-      setMyDrafts(UserSessionService.getDraftParticipations())
+      // Revert UI on error by reloading from storage (excluding abandoned)
+      setMyDrafts(UserSessionService.getVisibleDraftParticipations())
 
       alert('Failed to delete draft. You may not have permission to delete this draft.')
     }
   }
 
-  // Load user's drafts on component mount
+  // Load user's drafts on component mount (excluding abandoned ones)
   useEffect(() => {
-    const drafts = UserSessionService.getDraftParticipations()
+    // Auto-cleanup abandoned drafts from local storage
+    UserSessionService.cleanupAbandonedDrafts()
+
+    // Load only visible (non-abandoned) drafts
+    const drafts = UserSessionService.getVisibleDraftParticipations()
     setMyDrafts(drafts)
   }, [])
 

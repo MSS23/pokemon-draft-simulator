@@ -11,6 +11,7 @@ import { ImagePreferenceProvider } from "@/contexts/ImagePreferenceContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { HydrationErrorFilter } from "./hydration-error-filter";
+import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
 // import ErrorBoundary from "@/components/ui/error-boundary";
 
 const geistSans = Geist({
@@ -73,25 +74,27 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <HydrationErrorFilter />
-        <ErrorBoundaryProvider>
-          <HydrationFixProvider>
-            <ThemeProvider
-              defaultTheme="system"
-              storageKey="pokemon-draft-theme"
-            >
-              <ImagePreferenceProvider>
-                <AuthProvider>
-                  <NotificationProvider>
-                    <QueryProvider>
-                      <Header />
-                      {children}
-                    </QueryProvider>
-                  </NotificationProvider>
-                </AuthProvider>
-              </ImagePreferenceProvider>
-            </ThemeProvider>
-          </HydrationFixProvider>
-        </ErrorBoundaryProvider>
+        <PerformanceMonitorProvider>
+          <ErrorBoundaryProvider>
+            <HydrationFixProvider>
+              <ThemeProvider
+                defaultTheme="system"
+                storageKey="pokemon-draft-theme"
+              >
+                <ImagePreferenceProvider>
+                  <AuthProvider>
+                    <NotificationProvider>
+                      <QueryProvider>
+                        <Header />
+                        {children}
+                      </QueryProvider>
+                    </NotificationProvider>
+                  </AuthProvider>
+                </ImagePreferenceProvider>
+              </ThemeProvider>
+            </HydrationFixProvider>
+          </ErrorBoundaryProvider>
+        </PerformanceMonitorProvider>
       </body>
     </html>
   );

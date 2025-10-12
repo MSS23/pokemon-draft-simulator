@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Pokemon } from '@/types'
 import PokemonCard from './PokemonCard'
@@ -20,12 +20,11 @@ interface VirtualizedPokemonGridProps {
   showWishlistButton?: boolean
 }
 
-// Calculate grid columns based on screen size and card size
-const getColumnCount = (cardSize: 'sm' | 'md' | 'lg'): number => {
-  if (typeof window === 'undefined') return 6 // Default for SSR
-
-  const width = window.innerWidth
-
+/**
+ * Calculate grid columns based on screen size and card size
+ * Optimized: Called once on mount and debounced on resize
+ */
+const calculateColumnCount = (width: number, cardSize: 'sm' | 'md' | 'lg'): number => {
   if (cardSize === 'sm') {
     if (width >= 1536) return 8 // 2xl
     if (width >= 1280) return 7 // xl
@@ -53,6 +52,18 @@ const getColumnCount = (cardSize: 'sm' | 'md' | 'lg'): number => {
   return 1 // default
 }
 
+// Debounce utility for resize events
+function debounce<T extends (...args: any[]) => void>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }
+}
+
 const getEstimatedCardHeight = (cardSize: 'sm' | 'md' | 'lg'): number => {
   switch (cardSize) {
     case 'sm': return 220
@@ -62,6 +73,16 @@ const getEstimatedCardHeight = (cardSize: 'sm' | 'md' | 'lg'): number => {
   }
 }
 
+/**
+ * VirtualizedPokemonGrid - Optimized with debounced resize handling
+ *
+ * Performance optimizations:
+ * 1. Debounced resize events (250ms delay)
+ * 2. Column count calculated once and updated only on resize
+ * 3. Prevents unnecessary recalculations on every render
+ *
+ * Expected improvement: Eliminates jank during window resize
+ */
 export default function VirtualizedPokemonGrid({
   pokemon,
   onViewDetails,
@@ -77,8 +98,25 @@ export default function VirtualizedPokemonGrid({
 }: VirtualizedPokemonGridProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
-  const columnCount = getColumnCount(cardSize)
+  // State-based column count instead of recalculating on every render
+  const [columnCount, setColumnCount] = useState(() =>
+    typeof window !== 'undefined'
+      ? calculateColumnCount(window.innerWidth, cardSize)
+      : 6 // SSR default
+  )
+
   const estimatedCardHeight = getEstimatedCardHeight(cardSize)
+
+  // Debounced resize handler
+  useEffect(() => {
+    const handleResize = debounce(() => {
+      const newColumnCount = calculateColumnCount(window.innerWidth, cardSize)
+      setColumnCount(newColumnCount)
+    }, 250) // 250ms debounce
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [cardSize])
 
   // Calculate row data - group Pokemon into rows
   const rows: Pokemon[][] = []

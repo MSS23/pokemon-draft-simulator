@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "build:formats": "tsx scripts/build-format.ts",
-    "test": "vitest"
+    "test": "vitest",
+    "analyze": "ANALYZE=true next build",
+    "analyze:server": "ANALYZE=true BUNDLE_ANALYZE=server next build",
+    "analyze:browser": "ANALYZE=true BUNDLE_ANALYZE=browser next build"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.10",
@@ -30,11 +33,16 @@
     "@tanstack/react-query": "^5.90.2",
     "@tanstack/react-query-devtools": "^5.90.2",
     "@tanstack/react-virtual": "^3.13.12",
+    "@types/bcryptjs": "^2.4.6",
+    "bcryptjs": "^3.0.2",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.23.22",
+    "fuse.js": "^7.1.0",
+    "idb": "^8.0.3",
+    "immer": "^10.1.3",
     "lucide-react": "^0.544.0",
     "next": "15.1.6",
     "next-pwa": "^5.6.0",
@@ -44,21 +52,30 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.1.12",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^3.2.4",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
+    "happy-dom": "^20.0.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.7.0",
     "typescript": "^5",
-    "vitest": "^1.2.0"
+    "vitest": "^3.2.4",
+    "webpack-bundle-analyzer": "^4.10.2"
   }
 }

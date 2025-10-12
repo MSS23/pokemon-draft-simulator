@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { User, Save, ArrowLeft } from 'lucide-react'
+import { User, Save, ArrowLeft, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/components/providers/NotificationProvider'
@@ -15,26 +15,14 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, signOut } = useAuth()
   const notify = useNotify()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      notify.warning('Authentication Required', 'Please sign in to access your profile')
-      router.push('/')
-      return
-    }
-
-    if (user) {
-      loadProfile()
-    }
-  }, [user, authLoading])
-
-  async function loadProfile() {
+  const loadProfile = useCallback(async () => {
     if (!supabase || !user) return
 
     try {
@@ -74,7 +62,13 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user, notify])
+
+  useEffect(() => {
+    if (user) {
+      loadProfile()
+    }
+  }, [user, loadProfile])
 
   async function handleSave() {
     if (!supabase || !user) return
@@ -137,7 +131,79 @@ export default function ProfilePage() {
     }
   }
 
-  if (authLoading || loading) {
+  async function handleSignOut() {
+    try {
+      await signOut()
+      notify.success('Signed Out', 'You have been signed out successfully')
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+      notify.error('Sign Out Failed', 'Failed to sign out')
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="py-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-400">Loading authentication...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6">
+        <Card className="max-w-md w-full">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+                <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <CardTitle>Authentication Required</CardTitle>
+                <CardDescription>Sign in to access your profile</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-slate-600 dark:text-slate-400 text-sm">
+              You need to be signed in to view and edit your profile settings.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={() => router.push('/auth/login')}
+                className="w-full"
+              >
+                Sign In
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/auth/register')}
+                className="w-full"
+              >
+                Create Account
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/')}
+                className="w-full"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Home
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <Card className="max-w-md">
@@ -150,10 +216,6 @@ export default function ProfilePage() {
     )
   }
 
-  if (!user) {
-    return null
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6">
       <div className="container mx-auto max-w-2xl">
@@ -162,7 +224,13 @@ export default function ProfilePage() {
             <ArrowLeft className="h-4 w-4" />
             Back to Home
           </Button>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button variant="outline" onClick={handleSignOut} className="gap-2 text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20">
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
+          </div>
         </div>
 
         <Card>

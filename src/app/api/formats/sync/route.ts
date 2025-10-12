@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  * POST /api/formats/sync
  * Trigger a sync with Pokémon Showdown data
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const result = await syncShowdownData()
 

@@ -19,7 +19,8 @@ import {
   ChevronUp,
   Zap
 } from 'lucide-react'
-import { useDraftStore, selectUserWishlist, selectIsInWishlist } from '@/stores/draftStore'
+import { useDraftStore } from '@/stores/draftStore'
+import { selectUserWishlist, selectIsInWishlist } from '@/stores/selectors'
 import { useDragAndDrop } from '@/hooks/useDragAndDrop'
 import { useWishlistSync } from '@/hooks/useWishlistSync'
 import { useBudgetValidation } from '@/hooks/useBudgetValidation'

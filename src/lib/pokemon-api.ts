@@ -498,12 +498,17 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
   // Try to load from pre-built format pack first (much faster!)
   try {
     const manifest = await fetch('/data/format-manifest.json').then(res => res.json())
-    const formatEntry = manifest.formats.find((f: any) => f.id === formatId)
+    const formatEntry = manifest?.formats?.find((f: any) => f.id === formatId)
 
     if (formatEntry) {
       const formatPack = await fetch(`/data/format_${formatId}_${formatEntry.hash}.json`).then(res => res.json())
-      console.log(`✨ Loaded ${formatPack.pokemon.length} Pokemon from pre-built format pack for ${formatId}`)
-      return formatPack.pokemon.slice(0, limit)
+      // Validate format pack structure before using
+      if (formatPack && Array.isArray(formatPack.pokemon) && formatPack.pokemon.length > 0) {
+        console.log(`✨ Loaded ${formatPack.pokemon.length} Pokemon from pre-built format pack for ${formatId}`)
+        return formatPack.pokemon.slice(0, limit)
+      } else {
+        console.warn('Format pack has invalid structure, falling back to API fetching')
+      }
     }
   } catch (error) {
     console.warn('Could not load pre-built format pack, falling back to API fetching:', error)

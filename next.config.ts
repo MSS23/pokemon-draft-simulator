@@ -11,6 +11,9 @@ const nextConfig: NextConfig = {
         pathname: '/PokeAPI/sprites/**',
       },
     ],
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
   // Optimize bundle size with code splitting
@@ -53,8 +56,32 @@ const nextConfig: NextConfig = {
               chunks: 'all',
               priority: 25,
             },
+            radixui: {
+              test: /[\\/]node_modules[\\/](@radix-ui)[\\/]/,
+              name: 'radixui',
+              chunks: 'all',
+              priority: 24,
+            },
+            framermotion: {
+              test: /[\\/]node_modules[\\/](framer-motion)[\\/]/,
+              name: 'framer',
+              chunks: 'async',
+              priority: 23,
+            },
           },
         },
+      }
+
+      // Bundle analyzer (only when ANALYZE=true)
+      if (process.env.ANALYZE === 'true') {
+        const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer')
+        config.plugins.push(
+          new BundleAnalyzerPlugin({
+            analyzerMode: 'static',
+            openAnalyzer: false,
+            reportFilename: isServer ? '../analyze/server.html' : './analyze/client.html',
+          })
+        )
       }
     }
     return config
@@ -65,11 +92,42 @@ const nextConfig: NextConfig = {
 
   // Experimental features for performance
   experimental: {
-    optimizePackageImports: ['@supabase/supabase-js', 'lucide-react'],
+    optimizePackageImports: ['@supabase/supabase-js', 'lucide-react', '@radix-ui/react-icons'],
+  },
+
+  // HTTP/2 Server Push - preload critical resources
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+        ],
+      },
+      {
+        source: '/',
+        headers: [
+          {
+            key: 'Link',
+            value: '</fonts/geist-sans.woff2>; rel=preload; as=font; type=font/woff2; crossorigin',
+          },
+        ],
+      },
+    ]
   },
 
   // PWA configuration
   reactStrictMode: true,
+
+  // Production optimizations
+  poweredByHeader: false,
 };
 
 // Sentry configuration options

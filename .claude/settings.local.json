@@ -39,7 +39,16 @@
       "Bash(VERCEL_ENV_SETUP.md)",
       "Bash(supabase-schema.sql )",
       "Bash(supabase-league-schema.sql )",
-      "Bash(FIX-RLS-POLICIES.md)"
+      "Bash(FIX-RLS-POLICIES.md)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test)",
+      "Bash(npx vitest run:*)",
+      "Bash(npm test:*)",
+      "Bash(dir:*)",
+      "Bash(awk:*)",
+      "Bash(chmod:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

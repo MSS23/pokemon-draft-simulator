@@ -244,6 +244,36 @@ export class UserSessionService {
   }
 
   /**
+   * Get non-abandoned draft participations (for display in My Drafts)
+   * Filters out abandoned drafts but keeps active, completed, and spectator drafts
+   */
+  static getVisibleDraftParticipations(): DraftParticipation[] {
+    return this.getDraftParticipations().filter(p => p.status !== 'abandoned')
+  }
+
+  /**
+   * Remove all abandoned draft participations from local storage
+   */
+  static cleanupAbandonedDrafts(): void {
+    if (typeof window === 'undefined') return
+
+    try {
+      const stored = localStorage.getItem(DRAFT_PARTICIPATION_KEY)
+      if (!stored) return
+
+      const participations = JSON.parse(stored) as DraftParticipation[]
+      const nonAbandoned = participations.filter(p => p.status !== 'abandoned')
+
+      if (nonAbandoned.length !== participations.length) {
+        localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(nonAbandoned))
+        console.log(`Cleaned up ${participations.length - nonAbandoned.length} abandoned draft(s)`)
+      }
+    } catch (error) {
+      console.warn('Failed to cleanup abandoned drafts:', error)
+    }
+  }
+
+  /**
    * Get a specific draft participation
    */
   static getDraftParticipation(draftId: string): DraftParticipation | null {
@@ -323,4 +353,5 @@ export class UserSessionService {
 // Auto-cleanup on service import
 if (typeof window !== 'undefined') {
   UserSessionService.cleanupOldParticipations()
+  UserSessionService.cleanupAbandonedDrafts()
 }

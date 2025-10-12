@@ -1,4 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import type { DraftSettings, LeagueSettings, SpectatorEventMetadata } from '@/types/supabase-helpers'
+
+// Augment Window interface for Supabase instance tracking
+declare global {
+  interface Window {
+    __supabaseInstance?: SupabaseClient<Database>
+  }
+}
 
 // CACHE BUST: Build 2025-10-07-12:00
 // Get environment variables - these are embedded at build time for NEXT_PUBLIC_ prefixed vars
@@ -40,7 +48,7 @@ export type Database = {
           status: 'setup' | 'active' | 'completed' | 'paused'
           current_turn: number | null
           current_round: number
-          settings: Record<string, any> | null
+          settings: DraftSettings | null
           room_code: string | null
           is_public: boolean
           spectator_count: number
@@ -60,7 +68,7 @@ export type Database = {
           status?: 'setup' | 'active' | 'completed' | 'paused'
           current_turn?: number | null
           current_round?: number
-          settings?: Record<string, any> | null
+          settings?: DraftSettings | null
           room_code?: string | null
           is_public?: boolean
           spectator_count?: number
@@ -80,7 +88,7 @@ export type Database = {
           status?: 'setup' | 'active' | 'completed' | 'paused'
           current_turn?: number | null
           current_round?: number
-          settings?: Record<string, any> | null
+          settings?: DraftSettings | null
           room_code?: string | null
           is_public?: boolean
           spectator_count?: number
@@ -324,7 +332,7 @@ export type Database = {
           draft_id: string
           event_type: string
           spectator_id: string | null
-          metadata: Record<string, any>
+          metadata: SpectatorEventMetadata
           created_at: string
         }
         Insert: {
@@ -332,7 +340,7 @@ export type Database = {
           draft_id: string
           event_type: string
           spectator_id?: string | null
-          metadata?: Record<string, any>
+          metadata?: SpectatorEventMetadata
           created_at?: string
         }
         Update: {
@@ -340,7 +348,7 @@ export type Database = {
           draft_id?: string
           event_type?: string
           spectator_id?: string | null
-          metadata?: Record<string, any>
+          metadata?: SpectatorEventMetadata
           created_at?: string
         }
       }
@@ -435,7 +443,7 @@ export type Database = {
           end_date: string | null
           current_week: number
           total_weeks: number
-          settings: Record<string, any>
+          settings: LeagueSettings
           created_at: string
           updated_at: string
         }
@@ -450,7 +458,7 @@ export type Database = {
           end_date?: string | null
           current_week?: number
           total_weeks: number
-          settings?: Record<string, any>
+          settings?: LeagueSettings
           created_at?: string
           updated_at?: string
         }
@@ -465,7 +473,7 @@ export type Database = {
           end_date?: string | null
           current_week?: number
           total_weeks?: number
-          settings?: Record<string, any>
+          settings?: LeagueSettings
           created_at?: string
           updated_at?: string
         }
@@ -655,8 +663,15 @@ export type Database = {
   }
 }
 
-// Create singleton Supabase client
+// Create singleton Supabase client with proper instance tracking
 let supabaseInstance: SupabaseClient<Database> | null = null
+
+// Track if we've already created an instance in this session
+if (typeof window !== 'undefined') {
+  if (window.__supabaseInstance) {
+    supabaseInstance = window.__supabaseInstance
+  }
+}
 
 export const supabase = (() => {
   if (!supabaseInstance) {
@@ -665,9 +680,20 @@ export const supabase = (() => {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: 'pokemon-draft-auth'
+        // Use a unique storage key to avoid conflicts
+        storageKey: 'sb-pokemon-draft-auth-token'
+      },
+      global: {
+        headers: {
+          'X-Client-Info': 'pokemon-draft-app'
+        }
       }
     })
+
+    // Store instance reference in window to prevent duplication
+    if (typeof window !== 'undefined') {
+      window.__supabaseInstance = supabaseInstance
+    }
   }
   return supabaseInstance
 })()
