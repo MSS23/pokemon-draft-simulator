@@ -103,6 +103,13 @@ export class UserSessionService {
   }
 
   /**
+   * Alias for getOrCreateSession for backward compatibility
+   */
+  static async getSession(displayName?: string): Promise<UserSession> {
+    return this.getOrCreateSession(displayName)
+  }
+
+  /**
    * Update user session activity timestamp
    */
   static updateActivity(): void {

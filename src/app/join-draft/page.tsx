@@ -168,7 +168,7 @@ function JoinDraftForm() {
 
         if (profileError) throw profileError
 
-        setUserDisplayName(profile.display_name || '')
+        setUserDisplayName((profile as { display_name: string })?.display_name || '')
       } catch (error) {
         console.error('Error loading profile:', error)
         setError('Failed to load your profile. Please try again.')

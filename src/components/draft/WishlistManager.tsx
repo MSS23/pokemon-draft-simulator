@@ -23,7 +23,6 @@ import { useDraftStore, selectUserWishlist, selectIsInWishlist } from '@/stores/
 import { useDragAndDrop } from '@/hooks/useDragAndDrop'
 import { useWishlistSync } from '@/hooks/useWishlistSync'
 import { useBudgetValidation } from '@/hooks/useBudgetValidation'
-import WishlistConnectionStatus from './WishlistConnectionStatus'
 import BudgetWarnings from './BudgetWarnings'
 
 interface WishlistManagerProps {
@@ -152,7 +151,10 @@ export default function WishlistManager({
 
         {/* Wishlist Stats */}
         <div className="flex flex-wrap gap-2 text-xs">
-          <WishlistConnectionStatus isConnected={isConnected} showLabel />
+          <Badge variant={isConnected ? "default" : "destructive"} className="flex items-center gap-1">
+            <div className={cn("h-2 w-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
+            {isConnected ? "Connected" : "Disconnected"}
+          </Badge>
           <Badge variant="outline" className="flex items-center gap-1">
             <Star className="h-3 w-3" />
             {userWishlist.length} items
@@ -240,12 +242,14 @@ export default function WishlistManager({
                   // Clear unavailable items
                   userWishlist.forEach(item => {
                     if (!item.isAvailable) {
-                      handleRemoveItem(item.id)
+                      handleRemoveItem(item.pokemonId)
                     }
                   })
                 }}
+                disabled={!userWishlist.some(item => !item.isAvailable)}
               >
-                Clear Drafted
+                <X className="h-3 w-3 mr-1" />
+                Clear Picked
               </Button>
               <Button
                 variant="outline"
@@ -253,7 +257,7 @@ export default function WishlistManager({
                 className="flex-1 text-xs"
                 onClick={() => {
                   // Clear all items
-                  userWishlist.forEach(item => handleRemoveItem(item.id))
+                  userWishlist.forEach(item => handleRemoveItem(item.pokemonId))
                 }}
               >
                 Clear All
@@ -302,10 +306,10 @@ function WishlistItemCard({
     <div
       draggable
       className={cn(
-        "flex items-center gap-3 p-2 rounded-lg border transition-all duration-200",
+        "relative flex items-center gap-3 p-2 rounded-lg border transition-all duration-200",
         "hover:shadow-md hover:scale-[1.02] cursor-move",
         isNext && "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700",
-        !item.isAvailable && "opacity-60 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700",
+        !item.isAvailable && "opacity-75 bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700",
         item.isAvailable && !isNext && "bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700",
         isDragging && "opacity-50 scale-95 rotate-2 shadow-xl",
         isDragOver && "scale-105 border-purple-400 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20"
@@ -317,6 +321,20 @@ function WishlistItemCard({
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+      {/* Red X Overlay for Drafted Pokemon */}
+      {!item.isAvailable && (
+        <div className="absolute inset-0 flex items-center justify-center bg-red-500/10 rounded-lg pointer-events-none">
+          <div className="relative">
+            <X className="h-12 w-12 text-red-500 opacity-40" strokeWidth={3} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-xs font-bold text-red-600 dark:text-red-400 bg-white/90 dark:bg-slate-900/90 px-2 py-0.5 rounded">
+                PICKED
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Drag Handle */}
       <div className="cursor-move">
         <GripVertical className="h-4 w-4 text-gray-400" />
@@ -324,24 +342,28 @@ function WishlistItemCard({
 
       {/* Priority Number */}
       <div className={cn(
-        "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
-        isNext ? "bg-green-500 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+        "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold z-10",
+        isNext ? "bg-green-500 text-white" :
+        !item.isAvailable ? "bg-red-500 text-white" :
+        "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
       )}>
-        {index + 1}
+        {!item.isAvailable ? <X className="h-4 w-4" /> : index + 1}
       </div>
 
       {/* Pokemon Info */}
-      <div className="flex-1 min-w-0">
+      <div className={cn(
+        "flex-1 min-w-0",
+        !item.isAvailable && "line-through opacity-60"
+      )}>
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm truncate">{item.pokemonName}</span>
           {isNext && <Crown className="h-3 w-3 text-yellow-500" />}
-          {!item.isAvailable && <X className="h-3 w-3 text-red-500" />}
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
           <span>{item.cost} pts</span>
           {!item.isAvailable && (
-            <Badge variant="destructive" className="text-xs px-1 py-0">
-              Drafted
+            <Badge variant="destructive" className="text-xs px-1 py-0 font-bold">
+              Already Picked
             </Badge>
           )}
         </div>

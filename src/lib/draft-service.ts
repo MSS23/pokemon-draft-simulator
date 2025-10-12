@@ -286,17 +286,17 @@ export class DraftService {
     if (!supabase) throw new Error('Supabase not available')
 
     // Fetch user's display name from user_profiles
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
+    const { data: userProfile, error: profileError } = await (supabase
+      .from('user_profiles') as any)
       .select('display_name')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single()
 
     if (profileError || !userProfile) {
       throw new Error('User profile not found. Please ensure you have a profile set up.')
     }
 
-    const displayName = userProfile.display_name
+    const displayName = (userProfile as any).display_name
 
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
@@ -386,17 +386,17 @@ export class DraftService {
     if (!supabase) throw new Error('Supabase not available')
 
     // Fetch user's display name from user_profiles
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
+    const { data: userProfile, error: profileError } = await (supabase
+      .from('user_profiles') as any)
       .select('display_name')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single()
 
     if (profileError || !userProfile) {
       throw new Error('User profile not found. Please ensure you have a profile set up.')
     }
 
-    const displayName = userProfile.display_name
+    const displayName = (userProfile as any).display_name
 
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
@@ -604,8 +604,26 @@ export class DraftService {
     // Use the validated cost from format rules
     const validatedCost = formatValidation.validatedCost
 
+    // Get team info to validate budget and pick count
+    const team = draftState.teams.find(t => t.id === teamId)
+    if (!team) {
+      throw new Error('Team not found')
+    }
+
+    // Validate budget remaining
+    if (team.budget_remaining < validatedCost) {
+      throw new Error(`Insufficient budget! You have ${team.budget_remaining} points remaining but this Pokémon costs ${validatedCost} points.`)
+    }
+
+    // Validate Pokémon count limit
+    const maxPokemonPerTeam = draftState.draft.settings?.maxPokemonPerTeam || 10
+    const currentPickCount = draftState.picks.filter(p => p.team_id === teamId).length
+    if (currentPickCount >= maxPokemonPerTeam) {
+      throw new Error(`Team already has maximum number of Pokémon (${maxPokemonPerTeam})`)
+    }
+
     const totalTeams = draftState.teams.length
-    const maxRounds = draftState.draft.settings?.maxPokemonPerTeam || 10
+    const maxRounds = maxPokemonPerTeam
     const currentTurn = draftState.draft.current_turn || 1
 
     // Generate snake draft order for all rounds
@@ -685,6 +703,16 @@ export class DraftService {
 
     if (draftError) {
       console.error('Error updating draft turn:', draftError)
+    }
+
+    // If draft is complete and league creation is enabled, create the league
+    if (isComplete && draftState.draft.settings?.createLeague) {
+      try {
+        await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
+      } catch (leagueError) {
+        console.error('Error creating league:', leagueError)
+        // Don't fail the pick if league creation fails
+      }
     }
   }
 
@@ -1274,6 +1302,108 @@ export class DraftService {
     UserSessionService.updateDraftParticipation(draftId, { status: 'abandoned' })
   }
 
+  /**
+   * Adjust team budget (admin/host only)
+   */
+  static async adjustTeamBudget(
+    draftId: string,
+    teamId: string,
+    newBudget: number
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    if (newBudget < 0) {
+      throw new Error('Budget cannot be negative')
+    }
+
+    const { error } = await (supabase
+      .from('teams') as any)
+      .update({
+        budget_remaining: newBudget,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', teamId)
+      .eq('draft_id', draftId)
+
+    if (error) {
+      console.error('Error adjusting team budget:', error)
+      throw new Error('Failed to adjust team budget')
+    }
+  }
+
+  /**
+   * Set default auction timer duration (admin/host only)
+   */
+  static async setAuctionTimerDuration(
+    draftId: string,
+    durationSeconds: number
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    if (durationSeconds < 10) {
+      throw new Error('Auction duration must be at least 10 seconds')
+    }
+
+    // Get current settings
+    const { data: draft, error: fetchError } = await supabase
+      .from('drafts')
+      .select('settings')
+      .eq('id', draftId)
+      .single()
+
+    if (fetchError) {
+      throw new Error('Failed to fetch draft settings')
+    }
+
+    // Update settings with new auction duration
+    const currentSettings = (draft as any).settings || {}
+    const updatedSettings = {
+      ...currentSettings,
+      auctionDurationSeconds: durationSeconds
+    }
+
+    const { error } = await (supabase
+      .from('drafts') as any)
+      .update({
+        settings: updatedSettings,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftId)
+
+    if (error) {
+      console.error('Error setting auction timer duration:', error)
+      throw new Error('Failed to set auction timer duration')
+    }
+  }
+
+  /**
+   * Create league(s) for a completed draft
+   */
+  private static async createLeagueForCompletedDraft(
+    draftId: string,
+    settings: any
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    try {
+      const { LeagueService } = await import('./league-service')
+
+      const leagueWeeks = settings.leagueWeeks || 4
+      const splitIntoConferences = settings.splitIntoConferences || false
+
+      await LeagueService.createLeagueFromDraft(draftId, {
+        splitIntoConferences,
+        totalWeeks: leagueWeeks,
+        matchFormat: 'best_of_3'
+      })
+
+      console.log('League created successfully for draft:', draftId)
+    } catch (error) {
+      console.error('Failed to create league:', error)
+      throw error
+    }
+  }
+
   // =====================
   // AUCTION DRAFT METHODS
   // =====================
@@ -1642,6 +1772,16 @@ export class DraftService {
 
       if (error) {
         console.error('Error completing auction draft:', error)
+      }
+
+      // Create league if enabled
+      if (draftState.draft.settings?.createLeague) {
+        try {
+          await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
+        } catch (leagueError) {
+          console.error('Error creating league for auction draft:', leagueError)
+          // Don't fail the auction completion if league creation fails
+        }
       }
     }
 

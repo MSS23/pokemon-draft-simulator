@@ -32,12 +32,16 @@ export default function CreateDraftPage() {
     draftType: 'snake',
     timeLimit: '60',
     pokemonPerTeam: '6',
+    budgetPerTeam: '100',
     formatId: DEFAULT_FORMAT,
     isPublic: false,
     description: '',
     tags: '',
     password: '',
-    useCustomFormat: false
+    useCustomFormat: false,
+    createLeague: true,
+    splitIntoConferences: false,
+    leagueWeeks: '4'
   })
 
   const [customPricing, setCustomPricing] = useState<Record<string, number> | null>(null)
@@ -198,9 +202,13 @@ export default function CreateDraftPage() {
           draftType: formData.draftType as 'snake' | 'auction',
           timeLimit: parseInt(formData.timeLimit),
           pokemonPerTeam: parseInt(formData.pokemonPerTeam),
-          budgetPerTeam: formData.draftType === 'auction' ? 100 : undefined,
-          formatId: formData.useCustomFormat ? 'custom' : formData.formatId
-        },
+          budgetPerTeam: parseInt(formData.budgetPerTeam),
+          formatId: formData.useCustomFormat ? 'custom' : formData.formatId,
+          // League settings (stored in draft settings for league creation later)
+          createLeague: formData.createLeague,
+          splitIntoConferences: formData.splitIntoConferences,
+          leagueWeeks: parseInt(formData.leagueWeeks)
+        } as any,
         isPublic: formData.isPublic,
         description: formData.description || null,
         tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : null,
@@ -675,6 +683,100 @@ export default function CreateDraftPage() {
                       </p>
                     )}
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="budgetPerTeam" className="text-sm font-medium">
+                      Budget per Team (Points) <span className="text-xs text-slate-500">Used to draft Pokémon</span>
+                    </Label>
+                    <Select value={formData.budgetPerTeam} onValueChange={(value) => handleInputChange('budgetPerTeam', value)}>
+                      <SelectTrigger className="bg-white dark:bg-slate-800">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="50">50 points</SelectItem>
+                        <SelectItem value="75">75 points</SelectItem>
+                        <SelectItem value="100">100 points (Default)</SelectItem>
+                        <SelectItem value="120">120 points</SelectItem>
+                        <SelectItem value="150">150 points</SelectItem>
+                        <SelectItem value="200">200 points</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Each Pokémon has a cost based on its strength. Budget determines what you can draft.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* League Settings */}
+              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Post-Draft League
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="createLeague"
+                      checked={formData.createLeague}
+                      onChange={(e) => handleInputChange('createLeague', e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="createLeague" className="text-sm font-medium cursor-pointer">
+                        Create league after draft
+                      </Label>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                        Automatically generate a competitive league schedule with standings when the draft completes
+                      </p>
+                    </div>
+                  </div>
+
+                  {formData.createLeague && (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="leagueWeeks" className="text-sm font-medium">
+                            League Duration (Weeks)
+                          </Label>
+                          <Select value={formData.leagueWeeks} onValueChange={(value) => handleInputChange('leagueWeeks', value)}>
+                            <SelectTrigger className="bg-white dark:bg-slate-800">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="3">3 weeks</SelectItem>
+                              <SelectItem value="4">4 weeks</SelectItem>
+                              <SelectItem value="6">6 weeks</SelectItem>
+                              <SelectItem value="8">8 weeks</SelectItem>
+                              <SelectItem value="10">10 weeks</SelectItem>
+                              <SelectItem value="12">12 weeks</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                        <input
+                          type="checkbox"
+                          id="splitIntoConferences"
+                          checked={formData.splitIntoConferences}
+                          onChange={(e) => handleInputChange('splitIntoConferences', e.target.checked)}
+                          disabled={parseInt(formData.maxTeams) < 4}
+                          className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 disabled:opacity-50"
+                        />
+                        <div className="flex-1">
+                          <Label htmlFor="splitIntoConferences" className="text-sm font-medium cursor-pointer">
+                            Split into 2 conferences
+                          </Label>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                            {parseInt(formData.maxTeams) < 4
+                              ? 'Requires at least 4 teams'
+                              : 'Creates separate Conference A and Conference B with their own standings and schedules'}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -699,6 +801,10 @@ export default function CreateDraftPage() {
                   <Badge variant="secondary" className="flex items-center gap-1">
                     <Trophy className="h-3 w-3" />
                     {formData.pokemonPerTeam} Pokémon each
+                  </Badge>
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Tag className="h-3 w-3" />
+                    {formData.budgetPerTeam} points budget
                   </Badge>
                 </div>
               </div>

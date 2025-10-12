@@ -18,7 +18,7 @@ import { Search, Filter, SortAsc, SortDesc } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
-import PokemonComparison from './PokemonComparison'
+// import PokemonComparison from './PokemonComparison' // TODO: Re-enable when component is implemented
 
 interface PokemonGridProps {
   pokemon: Pokemon[]
@@ -259,10 +259,12 @@ export default function PokemonGrid({
               />
             </div>
             <div className="flex gap-2">
+              {/* TODO: Re-enable Pokemon comparison feature
               <PokemonComparison
                 availablePokemon={availablePokemon}
                 maxCompare={4}
               />
+              */}
               <Button
                 variant="outline"
                 size="lg"

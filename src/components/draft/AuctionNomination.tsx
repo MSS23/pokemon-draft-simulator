@@ -18,20 +18,28 @@ interface AuctionNominationProps {
     name: string
     budgetRemaining: number
   } | null
+  currentNominatingTeam: {
+    id: string
+    name: string
+    draftOrder: number
+  } | null
   canNominate: boolean
   onNominate: (pokemon: Pokemon, startingBid: number, duration: number) => Promise<void>
+  defaultAuctionDuration?: number
   className?: string
 }
 
 export default function AuctionNomination({
   selectedPokemon,
   userTeam,
+  currentNominatingTeam,
   canNominate,
   onNominate,
+  defaultAuctionDuration = 60,
   className
 }: AuctionNominationProps) {
   const [startingBid, setStartingBid] = useState('')
-  const [auctionDuration, setAuctionDuration] = useState('60')
+  const [auctionDuration, setAuctionDuration] = useState(defaultAuctionDuration.toString())
   const [isNominating, setIsNominating] = useState(false)
 
   const handleNominate = async () => {
@@ -63,12 +71,17 @@ export default function AuctionNomination({
   return (
     <Card className={cn('w-full', className)}>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 flex-wrap">
           <Gavel className="h-5 w-5 text-orange-600" />
           Nominate for Auction
           {canNominate ? (
             <Badge variant="default" className="bg-green-600">
-              Ready
+              Your Turn
+            </Badge>
+          ) : currentNominatingTeam ? (
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {currentNominatingTeam.name}'s Turn
             </Badge>
           ) : (
             <Badge variant="outline">
@@ -76,6 +89,11 @@ export default function AuctionNomination({
             </Badge>
           )}
         </CardTitle>
+        {!canNominate && currentNominatingTeam && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+            Waiting for <span className="font-semibold text-orange-600 dark:text-orange-400">{currentNominatingTeam.name}</span> to nominate a Pokémon for auction...
+          </p>
+        )}
       </CardHeader>
 
       <CardContent className="space-y-4">

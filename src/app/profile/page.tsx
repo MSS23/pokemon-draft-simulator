@@ -43,7 +43,7 @@ export default function ProfilePage() {
       const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single()
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = not found
@@ -51,16 +51,15 @@ export default function ProfilePage() {
       }
 
       if (profile) {
-        setDisplayName(profile.display_name || '')
-        setOriginalName(profile.display_name || '')
+        setDisplayName((profile as { display_name: string })?.display_name || '')
+        setOriginalName((profile as { display_name: string })?.display_name || '')
       } else {
         // Profile doesn't exist yet, create it
         const defaultName = user.email?.split('@')[0] || 'User'
-        const { error: insertError } = await supabase
-          .from('user_profiles')
+        const { error: insertError } = await (supabase
+          .from('user_profiles') as any)
           .insert({
-            id: user.id,
-            email: user.email,
+            user_id: user.id,
             display_name: defaultName
           })
 
@@ -102,7 +101,7 @@ export default function ProfilePage() {
       if (checkError) throw checkError
 
       // Filter out the current user
-      const otherUsers = existingUsers?.filter(u => u.id !== user.id) || []
+      const otherUsers = (existingUsers as { id: string; display_name: string }[])?.filter(u => u.id !== user.id) || []
 
       if (otherUsers.length > 0) {
         notify.error('Username Taken', `The username "${displayName.trim()}" is already taken. Please choose a different name.`)
@@ -110,13 +109,13 @@ export default function ProfilePage() {
         return
       }
 
-      const { error } = await supabase
-        .from('user_profiles')
+      const { error } = await (supabase
+        .from('user_profiles') as any)
         .update({
           display_name: displayName.trim(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', user.id)
+        .eq('user_id', user.id)
 
       if (error) {
         // Handle unique constraint violation

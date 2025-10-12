@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
-import { Copy, Share2 } from 'lucide-react'
+import { Copy, Share2, History } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
 import { useNotify } from '@/components/providers/NotificationProvider'
@@ -23,7 +23,6 @@ import { useReconnection } from '@/hooks/useReconnection'
 const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), { ssr: false })
 const PokemonDetailsModal = dynamic(() => import('@/components/pokemon/PokemonDetailsModal'), { ssr: false })
 const TeamRoster = dynamic(() => import('@/components/team/TeamRoster'), { ssr: false })
-const TeamStatus = dynamic(() => import('@/components/team/TeamStatus'), { ssr: false })
 const DraftProgress = dynamic(() => import('@/components/team/DraftProgress'), { ssr: false })
 const DraftControls = dynamic(() => import('@/components/draft/DraftControls'), { ssr: false })
 const DraftResults = dynamic(() => import('@/components/draft/DraftResults'), { ssr: false })
@@ -33,6 +32,7 @@ const AuctionNomination = dynamic(() => import('@/components/draft/AuctionNomina
 const SpectatorMode = dynamic(() => import('@/components/draft/SpectatorMode'), { ssr: false })
 const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNotifications'), { ssr: false })
 const AIDraftAssistant = dynamic(() => import('@/components/draft/AIDraftAssistant').then(mod => ({ default: mod.AIDraftAssistant })), { ssr: false })
+const DraftActivitySidebar = dynamic(() => import('@/components/draft/DraftActivitySidebar'), { ssr: false })
 
 interface DraftUIState {
   roomCode: string
@@ -156,6 +156,7 @@ export default function DraftRoomPage() {
     timestamp: string
   }>>([])
   const [showNotifications, setShowNotifications] = useState(false)
+  const [isActivitySidebarOpen, setIsActivitySidebarOpen] = useState(false)
 
   // Use format-specific Pokemon list
   const formatId = draftState?.draftSettings?.formatId
@@ -471,7 +472,7 @@ export default function DraftRoomPage() {
           console.log('[Draft Subscription] State updated, teams:', newState.teams.map(t => ({ name: t.name, order: t.draftOrder })))
 
           // Check for pick notifications (only if not the user's own pick)
-          if (draftState && newState.teams) {
+          if (draftState && newState.teams && pokemon) {
             const oldTotalPicks = draftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
             const newTotalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
 
@@ -483,12 +484,13 @@ export default function DraftRoomPage() {
               })
 
               if (pickingTeam && pickingTeam.id !== newState.userTeamId) {
-                const latestPick = pickingTeam.picks[pickingTeam.picks.length - 1]
-                if (latestPick) {
-                  notify.info(
-                    `${pickingTeam.name} drafted a Pokémon!`,
-                    `${pickingTeam.userName} selected their pick`,
-                    { duration: 3000 }
+                const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
+                const pickedPokemon = pokemon.find(p => p.id === latestPickId)
+                if (pickedPokemon) {
+                  notify.success(
+                    `${pickingTeam.name} drafted ${pickedPokemon.name}!`,
+                    `${pickingTeam.userName} selected ${pickedPokemon.name}`,
+                    { duration: 4000 }
                   )
                 }
               }
@@ -629,9 +631,26 @@ export default function DraftRoomPage() {
     return draftState?.teams.flatMap(team => team.picks) || []
   }, [draftState?.teams])
 
+  // Calculate current nominating team for auction drafts
+  const currentNominatingTeam = useMemo(() => {
+    if (!isAuctionDraft || !draftState || currentAuction) return null
+
+    const { teams } = draftState
+    if (!teams.length) return null
+
+    // Round-robin nomination: each team nominates once per round
+    const totalPicks = teams.reduce((sum, team) => sum + team.picks.length, 0)
+    const currentNominatorIndex = totalPicks % teams.length
+    const sortedTeams = [...teams].sort((a, b) => a.draftOrder - b.draftOrder)
+
+    return sortedTeams[currentNominatorIndex] || null
+  }, [isAuctionDraft, draftState, currentAuction])
+
   const canNominate = useMemo(() => {
-    return isAuctionDraft && !currentAuction && draftState?.status === 'drafting'
-  }, [isAuctionDraft, currentAuction, draftState?.status])
+    if (!isAuctionDraft || currentAuction || draftState?.status !== 'drafting') return false
+    if (!currentNominatingTeam || !userTeam) return false
+    return currentNominatingTeam.id === userTeam.id
+  }, [isAuctionDraft, currentAuction, draftState?.status, currentNominatingTeam, userTeam])
 
   const availablePokemon = useMemo(() => {
     return pokemon?.filter(p => p.isLegal && !allDraftedIds.includes(p.id)) || []
@@ -641,6 +660,109 @@ export default function DraftRoomPage() {
     setDetailsPokemon(pokemon)
     setIsDetailsOpen(true)
   }, [])
+
+  // Wishlist handlers
+  const handleAddToWishlist = useCallback(async (pokemon: Pokemon) => {
+    if (!draftState?.userTeamId || !userId || isSpectator) return
+
+    const { WishlistService } = await import('@/lib/wishlist-service')
+
+    // Find the participant ID for this user in this draft
+    const participant = draftState.teams.find(t => t.id === draftState.userTeamId)
+    if (!participant) {
+      notify.warning('Cannot Add to Wishlist', 'You must be part of a team to use wishlist')
+      return
+    }
+
+    try {
+      await WishlistService.addToWishlist(
+        roomCode.toLowerCase(),
+        userId, // Use userId as participantId
+        pokemon
+      )
+      notify.success('Added to Wishlist', `${pokemon.name} added to your wishlist`, { duration: 2000 })
+    } catch (error) {
+      console.error('Error adding to wishlist:', error)
+      notify.error('Failed to Add', 'Could not add Pokémon to wishlist')
+    }
+  }, [draftState, userId, roomCode, notify, isSpectator])
+
+  const handleRemoveFromWishlist = useCallback(async (pokemon: Pokemon) => {
+    if (!draftState?.userTeamId || !userId || isSpectator) return
+
+    const { WishlistService } = await import('@/lib/wishlist-service')
+
+    try {
+      await WishlistService.removeFromWishlist(
+        roomCode.toLowerCase(),
+        userId,
+        pokemon.id
+      )
+      notify.success('Removed from Wishlist', `${pokemon.name} removed from your wishlist`, { duration: 2000 })
+    } catch (error) {
+      console.error('Error removing from wishlist:', error)
+      notify.error('Failed to Remove', 'Could not remove Pokémon from wishlist')
+    }
+  }, [draftState, userId, roomCode, notify, isSpectator])
+
+  // Get wishlist Pokemon IDs for the current user
+  const wishlistPokemonIds = useMemo(() => {
+    // This will be populated by the wishlist real-time sync
+    // For now, return empty array - will be populated by WishlistManager component
+    return []
+  }, [])
+
+  // Transform recent activity for the sidebar
+  // This transforms draft state into an activity feed format for the DraftActivitySidebar component
+  // It includes all picks from all teams with metadata like round number and estimated timestamps
+  const sidebarActivities = useMemo(() => {
+    if (!draftState?.teams || !pokemon) return []
+
+    const activities: Array<{
+      id: string
+      teamId: string
+      teamName: string
+      userName: string
+      pokemonId: string
+      pokemonName: string
+      pickNumber: number
+      round: number
+      timestamp: number
+    }> = []
+
+    // Calculate total picks counter across all teams for sequential pick numbering
+    let totalPickNumber = 0
+
+    // Process all teams and their picks
+    draftState.teams.forEach(team => {
+      team.picks.forEach((pokemonId, index) => {
+        totalPickNumber++
+        const pokemonData = pokemon.find(p => p.id === pokemonId)
+        if (pokemonData) {
+          // Calculate round number: each team gets one pick per round
+          // Example: With 4 teams, picks 0-3 are round 1, picks 4-7 are round 2, etc.
+          const round = Math.floor(index / draftState.teams.length) + 1
+
+          activities.push({
+            id: `${team.id}-pick-${index}`,
+            teamId: team.id,
+            teamName: team.name,
+            userName: team.userName,
+            pokemonId,
+            pokemonName: pokemonData.name,
+            pickNumber: totalPickNumber,
+            round,
+            // Estimate timestamp based on pick order for relative time display
+            // Most recent pick = now, each earlier pick assumed to be 30 seconds before
+            timestamp: Date.now() - (totalPickNumber - 1) * 30000 // 30 seconds per pick estimate
+          })
+        }
+      })
+    })
+
+    // Sort by timestamp descending (most recent first) for activity feed display
+    return activities.sort((a, b) => b.timestamp - a.timestamp)
+  }, [draftState?.teams, pokemon])
 
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)
@@ -666,6 +788,10 @@ export default function DraftRoomPage() {
       targetUserId = userId
       if (!targetTeam) return
     }
+
+    // Mark Pokemon as drafted in all wishlists
+    const { WishlistService } = await import('@/lib/wishlist-service')
+    await WishlistService.markPokemonDrafted(roomCode.toLowerCase(), pokemon.id)
 
     try {
       if (isHost && isProxyPickingEnabled && !isUserTurn) {
@@ -1119,6 +1245,22 @@ export default function DraftRoomPage() {
                 <Share2 className="h-4 w-4 mr-1" />
                 Share
               </Button>
+              {draftState && draftState.status === 'drafting' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsActivitySidebarOpen(true)}
+                  className="relative"
+                >
+                  <History className="h-4 w-4 mr-1" />
+                  Activity
+                  {allDraftedIds.length > 0 && (
+                    <Badge variant="default" className="ml-2 h-5 px-1.5 text-xs">
+                      {allDraftedIds.length}
+                    </Badge>
+                  )}
+                </Button>
+              )}
               {draftState && ['completed'].includes(draftState.status) && (
                 <Button
                   variant="default"
@@ -1280,6 +1422,11 @@ export default function DraftRoomPage() {
                       name: userTeam.name,
                       budgetRemaining: userTeam.budgetRemaining
                     } : null}
+                    currentNominatingTeam={currentNominatingTeam ? {
+                      id: currentNominatingTeam.id,
+                      name: currentNominatingTeam.name,
+                      draftOrder: currentNominatingTeam.draftOrder
+                    } : null}
                     canNominate={canNominate}
                     onNominate={handleNominatePokemon}
                   />
@@ -1390,12 +1537,16 @@ export default function DraftRoomPage() {
             <PokemonGrid
               pokemon={pokemon?.filter(p => p.isLegal) || []}
               onViewDetails={handleViewDetails}
+              onAddToWishlist={handleAddToWishlist}
+              onRemoveFromWishlist={handleRemoveFromWishlist}
               draftedPokemonIds={draftState ? allDraftedIds : []}
+              wishlistPokemonIds={wishlistPokemonIds}
               isLoading={pokemonLoading}
               cardSize="md"
               showFilters={true}
               showCost={true}
               showStats={true}
+              showWishlistButton={!isSpectator && !!draftState?.userTeamId}
             />
           </EnhancedErrorBoundary>
         </div>
@@ -1408,6 +1559,36 @@ export default function DraftRoomPage() {
           onSelect={!draftState || isAuctionDraft ? undefined : ((isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting' ? handleDraftPokemon : undefined)}
           isDrafted={detailsPokemon && draftState ? allDraftedIds.includes(detailsPokemon.id) : false}
         />
+
+        {/* Wishlist Manager - Fixed Position */}
+        {!isSpectator && draftState?.userTeamId && userId && (
+          <EnhancedErrorBoundary>
+            {(() => {
+              const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager'), { ssr: false })
+              return (
+                <WishlistManager
+                  draftId={roomCode.toLowerCase()}
+                  participantId={userId}
+                  userTeam={userTeam}
+                  currentBudget={userTeam?.budgetRemaining || 100}
+                  usedBudget={(userTeam?.picks.length || 0) * 10}
+                  isCompact={true}
+                />
+              )
+            })()}
+          </EnhancedErrorBoundary>
+        )}
+
+        {/* Draft Activity Sidebar */}
+        {draftState && (
+          <DraftActivitySidebar
+            isOpen={isActivitySidebarOpen}
+            onClose={() => setIsActivitySidebarOpen(false)}
+            activities={sidebarActivities}
+            pokemon={pokemon || []}
+            currentUserTeamId={draftState.userTeamId}
+          />
+        )}
       </div>
     </div>
   )

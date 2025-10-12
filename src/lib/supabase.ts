@@ -400,6 +400,237 @@ export type Database = {
           deleted_at?: string | null
         }
       }
+      user_profiles: {
+        Row: {
+          id: string
+          user_id: string
+          display_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          display_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          display_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      leagues: {
+        Row: {
+          id: string
+          draft_id: string
+          name: string
+          league_type: 'single' | 'split_conference_a' | 'split_conference_b'
+          season_number: number
+          status: 'scheduled' | 'active' | 'completed' | 'cancelled'
+          start_date: string | null
+          end_date: string | null
+          current_week: number
+          total_weeks: number
+          settings: Record<string, any>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          draft_id: string
+          name: string
+          league_type?: 'single' | 'split_conference_a' | 'split_conference_b'
+          season_number?: number
+          status?: 'scheduled' | 'active' | 'completed' | 'cancelled'
+          start_date?: string | null
+          end_date?: string | null
+          current_week?: number
+          total_weeks: number
+          settings?: Record<string, any>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          draft_id?: string
+          name?: string
+          league_type?: 'single' | 'split_conference_a' | 'split_conference_b'
+          season_number?: number
+          status?: 'scheduled' | 'active' | 'completed' | 'cancelled'
+          start_date?: string | null
+          end_date?: string | null
+          current_week?: number
+          total_weeks?: number
+          settings?: Record<string, any>
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      league_teams: {
+        Row: {
+          id: string
+          league_id: string
+          team_id: string
+          seed: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          team_id: string
+          seed?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          team_id?: string
+          seed?: number | null
+          created_at?: string
+        }
+      }
+      matches: {
+        Row: {
+          id: string
+          league_id: string
+          week_number: number
+          match_number: number
+          home_team_id: string
+          away_team_id: string
+          scheduled_date: string | null
+          status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+          home_score: number
+          away_score: number
+          winner_team_id: string | null
+          battle_format: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          week_number: number
+          match_number: number
+          home_team_id: string
+          away_team_id: string
+          scheduled_date?: string | null
+          status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+          home_score?: number
+          away_score?: number
+          winner_team_id?: string | null
+          battle_format: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          week_number?: number
+          match_number?: number
+          home_team_id?: string
+          away_team_id?: string
+          scheduled_date?: string | null
+          status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+          home_score?: number
+          away_score?: number
+          winner_team_id?: string | null
+          battle_format?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+          completed_at?: string | null
+        }
+      }
+      standings: {
+        Row: {
+          id: string
+          league_id: string
+          team_id: string
+          wins: number
+          losses: number
+          draws: number
+          points_for: number
+          points_against: number
+          point_differential: number
+          rank: number | null
+          current_streak: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          team_id: string
+          wins?: number
+          losses?: number
+          draws?: number
+          points_for?: number
+          points_against?: number
+          point_differential?: number
+          rank?: number | null
+          current_streak?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          team_id?: string
+          wins?: number
+          losses?: number
+          draws?: number
+          points_for?: number
+          points_against?: number
+          point_differential?: number
+          rank?: number | null
+          current_streak?: string | null
+          updated_at?: string
+        }
+      }
+      match_games: {
+        Row: {
+          id: string
+          match_id: string
+          game_number: number
+          winner_team_id: string | null
+          home_team_score: number
+          away_team_score: number
+          duration_seconds: number | null
+          notes: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          match_id: string
+          game_number: number
+          winner_team_id?: string | null
+          home_team_score?: number
+          away_team_score?: number
+          duration_seconds?: number | null
+          notes?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          match_id?: string
+          game_number?: number
+          winner_team_id?: string | null
+          home_team_score?: number
+          away_team_score?: number
+          duration_seconds?: number | null
+          notes?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+      }
     }
     Views: {
       active_public_drafts: {

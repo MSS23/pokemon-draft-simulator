@@ -71,6 +71,10 @@ export interface DraftSettings {
   allowUndos?: boolean
   requireFullRoster?: boolean
   maxPokemonPerTeam?: number
+  // League settings
+  createLeague?: boolean
+  splitIntoConferences?: boolean
+  leagueWeeks?: number
 }
 
 export interface Team {
@@ -181,4 +185,87 @@ export interface DraftState {
   draftOrder: string[]
   isLoading: boolean
   error: string | null
+}
+
+// =====================================================
+// LEAGUE SYSTEM TYPES
+// =====================================================
+
+export interface League {
+  id: string
+  draftId: string
+  name: string
+  leagueType: 'single' | 'split_conference_a' | 'split_conference_b'
+  seasonNumber: number
+  status: 'scheduled' | 'active' | 'completed' | 'cancelled'
+  startDate: string | null
+  endDate: string | null
+  currentWeek: number
+  totalWeeks: number
+  settings: LeagueSettings
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LeagueSettings {
+  matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+  pointsPerWin?: number
+  pointsPerDraw?: number
+  playoffTeams?: number
+  [key: string]: unknown
+}
+
+export interface LeagueTeam {
+  id: string
+  leagueId: string
+  teamId: string
+  seed: number | null
+  createdAt: string
+}
+
+export interface Match {
+  id: string
+  leagueId: string
+  weekNumber: number
+  matchNumber: number
+  homeTeamId: string
+  awayTeamId: string
+  scheduledDate: string | null
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled'
+  homeScore: number
+  awayScore: number
+  winnerTeamId: string | null
+  battleFormat: string
+  notes: string | null
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+}
+
+export interface Standing {
+  id: string
+  leagueId: string
+  teamId: string
+  wins: number
+  losses: number
+  draws: number
+  pointsFor: number
+  pointsAgainst: number
+  pointDifferential: number
+  rank: number | null
+  currentStreak: string | null
+  updatedAt: string
+}
+
+export interface MatchGame {
+  id: string
+  matchId: string
+  gameNumber: number
+  winnerTeamId: string | null
+  homeTeamScore: number
+  awayTeamScore: number
+  durationSeconds: number | null
+  notes: string | null
+  createdAt: string
+  completedAt: string | null
 }

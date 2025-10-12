@@ -18,7 +18,6 @@ import {
   Zap,
   DollarSign
 } from 'lucide-react'
-import WishlistConnectionStatus from './WishlistConnectionStatus'
 
 interface MobileWishlistSheetProps {
   wishlist: WishlistItem[]
@@ -94,7 +93,10 @@ export default function MobileWishlistSheet({
 
         {/* Quick Stats */}
         <div className="flex items-center gap-2">
-          <WishlistConnectionStatus isConnected={isConnected} />
+          <Badge variant={isConnected ? "default" : "destructive"} className="flex items-center gap-1 text-xs">
+            <div className={cn("h-2 w-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
+            {isConnected ? "Live" : "Offline"}
+          </Badge>
           <Badge
             variant={isOverBudget ? "destructive" : "outline"}
             className="flex items-center gap-1 text-xs"
