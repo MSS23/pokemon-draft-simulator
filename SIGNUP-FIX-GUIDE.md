@@ -112,6 +112,32 @@ To prevent this issue in the future:
 4. Set permissive RLS policies for system operations
 5. Add proper error handling in trigger functions
 
+### Step 4: Disable Email Confirmation (Recommended)
+
+To remove the "Check your email for confirmation link" requirement:
+
+#### Via Supabase Dashboard (EASIEST):
+1. Go to https://app.supabase.com/project/YOUR_PROJECT/auth/providers
+2. Click on **"Email"** provider
+3. Scroll to **"Email confirmation"** section
+4. **UNCHECK** "Enable email confirmations"
+5. Click **"Save"**
+
+Now users can sign in immediately after signup!
+
+#### Auto-Confirm Existing Users (Optional):
+If users are stuck waiting for confirmation, run this in SQL Editor:
+
+```sql
+-- Auto-confirm all pending users
+UPDATE auth.users
+SET email_confirmed_at = NOW(),
+    updated_at = NOW()
+WHERE email_confirmed_at IS NULL;
+```
+
+See [9-disable-email-confirmation.sql](9-disable-email-confirmation.sql) for more details.
+
 ## Need Help?
 
 If signup still doesn't work after running both SQL files:
@@ -119,3 +145,4 @@ If signup still doesn't work after running both SQL files:
 2. Look for errors related to `handle_new_user` function
 3. Verify the `user_profiles` table has all required columns
 4. Check that `id` column in `user_profiles` has a default value (gen_random_uuid())
+5. Verify email confirmation is disabled (see Step 4 above)
