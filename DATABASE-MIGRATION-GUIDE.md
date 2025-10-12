@@ -64,3 +64,18 @@ This creates everything from scratch with the correct schema.
 
 ### Still having issues?
 Check the [SUPABASE-SETUP-GUIDE.md](SUPABASE-SETUP-GUIDE.md) for detailed setup instructions.
+
+## Optional: Auto-Cleanup Abandoned Drafts
+
+Want to automatically delete drafts that are abandoned? Run [6-auto-cleanup-abandoned-drafts.sql](6-auto-cleanup-abandoned-drafts.sql) to set up automatic cleanup.
+
+**What it does:**
+- Deletes drafts stuck in 'setup' for more than 24 hours
+- Deletes drafts 'paused' for more than 7 days
+- Optionally deletes completed drafts older than 30 days
+
+**How to use:**
+1. Run the SQL file in Supabase SQL Editor
+2. The function `cleanup_abandoned_drafts()` will be created
+3. Choose a scheduling method (instructions in the SQL file)
+4. Or run manually: `SELECT public.cleanup_abandoned_drafts();`
