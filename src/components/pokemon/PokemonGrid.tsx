@@ -283,93 +283,196 @@ export default function PokemonGrid({
           </div>
 
           {/* Sorting Presets */}
-          <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-lg p-3 border border-slate-200 dark:border-slate-600">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Quick Sort</h3>
+          <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-lg p-4 border border-slate-200 dark:border-slate-600 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Quick Sort</h3>
               {hasActiveFilters && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={clearAllFilters}
-                  className="text-xs text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                  className="text-xs h-7 px-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700"
                 >
                   Clear All
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              <Button
-                variant={sortBy === 'cost' && sortDirection === 'desc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('cost', 'desc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                💰 Most Expensive
-              </Button>
-              <Button
-                variant={sortBy === 'cost' && sortDirection === 'asc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('cost', 'asc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                💸 Cheapest
-              </Button>
-              <Button
-                variant={sortBy === 'total' && sortDirection === 'desc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('total', 'desc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                ⭐ Highest BST
-              </Button>
-              <Button
-                variant={sortBy === 'hp' && sortDirection === 'desc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('hp', 'desc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                ❤️ Highest HP
-              </Button>
-              <Button
-                variant={sortBy === 'attack' && sortDirection === 'desc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('attack', 'desc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                ⚔️ Strongest Attack
-              </Button>
-              <Button
-                variant={sortBy === 'defense' && sortDirection === 'desc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('defense', 'desc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                🛡️ Best Defense
-              </Button>
-              <Button
-                variant={sortBy === 'speed' && sortDirection === 'desc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('speed', 'desc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                ⚡ Fastest
-              </Button>
-              <Button
-                variant={sortBy === 'speed' && sortDirection === 'asc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('speed', 'asc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                🐌 Slowest
-              </Button>
-              <Button
-                variant={sortBy === 'name' && sortDirection === 'asc' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => applySortPreset('name', 'asc')}
-                className="text-xs h-8 px-3 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600"
-              >
-                🔤 A-Z
-              </Button>
+
+            {/* General Sorting */}
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">General</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={sortBy === 'name' && sortDirection === 'asc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('name', 'asc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'name' && sortDirection === 'asc' && "ring-2 ring-blue-500 dark:ring-blue-400"
+                    )}
+                  >
+                    <span className="mr-1.5">🔤</span>
+                    A-Z
+                  </Button>
+                  <Button
+                    variant={sortBy === 'cost' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('cost', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'cost' && sortDirection === 'desc' && "ring-2 ring-blue-500 dark:ring-blue-400"
+                    )}
+                  >
+                    <span className="mr-1.5">💰</span>
+                    Highest Cost
+                  </Button>
+                  <Button
+                    variant={sortBy === 'cost' && sortDirection === 'asc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('cost', 'asc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'cost' && sortDirection === 'asc' && "ring-2 ring-blue-500 dark:ring-blue-400"
+                    )}
+                  >
+                    <span className="mr-1.5">💸</span>
+                    Lowest Cost
+                  </Button>
+                  <Button
+                    variant={sortBy === 'total' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('total', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'total' && sortDirection === 'desc' && "ring-2 ring-blue-500 dark:ring-blue-400"
+                    )}
+                  >
+                    <span className="mr-1.5">⭐</span>
+                    Highest BST
+                  </Button>
+                </div>
+              </div>
+
+              {/* Stat-based Sorting */}
+              <div>
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Sort by Highest Stat</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={sortBy === 'hp' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('hp', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'hp' && sortDirection === 'desc' && "ring-2 ring-red-500 dark:ring-red-400"
+                    )}
+                  >
+                    <span className="mr-1.5">❤️</span>
+                    HP
+                  </Button>
+                  <Button
+                    variant={sortBy === 'attack' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('attack', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'attack' && sortDirection === 'desc' && "ring-2 ring-orange-500 dark:ring-orange-400"
+                    )}
+                  >
+                    <span className="mr-1.5">⚔️</span>
+                    Attack
+                  </Button>
+                  <Button
+                    variant={sortBy === 'defense' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('defense', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'defense' && sortDirection === 'desc' && "ring-2 ring-yellow-500 dark:ring-yellow-400"
+                    )}
+                  >
+                    <span className="mr-1.5">🛡️</span>
+                    Defense
+                  </Button>
+                  <Button
+                    variant={sortBy === 'specialAttack' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('specialAttack', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'specialAttack' && sortDirection === 'desc' && "ring-2 ring-blue-500 dark:ring-blue-400"
+                    )}
+                  >
+                    <span className="mr-1.5">✨</span>
+                    Sp. Atk
+                  </Button>
+                  <Button
+                    variant={sortBy === 'specialDefense' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('specialDefense', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'specialDefense' && sortDirection === 'desc' && "ring-2 ring-green-500 dark:ring-green-400"
+                    )}
+                  >
+                    <span className="mr-1.5">💚</span>
+                    Sp. Def
+                  </Button>
+                  <Button
+                    variant={sortBy === 'speed' && sortDirection === 'desc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('speed', 'desc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'speed' && sortDirection === 'desc' && "ring-2 ring-pink-500 dark:ring-pink-400"
+                    )}
+                  >
+                    <span className="mr-1.5">⚡</span>
+                    Speed
+                  </Button>
+                </div>
+              </div>
+
+              {/* Speed Variants */}
+              <div>
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Speed Variants</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={sortBy === 'speed' && sortDirection === 'asc' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => applySortPreset('speed', 'asc')}
+                    className={cn(
+                      "text-xs h-9 px-4 font-medium transition-all",
+                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
+                      "border-slate-300 dark:border-slate-600",
+                      sortBy === 'speed' && sortDirection === 'asc' && "ring-2 ring-blue-500 dark:ring-blue-400"
+                    )}
+                  >
+                    <span className="mr-1.5">🐌</span>
+                    Slowest
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
