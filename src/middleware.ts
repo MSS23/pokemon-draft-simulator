@@ -150,7 +150,6 @@ export async function middleware(request: NextRequest) {
 
   // Define protected routes that require authentication
   const protectedRoutes = [
-    '/profile',
     '/leagues',
     '/friends',
     '/achievements',
