@@ -180,7 +180,8 @@ function JoinDraftForm() {
           setUserDisplayName(displayName)
         } else {
           console.log('[Join Draft] Profile loaded:', profile)
-          setUserDisplayName(profile.display_name || user.email?.split('@')[0] || 'User')
+          const profileData = profile as { display_name: string }
+          setUserDisplayName(profileData.display_name || user.email?.split('@')[0] || 'User')
         }
       } catch (error) {
         console.error('[Join Draft] Error loading profile:', error)
