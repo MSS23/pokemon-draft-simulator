@@ -123,7 +123,7 @@ export class PokemonSearchIndex {
       matches: (result.matches || []).map(match => ({
         key: match.key || '',
         value: match.value || '',
-        indices: match.indices || [],
+        indices: match.indices ? match.indices.map(([start, end]) => [start, end] as [number, number]) : [],
       })),
     }))
 

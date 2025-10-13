@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useDraftStore } from '@/stores/draftStore'
+import { selectUserWishlist } from '@/stores/selectors'
 import { WishlistService } from '@/lib/wishlist-service'
 import { supabase } from '@/lib/supabase'
 import { WishlistItem } from '@/types'
@@ -16,7 +17,10 @@ export function useWishlistSync({
   participantId,
   enabled = true
 }: UseWishlistSyncOptions) {
-  const { setWishlistItems, wishlistItems } = useDraftStore()
+  const setWishlistItems = useDraftStore(state => state.setWishlistItems)
+  const wishlistItemsById = useDraftStore(state => state.wishlistItemsById)
+  const wishlistItemsByParticipantId = useDraftStore(state => state.wishlistItemsByParticipantId)
+  const userWishlist = useDraftStore(participantId ? selectUserWishlist(participantId) : () => [])
   const channelRef = useRef<RealtimeChannel | null>(null)
   const lastSyncRef = useRef<number>(0)
 
@@ -230,28 +234,21 @@ export function useWishlistSync({
     }
   }
 
-  // Get user's wishlist items
-  const userWishlist = participantId
-    ? wishlistItems
-        .filter(item => item.participantId === participantId)
-        .sort((a, b) => a.priority - b.priority)
-    : []
-
   // Check if a Pokemon is in user's wishlist
   const isInWishlist = (pokemonId: string) => {
-    return participantId
-      ? wishlistItems.some(
-          item => item.participantId === participantId && item.pokemonId === pokemonId
-        )
-      : false
+    if (!participantId) return false
+    const itemIds = wishlistItemsByParticipantId[participantId] || []
+    return itemIds.some(itemId => {
+      const item = wishlistItemsById[itemId]
+      return item && item.pokemonId === pokemonId
+    })
   }
 
   // Get wishlist Pokemon IDs (for grid display)
-  const wishlistPokemonIds = participantId
-    ? wishlistItems
-        .filter(item => item.participantId === participantId)
-        .map(item => item.pokemonId)
-    : []
+  const wishlistPokemonIds = userWishlist.map(item => item.pokemonId)
+
+  // Get all wishlist items
+  const wishlistItems = Object.values(wishlistItemsById)
 
   return {
     wishlistItems,

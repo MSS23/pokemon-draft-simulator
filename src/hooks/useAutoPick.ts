@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useDraftStore, selectIsUserTurn, selectNextAutoPickPokemon } from '@/stores/draftStore'
+import { useDraftStore } from '@/stores/draftStore'
+import { selectIsUserTurn, selectNextAutoPickPokemon } from '@/stores/selectors'
 import { Pokemon, WishlistItem } from '@/types'
 
 interface UseAutoPickOptions {

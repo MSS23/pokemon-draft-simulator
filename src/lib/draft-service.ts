@@ -1756,7 +1756,7 @@ export class DraftService {
     if (!draftState) return
     if (!supabase) return
 
-    const maxPicks = draftState.draft.settings?.pokemonPerTeam || 10
+    const maxPicks = Number(draftState.draft.settings?.pokemonPerTeam || 10)
     const totalPossiblePicks = draftState.teams.length * maxPicks
     const currentPicks = draftState.picks.length
 

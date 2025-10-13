@@ -15,19 +15,17 @@ export const flushPromises = () => new Promise(resolve => setImmediate(resolve))
 export function createMockDraft(overrides?: Partial<Draft>): Draft {
   return {
     id: 'draft-1',
-    roomCode: 'TEST01',
     name: 'Test Draft',
     hostId: 'user-1',
     format: 'snake',
+    ruleset: 'vgc-reg-h',
     maxTeams: 4,
     budgetPerTeam: 100,
     status: 'setup',
     currentTurn: 1,
     currentRound: 1,
     settings: {
-      timeLimit: 60,
-      pokemonPerTeam: 6,
-      formatId: 'vgc-reg-h',
+      timePerPick: 60,
       maxPokemonPerTeam: 6,
     },
     createdAt: new Date().toISOString(),
@@ -48,8 +46,6 @@ export function createMockTeam(overrides?: Partial<Team>): Team {
     draftOrder: 1,
     budgetRemaining: 100,
     picks: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
     ...overrides,
   }
 }
@@ -65,8 +61,8 @@ export function createMockParticipant(overrides?: Partial<Participant>): Partici
     displayName: 'Test User',
     teamId: 'team-1',
     isHost: false,
+    isAdmin: false,
     lastSeen: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
     ...overrides,
   }
 }

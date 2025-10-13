@@ -137,7 +137,7 @@ export class AutoSkipService {
     const pickedPokemonIds = new Set(draftState.picks.map((p: any) => p.pokemon_id))
 
     // Try each wishlist item in priority order
-    for (const item of wishlistItems) {
+    for (const item of wishlistItems as any[]) {
       // Skip if already drafted
       if (pickedPokemonIds.has(item.pokemon_id)) {
         continue
@@ -166,14 +166,14 @@ export class AutoSkipService {
           .eq('id', teamId)
           .single()
 
-        if (!ownerData?.owner_id) {
+        if (!(ownerData as any)?.owner_id) {
           console.error('[AutoSkip] No owner found for team')
           continue
         }
 
         await DraftService.makePick(
           draftId,
-          ownerData.owner_id,
+          (ownerData as any).owner_id,
           item.pokemon_id,
           item.pokemon_name,
           item.cost
@@ -219,7 +219,7 @@ export class AutoSkipService {
               team_name: teamName,
               reason: 'Timer expired'
             }
-          })
+          } as any)
       }
     } catch (error) {
       console.error('[AutoSkip] Failed to log skip event:', error)
@@ -327,17 +327,17 @@ export class AutoSkipService {
       .single()
 
     let budget = 0
-    if (participant?.team_id) {
+    if ((participant as any)?.team_id) {
       const { data: team } = await supabase
         .from('teams')
         .select('budget_remaining')
-        .eq('id', participant.team_id)
+        .eq('id', (participant as any).team_id)
         .single()
-      budget = team?.budget_remaining || 0
+      budget = (team as any)?.budget_remaining || 0
     }
 
-    const availableItems = wishlistItems.filter(item => item.is_available)
-    const affordableItems = availableItems.filter(item => item.cost <= budget)
+    const availableItems = (wishlistItems as any[]).filter((item: any) => item.is_available)
+    const affordableItems = availableItems.filter((item: any) => item.cost <= budget)
     const topPick = affordableItems.length > 0 ? affordableItems[0] : null
 
     return {

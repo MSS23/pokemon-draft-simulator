@@ -112,7 +112,7 @@ export function createFieldSelector<T, K extends keyof T>(
     const value = state[field]
 
     if (lastValue === value) {
-      return lastValue
+      return lastValue as T[K]
     }
 
     lastValue = value
@@ -220,7 +220,7 @@ export function createDebouncedUpdater<T>(
  * Create a selector cache to prevent recalculation
  * Useful for expensive derived state
  */
-export class SelectorCache<T, R> {
+export class SelectorCache<T extends object, R> {
   private cache = new WeakMap<T, R>()
 
   constructor(private selector: (state: T) => R) {}

@@ -6,19 +6,17 @@ import type { Draft, Team, Participant, Pick, Pokemon } from '@/types'
 
 export const mockDraft: Draft = {
   id: 'draft-1',
-  roomCode: 'TEST01',
   name: 'Test Draft',
   hostId: 'user-1',
   format: 'snake',
+  ruleset: 'vgc-reg-h',
   maxTeams: 4,
   budgetPerTeam: 100,
   status: 'active',
   currentTurn: 1,
   currentRound: 1,
   settings: {
-    timeLimit: 60,
-    pokemonPerTeam: 6,
-    formatId: 'vgc-reg-h',
+    timePerPick: 60,
     maxPokemonPerTeam: 6,
   },
   createdAt: '2025-01-01T00:00:00Z',
@@ -34,8 +32,6 @@ export const mockTeams: Team[] = [
     draftOrder: 1,
     budgetRemaining: 100,
     picks: [],
-    createdAt: '2025-01-01T00:00:00Z',
-    updatedAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'team-2',
@@ -45,8 +41,6 @@ export const mockTeams: Team[] = [
     draftOrder: 2,
     budgetRemaining: 100,
     picks: [],
-    createdAt: '2025-01-01T00:00:00Z',
-    updatedAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'team-3',
@@ -56,8 +50,6 @@ export const mockTeams: Team[] = [
     draftOrder: 3,
     budgetRemaining: 100,
     picks: [],
-    createdAt: '2025-01-01T00:00:00Z',
-    updatedAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'team-4',
@@ -67,8 +59,6 @@ export const mockTeams: Team[] = [
     draftOrder: 4,
     budgetRemaining: 100,
     picks: [],
-    createdAt: '2025-01-01T00:00:00Z',
-    updatedAt: '2025-01-01T00:00:00Z',
   },
 ]
 
@@ -80,8 +70,8 @@ export const mockParticipants: Participant[] = [
     displayName: 'Player One',
     teamId: 'team-1',
     isHost: true,
+    isAdmin: false,
     lastSeen: '2025-01-01T00:00:00Z',
-    createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'participant-2',
@@ -90,8 +80,8 @@ export const mockParticipants: Participant[] = [
     displayName: 'Player Two',
     teamId: 'team-2',
     isHost: false,
+    isAdmin: false,
     lastSeen: '2025-01-01T00:00:00Z',
-    createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'participant-3',
@@ -100,8 +90,8 @@ export const mockParticipants: Participant[] = [
     displayName: 'Player Three',
     teamId: 'team-3',
     isHost: false,
+    isAdmin: false,
     lastSeen: '2025-01-01T00:00:00Z',
-    createdAt: '2025-01-01T00:00:00Z',
   },
   {
     id: 'participant-4',
@@ -110,8 +100,8 @@ export const mockParticipants: Participant[] = [
     displayName: 'Player Four',
     teamId: 'team-4',
     isHost: false,
+    isAdmin: false,
     lastSeen: '2025-01-01T00:00:00Z',
-    createdAt: '2025-01-01T00:00:00Z',
   },
 ]
 
@@ -133,7 +123,10 @@ export const mockPokemon: Pokemon[] = [
   {
     id: '1',
     name: 'Bulbasaur',
-    types: ['grass', 'poison'],
+    types: [
+      { name: 'grass', color: '#78C850' },
+      { name: 'poison', color: '#A040A0' }
+    ],
     stats: {
       hp: 45,
       attack: 49,
@@ -141,16 +134,19 @@ export const mockPokemon: Pokemon[] = [
       specialAttack: 65,
       specialDefense: 65,
       speed: 45,
+      total: 318,
     },
-    baseStatTotal: 318,
     abilities: ['overgrow', 'chlorophyll'],
     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/1.png',
-    artwork: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png',
+    cost: 10,
+    isLegal: true,
   },
   {
     id: '4',
     name: 'Charmander',
-    types: ['fire'],
+    types: [
+      { name: 'fire', color: '#F08030' }
+    ],
     stats: {
       hp: 39,
       attack: 52,
@@ -158,16 +154,19 @@ export const mockPokemon: Pokemon[] = [
       specialAttack: 60,
       specialDefense: 50,
       speed: 65,
+      total: 309,
     },
-    baseStatTotal: 309,
     abilities: ['blaze', 'solar-power'],
     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/4.png',
-    artwork: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png',
+    cost: 10,
+    isLegal: true,
   },
   {
     id: '7',
     name: 'Squirtle',
-    types: ['water'],
+    types: [
+      { name: 'water', color: '#6890F0' }
+    ],
     stats: {
       hp: 44,
       attack: 48,
@@ -175,11 +174,12 @@ export const mockPokemon: Pokemon[] = [
       specialAttack: 50,
       specialDefense: 64,
       speed: 43,
+      total: 314,
     },
-    baseStatTotal: 314,
     abilities: ['torrent', 'rain-dish'],
     sprite: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/7.png',
-    artwork: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png',
+    cost: 10,
+    isLegal: true,
   },
 ]
 

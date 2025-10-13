@@ -91,7 +91,7 @@ export default function WishlistManager({
     handleDragOver,
     handleDrop,
     isDragging
-  } = useDragAndDrop({
+  } = useDragAndDrop<WishlistItem>({
     items: userWishlist,
     onReorder: (reorderedItems) => {
       reorderWishlistItems(reorderedItems)
@@ -190,7 +190,7 @@ export default function WishlistManager({
               // Handle suggestion application
               if (suggestion.type === 'remove' && suggestion.itemIds) {
                 suggestion.itemIds.forEach(itemId => {
-                  const item = userWishlist.find(w => w.id === itemId)
+                  const item = userWishlist.find((w: WishlistItem) => w.id === itemId)
                   if (item) handleRemoveItem(item.pokemonId)
                 })
               }
@@ -207,7 +207,7 @@ export default function WishlistManager({
         ) : (
           <ScrollArea className="h-64">
             <div className="space-y-2">
-              {userWishlist.map((item, index) => (
+              {userWishlist.map((item: WishlistItem, index: number) => (
                 <WishlistItemCard
                   key={item.id}
                   item={item}
@@ -241,13 +241,13 @@ export default function WishlistManager({
                 className="flex-1 text-xs"
                 onClick={() => {
                   // Clear unavailable items
-                  userWishlist.forEach(item => {
+                  userWishlist.forEach((item: WishlistItem) => {
                     if (!item.isAvailable) {
                       handleRemoveItem(item.pokemonId)
                     }
                   })
                 }}
-                disabled={!userWishlist.some(item => !item.isAvailable)}
+                disabled={!userWishlist.some((item: WishlistItem) => !item.isAvailable)}
               >
                 <X className="h-3 w-3 mr-1" />
                 Clear Picked
@@ -258,7 +258,7 @@ export default function WishlistManager({
                 className="flex-1 text-xs"
                 onClick={() => {
                   // Clear all items
-                  userWishlist.forEach(item => handleRemoveItem(item.pokemonId))
+                  userWishlist.forEach((item: WishlistItem) => handleRemoveItem(item.pokemonId))
                 }}
               >
                 Clear All

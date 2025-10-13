@@ -105,7 +105,7 @@ export class RealtimeManager {
     }
 
     try {
-      const channel = supabase.channel(channelName)
+      const channel = supabase.channel(channelName) as any
 
       // Set up postgres changes listener
       channel.on('postgres_changes', {
@@ -113,7 +113,7 @@ export class RealtimeManager {
         schema: config.schema,
         table: config.table,
         ...(config.filter ? { filter: config.filter } : {})
-      }, (payload) => {
+      }, (payload: any) => {
         try {
           callback(payload)
         } catch (error) {
@@ -127,7 +127,7 @@ export class RealtimeManager {
         this.updateState({ status: 'connected', reconnectAttempts: 0 })
       })
 
-      channel.on('system', { event: 'error' }, (error) => {
+      channel.on('system', { event: 'error' }, (error: any) => {
         console.error(`[RealtimeManager] Channel ${channelName} error:`, error)
         this.updateState({
           status: 'error',
@@ -196,23 +196,23 @@ export class RealtimeManager {
         const state = channel.presenceState()
         onlineUsers.clear()
         Object.keys(state).forEach(key => {
-          const presence = state[key][0]
+          const presence = state[key][0] as any
           if (presence?.user_id) {
             onlineUsers.add(presence.user_id)
           }
         })
         console.log(`[RealtimeManager] Presence sync - ${onlineUsers.size} users online`)
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        newPresences.forEach(presence => {
+      .on('presence', { event: 'join' }, ({ key, newPresences }: any) => {
+        newPresences.forEach((presence: any) => {
           if (presence?.user_id) {
             onlineUsers.add(presence.user_id)
           }
         })
         console.log(`[RealtimeManager] User joined:`, newPresences)
       })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-        leftPresences.forEach(presence => {
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }: any) => {
+        leftPresences.forEach((presence: any) => {
           if (presence?.user_id) {
             onlineUsers.delete(presence.user_id)
           }
