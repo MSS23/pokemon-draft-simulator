@@ -4,7 +4,6 @@ import { useState, useCallback, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Play,
   Pause,
@@ -381,28 +380,20 @@ const DraftControls = memo(function DraftControls({
             {/* Timer Controls */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Turn Timer
+                Turn Timer: {timeRemaining}s
               </label>
-              <div className="flex items-center gap-2">
-                <Select
-                  key={`timer-${draftStatus}`}
-                  defaultValue={String(timeRemaining)}
-                  onValueChange={handleSetTimer}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder={`${timeRemaining}s`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">30 seconds</SelectItem>
-                    <SelectItem value="60">1 minute</SelectItem>
-                    <SelectItem value="90">90 seconds</SelectItem>
-                    <SelectItem value="120">2 minutes</SelectItem>
-                    <SelectItem value="180">3 minutes</SelectItem>
-                    <SelectItem value="300">5 minutes</SelectItem>
-                    <SelectItem value="0">No timer</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="text-xs text-gray-500">Time limit per turn</span>
+              <div className="grid grid-cols-4 gap-2">
+                {[30, 60, 90, 120, 180, 300, 0].map(seconds => (
+                  <Button
+                    key={seconds}
+                    variant={timeRemaining === seconds ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleSetTimer(String(seconds))}
+                    className="text-xs"
+                  >
+                    {seconds === 0 ? 'None' : `${seconds}s`}
+                  </Button>
+                ))}
               </div>
             </div>
 
