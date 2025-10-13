@@ -181,11 +181,11 @@ export async function middleware(request: NextRequest) {
     try {
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('is_verified')
+        .select('id')
         .eq('id', user.id)
         .single()
 
-      if (!profile?.is_verified) {
+      if (!profile) {
         return NextResponse.redirect(new URL('/unauthorized', request.url))
       }
     } catch (error) {
@@ -203,8 +203,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
+     * - manifest.json (PWA manifest)
+     * - sw.js (service worker)
+     * - public folder files (images, icons, etc.)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icon-.*\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

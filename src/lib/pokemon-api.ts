@@ -497,6 +497,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
 
   // Try to load from pre-built format pack first (much faster!)
   try {
+    const startTime = performance.now()
     const manifest = await fetch('/data/format-manifest.json').then(res => res.json())
     const formatEntry = manifest?.formats?.find((f: any) => f.id === formatId)
 
@@ -552,7 +553,8 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
           pokemonList.push(pokemon)
         }
 
-        console.log(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${Date.now()}ms`)
+        const loadTime = Math.round(performance.now() - startTime)
+        console.log(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${loadTime}ms`)
         return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
       } else {
         console.warn('Format pack has invalid structure (missing legalPokemon or costs), falling back to API fetching')
