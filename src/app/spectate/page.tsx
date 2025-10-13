@@ -12,7 +12,7 @@ import { supabase } from '@/lib/supabase'
 
 interface PublicDraft {
   id: string
-  room_code: string
+  room_code?: string  // Optional until database migration is run
   name: string
   description?: string
   format: string
@@ -89,8 +89,28 @@ export default function SpectatePage() {
     }
   }
 
-  const handleJoinDraft = (roomCode: string) => {
-    router.push(`/spectate/${roomCode.toLowerCase()}`)
+  const handleJoinDraft = (roomCode: string | undefined, draftId: string) => {
+    // Prefer room_code, but fallback to fetching it from the draft if not available
+    if (roomCode) {
+      router.push(`/spectate/${roomCode.toLowerCase()}`)
+    } else {
+      // Fallback: fetch the draft to get its room_code
+      console.warn('room_code not available in view, fetching from drafts table')
+      if (supabase) {
+        supabase
+          .from('drafts')
+          .select('room_code')
+          .eq('id', draftId)
+          .single()
+          .then(({ data, error }: { data: { room_code: string } | null; error: any }) => {
+            if (error || !data?.room_code) {
+              console.error('Failed to fetch room_code:', error)
+            } else {
+              router.push(`/spectate/${data.room_code.toLowerCase()}`)
+            }
+          })
+      }
+    }
   }
 
   const filteredDrafts = drafts.filter(draft => 
@@ -280,7 +300,7 @@ export default function SpectatePage() {
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => handleJoinDraft(draft.room_code)}
+                        onClick={() => handleJoinDraft(draft.room_code, draft.id)}
                         className="bg-blue-600 hover:bg-blue-700"
                       >
                         <Eye className="h-4 w-4 mr-1" />

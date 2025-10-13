@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/components/providers/NotificationProvider'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -21,6 +22,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
 
   const loadProfile = useCallback(async () => {
     if (!supabase || !user) return
@@ -198,17 +201,23 @@ export default function ProfilePage() {
                 {/* Account Actions */}
                 <div className="flex flex-col gap-2">
                   <Button
-                    onClick={() => router.push('/auth/login')}
+                    onClick={() => {
+                      setAuthMode('signin')
+                      setAuthModalOpen(true)
+                    }}
                     className="w-full"
                   >
                     Sign In
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => router.push('/auth/register')}
+                    onClick={() => {
+                      setAuthMode('signup')
+                      setAuthModalOpen(true)
+                    }}
                     className="w-full"
                   >
-                    Create Account
+                    Sign Up
                   </Button>
                 </div>
 
@@ -241,6 +250,12 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         </div>
+
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          mode={authMode}
+        />
       </div>
     )
   }
