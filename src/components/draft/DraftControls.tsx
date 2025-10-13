@@ -1,5 +1,6 @@
 'use client'
 
+// Cache bust: 2025-10-13-fix-infinite-loop
 import { useState, useCallback, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
