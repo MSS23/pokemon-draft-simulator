@@ -154,10 +154,25 @@ export class WishlistService {
     }
 
     try {
+      // First get the actual draft UUID from room code if needed
+      let actualDraftId = draftId
+      if (!draftId.includes('-')) { // Room code doesn't contain hyphens, UUIDs do
+        const { data: draft, error: draftError } = await supabase
+          .from('drafts')
+          .select('id')
+          .eq('room_code', draftId)
+          .single()
+
+        if (draftError || !draft) {
+          throw new Error('Draft not found')
+        }
+        actualDraftId = draft.id
+      }
+
       const { data, error } = await supabase
         .from('wishlist_items')
         .select('*')
-        .eq('draft_id', draftId)
+        .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .order('priority', { ascending: true })
 

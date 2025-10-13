@@ -24,6 +24,24 @@ export function useWishlistSync({
   const channelRef = useRef<RealtimeChannel | null>(null)
   const lastSyncRef = useRef<number>(0)
 
+  // Helper function to get draft UUID from room code
+  const getDraftUuid = async (roomCode: string): Promise<string | null> => {
+    if (!supabase) return null
+    
+    const { data: draft, error } = await supabase
+      .from('drafts')
+      .select('id')
+      .eq('room_code', roomCode)
+      .single()
+
+    if (error || !draft) {
+      console.error('Error loading draft UUID:', error)
+      return null
+    }
+
+    return draft.id
+  }
+
   // Initialize wishlist data
   useEffect(() => {
     if (!enabled || !draftId || !supabase) return
@@ -32,10 +50,23 @@ export function useWishlistSync({
       try {
         // Load all wishlist items for the draft
         if (!supabase) return
+        
+        // First get the actual draft UUID from room code
+        const { data: draft, error: draftError } = await supabase
+          .from('drafts')
+          .select('id')
+          .eq('room_code', draftId)
+          .single()
+
+        if (draftError || !draft) {
+          console.error('Error loading draft:', draftError)
+          return
+        }
+
         const { data, error } = await supabase
           .from('wishlist_items')
           .select('*')
-          .eq('draft_id', draftId)
+          .eq('draft_id', draft.id)
           .order('participant_id, priority')
 
         if (error) {
@@ -70,13 +101,18 @@ export function useWishlistSync({
   useEffect(() => {
     if (!enabled || !draftId || !supabase) return
 
-    const setupSubscription = () => {
+    const setupSubscription = async () => {
       // Clean up existing channel
       if (channelRef.current) {
         channelRef.current.unsubscribe()
       }
 
       if (!supabase) return
+      
+      // Get the actual draft UUID
+      const draftUuid = await getDraftUuid(draftId)
+      if (!draftUuid) return
+      
       const channel = supabase
         .channel(`wishlist_${draftId}`)
         .on(
@@ -85,7 +121,7 @@ export function useWishlistSync({
             event: '*',
             schema: 'public',
             table: 'wishlist_items',
-            filter: `draft_id=eq.${draftId}`
+            filter: `draft_id=eq.${draftUuid}`
           },
           async (payload) => {
             // Debounce rapid changes
