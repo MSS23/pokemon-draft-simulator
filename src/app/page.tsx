@@ -399,7 +399,6 @@ export default function Home() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        mode="signin"
       />
     </div>
   )
