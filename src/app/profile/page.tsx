@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/components/providers/NotificationProvider'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { AuthModal } from '@/components/auth/AuthModal'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -22,8 +21,6 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
-  const [authModalOpen, setAuthModalOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
 
   const loadProfile = useCallback(async () => {
     if (!supabase || !user) return
@@ -159,105 +156,15 @@ export default function ProfilePage() {
     )
   }
 
+  // Redirect guests to home page - they can sign in from the header
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/')
+    }
+  }, [authLoading, user, router])
+
   if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-6">
-        <div className="container mx-auto max-w-2xl">
-          <div className="flex items-center justify-between mb-6">
-            <Button variant="ghost" onClick={() => router.push('/')} className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Home
-            </Button>
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-            </div>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
-                  <User className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <CardTitle>Account Information</CardTitle>
-                  <CardDescription>View your account details and statistics</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              {/* Guest User Info */}
-              <div className="space-y-4">
-                <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                    Guest Account
-                  </h4>
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    You're currently using a guest account. Sign in to access additional features and save your preferences.
-                  </p>
-                </div>
-
-                {/* Account Actions */}
-                <div className="flex flex-col gap-2">
-                  <Button
-                    onClick={() => {
-                      setAuthMode('signin')
-                      setAuthModalOpen(true)
-                    }}
-                    className="w-full"
-                  >
-                    Sign In
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setAuthMode('signup')
-                      setAuthModalOpen(true)
-                    }}
-                    className="w-full"
-                  >
-                    Sign Up
-                  </Button>
-                </div>
-
-                {/* Features Available */}
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                    Available Features
-                  </h4>
-                  <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                    <li>• Join draft rooms as a guest</li>
-                    <li>• Participate in drafts with a temporary name</li>
-                    <li>• View public draft rooms</li>
-                    <li>• Access basic app features</li>
-                  </ul>
-                </div>
-
-                {/* Sign In Benefits */}
-                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">
-                    Sign In Benefits
-                  </h4>
-                  <ul className="text-xs text-green-800 dark:text-green-200 space-y-1">
-                    <li>• Create and host your own draft rooms</li>
-                    <li>• Save your display name and preferences</li>
-                    <li>• Track your draft history and statistics</li>
-                    <li>• Access admin features (if verified)</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <AuthModal
-          isOpen={authModalOpen}
-          onClose={() => setAuthModalOpen(false)}
-          mode={authMode}
-        />
-      </div>
-    )
+    return null
   }
 
   if (loading) {
