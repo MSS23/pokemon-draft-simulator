@@ -160,18 +160,35 @@ function JoinDraftForm() {
       try {
         if (!supabase) throw new Error('Supabase not configured')
 
+        console.log('[Join Draft] Loading profile for user:', user.id)
+
         const { data: profile, error: profileError } = await supabase
           .from('user_profiles')
           .select('display_name')
           .eq('id', user.id)
-          .single()
+          .maybeSingle()
 
-        if (profileError) throw profileError
+        if (profileError) {
+          console.error('[Join Draft] Profile query error:', profileError)
+          throw profileError
+        }
 
-        setUserDisplayName((profile as { display_name: string })?.display_name || '')
+        if (!profile) {
+          console.warn('[Join Draft] No profile found, using email as display name')
+          // If no profile exists, use email username as display name
+          const displayName = user.email?.split('@')[0] || 'User'
+          setUserDisplayName(displayName)
+        } else {
+          console.log('[Join Draft] Profile loaded:', profile)
+          setUserDisplayName(profile.display_name || user.email?.split('@')[0] || 'User')
+        }
       } catch (error) {
-        console.error('Error loading profile:', error)
-        setError('Failed to load your profile. Please try again.')
+        console.error('[Join Draft] Error loading profile:', error)
+        // Don't block the user - use email as fallback
+        const fallbackName = user.email?.split('@')[0] || 'User'
+        setUserDisplayName(fallbackName)
+        // Clear the error so user can still proceed
+        setError('')
       } finally {
         setLoadingProfile(false)
       }
@@ -184,6 +201,7 @@ function JoinDraftForm() {
     if (formData.roomCode && !authLoading && user) {
       lookupDraft()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.roomCode, authLoading, user])
 
   const isFormValid = userDisplayName.trim() && formData.roomCode.trim() && (joinAsSpectator || formData.teamName.trim())
