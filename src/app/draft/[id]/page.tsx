@@ -513,10 +513,18 @@ export default function DraftRoomPage() {
 
     let errorCount = 0
     const MAX_ERRORS = 5
+    let updateTimeoutId: NodeJS.Timeout | null = null
 
     const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async (payload) => {
-      // Reload draft state when changes occur
-      console.log('[Draft Subscription] Change detected:', payload?.eventType, payload?.new || payload?.old)
+      // Debounce rapid updates to prevent infinite loops
+      // Multiple UPDATE events can fire within milliseconds when draft starts
+      if (updateTimeoutId) {
+        clearTimeout(updateTimeoutId)
+      }
+
+      updateTimeoutId = setTimeout(async () => {
+        // Reload draft state when changes occur
+        console.log('[Draft Subscription] Change detected:', payload?.eventType, payload?.new || payload?.old)
 
       try {
         const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
@@ -612,12 +620,15 @@ export default function DraftRoomPage() {
           setError('Failed to connect to draft after multiple attempts')
           mounted = false // Stop further updates
         }
-      }
+      }, 100) // 100ms debounce - batch rapid updates together
     })
 
     return () => {
       mounted = false
       abortController.abort()
+      if (updateTimeoutId) {
+        clearTimeout(updateTimeoutId)
+      }
       unsubscribe()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
