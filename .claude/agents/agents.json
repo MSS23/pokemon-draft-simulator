@@ -1,6 +1,46 @@
 {
   "agents": [
     {
+      "id": "frontend-specialist",
+      "name": "Frontend Specialist",
+      "description": "Comprehensive frontend development specialist - React, Next.js, UI/UX, components",
+      "file": "frontend-specialist.md",
+      "keywords": ["frontend", "react", "nextjs", "ui", "component", "tailwind", "responsive", "accessibility"],
+      "category": "development"
+    },
+    {
+      "id": "backend-specialist",
+      "name": "Backend Specialist",
+      "description": "Backend development specialist - API routes, business logic, database operations",
+      "file": "backend-specialist.md",
+      "keywords": ["backend", "api", "service", "business logic", "validation", "authentication", "realtime"],
+      "category": "development"
+    },
+    {
+      "id": "bug-fixer",
+      "name": "Bug Fixer",
+      "description": "Systematic bug detection and resolution specialist",
+      "file": "bug-fixer.md",
+      "keywords": ["bug", "debug", "error", "issue", "troubleshoot", "fix", "reproduction", "root cause"],
+      "category": "debugging"
+    },
+    {
+      "id": "code-quality",
+      "name": "Code Quality Specialist",
+      "description": "Code quality, maintainability, and best practices specialist",
+      "file": "code-quality.md",
+      "keywords": ["quality", "refactor", "clean code", "solid", "patterns", "maintainability", "review"],
+      "category": "quality-assurance"
+    },
+    {
+      "id": "product-strategy",
+      "name": "Product Strategy Advisor",
+      "description": "Product strategy and business planning specialist",
+      "file": "product-strategy.md",
+      "keywords": ["product", "strategy", "roadmap", "features", "growth", "metrics", "monetization", "ux"],
+      "category": "business"
+    },
+    {
       "id": "format-validator",
       "name": "Format Validator",
       "description": "Pokemon format validation specialist - VGC rules, legality checks, cost calculations",
@@ -49,7 +89,8 @@
       "category": "infrastructure"
     }
   ],
-  "version": "1.0.0",
+  "version": "2.0.0",
   "created": "2025-01-13",
+  "updated": "2025-01-13",
   "project": "Pokemon Draft Simulator"
 }
