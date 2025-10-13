@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -56,7 +56,7 @@ interface DraftControlsProps {
   notificationsEnabled?: boolean
 }
 
-export default function DraftControls({
+const DraftControls = memo(function DraftControls({
   draftStatus,
   currentTurn,
   totalTeams,
@@ -110,12 +110,12 @@ export default function DraftControls({
     }
   }
 
-  const handleSetTimer = (value: string) => {
+  const handleSetTimer = useCallback((value: string) => {
     const seconds = parseInt(value)
     onSetTimer(seconds)
     setTimerValue(value)
-    notify.info('Timer Updated', `Turn timer set to ${seconds} seconds`)
-  }
+    // Don't show notification immediately - it causes re-renders
+  }, [onSetTimer])
 
   const handleEnableProxyPicking = () => {
     if (onEnableProxyPicking) {
@@ -458,4 +458,6 @@ export default function DraftControls({
       </CardContent>
     </Card>
   )
-}
+})
+
+export default DraftControls
