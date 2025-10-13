@@ -191,6 +191,9 @@ export default function DraftRoomPage() {
   const [pickTimeRemaining, setPickTimeRemaining] = useState<number>(0)
   const [turnStartTime, setTurnStartTime] = useState<number | null>(null)
 
+  // Stabilized timer value for components (updates max once per second)
+  const stabilizedTimeRemaining = useMemo(() => Math.floor(pickTimeRemaining), [Math.floor(pickTimeRemaining)])
+
   // Server time synchronization state
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
   const getServerTime = useCallback(() => {
@@ -1475,7 +1478,7 @@ export default function DraftRoomPage() {
               currentTeam={draftState?.currentTeam}
               teams={draftState?.teams || []}
               isHost={isHost}
-              timeRemaining={pickTimeRemaining}
+              timeRemaining={stabilizedTimeRemaining}
               onStartDraft={startDraft}
               onShuffleDraftOrder={handleShuffleDraftOrder}
               onPauseDraft={handlePauseDraft}
