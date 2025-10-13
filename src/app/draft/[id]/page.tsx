@@ -526,8 +526,8 @@ export default function DraftRoomPage() {
         // Reload draft state when changes occur
         console.log('[Draft Subscription] Change detected:', payload?.eventType, payload?.new || payload?.old)
 
-      try {
-        const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
+        try {
+          const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
 
         // Check if component is still mounted before updating state
         if (!mounted || abortController.signal.aborted) return
@@ -620,6 +620,7 @@ export default function DraftRoomPage() {
           setError('Failed to connect to draft after multiple attempts')
           mounted = false // Stop further updates
         }
+      }
       }, 100) // 100ms debounce - batch rapid updates together
     })
 
