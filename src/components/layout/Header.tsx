@@ -43,12 +43,6 @@ export function Header() {
                 Watch Drafts
               </Button>
             </Link>
-            <Link href="/profile">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <User className="h-4 w-4" />
-                Profile
-              </Button>
-            </Link>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-2">
             <ImageTypeToggle />
@@ -76,10 +70,6 @@ export function Header() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push('/profile')}>
-                    <User className="h-4 w-4 mr-2" />
-                    Profile Settings
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut()}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
