@@ -27,19 +27,24 @@ export function useWishlistSync({
   // Helper function to get draft UUID from room code
   const getDraftUuid = async (roomCode: string): Promise<string | null> => {
     if (!supabase) return null
-    
-    const { data: draft, error } = await supabase
+
+    const { data, error } = await supabase
       .from('drafts')
       .select('id')
       .eq('room_code', roomCode)
       .single()
 
-    if (error || !draft) {
+    if (error) {
       console.error('Error loading draft UUID:', error)
       return null
     }
 
-    return draft.id
+    if (!data) {
+      return null
+    }
+
+    // Type assertion needed due to Supabase type inference limitations
+    return (data as { id: string }).id
   }
 
   // Initialize wishlist data
@@ -52,21 +57,26 @@ export function useWishlistSync({
         if (!supabase) return
         
         // First get the actual draft UUID from room code
-        const { data: draft, error: draftError } = await supabase
+        const { data: draftData, error: draftError } = await supabase
           .from('drafts')
           .select('id')
           .eq('room_code', draftId)
           .single()
 
-        if (draftError || !draft) {
+        if (draftError) {
           console.error('Error loading draft:', draftError)
+          return
+        }
+
+        if (!draftData) {
+          console.error('Draft not found')
           return
         }
 
         const { data, error } = await supabase
           .from('wishlist_items')
           .select('*')
-          .eq('draft_id', draft.id)
+          .eq('draft_id', (draftData as { id: string }).id)
           .order('participant_id, priority')
 
         if (error) {

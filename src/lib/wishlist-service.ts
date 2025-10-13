@@ -157,16 +157,21 @@ export class WishlistService {
       // First get the actual draft UUID from room code if needed
       let actualDraftId = draftId
       if (!draftId.includes('-')) { // Room code doesn't contain hyphens, UUIDs do
-        const { data: draft, error: draftError } = await supabase
+        const { data: draftData, error: draftError } = await supabase
           .from('drafts')
           .select('id')
           .eq('room_code', draftId)
           .single()
 
-        if (draftError || !draft) {
+        if (draftError) {
+          throw new Error(`Draft lookup error: ${draftError.message}`)
+        }
+
+        if (!draftData) {
           throw new Error('Draft not found')
         }
-        actualDraftId = draft.id
+
+        actualDraftId = (draftData as { id: string }).id
       }
 
       const { data, error } = await supabase
