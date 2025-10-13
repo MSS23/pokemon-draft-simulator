@@ -488,11 +488,16 @@ export default function DraftRoomPage() {
     // Sort by timestamp descending (most recent first)
     newActivities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
+    // Create stable ID string for comparison
+    const newActivityIds = newActivities.map(a => a.id).join(',')
+    const currentActivityIds = recentActivity.map(a => a.id).join(',')
+
     // Only update if the activity has actually changed
-    if (JSON.stringify(newActivities.map(a => a.id)) !== JSON.stringify(recentActivity.map(a => a.id))) {
+    if (newActivityIds !== currentActivityIds) {
       setRecentActivity(newActivities)
     }
-  }, [draftState?.teams, pokemon, recentActivity])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftState?.teams, pokemon])
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -518,26 +523,34 @@ export default function DraftRoomPage() {
         errorCount = 0
 
         if (dbState) {
-          const newState = transformDraftState(dbState, userId)
+          // Use refs to get current values without creating dependencies
+          const currentUserId = userIdRef.current
+          const currentTransformDraftState = transformDraftStateRef.current
+          const currentDraftState = draftStateRef.current
+          const currentPokemon = pokemonRef.current
+          const currentIsAuctionDraft = isAuctionDraftRef.current
+          const currentNotify = notifyRef.current
+
+          const newState = currentTransformDraftState(dbState, currentUserId)
           console.log('[Draft Subscription] State updated, teams:', newState.teams.map(t => ({ name: t.name, order: t.draftOrder })))
 
           // Check for pick notifications (only if not the user's own pick)
-          if (draftState && newState.teams && pokemon) {
-            const oldTotalPicks = draftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
+          if (currentDraftState && newState.teams && currentPokemon) {
+            const oldTotalPicks = currentDraftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
             const newTotalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
 
             if (newTotalPicks > oldTotalPicks) {
               // Find which team made the pick
               const pickingTeam = newState.teams.find(team => {
-                const oldTeam = draftState.teams.find(t => t.id === team.id)
+                const oldTeam = currentDraftState.teams.find(t => t.id === team.id)
                 return oldTeam && team.picks.length > oldTeam.picks.length
               })
 
               if (pickingTeam && pickingTeam.id !== newState.userTeamId) {
                 const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
-                const pickedPokemon = pokemon.find(p => p.id === latestPickId)
+                const pickedPokemon = currentPokemon.find(p => p.id === latestPickId)
                 if (pickedPokemon) {
-                  notify.success(
+                  currentNotify.success(
                     `${pickingTeam.name} drafted ${pickedPokemon.name}!`,
                     `${pickingTeam.userName} selected ${pickedPokemon.name}`,
                     { duration: 4000 }
@@ -548,17 +561,17 @@ export default function DraftRoomPage() {
           }
 
           // Check for turn change notifications (snake draft only)
-          if (!isAuctionDraft && draftState && newState.currentTeam !== draftState.currentTeam) {
+          if (!currentIsAuctionDraft && currentDraftState && newState.currentTeam !== currentDraftState.currentTeam) {
             const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
             if (currentTeam) {
               if (newState.userTeamId === newState.currentTeam) {
-                notify.success(
+                currentNotify.success(
                   "It's Your Turn!",
                   "Select a Pokémon to draft",
                   { duration: 5000 }
                 )
               } else {
-                notify.info(
+                currentNotify.info(
                   `${currentTeam.name}'s Turn`,
                   `Waiting for ${currentTeam.userName} to pick`,
                   { duration: 3000 }
@@ -585,7 +598,8 @@ export default function DraftRoomPage() {
         console.error('Error updating draft state:', err, `(${errorCount}/${MAX_ERRORS})`)
 
         if (errorCount >= MAX_ERRORS) {
-          notify.error('Connection Error', 'Unable to connect to draft. Please refresh the page.')
+          const currentNotify = notifyRef.current
+          currentNotify.error('Connection Error', 'Unable to connect to draft. Please refresh the page.')
           setError('Failed to connect to draft after multiple attempts')
           mounted = false // Stop further updates
         }
@@ -597,7 +611,8 @@ export default function DraftRoomPage() {
       abortController.abort()
       unsubscribe()
     }
-  }, [roomCode, isConnected, userId, transformDraftState, draftState, notify, isAuctionDraft])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomCode, isConnected, userId])
 
   // Load current auction for auction drafts
   useEffect(() => {
@@ -736,13 +751,21 @@ export default function DraftRoomPage() {
   const isSpectatorRef = useRef(isSpectator)
   const notifyRef = useRef(notify)
 
+  // Additional refs for subscription callback
+  const transformDraftStateRef = useRef(transformDraftState)
+  const pokemonRef = useRef(pokemon)
+  const isAuctionDraftRef = useRef(isAuctionDraft)
+
   // Keep refs in sync with latest values
   useEffect(() => {
     draftStateRef.current = draftState
     userIdRef.current = userId
     isSpectatorRef.current = isSpectator
     notifyRef.current = notify
-  }, [draftState, userId, isSpectator, notify])
+    transformDraftStateRef.current = transformDraftState
+    pokemonRef.current = pokemon
+    isAuctionDraftRef.current = isAuctionDraft
+  }, [draftState, userId, isSpectator, notify, transformDraftState, pokemon, isAuctionDraft])
 
   // Stable handleViewDetails - never changes
   const handleViewDetails = useCallback((pokemon: Pokemon) => {
