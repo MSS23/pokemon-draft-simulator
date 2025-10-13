@@ -51,8 +51,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         setPassword('')
         setShowPassword(false)
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred. Please try again.')
+    } catch (err) {
+      const error = err as Error
+      setError(error.message || 'An error occurred. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -106,7 +107,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   required
                   minLength={6}
                   disabled={loading}
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  autoComplete="current-password"
                 />
                 <Button
                   type="button"

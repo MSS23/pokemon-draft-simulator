@@ -21,13 +21,6 @@ class RateLimiter {
     this.requests.set(key, validTimestamps)
     return true
   }
-
-  getRemainingRequests(key: string, limit: number, windowMs: number): number {
-    const now = Date.now()
-    const timestamps = this.requests.get(key) || []
-    const validTimestamps = timestamps.filter(t => now - t < windowMs)
-    return Math.max(0, limit - validTimestamps.length)
-  }
 }
 
 const rateLimiter = new RateLimiter()

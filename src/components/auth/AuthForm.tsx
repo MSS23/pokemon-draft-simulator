@@ -80,7 +80,8 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
             router.refresh()
           }
         }
-      } catch (error: any) {
+      } catch (err) {
+        const error = err as Error
         console.error('Auth error:', error)
         setError(error.message || 'An unexpected error occurred')
       }
@@ -102,7 +103,8 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
       })
 
       if (error) throw error
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error
       setError(error.message || 'Failed to sign in with Google')
     }
   }
@@ -122,7 +124,8 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
       })
 
       if (error) throw error
-    } catch (error: any) {
+    } catch (err) {
+      const error = err as Error
       setError(error.message || 'Failed to sign in with GitHub')
     }
   }
