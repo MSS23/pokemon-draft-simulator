@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 
 interface PublicDraft {
   id: string
+  room_code: string
   name: string
   description?: string
   format: string
@@ -88,8 +89,8 @@ export default function SpectatePage() {
     }
   }
 
-  const handleJoinDraft = (draftId: string) => {
-    router.push(`/spectate/${draftId}`)
+  const handleJoinDraft = (roomCode: string) => {
+    router.push(`/spectate/${roomCode.toLowerCase()}`)
   }
 
   const filteredDrafts = drafts.filter(draft => 
@@ -277,9 +278,9 @@ export default function SpectatePage() {
                         <Clock className="h-3 w-3" />
                         {formatTimeAgo(draft.last_activity)}
                       </div>
-                      <Button 
-                        size="sm" 
-                        onClick={() => handleJoinDraft(draft.id)}
+                      <Button
+                        size="sm"
+                        onClick={() => handleJoinDraft(draft.room_code)}
                         className="bg-blue-600 hover:bg-blue-700"
                       >
                         <Eye className="h-4 w-4 mr-1" />
