@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
-import { supabase } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabase'
 import { Eye, EyeOff, Mail, Lock, User, Loader2, Github } from 'lucide-react'
 
 interface AuthFormProps {
@@ -83,7 +83,21 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
       } catch (err) {
         const error = err as Error
         console.error('Auth error:', error)
-        setError(error.message || 'An unexpected error occurred')
+
+        // Parse common Supabase error messages to user-friendly ones
+        let errorMessage = error.message || 'An unexpected error occurred'
+
+        if (errorMessage.includes('User already registered')) {
+          errorMessage = 'This email is already registered. Please sign in instead.'
+        } else if (errorMessage.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password. Please try again.'
+        } else if (errorMessage.includes('Email not confirmed')) {
+          errorMessage = 'Please check your email and verify your account before signing in.'
+        } else if (errorMessage.includes('Password should be at least')) {
+          errorMessage = 'Password must be at least 6 characters long.'
+        }
+
+        setError(errorMessage)
       }
     })
   }

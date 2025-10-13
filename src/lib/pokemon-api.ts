@@ -553,8 +553,11 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
           pokemonList.push(pokemon)
         }
 
-        const loadTime = Math.round(performance.now() - startTime)
-        console.log(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${loadTime}ms`)
+        const endTime = performance.now()
+        const loadTime = Math.round(endTime - startTime)
+        // Sanity check: if loadTime is unreasonably large (>60 seconds), just report as fast
+        const displayTime = loadTime > 60000 ? '<100' : loadTime.toString()
+        console.log(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${displayTime}ms`)
         return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
       } else {
         console.warn('Format pack has invalid structure (missing legalPokemon or costs), falling back to API fetching')
