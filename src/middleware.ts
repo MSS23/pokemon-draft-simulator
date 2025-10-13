@@ -114,6 +114,11 @@ export async function middleware(request: NextRequest) {
       supabaseUrl,
       supabaseKey,
       {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
         cookies: {
           getAll() {
             return request.cookies.getAll()

@@ -411,24 +411,45 @@ export type Database = {
       user_profiles: {
         Row: {
           id: string
-          user_id: string
-          display_name: string
           created_at: string
           updated_at: string
+          email: string | null
+          display_name: string | null
+          avatar_url: string | null
+          is_verified: boolean
+          total_drafts_created: number
+          total_drafts_participated: number
+          favorite_pokemon: any
+          stats: any
+          preferences: any
         }
         Insert: {
-          id?: string
-          user_id: string
-          display_name: string
+          id: string
           created_at?: string
           updated_at?: string
+          email?: string | null
+          display_name?: string | null
+          avatar_url?: string | null
+          is_verified?: boolean
+          total_drafts_created?: number
+          total_drafts_participated?: number
+          favorite_pokemon?: any
+          stats?: any
+          preferences?: any
         }
         Update: {
           id?: string
-          user_id?: string
-          display_name?: string
           created_at?: string
           updated_at?: string
+          email?: string | null
+          display_name?: string | null
+          avatar_url?: string | null
+          is_verified?: boolean
+          total_drafts_created?: number
+          total_drafts_participated?: number
+          favorite_pokemon?: any
+          stats?: any
+          preferences?: any
         }
       }
       leagues: {

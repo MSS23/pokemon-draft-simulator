@@ -31,7 +31,7 @@ export default function ProfilePage() {
       const { data: profile, error } = await supabase
         .from('user_profiles')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .single()
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = not found
@@ -47,7 +47,8 @@ export default function ProfilePage() {
         const { error: insertError } = await (supabase
           .from('user_profiles') as any)
           .insert({
-            user_id: user.id,
+            id: user.id,
+            email: user.email,
             display_name: defaultName
           })
 
@@ -109,7 +110,7 @@ export default function ProfilePage() {
           display_name: displayName.trim(),
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', user.id)
+        .eq('id', user.id)
 
       if (error) {
         // Handle unique constraint violation

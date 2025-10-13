@@ -62,6 +62,7 @@
   "share_target": {
     "action": "/join-draft",
     "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
     "params": {
       "title": "title",
       "text": "text",

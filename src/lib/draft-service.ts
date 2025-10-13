@@ -289,7 +289,7 @@ export class DraftService {
     const { data: userProfile, error: profileError } = await (supabase
       .from('user_profiles') as any)
       .select('display_name')
-      .eq('user_id', userId)
+      .eq('id', userId)
       .single()
 
     if (profileError || !userProfile) {
@@ -389,7 +389,7 @@ export class DraftService {
     const { data: userProfile, error: profileError } = await (supabase
       .from('user_profiles') as any)
       .select('display_name')
-      .eq('user_id', userId)
+      .eq('id', userId)
       .single()
 
     if (profileError || !userProfile) {

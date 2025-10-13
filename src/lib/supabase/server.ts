@@ -8,6 +8,11 @@ export async function createSupabaseServerClient() {
     (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim(),
     (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim(),
     {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
       cookies: {
         getAll() {
           return Array.from(cookieStore.getAll())
@@ -35,6 +40,11 @@ export async function createSupabaseServerComponentClient() {
     (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim(),
     (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim(),
     {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
       cookies: {
         getAll() {
           return Array.from(cookieStore.getAll())
