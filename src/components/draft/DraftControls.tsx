@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, memo, useEffect } from 'react'
+import { useState, useCallback, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -83,15 +83,7 @@ const DraftControls = memo(function DraftControls({
   notificationsEnabled = false
 }: DraftControlsProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const [timerValue, setTimerValue] = useState('60')
   const notify = useNotify()
-
-  // Sync timer value with timeRemaining prop to avoid state conflicts
-  useEffect(() => {
-    if (timeRemaining !== undefined) {
-      setTimerValue(String(timeRemaining))
-    }
-  }, [timeRemaining])
 
   const handlePauseDraft = () => {
     onPauseDraft()
@@ -119,7 +111,6 @@ const DraftControls = memo(function DraftControls({
 
   const handleSetTimer = useCallback((value: string) => {
     const seconds = parseInt(value)
-    setTimerValue(value)
     onSetTimer(seconds)
     // Don't show notification immediately - it causes re-renders
   }, [onSetTimer])
@@ -395,11 +386,11 @@ const DraftControls = memo(function DraftControls({
               <div className="flex items-center gap-2">
                 <Select
                   key={`timer-${draftStatus}`}
-                  value={timerValue}
+                  defaultValue={String(timeRemaining)}
                   onValueChange={handleSetTimer}
                 >
                   <SelectTrigger className="w-32">
-                    <SelectValue />
+                    <SelectValue placeholder={`${timeRemaining}s`} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="30">30 seconds</SelectItem>

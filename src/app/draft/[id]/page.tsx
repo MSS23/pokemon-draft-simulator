@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
+import ConnectionStatus from '@/components/ui/ConnectionStatus'
 import { Copy, Share2, History } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
@@ -1390,6 +1391,7 @@ export default function DraftRoomPage() {
                   Results
                 </Button>
               )}
+              <ConnectionStatus className="mr-2" />
               <ImageTypeToggle />
               <ThemeToggle />
             </div>
