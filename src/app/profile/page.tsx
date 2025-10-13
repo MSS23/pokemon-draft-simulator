@@ -22,6 +22,13 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState('')
   const [originalName, setOriginalName] = useState('')
 
+  // Redirect guests to home page - they can sign in from the header
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/')
+    }
+  }, [authLoading, user, router])
+
   const loadProfile = useCallback(async () => {
     if (!supabase || !user) return
 
@@ -155,13 +162,6 @@ export default function ProfilePage() {
       </div>
     )
   }
-
-  // Redirect guests to home page - they can sign in from the header
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/')
-    }
-  }, [authLoading, user, router])
 
   if (!user) {
     return null
