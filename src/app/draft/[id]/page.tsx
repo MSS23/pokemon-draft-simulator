@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
@@ -172,6 +172,7 @@ export default function DraftRoomPage() {
 
   // Real draft state from Supabase
   const [draftState, setDraftState] = useState<DraftUIState | null>(null)
+  const [, startTransition] = useTransition()
 
   // Auction-specific state
   const [currentAuction, setCurrentAuction] = useState<{
@@ -580,7 +581,11 @@ export default function DraftRoomPage() {
             }
           }
 
-          setDraftState(newState)
+          // Use startTransition to defer state updates and prevent infinite loops
+          // This allows React to complete current renders before processing new updates
+          startTransition(() => {
+            setDraftState(newState)
+          })
         } else {
           // Draft not found - increment error count
           errorCount++
