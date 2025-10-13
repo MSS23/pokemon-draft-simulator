@@ -1,0 +1,55 @@
+{
+  "agents": [
+    {
+      "id": "format-validator",
+      "name": "Format Validator",
+      "description": "Pokemon format validation specialist - VGC rules, legality checks, cost calculations",
+      "file": "format-validator.md",
+      "keywords": ["format", "legal", "vgc", "regulation", "banned", "cost", "tier", "paradox", "legendary", "mythical"],
+      "category": "domain-specific"
+    },
+    {
+      "id": "draft-debugger",
+      "name": "Draft Debugger",
+      "description": "Draft state and real-time synchronization debugging specialist",
+      "file": "draft-debugger.md",
+      "keywords": ["draft", "state", "realtime", "sync", "turn", "order", "zustand", "supabase", "subscription"],
+      "category": "debugging"
+    },
+    {
+      "id": "test-writer",
+      "name": "Test Writer",
+      "description": "Comprehensive testing specialist - Vitest, React Testing Library, coverage",
+      "file": "test-writer.md",
+      "keywords": ["test", "vitest", "coverage", "unit", "integration", "mock", "fixture"],
+      "category": "quality-assurance"
+    },
+    {
+      "id": "type-fixer",
+      "name": "Type Fixer",
+      "description": "TypeScript type error resolution specialist",
+      "file": "type-fixer.md",
+      "keywords": ["typescript", "type", "error", "build", "generic", "inference", "any", "assertion"],
+      "category": "development"
+    },
+    {
+      "id": "performance-optimizer",
+      "name": "Performance Optimizer",
+      "description": "React performance optimization specialist - rendering, memoization, bundle size",
+      "file": "performance-optimizer.md",
+      "keywords": ["performance", "optimize", "slow", "rerender", "memo", "bundle", "virtual", "lazy"],
+      "category": "optimization"
+    },
+    {
+      "id": "database-helper",
+      "name": "Database Helper",
+      "description": "Supabase database and RLS specialist - PostgreSQL, migrations, queries",
+      "file": "database-helper.md",
+      "keywords": ["database", "supabase", "rls", "policy", "query", "migration", "sql", "postgres"],
+      "category": "infrastructure"
+    }
+  ],
+  "version": "1.0.0",
+  "created": "2025-01-13",
+  "project": "Pokemon Draft Simulator"
+}
