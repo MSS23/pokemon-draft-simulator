@@ -17,7 +17,10 @@ import DraftProgress from '@/components/team/DraftProgress'
 export default function SpectateRoomPage() {
   const params = useParams()
   const router = useRouter()
-  const draftId = (params.id as string)?.toLowerCase()
+  const roomCode = (params.id as string)?.toLowerCase()
+
+  // Validate room code format (should be 6 characters, not a UUID)
+  const isValidRoomCode = roomCode && roomCode.length === 6 && !/[^a-z0-9]/.test(roomCode)
 
   const [draftState, setDraftState] = useState<DraftState | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -36,11 +39,18 @@ export default function SpectateRoomPage() {
   // Load draft state
   useEffect(() => {
     const loadDraft = async () => {
-      if (!draftId) return
+      if (!roomCode) return
+
+      // Validate room code format before making the request
+      if (!isValidRoomCode) {
+        setError('Invalid room code format. Room codes should be 6 characters (e.g., CC7A5I)')
+        setIsLoading(false)
+        return
+      }
 
       try {
         setIsLoading(true)
-        const state = await DraftService.getDraftState(draftId)
+        const state = await DraftService.getDraftState(roomCode)
 
         if (!state) {
           setError('Draft room not found')
@@ -58,15 +68,15 @@ export default function SpectateRoomPage() {
     }
 
     loadDraft()
-  }, [draftId])
+  }, [roomCode, isValidRoomCode])
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!draftId || !draftState) return
+    if (!roomCode || !draftState || !isValidRoomCode) return
 
-    const unsubscribe = DraftService.subscribeToDraft(draftId, async () => {
+    const unsubscribe = DraftService.subscribeToDraft(roomCode, async () => {
       try {
-        const state = await DraftService.getDraftState(draftId)
+        const state = await DraftService.getDraftState(roomCode)
         if (state) {
           // Track pick activity
           if (draftState && state.picks.length > draftState.picks.length) {
@@ -90,7 +100,7 @@ export default function SpectateRoomPage() {
     })
 
     return unsubscribe
-  }, [draftId, draftState])
+  }, [roomCode, draftState, isValidRoomCode])
 
   if (isLoading) {
     return (
@@ -165,7 +175,7 @@ export default function SpectateRoomPage() {
           <div className="flex items-center justify-center gap-2">
             <Eye className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent">
-              Spectating: {draftId.toUpperCase()}
+              Spectating: {roomCode.toUpperCase()}
             </h1>
           </div>
           <div className="flex justify-center gap-2 mt-2">
@@ -181,7 +191,7 @@ export default function SpectateRoomPage() {
         {/* Spectator Mode Component */}
         <div className="mb-6">
           <SpectatorMode
-            draftId={draftId}
+            draftId={roomCode}
             currentPhase={currentPhase}
             participantCount={draftState.participants.length}
             currentAction={draftState.draft.status === 'active' && currentTeam ? {

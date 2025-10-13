@@ -501,13 +501,61 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
     const formatEntry = manifest?.formats?.find((f: any) => f.id === formatId)
 
     if (formatEntry) {
-      const formatPack = await fetch(`/data/format_${formatId}_${formatEntry.hash}.json`).then(res => res.json())
-      // Validate format pack structure before using
-      if (formatPack && Array.isArray(formatPack.pokemon) && formatPack.pokemon.length > 0) {
-        console.log(`✨ Loaded ${formatPack.pokemon.length} Pokemon from pre-built format pack for ${formatId}`)
-        return formatPack.pokemon.slice(0, limit)
+      // Load both the format pack and the Pokemon index in parallel
+      const [formatPack, pokemonIndex] = await Promise.all([
+        fetch(`/data/format_${formatId}_${formatEntry.hash}.json`).then(res => res.json()),
+        fetch(`/data/pokemon_index_${manifest.pokemonIndexHash}.json`).then(res => res.json())
+      ])
+
+      // Validate format pack structure (should have legalPokemon array and costs object)
+      if (formatPack && Array.isArray(formatPack.legalPokemon) && formatPack.legalPokemon.length > 0 && formatPack.costs && pokemonIndex) {
+        console.log(`✨ Loaded format pack with ${formatPack.legalPokemon.length} legal Pokemon for ${formatId} from pre-built files`)
+
+        // Convert legal Pokemon names to full Pokemon objects using the index
+        const pokemonList: Pokemon[] = []
+        const legalPokemonSlice = formatPack.legalPokemon.slice(0, limit)
+
+        for (const pokemonName of legalPokemonSlice) {
+          const pokemonData = pokemonIndex[pokemonName]
+          if (!pokemonData) {
+            console.warn(`Pokemon ${pokemonName} not found in index`)
+            continue
+          }
+
+          // Convert from index format to Pokemon type
+          const types: PokemonType[] = pokemonData.types.map((typeName: string) => ({
+            name: typeName,
+            color: getTypeColor(typeName)
+          }))
+
+          const pokemon: Pokemon = {
+            id: pokemonData.nationalDex.toString(),
+            name: pokemonData.name.split('-').map((part: string) =>
+              part.charAt(0).toUpperCase() + part.slice(1)
+            ).join('-'),
+            types,
+            stats: pokemonData.stats,
+            abilities: pokemonData.abilities.map((ability: string) =>
+              ability.replace('-', ' ')
+                .split(' ')
+                .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ')
+            ),
+            sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.nationalDex}.png`,
+            cost: formatPack.costs[pokemonName] || 10,
+            isLegal: true,
+            isLegendary: pokemonData.flags.isLegendary,
+            isMythical: pokemonData.flags.isMythical,
+            generation: Math.ceil(pokemonData.nationalDex / 100) // Rough estimation
+          }
+
+          pokemonList.push(pokemon)
+        }
+
+        console.log(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${Date.now()}ms`)
+        return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
       } else {
-        console.warn('Format pack has invalid structure, falling back to API fetching')
+        console.warn('Format pack has invalid structure (missing legalPokemon or costs), falling back to API fetching')
       }
     }
   } catch (error) {

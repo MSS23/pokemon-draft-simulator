@@ -48,7 +48,8 @@
       "Bash(dir:*)",
       "Bash(awk:*)",
       "Bash(chmod:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

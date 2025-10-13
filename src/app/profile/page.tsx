@@ -30,7 +30,7 @@ export default function ProfilePage() {
 
       const { data: profile, error } = await supabase
         .from('user_profiles')
-        .select('id, email, display_name, created_at, updated_at, is_verified')
+        .select('id, email, display_name, created_at, updated_at')
         .eq('id', user.id)
         .single()
 
