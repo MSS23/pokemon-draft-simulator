@@ -343,13 +343,13 @@ export default function DraftRoomPage() {
       teams,
       draftSettings: {
         maxTeams: dbState.draft.max_teams,
-        timeLimit: dbState.draft.settings?.timeLimit || 60,
-        pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
+        timeLimit: (dbState.draft.settings as any)?.timeLimit || 60,
+        pokemonPerTeam: (dbState.draft.settings as any)?.pokemonPerTeam || 6,
         draftType: dbState.draft.format,
-        formatId: dbState.draft.settings?.formatId,
+        formatId: (dbState.draft.settings as any)?.formatId,
         customFormatId: (dbState.draft as any).custom_format_id
       },
-      timeRemaining: dbState.draft.settings?.timeLimit || 60,
+      timeRemaining: (dbState.draft.settings as any)?.timeLimit || 60,
       draft: {
         id: dbState.draft.id,
         custom_format_id: (dbState.draft as any).custom_format_id

@@ -149,9 +149,9 @@ export default function DraftResultsPage() {
           picks={picks}
           draftSettings={{
             maxTeams: draftState.draft.max_teams,
-            pokemonPerTeam: draftState.draft.settings?.pokemonPerTeam || 6,
+            pokemonPerTeam: (draftState.draft.settings as any)?.pokemonPerTeam || 6,
             draftType: draftState.draft.format,
-            timeLimit: draftState.draft.settings?.timeLimit || 60,
+            timeLimit: (draftState.draft.settings as any)?.timeLimit || 60,
             budgetPerTeam: draftState.draft.budget_per_team
           }}
           startTime={draftState.draft.created_at}
