@@ -22,23 +22,12 @@ export function Header() {
   const router = useRouter()
   const { user, signOut, loading } = useAuth()
   const [authModalOpen, setAuthModalOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
   const [mounted, setMounted] = useState(false)
 
   // Prevent hydration mismatch
   useState(() => {
     setMounted(true)
   })
-
-  const openSignIn = () => {
-    setAuthMode('signin')
-    setAuthModalOpen(true)
-  }
-
-  const openSignUp = () => {
-    setAuthMode('signup')
-    setAuthModalOpen(true)
-  }
 
   return (
     <>
@@ -99,14 +88,9 @@ export function Header() {
               </DropdownMenu>
             ) : (
               // User is not signed in
-              <>
-                <Button variant="ghost" size="sm" onClick={openSignIn}>
-                  Sign In
-                </Button>
-                <Button size="sm" onClick={openSignUp}>
-                  Sign Up
-                </Button>
-              </>
+              <Button variant="ghost" size="sm" onClick={() => setAuthModalOpen(true)}>
+                Sign In
+              </Button>
             )}
           </div>
         </div>
@@ -115,7 +99,6 @@ export function Header() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
-        mode={authMode}
       />
     </>
   )
