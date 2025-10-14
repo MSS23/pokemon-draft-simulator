@@ -309,24 +309,48 @@ export default function DraftRoomPage() {
   }, [roomCode])
 
   // Derived variables - use refs to prevent infinite loops in Radix UI
-  // Store draftState in ref to get current value without triggering re-renders
-  const draftStateForDerivedRef = useRef(draftState)
+  // Create stable signature using ref to prevent infinite recalculation
+  const lastTeamsSignatureRef = useRef('')
+  const draftStateTeamsRef = useRef(draftState?.teams)
+
+  // Keep ref in sync
   useEffect(() => {
-    draftStateForDerivedRef.current = draftState
-  }, [draftState])
+    draftStateTeamsRef.current = draftState?.teams
+  }, [draftState?.teams])
+
+  const teamsSignature = useMemo(() => {
+    const teams = draftStateTeamsRef.current
+    if (!teams) return ''
+
+    // Create signature from team data
+    const newSignature = teams
+      .map(t => `${t.id}:${t.picks.length}:${t.budgetRemaining}`)
+      .join('|')
+
+    // Only update ref if signature actually changed
+    if (newSignature !== lastTeamsSignatureRef.current) {
+      lastTeamsSignatureRef.current = newSignature
+      return newSignature // Return new signature when changed
+    }
+
+    // Return stable ref value (prevents re-renders)
+    return lastTeamsSignatureRef.current
+  }, [draftState?.teams]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Note: We intentionally depend on draftState?.teams to trigger recalculation,
+  // but use refs to prevent infinite loops
 
   // Create stable team references that only change when actual team data changes
   const userTeam = useMemo(() => {
     if (!draftState?.teams || !draftState.userTeamId) return null
     const team = draftState.teams.find(t => t.id === draftState.userTeamId)
     return team || null
-  }, [draftState?.userTeamId, draftState?.teams?.map(t => `${t.id}:${t.picks.length}:${t.budgetRemaining}`).join('|')])
+  }, [teamsSignature, draftState?.userTeamId])
 
   const currentTeam = useMemo(() => {
     if (!draftState?.teams || !draftState.currentTeam) return null
     const team = draftState.teams.find(t => t.id === draftState.currentTeam)
     return team || null
-  }, [draftState?.currentTeam, draftState?.teams?.map(t => `${t.id}:${t.picks.length}:${t.budgetRemaining}`).join('|')])
+  }, [teamsSignature, draftState?.currentTeam])
 
   const isUserTurn = useMemo(() =>
     draftState?.userTeamId === draftState?.currentTeam,
