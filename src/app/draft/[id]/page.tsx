@@ -865,14 +865,16 @@ export default function DraftRoomPage() {
    * Expected improvement: 50-70% fewer recalculations
    */
 
-  // Track total pick count for optimization
-  const totalPickCount = useMemo(() => {
-    return draftState?.teams.reduce((sum, team) => sum + team.picks.length, 0) || 0
+  // Create a stable string representation of picks for memo dependency
+  const picksSignature = useMemo(() => {
+    if (!draftState?.teams) return ''
+    return draftState.teams.map(t => `${t.id}:${t.picks.length}`).join('|')
   }, [draftState?.teams])
 
+  // Sidebar activities - only recalculate when picks change (not on every draftState update)
   const sidebarActivities = useMemo(() => {
     // Early return for empty states
-    if (!draftState?.teams || !pokemon || totalPickCount === 0) return []
+    if (!draftState?.teams || !pokemon) return []
 
     const activities: Array<{
       id: string
@@ -912,7 +914,7 @@ export default function DraftRoomPage() {
     })
 
     return activities.sort((a, b) => b.timestamp - a.timestamp)
-  }, [draftState?.teams, pokemon, totalPickCount])
+  }, [picksSignature, pokemon])
 
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)
