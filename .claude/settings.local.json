@@ -49,7 +49,11 @@
       "Bash(awk:*)",
       "Bash(chmod:*)",
       "Bash(test:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(where convert)",
+      "Bash(where magick)",
+      "Bash(node scripts/generate-icons.js)"
     ],
     "deny": [],
     "ask": []

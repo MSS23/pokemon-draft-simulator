@@ -95,7 +95,7 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['@supabase/supabase-js', 'lucide-react', '@radix-ui/react-icons'],
   },
 
-  // HTTP/2 Server Push - preload critical resources
+  // Security headers
   async headers() {
     return [
       {
@@ -108,15 +108,6 @@ const nextConfig: NextConfig = {
           {
             key: 'X-Frame-Options',
             value: 'SAMEORIGIN'
-          },
-        ],
-      },
-      {
-        source: '/',
-        headers: [
-          {
-            key: 'Link',
-            value: '</fonts/geist-sans.woff2>; rel=preload; as=font; type=font/woff2; crossorigin',
           },
         ],
       },
