@@ -1,5 +1,10 @@
 'use client'
 
+/**
+ * Draft Room Page - Multi-user real-time Pokemon drafting
+ * Cache bust: 2025-10-14-v2
+ */
+
 import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
