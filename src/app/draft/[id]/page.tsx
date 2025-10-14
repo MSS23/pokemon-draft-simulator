@@ -2,7 +2,7 @@
 
 /**
  * Draft Room Page - Multi-user real-time Pokemon drafting
- * Cache bust: 2025-10-14-v2
+ * Cache bust: 2025-10-14-v3-fix-infinite-loop
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from 'react'
