@@ -125,10 +125,7 @@ export default function WatchDraftsPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <div className="relative text-center mb-8">
-          <div className="absolute top-0 right-0">
-            <ThemeToggle />
-          </div>
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
             Watch Public Drafts
           </h1>

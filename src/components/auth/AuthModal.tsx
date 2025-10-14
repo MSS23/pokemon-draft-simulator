@@ -154,6 +154,20 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
               Forgot your password?
             </button>
           </div>
+
+          {/* Sign Up Link */}
+          <div className="text-center text-sm">
+            <p>
+              Don&apos;t have an account?{' '}
+              <a
+                href="/auth/register"
+                className="font-medium text-primary hover:underline"
+                onClick={() => onClose()}
+              >
+                Sign up
+              </a>
+            </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
