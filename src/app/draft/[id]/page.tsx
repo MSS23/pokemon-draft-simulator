@@ -308,25 +308,34 @@ export default function DraftRoomPage() {
     }
   }, [roomCode])
 
-  // Derived variables - calculate from draft state
-  const userTeam = useMemo(() =>
-    draftState?.teams.find(team => team.id === draftState.userTeamId) || null,
-    [draftState]
-  )
+  // Derived variables - use refs to prevent infinite loops in Radix UI
+  // Store draftState in ref to get current value without triggering re-renders
+  const draftStateForDerivedRef = useRef(draftState)
+  useEffect(() => {
+    draftStateForDerivedRef.current = draftState
+  }, [draftState])
 
-  const currentTeam = useMemo(() =>
-    draftState?.teams.find(team => team.id === draftState.currentTeam) || null,
-    [draftState]
-  )
+  // Create stable team references that only change when actual team data changes
+  const userTeam = useMemo(() => {
+    if (!draftState?.teams || !draftState.userTeamId) return null
+    const team = draftState.teams.find(t => t.id === draftState.userTeamId)
+    return team || null
+  }, [draftState?.userTeamId, draftState?.teams?.map(t => `${t.id}:${t.picks.length}:${t.budgetRemaining}`).join('|')])
+
+  const currentTeam = useMemo(() => {
+    if (!draftState?.teams || !draftState.currentTeam) return null
+    const team = draftState.teams.find(t => t.id === draftState.currentTeam)
+    return team || null
+  }, [draftState?.currentTeam, draftState?.teams?.map(t => `${t.id}:${t.picks.length}:${t.budgetRemaining}`).join('|')])
 
   const isUserTurn = useMemo(() =>
     draftState?.userTeamId === draftState?.currentTeam,
-    [draftState]
+    [draftState?.userTeamId, draftState?.currentTeam]
   )
 
   const isAuctionDraft = useMemo(() =>
     draftState?.draftSettings?.draftType === 'auction',
-    [draftState]
+    [draftState?.draftSettings?.draftType]
   )
 
   // Connection management with auto-reconnect
