@@ -8,6 +8,7 @@ interface TurnNotificationOptions {
   enableBrowserNotifications?: boolean
   warningThreshold?: number // Seconds before auto-skip to show warning
   onAutoSkip?: () => void
+  isConnected?: boolean // Only auto-skip if connected to prevent auto-skip during connection issues
 }
 
 /**
@@ -19,7 +20,8 @@ export function useTurnNotifications({
   draftStatus,
   enableBrowserNotifications = true,
   warningThreshold = 10,
-  onAutoSkip
+  onAutoSkip,
+  isConnected = true
 }: TurnNotificationOptions) {
   const notify = useNotify()
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission>('default')
@@ -129,15 +131,16 @@ export function useTurnNotifications({
     notify
   ])
 
-  // Handle auto-skip when time expires
+  // Handle auto-skip when time expires (only if connected)
   useEffect(() => {
     if (!isUserTurn || draftStatus !== 'drafting') return
 
-    if (pickTimeRemaining === 0) {
+    // Only auto-skip if connected to prevent skipping during connection issues
+    if (pickTimeRemaining === 0 && isConnected) {
       // Call auto-skip callback
       onAutoSkip?.()
     }
-  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip])
+  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip, isConnected])
 
   return {
     browserNotificationPermission,

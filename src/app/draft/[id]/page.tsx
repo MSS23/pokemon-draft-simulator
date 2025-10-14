@@ -231,15 +231,16 @@ export default function DraftRoomPage() {
   const currentTeam = draftState?.teams.find(team => team.id === draftState.currentTeam)
   const isUserTurn = draftState?.userTeamId === draftState?.currentTeam
 
-  // Turn notifications with AFK auto-skip
+  // Turn notifications with AFK auto-skip (only when connected)
   const { requestBrowserNotificationPermission } = useTurnNotifications({
     isUserTurn: isUserTurn || false,
     pickTimeRemaining,
     draftStatus: draftState?.status || 'waiting',
     enableBrowserNotifications: true,
     warningThreshold: 10,
+    isConnected: isConnected && connectionStatus === 'online', // Only auto-skip when fully connected
     onAutoSkip: async () => {
-      if (roomCode && isUserTurn) {
+      if (roomCode && isUserTurn && isConnected && connectionStatus === 'online') {
         try {
           await DraftService.autoSkipTurn(roomCode.toLowerCase())
           notify.warning('Turn Skipped', 'Your time expired and your turn was skipped', { duration: 5000 })
