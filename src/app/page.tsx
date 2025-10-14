@@ -163,20 +163,24 @@ export default function Home() {
           </div>
         )}
 
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-3">
+        {/* Hero Section */}
+        <div className="text-center mb-12">
+          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
             Pokémon Draft League
           </h1>
-          <p className="text-lg text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
-            Real-time competitive Pokémon drafting with friends
+          <p className="text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-2">
+            Build your dream team in real-time competitive Pokémon drafts
+          </p>
+          <p className="text-sm text-slate-500 dark:text-slate-500 max-w-2xl mx-auto">
+            Create custom draft rooms, choose from official formats, and compete with friends in snake or auction drafts
           </p>
         </div>
 
 
-        {/* Quick Actions */}
-        <div className="mb-8 flex gap-4 justify-center flex-wrap">
-          <Button
+        {/* Quick Actions - Enhanced Cards */}
+        <div className="mb-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          {/* Create Draft Card */}
+          <div
             onClick={() => {
               if (!user) {
                 setAuthModalOpen(true)
@@ -184,43 +188,58 @@ export default function Home() {
               }
               window.location.href = '/create-draft'
             }}
-            size="lg"
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8"
+            className="group relative bg-white dark:bg-slate-800 rounded-xl p-6 border-2 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
           >
-            <Users className="h-5 w-5 mr-2" />
-            Create Draft Room
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
+            <div className="flex flex-col items-center text-center">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Users className="h-7 w-7 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Create Draft</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Set up a new draft room and invite your friends</p>
+            </div>
+          </div>
+
+          {/* Join Draft Card */}
+          <div
             onClick={() => {
-              const code = prompt('Enter room code:')
+              const code = prompt('Enter 6-character room code:')
               if (code) {
                 window.location.href = `/join-draft?code=${code.toUpperCase()}`
               }
             }}
-            className="px-8"
+            className="group relative bg-white dark:bg-slate-800 rounded-xl p-6 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
           >
-            <Play className="h-5 w-5 mr-2" />
-            Join Draft Room
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
+            <div className="flex flex-col items-center text-center">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Play className="h-7 w-7 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Join Draft</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Enter a room code to join an existing draft</p>
+            </div>
+          </div>
+
+          {/* Watch Drafts Card */}
+          <div
             onClick={() => router.push('/watch-drafts')}
-            className="px-8"
+            className="group relative bg-white dark:bg-slate-800 rounded-xl p-6 border-2 border-cyan-200 dark:border-cyan-800 hover:border-cyan-400 dark:hover:border-cyan-600 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
           >
-            <Eye className="h-5 w-5 mr-2" />
-            Watch Public Drafts
-          </Button>
+            <div className="flex flex-col items-center text-center">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-cyan-600 to-teal-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                <Eye className="h-7 w-7 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Watch Live</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">Spectate public drafts from the community</p>
+            </div>
+          </div>
         </div>
 
         {/* My Drafts Section */}
-        {myDrafts.length > 0 && (
+        {myDrafts.length > 0 ? (
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-4 text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Trophy className="h-6 w-6" />
               My Drafts
+              <Badge variant="secondary" className="ml-2">{myDrafts.length}</Badge>
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {myDrafts.slice(0, 6).map((draft) => (
@@ -244,15 +263,18 @@ export default function Home() {
                         </Badge>
                       )}
                       <Badge
-                        className={`text-xs ${
+                        variant="outline"
+                        className={`text-xs font-medium ${
                           draft.status === 'active'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            ? 'bg-green-50 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-700'
                             : draft.status === 'completed'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                            ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-700'
+                            : 'bg-slate-50 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-600'
                         }`}
                       >
-                        {draft.status}
+                        {draft.status === 'active' && '🟢 '}
+                        {draft.status === 'completed' && '✓ '}
+                        {draft.status.charAt(0).toUpperCase() + draft.status.slice(1)}
                       </Badge>
                     </div>
                   </div>
@@ -312,7 +334,78 @@ export default function Home() {
               </div>
             )}
           </div>
+        ) : user && (
+          <div className="mb-8 max-w-2xl mx-auto">
+            <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-xl p-8 text-center border border-slate-200 dark:border-slate-700">
+              <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-4">
+                <Trophy className="h-8 w-8 text-slate-400 dark:text-slate-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                No drafts yet
+              </h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-6">
+                Get started by creating your first draft room or joining an existing one
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={() => window.location.href = '/create-draft'}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Create Draft
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const code = prompt('Enter room code:')
+                    if (code) {
+                      window.location.href = `/join-draft?code=${code.toUpperCase()}`
+                    }
+                  }}
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Join Draft
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
+
+        {/* Features Section */}
+        <div className="mb-12 max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-8 text-slate-800 dark:text-slate-200">
+            Why Choose Our Platform?
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+              <div className="h-12 w-12 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center mb-4">
+                <Zap className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 text-slate-800 dark:text-slate-200">Real-Time Drafting</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Instant synchronization across all participants with WebSocket technology
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+              <div className="h-12 w-12 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center mb-4">
+                <Trophy className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 text-slate-800 dark:text-slate-200">Official Formats</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                VGC, Smogon, and custom formats with automatic cost calculation
+              </p>
+            </div>
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+              <div className="h-12 w-12 rounded-lg bg-cyan-100 dark:bg-cyan-900 flex items-center justify-center mb-4">
+                <Users className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <h3 className="font-semibold text-lg mb-2 text-slate-800 dark:text-slate-200">Multiplayer Ready</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Support for 2-8 teams with spectator mode and live commentary
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Format Selector & Pokemon Grid */}
         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 p-6">
@@ -352,16 +445,29 @@ export default function Home() {
             </div>
           </div>
 
-          <PokemonGrid
-            pokemon={pokemon || []}
-            onViewDetails={handleViewDetails}
-            draftedPokemonIds={draftedPokemon.map(p => p.id)}
-            isLoading={isLoading}
-            cardSize="md"
-            showFilters={true}
-            showCost={true}
-            showStats={true}
-          />
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="relative">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600"></div>
+                </div>
+              </div>
+              <p className="mt-4 text-lg font-medium text-slate-700 dark:text-slate-300">Loading Pokémon...</p>
+              <p className="text-sm text-slate-500 dark:text-slate-500">This may take a moment</p>
+            </div>
+          ) : (
+            <PokemonGrid
+              pokemon={pokemon || []}
+              onViewDetails={handleViewDetails}
+              draftedPokemonIds={draftedPokemon.map(p => p.id)}
+              isLoading={isLoading}
+              cardSize="md"
+              showFilters={true}
+              showCost={true}
+              showStats={true}
+            />
+          )}
         </div>
 
         {/* Details Modal */}
