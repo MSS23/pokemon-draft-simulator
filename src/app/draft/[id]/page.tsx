@@ -529,86 +529,86 @@ export default function DraftRoomPage() {
         try {
           const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
 
-        // Check if component is still mounted before updating state
-        if (!mounted || abortController.signal.aborted) return
+          // Check if component is still mounted before updating state
+          if (!mounted || abortController.signal.aborted) return
 
-        // Reset error count on successful fetch
-        errorCount = 0
+          // Reset error count on successful fetch
+          errorCount = 0
 
-        if (dbState) {
-          // Use refs to get current values without creating dependencies
-          const currentUserId = userIdRef.current
-          const currentTransformDraftState = transformDraftStateRef.current
-          const currentDraftState = draftStateRef.current
-          const currentPokemon = pokemonRef.current
-          const currentIsAuctionDraft = isAuctionDraftRef.current
-          const currentNotify = notifyRef.current
+          if (dbState) {
+            // Use refs to get current values without creating dependencies
+            const currentUserId = userIdRef.current
+            const currentTransformDraftState = transformDraftStateRef.current
+            const currentDraftState = draftStateRef.current
+            const currentPokemon = pokemonRef.current
+            const currentIsAuctionDraft = isAuctionDraftRef.current
+            const currentNotify = notifyRef.current
 
-          const newState = currentTransformDraftState(dbState, currentUserId)
-          console.log('[Draft Subscription] State updated, teams:', newState.teams.map(t => ({ name: t.name, order: t.draftOrder })))
+            const newState = currentTransformDraftState(dbState, currentUserId)
+            console.log('[Draft Subscription] State updated, teams:', newState.teams.map(t => ({ name: t.name, order: t.draftOrder })))
 
-          // Check for pick notifications (only if not the user's own pick)
-          if (currentDraftState && newState.teams && currentPokemon) {
-            const oldTotalPicks = currentDraftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
-            const newTotalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
+            // Check for pick notifications (only if not the user's own pick)
+            if (currentDraftState && newState.teams && currentPokemon) {
+              const oldTotalPicks = currentDraftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
+              const newTotalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
 
-            if (newTotalPicks > oldTotalPicks) {
-              // Find which team made the pick
-              const pickingTeam = newState.teams.find(team => {
-                const oldTeam = currentDraftState.teams.find(t => t.id === team.id)
-                return oldTeam && team.picks.length > oldTeam.picks.length
-              })
+              if (newTotalPicks > oldTotalPicks) {
+                // Find which team made the pick
+                const pickingTeam = newState.teams.find(team => {
+                  const oldTeam = currentDraftState.teams.find(t => t.id === team.id)
+                  return oldTeam && team.picks.length > oldTeam.picks.length
+                })
 
-              if (pickingTeam && pickingTeam.id !== newState.userTeamId) {
-                const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
-                const pickedPokemon = currentPokemon.find(p => p.id === latestPickId)
-                if (pickedPokemon) {
+                if (pickingTeam && pickingTeam.id !== newState.userTeamId) {
+                  const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
+                  const pickedPokemon = currentPokemon.find(p => p.id === latestPickId)
+                  if (pickedPokemon) {
+                    currentNotify.success(
+                      `${pickingTeam.name} drafted ${pickedPokemon.name}!`,
+                      `${pickingTeam.userName} selected ${pickedPokemon.name}`,
+                      { duration: 4000 }
+                    )
+                  }
+                }
+              }
+            }
+
+            // Check for turn change notifications (snake draft only)
+            if (!currentIsAuctionDraft && currentDraftState && newState.currentTeam !== currentDraftState.currentTeam) {
+              const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
+              if (currentTeam) {
+                if (newState.userTeamId === newState.currentTeam) {
                   currentNotify.success(
-                    `${pickingTeam.name} drafted ${pickedPokemon.name}!`,
-                    `${pickingTeam.userName} selected ${pickedPokemon.name}`,
-                    { duration: 4000 }
+                    "It's Your Turn!",
+                    "Select a Pokémon to draft",
+                    { duration: 5000 }
+                  )
+                } else {
+                  currentNotify.info(
+                    `${currentTeam.name}'s Turn`,
+                    `Waiting for ${currentTeam.userName} to pick`,
+                    { duration: 3000 }
                   )
                 }
               }
             }
-          }
 
-          // Check for turn change notifications (snake draft only)
-          if (!currentIsAuctionDraft && currentDraftState && newState.currentTeam !== currentDraftState.currentTeam) {
-            const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
-            if (currentTeam) {
-              if (newState.userTeamId === newState.currentTeam) {
-                currentNotify.success(
-                  "It's Your Turn!",
-                  "Select a Pokémon to draft",
-                  { duration: 5000 }
-                )
-              } else {
-                currentNotify.info(
-                  `${currentTeam.name}'s Turn`,
-                  `Waiting for ${currentTeam.userName} to pick`,
-                  { duration: 3000 }
-                )
-              }
+            // Use startTransition to defer state updates and prevent infinite loops
+            // This allows React to complete current renders before processing new updates
+            startTransition(() => {
+              setDraftState(newState)
+            })
+          } else {
+            // Draft not found - increment error count
+            errorCount++
+            if (errorCount >= MAX_ERRORS) {
+              console.error('Draft not found after multiple attempts, stopping updates')
+              setError('Draft room not found or has been deleted')
+              mounted = false // Stop further updates
+              return
             }
           }
-
-          // Use startTransition to defer state updates and prevent infinite loops
-          // This allows React to complete current renders before processing new updates
-          startTransition(() => {
-            setDraftState(newState)
-          })
-        } else {
-          // Draft not found - increment error count
-          errorCount++
-          if (errorCount >= MAX_ERRORS) {
-            console.error('Draft not found after multiple attempts, stopping updates')
-            setError('Draft room not found or has been deleted')
-            mounted = false // Stop further updates
-            return
-          }
-        }
-      } catch (err) {
+        } catch (err) {
         if (!mounted || abortController.signal.aborted) return
 
         errorCount++
