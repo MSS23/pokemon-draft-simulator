@@ -10,54 +10,39 @@
 -- 3. Click "Run"
 -- ============================================================================
 
--- Disable foreign key checks temporarily (if supported)
--- SET session_replication_role = 'replica';
+-- Delete in reverse dependency order (children before parents)
 
-BEGIN;
-
--- Delete all wishlist items
+-- 1. Delete all wishlist items (depends on participants and drafts)
 DELETE FROM wishlist_items;
-RAISE NOTICE 'Deleted all wishlist items';
 
--- Delete all bid history
+-- 2. Delete all bid history (depends on auctions)
 DELETE FROM bid_history;
-RAISE NOTICE 'Deleted all bid history';
 
--- Delete all auctions
+-- 3. Delete all auctions (depends on drafts and teams)
 DELETE FROM auctions;
-RAISE NOTICE 'Deleted all auctions';
 
--- Delete all picks
+-- 4. Delete all picks (depends on teams and drafts)
 DELETE FROM picks;
-RAISE NOTICE 'Deleted all picks';
 
--- Delete all pokemon tiers
+-- 5. Delete all pokemon tiers (depends on drafts)
 DELETE FROM pokemon_tiers;
-RAISE NOTICE 'Deleted all pokemon tiers';
 
--- Delete all participants
-DELETE FROM participants;
-RAISE NOTICE 'Deleted all participants';
-
--- Delete all teams
-DELETE FROM teams;
-RAISE NOTICE 'Deleted all teams';
-
--- Delete all spectator events
+-- 6. Delete all spectator events (depends on drafts)
 DELETE FROM spectator_events;
-RAISE NOTICE 'Deleted all spectator events';
 
--- Delete all drafts
+-- 7. Delete all participants (depends on teams and drafts)
+DELETE FROM participants;
+
+-- 8. Delete all teams (depends on drafts)
+DELETE FROM teams;
+
+-- 9. Delete all drafts (parent table)
 DELETE FROM drafts;
-RAISE NOTICE 'Deleted all drafts';
 
--- Commit the transaction
-COMMIT;
+-- ============================================================================
+-- Verify cleanup - All tables should show 0 rows
+-- ============================================================================
 
--- Re-enable foreign key checks
--- SET session_replication_role = 'origin';
-
--- Verify cleanup
 SELECT
   'drafts' as table_name,
   COUNT(*) as remaining_rows
@@ -82,6 +67,21 @@ SELECT
   'auctions' as table_name,
   COUNT(*) as remaining_rows
 FROM auctions
+UNION ALL
+SELECT
+  'bid_history' as table_name,
+  COUNT(*) as remaining_rows
+FROM bid_history
+UNION ALL
+SELECT
+  'pokemon_tiers' as table_name,
+  COUNT(*) as remaining_rows
+FROM pokemon_tiers
+UNION ALL
+SELECT
+  'spectator_events' as table_name,
+  COUNT(*) as remaining_rows
+FROM spectator_events
 UNION ALL
 SELECT
   'wishlist_items' as table_name,
