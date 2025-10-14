@@ -60,8 +60,13 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
           if (error) throw error
 
           if (data.user) {
-            setSuccess('Registration successful! Please check your email to verify your account.')
-            // Don't redirect immediately for email verification
+            setSuccess('Registration successful! Redirecting to homepage...')
+            onSuccess?.()
+            // Redirect to homepage after successful registration
+            setTimeout(() => {
+              router.push('/')
+              router.refresh()
+            }, 1000)
           }
         } else {
           // Sign in existing user
