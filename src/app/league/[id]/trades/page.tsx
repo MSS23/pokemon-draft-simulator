@@ -68,13 +68,13 @@ export default function LeagueTradesPage() {
       if (supabase) {
         const picks: { [teamId: string]: Pick[] } = {}
         for (const team of leagueData.teams) {
-          const { data } = await supabase
+          const picksResponse = await supabase
             .from('picks')
             .select('*')
             .eq('team_id', team.id)
 
-          if (data) {
-            picks[team.id] = data.map(p => ({
+          if (picksResponse.data) {
+            picks[team.id] = (picksResponse.data as any[]).map((p: any) => ({
               id: p.id,
               draftId: p.draft_id,
               teamId: p.team_id,

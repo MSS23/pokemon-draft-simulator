@@ -130,7 +130,11 @@ export class AIAnalysisService {
   ): Promise<TeamAnalysis> {
     // Fetch stats if not provided
     if (!stats) {
-      stats = await LeagueStatsService.getAdvancedTeamStats(teamId)
+      const fetchedStats = await LeagueStatsService.getAdvancedTeamStats(teamId)
+      if (!fetchedStats) {
+        throw new Error('Unable to fetch team statistics')
+      }
+      stats = fetchedStats
     }
 
     if (!stats) {

@@ -40,8 +40,7 @@ import {
 } from 'lucide-react'
 import type {
   AdvancedTeamStats,
-  TeamFormIndicator,
-  TeamAnalysis
+  TeamFormIndicator
 } from '@/lib/league-stats-service'
 import type { Pick, Team } from '@/types'
 
@@ -55,7 +54,7 @@ export default function TeamDetailPage() {
   const [picks, setPicks] = useState<Pick[]>([])
   const [stats, setStats] = useState<AdvancedTeamStats | null>(null)
   const [form, setForm] = useState<TeamFormIndicator | null>(null)
-  const [analysis, setAnalysis] = useState<TeamAnalysis | null>(null)
+  const [analysis, setAnalysis] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -363,7 +362,7 @@ export default function TeamDetailPage() {
                     Strengths
                   </h3>
                   <ul className="space-y-1">
-                    {analysis.strengths.map((strength, index) => (
+                    {analysis.strengths.map((strength: string, index: number) => (
                       <li key={index} className="text-sm flex items-start gap-2">
                         <span className="text-green-500 mt-1">✓</span>
                         <span>{strength}</span>
@@ -381,7 +380,7 @@ export default function TeamDetailPage() {
                     Weaknesses
                   </h3>
                   <ul className="space-y-1">
-                    {analysis.weaknesses.map((weakness, index) => (
+                    {analysis.weaknesses.map((weakness: string, index: number) => (
                       <li key={index} className="text-sm flex items-start gap-2">
                         <span className="text-red-500 mt-1">✗</span>
                         <span>{weakness}</span>
@@ -399,7 +398,7 @@ export default function TeamDetailPage() {
                     Recommendations
                   </h3>
                   <ul className="space-y-1">
-                    {analysis.recommendations.map((rec, index) => (
+                    {analysis.recommendations.map((rec: string, index: number) => (
                       <li key={index} className="text-sm flex items-start gap-2">
                         <span className="text-blue-500 mt-1">→</span>
                         <span>{rec}</span>

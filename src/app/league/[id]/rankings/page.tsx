@@ -57,21 +57,27 @@ export default function PowerRankingsPage() {
       if (!supabase) throw new Error('Supabase not available')
 
       // Get league to find draft_id
-      const { data: league } = await supabase
+      const leagueResponse = await supabase
         .from('leagues')
         .select('draft_id')
         .eq('id', leagueId)
         .single()
 
+      if (leagueResponse.error) throw leagueResponse.error
+      const league = leagueResponse.data as { draft_id: string } | null
       if (!league) throw new Error('League not found')
 
+      const draftId = league.draft_id
+
       // Get all teams
-      const { data: teams } = await supabase
+      const teamsResponse = await supabase
         .from('teams')
         .select('*')
-        .eq('draft_id', league.draft_id)
+        .eq('draft_id', draftId)
 
-      if (!teams) throw new Error('No teams found')
+      if (teamsResponse.error) throw teamsResponse.error
+      const teams = teamsResponse.data as Team[]
+      if (!teams || teams.length === 0) throw new Error('No teams found')
 
       // Load stats and form for each team
       const teamRankings = await Promise.all(
@@ -108,10 +114,10 @@ export default function PowerRankingsPage() {
 
       // Filter nulls and sort by power score
       const validRankings = teamRankings
-        .filter((r): r is PowerRanking => r !== null)
-        .sort((a, b) => b.powerScore - a.powerScore)
+        .filter((r) => r !== null)
+        .sort((a, b) => b!.powerScore - a!.powerScore)
         .map((ranking, index) => ({
-          ...ranking,
+          ...ranking!,
           rank: index + 1,
           previousRank: index + 1  // TODO: Store previous rankings to calculate trend
         }))

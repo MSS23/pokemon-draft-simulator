@@ -73,7 +73,7 @@ export function CreateLeagueModal({
       await LeagueService.updateLeagueSettings(leagueId, {
         enableNuzlocke,
         enableTrades,
-        tradeDeadlineWeek: enableTrades ? tradeDeadlineWeek : null,
+        tradeDeadlineWeek: enableTrades ? (tradeDeadlineWeek ?? undefined) : undefined,
         requireCommissionerApproval: enableTrades ? requireCommissionerApproval : false,
         matchFormat,
       })
