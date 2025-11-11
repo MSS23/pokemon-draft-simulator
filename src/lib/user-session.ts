@@ -177,12 +177,11 @@ export class UserSessionService {
       // Remove any existing participation for this draft
       const filtered = participations.filter(p => p.draftId !== participation.draftId)
 
-      // Add new participation
-      filtered.push(fullParticipation)
+      // Add new participation at the beginning (most recent)
+      filtered.unshift(fullParticipation)
 
       // Keep only last 20 participations
-      const sorted = filtered.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
-      const limited = sorted.slice(0, 20)
+      const limited = filtered.slice(0, 20)
 
       localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(limited))
     } catch (error) {

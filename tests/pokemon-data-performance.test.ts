@@ -8,6 +8,9 @@
  * - Format switching: < 500ms
  */
 
+// Polyfill IndexedDB for Node.js test environment
+import 'fake-indexeddb/auto'
+
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { PokemonDataManager } from '@/lib/pokemon-data-manager'
 import { PokemonCacheDB, type CachedPokemon } from '@/lib/pokemon-cache-db'

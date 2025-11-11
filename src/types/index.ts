@@ -269,3 +269,111 @@ export interface MatchGame {
   createdAt: string
   completedAt: string | null
 }
+
+// ============================================
+// POKEMON TRACKING & TRADES
+// ============================================
+
+export interface MatchPokemonKO {
+  id: string
+  matchId: string
+  gameNumber: number
+  pokemonId: string // Pokemon species ID
+  pickId: string
+  koCount: number // Times this Pokemon fainted in this game
+  isDeath: boolean // Permanent death (Nuzlocke)
+  koDetails?: {
+    opponentPokemon?: string
+    moveUsed?: string
+    turnNumber?: number
+    damage?: number
+    [key: string]: unknown
+  }
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TeamPokemonStatus {
+  id: string
+  pickId: string
+  teamId: string
+  leagueId: string
+  status: 'alive' | 'fainted' | 'dead'
+  totalKos: number
+  matchesPlayed: number
+  matchesWon: number
+  deathMatchId?: string | null
+  deathDate?: string | null
+  deathDetails?: {
+    opponentTeam?: string
+    opponentPokemon?: string
+    moveUsed?: string
+    [key: string]: unknown
+  }
+  notes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Trade {
+  id: string
+  leagueId: string
+  weekNumber: number
+  teamAId: string
+  teamBId: string
+  teamAGives: string[] // Array of pick IDs
+  teamBGives: string[] // Array of pick IDs
+  status: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
+  proposedBy: string
+  proposedAt: string
+  respondedAt?: string | null
+  completedAt?: string | null
+  notes?: string | null
+  commissionerApproved?: boolean | null
+  commissionerId?: string | null
+  commissionerNotes?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TradeApproval {
+  id: string
+  tradeId: string
+  approverUserId: string
+  approverRole?: 'commissioner' | 'admin' | 'owner'
+  approved: boolean
+  comments?: string | null
+  createdAt: string
+}
+
+// Extended League Settings with new features
+export interface ExtendedLeagueSettings extends LeagueSettings {
+  enableNuzlocke?: boolean // Enable permanent Pokemon deaths
+  enableTrades?: boolean // Allow Pokemon trading between teams
+  tradeDeadlineWeek?: number // Week after which trades are locked
+  requireCommissionerApproval?: boolean // Trades need approval
+}
+
+// Trade with team details (for UI)
+export interface TradeWithDetails extends Trade {
+  teamAName: string
+  teamBName: string
+  proposedByName: string
+  leagueName: string
+  teamAGivesPokemon?: Pick[] // Full pick objects for Pokemon being traded
+  teamBGivesPokemon?: Pick[]
+}
+
+// Match with Pokemon KO stats (for detailed view)
+export interface MatchWithKOs extends Match {
+  pokemonKOs: MatchPokemonKO[]
+  homeTeamDeaths: number // Count of permanent deaths for home team
+  awayTeamDeaths: number
+}
+
+// Team with Pokemon status (for league roster view)
+export interface TeamWithPokemonStatus extends Team {
+  pokemonStatuses: TeamPokemonStatus[]
+  alivePokemon: number
+  deadPokemon: number
+}

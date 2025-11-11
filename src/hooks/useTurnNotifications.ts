@@ -131,16 +131,41 @@ export function useTurnNotifications({
     notify
   ])
 
-  // Handle auto-skip when time expires (only if connected)
+  // Handle auto-skip when time expires with grace period for disconnected users
   useEffect(() => {
     if (!isUserTurn || draftStatus !== 'drafting') return
 
-    // Only auto-skip if connected to prevent skipping during connection issues
-    if (pickTimeRemaining === 0 && isConnected) {
-      // Call auto-skip callback
-      onAutoSkip?.()
+    // Timer has expired
+    if (pickTimeRemaining === 0) {
+      // If connected, skip immediately
+      if (isConnected) {
+        onAutoSkip?.()
+        return
+      }
+
+      // If disconnected, we're at the start of grace period
+      // Auto-skip will trigger when pickTimeRemaining <= -GRACE_PERIOD_SECONDS
+      // This is handled below
     }
-  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip, isConnected])
+
+    // Handle grace period for disconnected users
+    if (pickTimeRemaining < 0 && !isConnected) {
+      const GRACE_PERIOD_SECONDS = 30 // 30-second grace period
+      const gracePeriodExpired = pickTimeRemaining <= -GRACE_PERIOD_SECONDS
+
+      if (gracePeriodExpired) {
+        // Grace period has expired, auto-skip even though disconnected
+        onAutoSkip?.()
+
+        // Notify user that turn was skipped due to disconnect
+        notify.warning(
+          'Turn Skipped',
+          'You were disconnected and the grace period expired',
+          { duration: 6000 }
+        )
+      }
+    }
+  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip, isConnected, notify])
 
   return {
     browserNotificationPermission,

@@ -1,5 +1,14 @@
 import { supabase } from './supabase'
-import type { League, LeagueTeam, Match, Standing, Team } from '@/types'
+import type {
+  League,
+  LeagueTeam,
+  Match,
+  Standing,
+  Team,
+  TeamWithPokemonStatus,
+  ExtendedLeagueSettings,
+} from '@/types'
+import { MatchKOService } from './match-ko-service'
 
 export class LeagueService {
   /**
@@ -518,5 +527,312 @@ export class LeagueService {
       updatedAt: league.updated_at,
       teams: league.league_teams.map((lt: any) => lt.team)
     }
+  }
+
+  /**
+   * Get league with Pokemon status for all teams
+   */
+  static async getLeagueWithPokemonStatus(
+    leagueId: string
+  ): Promise<(League & { teams: TeamWithPokemonStatus[] }) | null> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Get base league with teams
+    const league = await this.getLeague(leagueId)
+    if (!league) return null
+
+    // Get Pokemon status for each team
+    const teamsWithStatus: TeamWithPokemonStatus[] = await Promise.all(
+      league.teams.map(async (team) => {
+        const statuses = await MatchKOService.getTeamPokemonStatuses(team.id, leagueId)
+
+        const alivePokemon = statuses.filter(s => s.status === 'alive').length
+        const deadPokemon = statuses.filter(s => s.status === 'dead').length
+
+        return {
+          ...team,
+          pokemonStatuses: statuses,
+          alivePokemon,
+          deadPokemon,
+        }
+      })
+    )
+
+    return {
+      ...league,
+      teams: teamsWithStatus,
+    }
+  }
+
+  /**
+   * Get all matches for a specific week in a league
+   */
+  static async getWeekFixtures(
+    leagueId: string,
+    weekNumber: number
+  ): Promise<(Match & { homeTeam: Team; awayTeam: Team })[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data: matches } = await (supabase
+      .from('matches') as any)
+      .select(`
+        *,
+        home_team:teams!matches_home_team_id_fkey(*),
+        away_team:teams!matches_away_team_id_fkey(*)
+      `)
+      .eq('league_id', leagueId)
+      .eq('week_number', weekNumber)
+      .order('match_number', { ascending: true })
+
+    if (!matches) return []
+
+    return matches.map((m: any) => ({
+      id: m.id,
+      leagueId: m.league_id,
+      weekNumber: m.week_number,
+      matchNumber: m.match_number,
+      homeTeamId: m.home_team_id,
+      awayTeamId: m.away_team_id,
+      scheduledDate: m.scheduled_date,
+      status: m.status,
+      homeScore: m.home_score,
+      awayScore: m.away_score,
+      winnerTeamId: m.winner_team_id,
+      battleFormat: m.battle_format,
+      notes: m.notes,
+      createdAt: m.created_at,
+      updatedAt: m.updated_at,
+      completedAt: m.completed_at,
+      homeTeam: m.home_team,
+      awayTeam: m.away_team,
+    }))
+  }
+
+  /**
+   * Check if trading is allowed for the current week
+   */
+  static async canTradeThisWeek(
+    leagueId: string,
+    currentWeek: number
+  ): Promise<boolean> {
+    const settings = await this.getLeagueSettings(leagueId)
+
+    // Trading disabled if league setting is off
+    if (!settings.enableTrades) {
+      return false
+    }
+
+    // Trading disabled after trade deadline
+    if (settings.tradeDeadlineWeek && currentWeek >= settings.tradeDeadlineWeek) {
+      return false
+    }
+
+    // Check if there are any matches in progress this week
+    const weekMatches = await this.getWeekFixtures(leagueId, currentWeek)
+    const hasMatchesInProgress = weekMatches.some(m => m.status === 'in_progress')
+
+    // Trading not allowed during matches
+    return !hasMatchesInProgress
+  }
+
+  /**
+   * Get league settings with extended options
+   */
+  static async getLeagueSettings(leagueId: string): Promise<ExtendedLeagueSettings> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data: league } = await (supabase
+      .from('leagues') as any)
+      .select('settings')
+      .eq('id', leagueId)
+      .single()
+
+    if (!league) {
+      throw new Error('League not found')
+    }
+
+    return {
+      matchFormat: league.settings?.matchFormat || 'best_of_3',
+      pointsPerWin: league.settings?.pointsPerWin || 3,
+      pointsPerDraw: league.settings?.pointsPerDraw || 1,
+      enableNuzlocke: league.settings?.enableNuzlocke || false,
+      enableTrades: league.settings?.enableTrades || false,
+      tradeDeadlineWeek: league.settings?.tradeDeadlineWeek || null,
+      requireCommissionerApproval: league.settings?.requireCommissionerApproval || false,
+    }
+  }
+
+  /**
+   * Update league settings
+   */
+  static async updateLeagueSettings(
+    leagueId: string,
+    settings: Partial<ExtendedLeagueSettings>
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Get current settings
+    const currentSettings = await this.getLeagueSettings(leagueId)
+
+    // Merge with new settings
+    const updatedSettings = {
+      ...currentSettings,
+      ...settings,
+    }
+
+    // Update in database
+    const { error } = await (supabase
+      .from('leagues') as any)
+      .update({
+        settings: updatedSettings,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', leagueId)
+
+    if (error) {
+      throw new Error(`Failed to update league settings: ${error.message}`)
+    }
+  }
+
+  /**
+   * Initialize Pokemon status for all teams in a league
+   * Should be called after league creation
+   */
+  static async initializeLeaguePokemonStatus(leagueId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Get all teams in league
+    const league = await this.getLeague(leagueId)
+    if (!league) {
+      throw new Error('League not found')
+    }
+
+    // For each team, get their picks and initialize status
+    for (const team of league.teams) {
+      const { data: picks } = await supabase
+        .from('picks')
+        .select('*')
+        .eq('team_id', team.id)
+
+      if (picks && picks.length > 0) {
+        await MatchKOService.initializePokemonStatus(
+          leagueId,
+          team.id,
+          picks.map(p => ({
+            id: p.id,
+            draftId: p.draft_id,
+            teamId: p.team_id,
+            pokemonId: p.pokemon_id,
+            pokemonName: p.pokemon_name,
+            cost: p.cost,
+            pickOrder: p.pick_order,
+            round: p.round,
+            createdAt: p.created_at,
+          }))
+        )
+      }
+    }
+  }
+
+  /**
+   * Get league by draft ID
+   */
+  static async getLeagueByDraftId(draftId: string): Promise<League | null> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data: league } = await (supabase
+      .from('leagues') as any)
+      .select('*')
+      .eq('draft_id', draftId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (!league) return null
+
+    return {
+      id: league.id,
+      draftId: league.draft_id,
+      name: league.name,
+      leagueType: league.league_type,
+      seasonNumber: league.season_number,
+      status: league.status,
+      startDate: league.start_date,
+      endDate: league.end_date,
+      currentWeek: league.current_week,
+      totalWeeks: league.total_weeks,
+      settings: league.settings,
+      createdAt: league.created_at,
+      updatedAt: league.updated_at,
+    }
+  }
+
+  /**
+   * Advance league to next week
+   * Should be called when all matches for current week are completed
+   */
+  static async advanceToNextWeek(leagueId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Get current league state
+    const { data: league } = await (supabase
+      .from('leagues') as any)
+      .select('current_week, total_weeks, status')
+      .eq('id', leagueId)
+      .single()
+
+    if (!league) {
+      throw new Error('League not found')
+    }
+
+    // Check if all matches for current week are completed
+    const weekFixtures = await this.getWeekFixtures(leagueId, league.current_week)
+    const allCompleted = weekFixtures.every(m => m.status === 'completed')
+
+    if (!allCompleted) {
+      throw new Error('Cannot advance to next week - not all matches are completed')
+    }
+
+    // Generate weekly highlights before advancing
+    try {
+      const { WeeklyHighlightsService } = await import('./weekly-highlights-service')
+      await WeeklyHighlightsService.generateWeeklySummary(leagueId, league.current_week)
+      await WeeklyHighlightsService.autoGenerateHighlights(leagueId, league.current_week)
+    } catch (error) {
+      console.error('Error generating weekly highlights:', error)
+      // Continue even if highlights fail
+    }
+
+    const nextWeek = league.current_week + 1
+
+    // Check if season is complete
+    if (nextWeek > league.total_weeks) {
+      // Mark league as completed
+      await (supabase
+        .from('leagues') as any)
+        .update({
+          status: 'completed',
+          end_date: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', leagueId)
+    } else {
+      // Advance to next week
+      await (supabase
+        .from('leagues') as any)
+        .update({
+          current_week: nextWeek,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', leagueId)
+    }
+  }
+
+  /**
+   * Check if all matches for current week are completed
+   */
+  static async canAdvanceWeek(leagueId: string, currentWeek: number): Promise<boolean> {
+    const weekFixtures = await this.getWeekFixtures(leagueId, currentWeek)
+    return weekFixtures.length > 0 && weekFixtures.every(m => m.status === 'completed')
   }
 }

@@ -24,6 +24,7 @@ import { DraftRoomLoading, TeamStatusSkeleton } from '@/components/ui/loading-st
 import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 import { useTurnNotifications } from '@/hooks/useTurnNotifications'
 import { useReconnection } from '@/hooks/useReconnection'
+import { useLatest } from '@/hooks/useLatest'
 
 /**
  * OPTIMIZED DYNAMIC IMPORTS - Strategic code splitting:
@@ -104,6 +105,12 @@ interface DraftUIState {
     picks: string[]
     budgetRemaining: number
   }>
+  participants: Array<{
+    userId: string | null
+    team_id: string | null
+    display_name: string
+    last_seen: string
+  }>
   draftSettings: {
     maxTeams: number
     timeLimit: number
@@ -119,6 +126,31 @@ interface DraftUIState {
   }
 }
 
+// Global subscription tracker to prevent leaks across page refreshes
+declare global {
+  interface Window {
+    __draftSubscriptionCleanup?: (() => void)[]
+  }
+}
+
+// Initialize global cleanup array
+if (typeof window !== 'undefined' && !window.__draftSubscriptionCleanup) {
+  window.__draftSubscriptionCleanup = []
+
+  // Global cleanup on page unload (handles hard refresh, tab close, navigation)
+  window.addEventListener('beforeunload', () => {
+    console.log('[Draft Cleanup] Page unloading, cleaning up subscriptions:', window.__draftSubscriptionCleanup?.length)
+    window.__draftSubscriptionCleanup?.forEach(cleanup => {
+      try {
+        cleanup()
+      } catch (error) {
+        console.error('[Draft Cleanup] Error during cleanup:', error)
+      }
+    })
+    window.__draftSubscriptionCleanup = []
+  })
+}
+
 export default function DraftRoomPage() {
   const params = useParams()
   const searchParams = useSearchParams()
@@ -126,46 +158,44 @@ export default function DraftRoomPage() {
 
   const roomCode = (params.id as string)?.toUpperCase()
   const userName = searchParams.get('userName') || ''
-  const teamName = searchParams.get('teamName') || ''
   const isHost = searchParams.get('isHost') === 'true'
   const isSpectator = searchParams.get('spectator') === 'true'
 
-  // Get or create persistent user session
-  const [userId, setUserId] = useState<string>(() => {
+  // Get or create persistent user session - SYNCHRONOUS to prevent race conditions
+  const [userId] = useState<string>(() => {
     // Try to get from existing participation first
     const participation = UserSessionService.getDraftParticipation(roomCode?.toLowerCase() || '')
-    if (participation) {
+    if (participation && participation.userId) {
       return participation.userId
     }
 
-    // Try to get current session (synchronous)
+    // Try to get current session from localStorage (synchronous)
     const currentSession = UserSessionService.getCurrentSession()
     if (currentSession && currentSession.userId) {
       return currentSession.userId
     }
 
-    // Fallback to temporary ID - will be replaced by async call
-    return `temp-${Date.now()}`
-  })
-
-  // Async initialization of user session
-  useEffect(() => {
-    const initializeSession = async () => {
-      // Skip if we already have a valid user ID from participation or current session
-      if (!userId.startsWith('temp-')) return
-
-      try {
-        const session = await UserSessionService.getOrCreateSession(userName)
-        if (session.userId && session.userId !== userId) {
-          setUserId(session.userId)
-        }
-      } catch (error) {
-        console.error('Failed to initialize user session:', error)
+    // Try sessionStorage for this specific draft (for incognito mode)
+    if (typeof window !== 'undefined' && roomCode) {
+      const draftSessionKey = `draft-user-${roomCode.toLowerCase()}`
+      const storedId = sessionStorage.getItem(draftSessionKey)
+      if (storedId) {
+        return storedId
       }
     }
 
-    initializeSession()
-  }, [userName, userId])
+    // Generate a stable guest ID (synchronous)
+    // Use combination of timestamp and random for uniqueness
+    const guestId = `guest-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
+
+    // Store in sessionStorage immediately for this draft (works in incognito)
+    if (typeof window !== 'undefined' && roomCode) {
+      const draftSessionKey = `draft-user-${roomCode.toLowerCase()}`
+      sessionStorage.setItem(draftSessionKey, guestId)
+    }
+
+    return guestId
+  })
 
   const [selectedPokemon, setSelectedPokemon] = useState<Pokemon | null>(null)
   const [detailsPokemon, setDetailsPokemon] = useState<Pokemon | null>(null)
@@ -297,6 +327,12 @@ export default function DraftRoomPage() {
       currentTeam: currentTeamId,
       userTeamId,
       teams,
+      participants: dbState.participants.map(p => ({
+        userId: p.user_id,
+        team_id: p.team_id,
+        display_name: p.display_name,
+        last_seen: p.last_seen
+      })),
       draftSettings: {
         maxTeams: dbState.draft.max_teams,
         timeLimit: (dbState.draft.settings as any)?.timeLimit || 60,
@@ -366,6 +402,28 @@ export default function DraftRoomPage() {
     draftState?.draftSettings?.draftType === 'auction',
     [draftState?.draftSettings?.draftType]
   )
+
+  // Track participant online status based on last_seen timestamps
+  const participantOnlineStatus = useMemo(() => {
+    if (!draftState?.participants) return new Map<string, boolean>()
+
+    const OFFLINE_THRESHOLD_MS = 45000 // 45 seconds (30s heartbeat + 15s buffer)
+    const now = Date.now()
+
+    return new Map(
+      draftState.participants.map(participant => {
+        const lastSeenTime = new Date(participant.last_seen).getTime()
+        const isOnline = (now - lastSeenTime) < OFFLINE_THRESHOLD_MS
+        return [participant.team_id || participant.userId, isOnline]
+      })
+    )
+  }, [draftState?.participants])
+
+  // Check if current turn user is online
+  const isCurrentUserOnline = useMemo(() => {
+    if (!draftState?.currentTeam) return true
+    return participantOnlineStatus.get(draftState.currentTeam) ?? true
+  }, [draftState?.currentTeam, participantOnlineStatus])
 
   // Connection management with auto-reconnect
   const { isConnected: hookConnected, isReconnecting } = useReconnection({
@@ -562,17 +620,45 @@ export default function DraftRoomPage() {
     let errorCount = 0
     const MAX_ERRORS = 5
     let updateTimeoutId: NodeJS.Timeout | null = null
+    let lastProcessedTimestamp: string | null = null // Track last processed update to prevent duplicates
+
+    // Create cleanup function for this subscription
+    const cleanup = () => {
+      mounted = false
+      abortController.abort()
+      if (updateTimeoutId) {
+        clearTimeout(updateTimeoutId)
+      }
+    }
+
+    // Register cleanup globally to prevent leaks on page refresh
+    if (typeof window !== 'undefined') {
+      window.__draftSubscriptionCleanup = window.__draftSubscriptionCleanup || []
+      window.__draftSubscriptionCleanup.push(cleanup)
+    }
 
     const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async (payload) => {
       // Debounce rapid updates to prevent infinite loops
-      // Multiple UPDATE events can fire within milliseconds when draft starts
+      // Increased to 500ms to account for network latency (was 100ms)
       if (updateTimeoutId) {
         clearTimeout(updateTimeoutId)
       }
 
       updateTimeoutId = setTimeout(async () => {
+        // Deduplicate events by updated_at timestamp
+        const newTimestamp = payload?.new?.updated_at || payload?.new?.created_at
+        if (newTimestamp && newTimestamp === lastProcessedTimestamp) {
+          console.log('[Draft Subscription] Duplicate event ignored:', newTimestamp)
+          return
+        }
+
         // Reload draft state when changes occur
         console.log('[Draft Subscription] Change detected:', payload?.eventType, payload?.new || payload?.old)
+
+        // Update last processed timestamp
+        if (newTimestamp) {
+          lastProcessedTimestamp = newTimestamp
+        }
 
         try {
           const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
@@ -669,16 +755,21 @@ export default function DraftRoomPage() {
           mounted = false // Stop further updates
         }
       }
-      }, 100) // 100ms debounce - batch rapid updates together
+      }, 500) // 500ms debounce - increased from 100ms to account for network latency and prevent infinite loops
     })
 
     return () => {
-      mounted = false
-      abortController.abort()
-      if (updateTimeoutId) {
-        clearTimeout(updateTimeoutId)
-      }
+      // Run cleanup
+      cleanup()
       unsubscribe()
+
+      // Remove from global cleanup list
+      if (typeof window !== 'undefined' && window.__draftSubscriptionCleanup) {
+        const index = window.__draftSubscriptionCleanup.indexOf(cleanup)
+        if (index > -1) {
+          window.__draftSubscriptionCleanup.splice(index, 1)
+        }
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomCode, isConnected, userId])
@@ -815,26 +906,14 @@ export default function DraftRoomPage() {
    */
 
   // Store latest values in refs to avoid callback recreation
-  const draftStateRef = useRef(draftState)
-  const userIdRef = useRef(userId)
-  const isSpectatorRef = useRef(isSpectator)
-  const notifyRef = useRef(notify)
-
-  // Additional refs for subscription callback
-  const transformDraftStateRef = useRef(transformDraftState)
-  const pokemonRef = useRef(pokemon)
-  const isAuctionDraftRef = useRef(isAuctionDraft)
-
-  // Keep refs in sync with latest values
-  useEffect(() => {
-    draftStateRef.current = draftState
-    userIdRef.current = userId
-    isSpectatorRef.current = isSpectator
-    notifyRef.current = notify
-    transformDraftStateRef.current = transformDraftState
-    pokemonRef.current = pokemon
-    isAuctionDraftRef.current = isAuctionDraft
-  }, [draftState, userId, isSpectator, notify, transformDraftState, pokemon, isAuctionDraft])
+  // Use useLatest to always have fresh values in callbacks (prevents stale closures)
+  const draftStateRef = useLatest(draftState)
+  const userIdRef = useLatest(userId)
+  const isSpectatorRef = useLatest(isSpectator)
+  const notifyRef = useLatest(notify)
+  const transformDraftStateRef = useLatest(transformDraftState)
+  const pokemonRef = useLatest(pokemon)
+  const isAuctionDraftRef = useLatest(isAuctionDraft)
 
   // Stable handleViewDetails - never changes
   const handleViewDetails = useCallback((pokemon: Pokemon) => {

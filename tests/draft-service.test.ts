@@ -1,19 +1,18 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { DraftService } from '@/lib/draft-service'
+import { supabase } from '@/lib/supabase'
 import { mockDraft, mockTeams, mockParticipants, mockAuthUser, mockUserProfile } from './utils/test-data'
 
-// Mock Supabase
-const mockSupabase = {
-  from: vi.fn(),
-  auth: {
-    getUser: vi.fn(),
-  },
-  channel: vi.fn(),
-  removeChannel: vi.fn(),
-}
-
+// Mock Supabase - use factory function to avoid hoisting issues
 vi.mock('@/lib/supabase', () => ({
-  supabase: mockSupabase,
+  supabase: {
+    from: vi.fn(),
+    auth: {
+      getUser: vi.fn(),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
 }))
 
 // Mock UserSessionService
@@ -79,7 +78,7 @@ describe('DraftService', () => {
 
   describe('createDraft', () => {
     beforeEach(() => {
-      mockSupabase.auth.getUser.mockResolvedValue({
+      vi.mocked(supabase).auth.getUser.mockResolvedValue({
         data: { user: mockAuthUser },
         error: null,
       })
@@ -93,7 +92,7 @@ describe('DraftService', () => {
         error: null,
       })
 
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase).from.mockReturnValue({
         insert: mockInsert,
         select: mockSelect,
       })
@@ -125,7 +124,7 @@ describe('DraftService', () => {
     })
 
     it('should throw error if user is not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({
+      vi.mocked(supabase).auth.getUser.mockResolvedValue({
         data: { user: null },
         error: { message: 'Not authenticated' },
       })
@@ -171,7 +170,7 @@ describe('DraftService', () => {
         error: { message: 'Database error' },
       })
 
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase).from.mockReturnValue({
         insert: mockInsert,
         select: mockSelect,
       })
@@ -222,7 +221,7 @@ describe('DraftService', () => {
         single: mockSingle,
       })
 
-      mockSupabase.from.mockImplementation((table: string) => {
+      vi.mocked(supabase).from.mockImplementation((table: string) => {
         if (table === 'drafts') {
           return { select: mockSelect }
         }
@@ -282,7 +281,7 @@ describe('DraftService', () => {
         })),
       }))
 
-      mockSupabase.from.mockReturnValue({ select: mockSelect })
+      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect })
 
       await expect(
         DraftService.joinDraft({
@@ -326,7 +325,7 @@ describe('DraftService', () => {
         single: mockSingle,
       })
 
-      mockSupabase.from.mockReturnValue({ select: mockSelect })
+      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect })
 
       const result = await DraftService.getDraftState('TEST01')
 
@@ -346,7 +345,7 @@ describe('DraftService', () => {
         })),
       }))
 
-      mockSupabase.from.mockReturnValue({ select: mockSelect })
+      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect })
 
       const result = await DraftService.getDraftState('INVALID')
 
@@ -372,7 +371,7 @@ describe('DraftService', () => {
         error: null,
       })
 
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase).from.mockReturnValue({
         update: mockUpdate,
       })
 
@@ -426,7 +425,7 @@ describe('DraftService', () => {
         error: null,
       })
 
-      mockSupabase.from.mockImplementation((table: string) => {
+      vi.mocked(supabase).from.mockImplementation((table: string) => {
         if (table === 'picks') {
           return { insert: mockInsert }
         }
@@ -536,7 +535,7 @@ describe('DraftService', () => {
         single: mockSingle,
       })
 
-      mockSupabase.from.mockReturnValue({ select: mockSelect })
+      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect })
 
       const result = await DraftService.verifyDraftPassword({
         roomCode: 'TEST01',
@@ -561,7 +560,7 @@ describe('DraftService', () => {
         single: mockSingle,
       })
 
-      mockSupabase.from.mockReturnValue({ select: mockSelect })
+      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect })
 
       const result = await DraftService.verifyDraftPassword({
         roomCode: 'TEST01',
@@ -586,7 +585,7 @@ describe('DraftService', () => {
         single: mockSingle,
       })
 
-      mockSupabase.from.mockReturnValue({ select: mockSelect })
+      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect })
 
       const result = await DraftService.verifyDraftPassword({
         roomCode: 'TEST01',
@@ -599,13 +598,21 @@ describe('DraftService', () => {
 
   describe('pauseDraft', () => {
     it('should pause draft', async () => {
+      // Mock getDraftState
+      vi.spyOn(DraftService, 'getDraftState').mockResolvedValue({
+        draft: mockDraft,
+        teams: mockTeams,
+        participants: mockParticipants,
+        picks: [],
+      })
+
       const mockUpdate = vi.fn().mockReturnThis()
       const mockEq = vi.fn().mockResolvedValue({
         data: null,
         error: null,
       })
 
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase).from.mockReturnValue({
         update: mockUpdate,
       })
 
@@ -625,13 +632,21 @@ describe('DraftService', () => {
 
   describe('endDraft', () => {
     it('should end draft', async () => {
+      // Mock getDraftState
+      vi.spyOn(DraftService, 'getDraftState').mockResolvedValue({
+        draft: mockDraft,
+        teams: mockTeams,
+        participants: mockParticipants,
+        picks: [],
+      })
+
       const mockUpdate = vi.fn().mockReturnThis()
       const mockEq = vi.fn().mockResolvedValue({
         data: null,
         error: null,
       })
 
-      mockSupabase.from.mockReturnValue({
+      vi.mocked(supabase).from.mockReturnValue({
         update: mockUpdate,
       })
 
@@ -667,7 +682,7 @@ describe('DraftService', () => {
         error: null,
       })
 
-      mockSupabase.from.mockImplementation((table: string) => {
+      vi.mocked(supabase).from.mockImplementation((table: string) => {
         if (table === 'picks' || table === 'auctions' || table === 'bid_history') {
           return {
             delete: mockDelete,

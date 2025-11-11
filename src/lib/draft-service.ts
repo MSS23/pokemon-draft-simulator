@@ -1009,6 +1009,32 @@ export class DraftService {
     }
   }
 
+  static async unpauseDraft(draftId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    if (draftState.draft.status !== 'paused') {
+      throw new Error('Draft is not paused')
+    }
+
+    const { error } = await (supabase
+      .from('drafts') as any)
+      .update({
+        status: 'active',
+        turn_started_at: new Date().toISOString(), // Reset turn timer when resuming
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draftState.draft.id)
+
+    if (error) {
+      console.error('Error unpausing draft:', error)
+      throw new Error('Failed to unpause draft')
+    }
+  }
 
   static async endDraft(draftId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
@@ -1236,13 +1262,15 @@ export class DraftService {
       ? {
           status: 'completed' as const,
           updated_at: new Date().toISOString(),
-          settings: updatedSettings
+          settings: updatedSettings,
+          turn_started_at: null // Clear turn_started_at when draft completes
         }
       : {
           current_turn: nextTurn,
           current_round: nextRound,
           updated_at: new Date().toISOString(),
-          settings: updatedSettings
+          settings: updatedSettings,
+          turn_started_at: new Date().toISOString() // Track when turn started for disconnect handling
         }
 
     const { error } = await (supabase

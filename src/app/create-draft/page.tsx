@@ -15,7 +15,6 @@ import { POKEMON_FORMATS, getFormatById, getPopularFormats, DEFAULT_FORMAT } fro
 // import { generateRoomCode } from '@/lib/room-utils'
 import { useHydrationFix } from '@/lib/hydration-fix'
 import CSVUpload from '@/components/draft/CSVUpload'
-import type { ParsedCSVResult } from '@/lib/csv-parser'
 import { exportFormatWithProgress, downloadFormatCSV, createCustomFormatTemplate } from '@/lib/format-export'
 import { supabase } from '@/lib/supabase'
 
@@ -45,7 +44,6 @@ export default function CreateDraftPage() {
   })
 
   const [customPricing, setCustomPricing] = useState<Record<string, number> | null>(null)
-  const [customPricingStats, setCustomPricingStats] = useState<ParsedCSVResult['stats'] | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [exportProgress, setExportProgress] = useState(0)
 
@@ -388,13 +386,11 @@ export default function CreateDraftPage() {
                   {/* Show CSV upload if custom format is selected */}
                   {formData.useCustomFormat ? (
                     <CSVUpload
-                      onPricingParsed={(pricing, stats) => {
+                      onPricingParsed={(pricing) => {
                         setCustomPricing(pricing)
-                        setCustomPricingStats(stats)
                       }}
                       onClear={() => {
                         setCustomPricing(null)
-                        setCustomPricingStats(null)
                       }}
                     />
                   ) : (

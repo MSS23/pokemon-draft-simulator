@@ -14,6 +14,7 @@ import { Clock, Play, Trophy, Users, Trash2, Eye, Zap } from 'lucide-react'
 import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { toast } from 'sonner'
 
 // Lazy load heavy components for better initial load performance
 const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), {
@@ -99,11 +100,11 @@ export default function Home() {
       if (result.success && result.url) {
         router.push(result.url)
       } else {
-        alert(result.error || 'Failed to resume draft')
+        toast.error(result.error || 'Failed to resume draft')
       }
     } catch (error) {
       console.error('Error resuming draft:', error)
-      alert('Failed to resume draft')
+      toast.error('Failed to resume draft')
     }
   }
 
@@ -129,7 +130,7 @@ export default function Home() {
       // Revert UI on error by reloading from storage (excluding abandoned)
       setMyDrafts(UserSessionService.getVisibleDraftParticipations())
 
-      alert('Failed to delete draft. You may not have permission to delete this draft.')
+      toast.error('Failed to delete draft. You may not have permission to delete this draft.')
     }
   }
 
@@ -305,7 +306,7 @@ export default function Home() {
                       onClick={() => {
                         const url = `/draft/${draft.draftId}`
                         navigator.clipboard.writeText(`${window.location.origin}${url}`)
-                        alert('Draft link copied to clipboard!')
+                        toast.success('Draft link copied to clipboard!')
                       }}
                       className="flex-1"
                     >

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useDraftStore, selectCurrentTeam, selectUserTeam, selectIsUserTurn } from '@/stores/draftStore'
+import { useDraftStore } from '@/stores/draftStore'
+import { selectCurrentTeam, selectUserTeam, selectIsUserTurn } from '@/stores/selectors'
 import { createMockDraft, createMockTeam, createMockParticipant } from './utils/test-helpers'
 import type { Pick } from '@/types'
 
@@ -174,7 +175,7 @@ describe('DraftStore', () => {
     beforeEach(() => {
       const draft = createMockDraft({ id: 'draft-1' })
       const teams = [
-        createMockTeam({ id: 'team-1', budgetRemaining: 85 }),
+        createMockTeam({ id: 'team-1', budgetRemaining: 100 }),
       ]
       const pick: Pick = {
         id: 'pick-1',

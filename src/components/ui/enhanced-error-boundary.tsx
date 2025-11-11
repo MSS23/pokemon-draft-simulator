@@ -16,6 +16,7 @@ import {
   Send
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface ErrorInfo {
   componentStack: string
@@ -178,7 +179,9 @@ Timestamp: ${new Date().toISOString()}
     `.trim()
 
     navigator.clipboard.writeText(errorText).then(() => {
-      alert('Error details copied to clipboard')
+      toast.success('Error details copied to clipboard')
+    }).catch(() => {
+      toast.error('Failed to copy error details')
     })
   }
 

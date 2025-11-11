@@ -25,9 +25,35 @@ if (typeof window !== 'undefined') {
   })
 }
 
-// Validate configuration
+// Validate configuration with helpful error messages
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set.')
+  const missingVars = []
+  if (!supabaseUrl) missingVars.push('NEXT_PUBLIC_SUPABASE_URL')
+  if (!supabaseAnonKey) missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+
+  const errorMessage = `
+🔧 Supabase Configuration Error
+
+Missing required environment variables: ${missingVars.join(', ')}
+
+To fix this:
+1. Create a .env.local file in the project root
+2. Add the following variables:
+   NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+3. Get these values from your Supabase project:
+   • Go to https://app.supabase.com
+   • Select your project
+   • Go to Settings > API
+   • Copy the Project URL and anon/public key
+
+4. Restart your development server
+
+See .env.example for reference.
+  `.trim()
+
+  throw new Error(errorMessage)
 }
 
 // Database types

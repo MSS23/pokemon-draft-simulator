@@ -4,7 +4,7 @@
  * Allows syncing format data from Pokémon Showdown
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { syncShowdownData } from '@/services/showdown-sync'
 
 export const runtime = 'edge'
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  * POST /api/formats/sync
  * Trigger a sync with Pokémon Showdown data
  */
-export async function POST(_request: NextRequest) {
+export async function POST() {
   try {
     const result = await syncShowdownData()
 

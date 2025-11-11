@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { usePokemonList } from '@/hooks/usePokemon'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ArrowLeft, Home } from 'lucide-react'
+import { ArrowLeft, Home, Trophy } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
+import { LeagueService } from '@/lib/league-service'
 import DraftResults from '@/components/draft/DraftResults'
+import { CreateLeagueModal } from '@/components/league/CreateLeagueModal'
 import { useNotify } from '@/components/providers/NotificationProvider'
 import { LoadingScreen } from '@/components/ui/loading-states'
 
@@ -21,9 +22,10 @@ export default function DraftResultsPage() {
   const [draftState, setDraftState] = useState<DBDraftState | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [existingLeagueId, setExistingLeagueId] = useState<string | null>(null)
+  const [isLeagueModalOpen, setIsLeagueModalOpen] = useState(false)
+  const [isCheckingLeague, setIsCheckingLeague] = useState(false)
 
-  const { data: pokemon } = usePokemonList()
-  // pokemon is fetched but used in child component DraftResults
   const notify = useNotify()
 
   useEffect(() => {
@@ -45,6 +47,19 @@ export default function DraftResultsPage() {
         }
 
         setDraftState(dbState)
+
+        // Check if league already exists for this draft
+        setIsCheckingLeague(true)
+        try {
+          const league = await LeagueService.getLeagueByDraftId(dbState.draft.id)
+          if (league) {
+            setExistingLeagueId(league.id)
+          }
+        } catch (err) {
+          console.error('Error checking for existing league:', err)
+        } finally {
+          setIsCheckingLeague(false)
+        }
       } catch (err) {
         console.error('Error loading draft state:', err)
         setError('Failed to load draft results')
@@ -55,6 +70,12 @@ export default function DraftResultsPage() {
 
     loadDraftState()
   }, [roomCode])
+
+  const handleLeagueSuccess = (leagueId: string) => {
+    notify.success('League Created!', 'Your league has been created successfully')
+    setExistingLeagueId(leagueId)
+    router.push(`/league/${leagueId}`)
+  }
 
   if (isLoading) {
     return (
@@ -143,6 +164,42 @@ export default function DraftResultsPage() {
           </Badge>
         </div>
 
+        {/* League Creation Section */}
+        {!isCheckingLeague && (
+          <Card className="mb-6 border-2 border-yellow-500/50 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                {existingLeagueId ? 'League Created' : 'Create League'}
+              </CardTitle>
+              <CardDescription>
+                {existingLeagueId
+                  ? 'A league has been created from this draft. View standings, fixtures, and match results.'
+                  : 'Start a competitive league season with weekly fixtures, standings, and Pokemon battles.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {existingLeagueId ? (
+                <Button
+                  onClick={() => router.push(`/league/${existingLeagueId}`)}
+                  className="w-full"
+                >
+                  <Trophy className="mr-2 h-4 w-4" />
+                  View League
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setIsLeagueModalOpen(true)}
+                  className="w-full"
+                >
+                  <Trophy className="mr-2 h-4 w-4" />
+                  Create League
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <DraftResults
           draftName={draftState.draft.name}
           teams={teams}
@@ -178,6 +235,18 @@ export default function DraftResultsPage() {
             notify.success('Export Complete!', 'Draft data exported to JSON file')
           }}
         />
+
+        {/* League Creation Modal */}
+        {draftState && (
+          <CreateLeagueModal
+            isOpen={isLeagueModalOpen}
+            onClose={() => setIsLeagueModalOpen(false)}
+            draftId={draftState.draft.id}
+            draftName={draftState.draft.name}
+            teamCount={draftState.teams.length}
+            onSuccess={handleLeagueSuccess}
+          />
+        )}
       </div>
     </div>
   )

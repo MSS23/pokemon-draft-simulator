@@ -14,8 +14,8 @@ const TEST_FORMAT: FormatRules = {
   name: 'Test Format',
   generation: 9,
   gameType: 'doubles',
-  allowedPokedexNumbers: Array.from({ length: 100 }, (_, i) => i + 1),
-  bannedCategories: ['legendary', 'mythical'],
+  allowedPokedexNumbers: Array.from({ length: 200 }, (_, i) => i + 1), // Include 150, 151 for category tests
+  bannedCategories: ['mythical', 'legendary'], // Mythical first so Mew (151) is caught as mythical
   costConfig: {
     type: 'bst',
     minCost: 1,
@@ -29,7 +29,7 @@ const RESTRICTIVE_FORMAT: FormatRules = {
   name: 'Restrictive Format',
   generation: 9,
   gameType: 'doubles',
-  allowedPokedexNumbers: [1, 4, 7, 25, 133],
+  allowedPokedexNumbers: [1, 4, 7, 25, 133, 984], // Include 984 (Great Tusk) for paradox test
   explicitBans: [25], // Pikachu banned
   bannedCategories: ['legendary', 'mythical', 'paradox'],
   costConfig: {
@@ -241,7 +241,7 @@ describe('FormatValidator', () => {
 
     it('should apply max cost', () => {
       const pokemon = generateMockPokemon(1, {
-        stats: Array(6).fill({ base_stat: 200, stat: { name: 'stat' } }),
+        stats: Array(6).fill({ base_stat: 350, stat: { name: 'stat' } }), // BST = 2100, cost = 21, clamped to maxCost 20
       })
 
       const cost = FormatValidator.calculateCost(pokemon, TEST_FORMAT)
