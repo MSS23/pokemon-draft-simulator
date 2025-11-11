@@ -6,9 +6,10 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Plus, Users, Trophy, Clock, LogOut } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Clock } from 'lucide-react'
 import Link from 'next/link'
 import type { User } from '@supabase/supabase-js'
+import { SidebarLayout } from '@/components/layout/SidebarLayout'
 
 interface UserDraft {
   id: string
@@ -59,12 +60,6 @@ export default function DashboardPage() {
     checkUser()
   }, [router])
 
-  const handleSignOut = async () => {
-    if (!supabase) return
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -76,20 +71,14 @@ export default function DashboardPage() {
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Welcome back, {displayName}!</p>
-          </div>
-          <Button variant="ghost" onClick={handleSignOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
-          </Button>
+    <SidebarLayout>
+      {/* Page Header */}
+      <div className="border-b bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
+        <div className="container mx-auto px-4 py-4">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Welcome back, {displayName}!</p>
         </div>
-      </header>
+      </div>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
@@ -200,6 +189,6 @@ export default function DashboardPage() {
           </Card>
         </div>
       </main>
-    </div>
+    </SidebarLayout>
   )
 }

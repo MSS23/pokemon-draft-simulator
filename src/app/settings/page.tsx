@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Pencil, LogOut } from 'lucide-react'
+import { Pencil } from 'lucide-react'
+import { SidebarLayout } from '@/components/layout/SidebarLayout'
 
 interface UserProfile {
   id: string
@@ -103,46 +104,22 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleLogout() {
-    if (!supabase) return
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-white">Loading...</div>
-      </div>
+      <SidebarLayout>
+        <div className="min-h-full bg-slate-950 flex items-center justify-center">
+          <div className="text-white">Loading...</div>
+        </div>
+      </SidebarLayout>
     )
   }
 
   if (!profile) return null
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-yellow-500 rounded flex items-center justify-center">
-              <span className="text-slate-900 font-bold">P</span>
-            </div>
-            <h1 className="text-white text-xl font-bold">Pokémon Draft League</h1>
-          </div>
-          <Button
-            variant="ghost"
-            onClick={handleLogout}
-            className="text-white"
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Log Out
-          </Button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <SidebarLayout>
+      <div className="min-h-full bg-slate-950 p-8">
+        <div className="container mx-auto max-w-4xl">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Profile Settings</h1>
         </div>
@@ -252,7 +229,8 @@ export default function SettingsPage() {
             </Button>
           </div>
         </Card>
+        </div>
       </div>
-    </div>
+    </SidebarLayout>
   )
 }

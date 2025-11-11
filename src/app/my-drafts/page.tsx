@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
 import { UserSessionService } from '@/lib/user-session'
 import { supabase } from '@/lib/supabase'
+import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import type { Match, League, Team, Draft } from '@/types'
 import { format, isPast, isFuture, isToday } from 'date-fns'
 
@@ -127,12 +128,14 @@ export default function MyDraftsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Loading your matches...</p>
+      <SidebarLayout>
+        <div className="bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 min-h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-400">Loading your matches...</p>
+          </div>
         </div>
-      </div>
+      </SidebarLayout>
     )
   }
 
@@ -142,44 +145,47 @@ export default function MyDraftsPage() {
 
   if (matches.length === 0 && drafts.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4">
-        <div className="max-w-4xl mx-auto pt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-6 w-6 text-yellow-500" />
-                My Drafts
-              </CardTitle>
-              <CardDescription>
-                You haven't joined any drafts yet. Create or join a draft to get started!
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => router.push('/')}>
-                Go to Home
-              </Button>
-            </CardContent>
-          </Card>
+      <SidebarLayout>
+        <div className="bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 min-h-full">
+          <div className="max-w-4xl mx-auto pt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-6 w-6 text-yellow-500" />
+                  My Drafts
+                </CardTitle>
+                <CardDescription>
+                  You haven't joined any drafts yet. Create or join a draft to get started!
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button onClick={() => router.push('/')}>
+                  Go to Home
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      </SidebarLayout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4">
-      <div className="max-w-6xl mx-auto pt-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-              <Trophy className="h-8 w-8 text-yellow-500" />
-              My League Matches
-            </h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-1">
-              Track your upcoming games and view results
-            </p>
+    <SidebarLayout>
+      <div className="bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 min-h-full">
+        <div className="max-w-6xl mx-auto pt-8 space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                <Trophy className="h-8 w-8 text-yellow-500" />
+                My League Matches
+              </h1>
+              <p className="text-slate-600 dark:text-slate-400 mt-1">
+                Track your upcoming games and view results
+              </p>
+            </div>
           </div>
-        </div>
 
         {/* Drafts Section */}
         {drafts.length > 0 && (
@@ -257,8 +263,9 @@ export default function MyDraftsPage() {
           </TabsContent>
         </Tabs>
         )}
+        </div>
       </div>
-    </div>
+    </SidebarLayout>
   )
 }
 
