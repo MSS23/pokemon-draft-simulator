@@ -289,14 +289,30 @@ export class DraftService {
     const { data: userProfile, error: profileError } = await (supabase
       .from('user_profiles') as any)
       .select('display_name')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single()
 
-    if (profileError || !userProfile) {
-      throw new Error('User profile not found. Please ensure you have a profile set up.')
-    }
+    let displayName: string
 
-    const displayName = (userProfile as any).display_name
+    // If no profile exists, fall back to user metadata and create profile
+    if (profileError || !userProfile) {
+      const { data: { user } } = await supabase.auth.getUser()
+      displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
+
+      // Auto-create missing profile
+      const { error: createError } = await (supabase as any)
+        .from('user_profiles')
+        .insert({
+          user_id: userId,
+          display_name: displayName
+        })
+
+      if (createError) {
+        console.error('Failed to auto-create user profile:', createError)
+      }
+    } else {
+      displayName = (userProfile as any).display_name
+    }
 
     const { data: draft, error: draftError } = await supabase
       .from('drafts')
@@ -444,14 +460,30 @@ export class DraftService {
     const { data: userProfile, error: profileError } = await (supabase
       .from('user_profiles') as any)
       .select('display_name')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single()
 
-    if (profileError || !userProfile) {
-      throw new Error('User profile not found. Please ensure you have a profile set up.')
-    }
+    let displayName: string
 
-    const displayName = (userProfile as any).display_name
+    // If no profile exists, fall back to user metadata and create profile
+    if (profileError || !userProfile) {
+      const { data: { user } } = await supabase.auth.getUser()
+      displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
+
+      // Auto-create missing profile
+      const { error: createError } = await (supabase as any)
+        .from('user_profiles')
+        .insert({
+          user_id: userId,
+          display_name: displayName
+        })
+
+      if (createError) {
+        console.error('Failed to auto-create user profile:', createError)
+      }
+    } else {
+      displayName = (userProfile as any).display_name
+    }
 
     const { data: draft, error: draftError } = await supabase
       .from('drafts')

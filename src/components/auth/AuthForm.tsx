@@ -60,6 +60,19 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
           if (error) throw error
 
           if (data.user) {
+            // Create user profile in database
+            const { error: profileError } = await (supabase as any)
+              .from('user_profiles')
+              .insert({
+                user_id: data.user.id,
+                display_name: displayName || email.split('@')[0],
+              })
+
+            if (profileError) {
+              console.error('Failed to create user profile:', profileError)
+              // Don't throw - profile creation is not critical for signup
+            }
+
             setSuccess('Registration successful! Redirecting to homepage...')
             onSuccess?.()
             // Redirect to homepage after successful registration
