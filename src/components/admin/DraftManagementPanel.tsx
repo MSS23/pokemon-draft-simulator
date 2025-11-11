@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,11 +27,7 @@ export default function DraftManagementPanel() {
   const [searchTerm, setSearchTerm] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadDrafts()
-  }, [])
-
-  async function loadDrafts() {
+  const loadDrafts = useCallback(async () => {
     if (!supabase) return
 
     setLoading(true)
@@ -49,7 +45,11 @@ export default function DraftManagementPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [notify])
+
+  useEffect(() => {
+    loadDrafts()
+  }, [loadDrafts])
 
   async function deleteDraft(draftId: string, roomCode: string) {
     if (!supabase) return

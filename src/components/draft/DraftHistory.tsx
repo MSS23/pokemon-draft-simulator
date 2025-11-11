@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -35,11 +35,7 @@ export default function DraftHistory() {
   const [hasMore, setHasMore] = useState(true)
   const itemsPerPage = 10
 
-  useEffect(() => {
-    loadHistory()
-  }, [currentPage])
-
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     try {
       setIsLoading(true)
       const data = await DraftService.getDraftHistory(itemsPerPage, currentPage * itemsPerPage)
@@ -51,7 +47,11 @@ export default function DraftHistory() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentPage, itemsPerPage])
+
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)

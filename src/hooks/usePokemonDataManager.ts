@@ -79,7 +79,7 @@ export function usePokemonDataManager(
     return () => {
       mounted = false
     }
-  }, []) // Only run once on mount
+  }, [options])
 
   // Load format
   const loadFormat = useCallback(async (formatOptions: LoadFormatOptions) => {
