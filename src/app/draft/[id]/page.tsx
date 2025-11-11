@@ -1042,6 +1042,39 @@ export default function DraftRoomPage() {
     return activities.sort((a, b) => b.timestamp - a.timestamp)
   }, [pokemon, draftState?.teams])
 
+  // Memoize AI Assistant props to prevent infinite re-renders
+  const aiCurrentTeam = useMemo(() => {
+    if (!userTeam || !pokemon) return []
+    return userTeam.picks
+      .map(id => pokemon.find(p => p.id === id))
+      .filter(Boolean) as Pokemon[]
+  }, [userTeam, pokemon])
+
+  const aiOpponentTeams = useMemo(() => {
+    if (!draftState?.teams || !draftState.userTeamId || !pokemon || !roomCode) return []
+    return draftState.teams
+      .filter(t => t.id !== draftState.userTeamId)
+      .map(t => ({
+        id: t.id,
+        draftId: roomCode.toLowerCase(),
+        name: t.name,
+        ownerId: null,
+        budgetRemaining: t.budgetRemaining,
+        draftOrder: t.draftOrder,
+        picks: t.picks.map(pokemonId => ({
+          id: pokemonId,
+          draftId: roomCode.toLowerCase(),
+          teamId: t.id,
+          pokemonId,
+          pokemonName: pokemon.find(p => p.id === pokemonId)?.name || 'Unknown',
+          cost: pokemon.find(p => p.id === pokemonId)?.cost || 0,
+          pickOrder: 0,
+          round: 1,
+          createdAt: new Date().toISOString()
+        }))
+      }))
+  }, [draftState?.teams, draftState?.userTeamId, pokemon, roomCode])
+
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)
     const canDraft = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
@@ -1755,26 +1788,8 @@ export default function DraftRoomPage() {
             <EnhancedErrorBoundary>
               <AIDraftAssistant
                 availablePokemon={availablePokemon}
-                currentTeam={userTeam?.picks.map(id => pokemon?.find(p => p.id === id)).filter(Boolean) as Pokemon[] || []}
-                opponentTeams={draftState.teams.filter(t => t.id !== draftState.userTeamId).map(t => ({
-                  id: t.id,
-                  draftId: roomCode?.toLowerCase() || '',
-                  name: t.name,
-                  ownerId: null,
-                  budgetRemaining: t.budgetRemaining,
-                  draftOrder: t.draftOrder,
-                  picks: t.picks.map(pokemonId => ({
-                    id: pokemonId,
-                    draftId: roomCode?.toLowerCase() || '',
-                    teamId: t.id,
-                    pokemonId,
-                    pokemonName: pokemon?.find(p => p.id === pokemonId)?.name || 'Unknown',
-                    cost: pokemon?.find(p => p.id === pokemonId)?.cost || 0,
-                    pickOrder: 0,
-                    round: 1,
-                    createdAt: new Date().toISOString()
-                  }))
-                }))}
+                currentTeam={aiCurrentTeam}
+                opponentTeams={aiOpponentTeams}
                 remainingBudget={userTeam?.budgetRemaining || 0}
                 remainingPicks={(draftState.draftSettings.pokemonPerTeam || 6) - (userTeam?.picks.length || 0)}
                 format={{ id: formatId, name: formatId } as any}
