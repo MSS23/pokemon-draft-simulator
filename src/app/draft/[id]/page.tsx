@@ -53,32 +53,32 @@ import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
 // Heavy components - lazy load with loading states
 const DraftControls = dynamic(() => import('@/components/draft/DraftControls'), {
   ssr: false,
-  loading: () => <div className="h-20 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+  loading: () => <div className="h-20 bg-muted rounded-lg animate-pulse" />
 })
 
 const DraftResults = dynamic(() => import('@/components/draft/DraftResults'), {
   ssr: false,
-  loading: () => <div className="h-screen bg-gray-100 dark:bg-gray-800 animate-pulse" />
+  loading: () => <div className="h-screen bg-muted animate-pulse" />
 })
 
 const AuctionBiddingInterface = dynamic(() => import('@/components/draft/AuctionBiddingInterface'), {
   ssr: false,
-  loading: () => <div className="h-64 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+  loading: () => <div className="h-64 bg-muted rounded-lg animate-pulse" />
 })
 
 const AuctionTimer = dynamic(() => import('@/components/draft/AuctionTimer'), {
   ssr: false,
-  loading: () => <div className="h-32 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+  loading: () => <div className="h-32 bg-muted rounded-lg animate-pulse" />
 })
 
 const AuctionNomination = dynamic(() => import('@/components/draft/AuctionNomination'), {
   ssr: false,
-  loading: () => <div className="h-40 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+  loading: () => <div className="h-40 bg-muted rounded-lg animate-pulse" />
 })
 
 const SpectatorMode = dynamic(() => import('@/components/draft/SpectatorMode'), {
   ssr: false,
-  loading: () => <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+  loading: () => <div className="h-96 bg-muted rounded-lg animate-pulse" />
 })
 
 const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNotifications'), {
@@ -88,7 +88,7 @@ const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNot
 const AIDraftAssistant = dynamic(() =>
   import('@/components/draft/AIDraftAssistant').then(mod => ({ default: mod.AIDraftAssistant })), {
   ssr: false,
-  loading: () => <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+  loading: () => <div className="h-96 bg-muted rounded-lg animate-pulse" />
 })
 
 interface DraftUIState {
@@ -1368,7 +1368,7 @@ export default function DraftRoomPage() {
   // Show error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle>Error</CardTitle>
@@ -1392,7 +1392,7 @@ export default function DraftRoomPage() {
   // Handle draft completion - show results page
   if (draftState?.status === 'completed') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pokemon-bg transition-colors duration-500">
+      <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
           <div className="relative text-center mb-6">
@@ -1400,7 +1400,7 @@ export default function DraftRoomPage() {
               <ImageTypeToggle />
               <ThemeToggle />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-2">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-2">
               Draft Room: {roomCode}
             </h1>
           </div>
@@ -1476,13 +1476,13 @@ export default function DraftRoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+    <div className="min-h-screen bg-background transition-colors duration-500">
       <div className="container mx-auto px-4 py-4 max-w-screen-2xl">
         {/* Header */}
-        <div className="mb-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-4">
+        <div className="mb-6 bg-card rounded-lg shadow-sm border p-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-1">
+              <h1 className="text-2xl font-bold mb-1">
                 {roomCode}
               </h1>
               <div className="flex items-center gap-2">
@@ -1527,7 +1527,6 @@ export default function DraftRoomPage() {
                   variant="default"
                   size="sm"
                   onClick={() => router.push(`/draft/${roomCode}/results`)}
-                  className="bg-green-600 hover:bg-green-700"
                 >
                   Results
                 </Button>
@@ -1696,8 +1695,8 @@ export default function DraftRoomPage() {
               </div>
             ) : (
               // Snake Draft Controls
-              <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow">
-                <h3 className="font-semibold mb-3 text-slate-800 dark:text-slate-200">
+              <div className="p-4 bg-card rounded-lg shadow">
+                <h3 className="font-semibold mb-3">
                   {isHost && isProxyPickingEnabled && !isUserTurn
                     ? `Proxy Selection for ${currentTeam?.name}`
                     : 'Your Selection'
@@ -1707,7 +1706,6 @@ export default function DraftRoomPage() {
                   {selectedPokemon && (isUserTurn || (isHost && isProxyPickingEnabled)) ? (
                     <Button
                       onClick={() => handleDraftPokemon(selectedPokemon)}
-                      className="bg-green-600 hover:bg-green-700"
                     >
                       {isHost && isProxyPickingEnabled && !isUserTurn
                         ? `Draft ${selectedPokemon.name} for ${currentTeam?.name}`
@@ -1715,7 +1713,7 @@ export default function DraftRoomPage() {
                       }
                     </Button>
                   ) : (
-                    <p className="text-slate-600 dark:text-slate-400">
+                    <p className="text-muted-foreground">
                       {!isUserTurn && !(isHost && isProxyPickingEnabled)
                         ? `Waiting for ${currentTeam?.name} to pick...`
                         : 'Select a Pokémon to draft'
@@ -1723,7 +1721,7 @@ export default function DraftRoomPage() {
                     </p>
                   )}
                   {isHost && isProxyPickingEnabled && !isUserTurn && (
-                    <p className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                    <p className="text-xs text-primary bg-primary/10 px-2 py-1 rounded">
                       Proxy picking enabled - You can pick for {currentTeam?.name}
                     </p>
                   )}
@@ -1735,14 +1733,14 @@ export default function DraftRoomPage() {
 
         {/* Loading Notice */}
         {!draftState && (
-          <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="mb-6 bg-primary/5 border border-primary/20 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mt-0.5"></div>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mt-0.5"></div>
               <div>
-                <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                <h3 className="font-semibold mb-1">
                   Connecting to Draft Room
                 </h3>
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+                <p className="text-sm text-muted-foreground">
                   You can browse and select Pokemon while we load the team information.
                   The draft order will be determined once all teams have joined.
                 </p>
@@ -1794,7 +1792,7 @@ export default function DraftRoomPage() {
         )}
 
         {/* Pokemon Grid */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 sm:p-6">
+        <div className="bg-card rounded-lg shadow p-3 sm:p-6">
           <EnhancedErrorBoundary>
             <PokemonGrid
               pokemon={pokemon?.filter(p => p.isLegal) || []}
