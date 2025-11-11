@@ -8,7 +8,6 @@
     "silent": true,
     "autoJobCancelation": true
   },
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- './(src|public|migrations)/**' './package.json' './tsconfig.json' './next.config.ts' './tailwind.config.ts'",
   "headers": [
     {
       "source": "/(.*)",
