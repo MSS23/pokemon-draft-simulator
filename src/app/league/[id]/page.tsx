@@ -309,7 +309,7 @@ export default function LeaguePage() {
                       Week {league.currentWeek} Fixtures
                     </CardTitle>
                     <CardDescription>
-                      {leagueSettings.matchFormat?.replace('_', ' ') || 'Best of 1'} format
+                      {leagueSettings.matchFormat?.replace('_', ' ') || 'Best of 3'} format
                       {weekFixtures.length > 0 && weekFixtures[0].scheduledDate && (
                         <span className="ml-2">
                           • {new Date(weekFixtures[0].scheduledDate).toLocaleDateString('en-US', {
