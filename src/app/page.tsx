@@ -350,7 +350,6 @@ export default function Home() {
               <div className="flex gap-3 justify-center">
                 <Button
                   onClick={() => window.location.href = '/create-draft'}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Create Draft
@@ -388,8 +387,8 @@ export default function Home() {
               </p>
             </div>
             <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-              <div className="h-12 w-12 rounded-lg bg-purple-100 dark:bg-purple-900 flex items-center justify-center mb-4">
-                <Trophy className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
+                <Trophy className="h-6 w-6 text-primary" />
               </div>
               <h3 className="font-semibold text-lg mb-2 text-slate-800 dark:text-slate-200">Official Formats</h3>
               <p className="text-sm text-slate-600 dark:text-slate-400">
@@ -449,9 +448,9 @@ export default function Home() {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="relative">
-                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-purple-600"></div>
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-cyan-500"></div>
                 </div>
               </div>
               <p className="mt-4 text-lg font-medium text-slate-700 dark:text-slate-300">Loading Pokémon...</p>

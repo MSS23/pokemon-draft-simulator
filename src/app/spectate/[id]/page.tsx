@@ -104,7 +104,7 @@ export default function SpectateRoomPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="pt-6">
             <div className="text-center">
@@ -122,7 +122,7 @@ export default function SpectateRoomPage() {
 
   if (error || !draftState) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
             <CardTitle>Error</CardTitle>
@@ -159,7 +159,7 @@ export default function SpectateRoomPage() {
   })
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
+    <div className="min-h-screen bg-background transition-colors duration-500">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="relative text-center mb-6">
@@ -173,8 +173,8 @@ export default function SpectateRoomPage() {
             <ThemeToggle />
           </div>
           <div className="flex items-center justify-center gap-2">
-            <Eye className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent">
+            <Eye className="h-6 w-6 text-primary" />
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent">
               Spectating: {roomCode.toUpperCase()}
             </h1>
           </div>
