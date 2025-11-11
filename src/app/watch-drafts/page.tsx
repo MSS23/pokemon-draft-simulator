@@ -35,7 +35,7 @@ export default function WatchDraftsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'setup' | 'active' | 'completed'>('all')
 
-  const loadPublicDrafts = useCallback(async () => {
+  const loadPublicDrafts = async () => {
     try {
       setIsLoading(true)
       const data = await DraftService.getPublicDrafts({
@@ -50,11 +50,12 @@ export default function WatchDraftsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [statusFilter, notify])
+  }
 
   useEffect(() => {
     loadPublicDrafts()
-  }, [loadPublicDrafts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter])
 
   useEffect(() => {
     if (!searchQuery) {
