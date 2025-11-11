@@ -71,7 +71,7 @@ export class WeeklyHighlightsService {
 
     try {
       // Call database function to generate summary
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .rpc('generate_week_summary', {
           p_league_id: leagueId,
           p_week_number: weekNumber
@@ -96,7 +96,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('weekly_summaries')
         .select('*')
         .eq('league_id', leagueId)
@@ -143,7 +143,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('weekly_highlights')
         .select('*')
         .eq('league_id', leagueId)
@@ -199,7 +199,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('weekly_highlights')
         .insert({
           league_id: leagueId,
@@ -254,7 +254,7 @@ export class WeeklyHighlightsService {
 
     try {
       // Get all completed matches for the week
-      const { data: matches } = await supabase
+      const { data: matches } = await (supabase as any)
         .from('matches')
         .select(`
           *,
@@ -320,7 +320,7 @@ export class WeeklyHighlightsService {
       }
 
       // Get Pokemon with most KOs this week
-      const { data: topKOs } = await supabase
+      const { data: topKOs } = await (supabase as any)
         .from('match_pokemon_kos')
         .select(`
           pick_id,
@@ -347,7 +347,7 @@ export class WeeklyHighlightsService {
       }
 
       // Check for deaths (Nuzlocke)
-      const { data: deaths } = await supabase
+      const { data: deaths } = await (supabase as any)
         .from('match_pokemon_kos')
         .select(`
           pick_id,
@@ -388,7 +388,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('weekly_summaries')
         .select('*')
         .eq('league_id', leagueId)

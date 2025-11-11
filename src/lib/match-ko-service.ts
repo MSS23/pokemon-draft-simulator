@@ -295,14 +295,14 @@ export class MatchKOService {
     }
 
     // Increment matches_played and optionally matches_won
-    const { error } = await supabase.rpc('increment_pokemon_match_stats', {
+    const { error } = await (supabase as any).rpc('increment_pokemon_match_stats', {
       p_pick_id: pickId,
       p_won: won,
     })
 
     // If RPC doesn't exist, use manual update
     if (error && error.code === '42883') {
-      const { data: current, error: fetchError } = await supabase
+      const { data: current, error: fetchError } = await (supabase as any)
         .from('team_pokemon_status')
         .select('matches_played, matches_won')
         .eq('pick_id', pickId)
@@ -312,7 +312,7 @@ export class MatchKOService {
         throw new Error(`Failed to fetch Pokemon stats: ${fetchError.message}`)
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('team_pokemon_status')
         .update({
           matches_played: (current.matches_played || 0) + 1,
@@ -338,7 +338,7 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data: current, error: fetchError } = await supabase
+    const { data: current, error: fetchError } = await (supabase as any)
       .from('team_pokemon_status')
       .select('total_kos')
       .eq('pick_id', pickId)
@@ -349,7 +349,7 @@ export class MatchKOService {
       return
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('team_pokemon_status')
       .update({
         total_kos: (current.total_kos || 0) + koCount,
@@ -404,7 +404,7 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('team_pokemon_status')
       .select('pick_id, team_id, total_kos, picks!inner(pokemon_id)')
       .eq('league_id', leagueId)

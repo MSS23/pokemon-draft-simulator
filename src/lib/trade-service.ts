@@ -50,7 +50,7 @@ export class TradeService {
     }
 
     // Insert trade proposal
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trades')
       .insert({
         league_id: leagueId,
@@ -85,7 +85,7 @@ export class TradeService {
     }
 
     // Get trade to verify the accepting team is correct
-    const { data: trade, error: fetchError } = await supabase
+    const { data: trade, error: fetchError } = await (supabase as any)
       .from('trades')
       .select('*')
       .eq('id', tradeId)
@@ -109,7 +109,7 @@ export class TradeService {
     }
 
     // Update trade status to accepted
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trades')
       .update({
         status: 'accepted',
@@ -143,7 +143,7 @@ export class TradeService {
     }
 
     // Get trade to verify the rejecting team is correct
-    const { data: trade, error: fetchError } = await supabase
+    const { data: trade, error: fetchError } = await (supabase as any)
       .from('trades')
       .select('*')
       .eq('id', tradeId)
@@ -162,7 +162,7 @@ export class TradeService {
     }
 
     // Update trade status to rejected
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trades')
       .update({
         status: 'rejected',
@@ -191,7 +191,7 @@ export class TradeService {
     }
 
     // Call the database function to execute the trade
-    const { error } = await supabase.rpc('execute_trade', {
+    const { error } = await (supabase as any).rpc('execute_trade', {
       trade_uuid: tradeId,
     })
 
@@ -212,7 +212,7 @@ export class TradeService {
     }
 
     // Get trade to verify the canceling team is the proposer
-    const { data: trade, error: fetchError } = await supabase
+    const { data: trade, error: fetchError } = await (supabase as any)
       .from('trades')
       .select('*')
       .eq('id', tradeId)
@@ -233,7 +233,7 @@ export class TradeService {
     }
 
     // Update trade status to cancelled
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trades')
       .update({
         status: 'cancelled',
@@ -366,7 +366,7 @@ export class TradeService {
     }
 
     // Insert approval record
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trade_approvals')
       .insert({
         trade_id: tradeId,
@@ -383,7 +383,7 @@ export class TradeService {
     }
 
     // Update trade record with commissioner approval
-    const { error: updateError } = await supabase
+    const { error: updateError } = await (supabase as any)
       .from('trades')
       .update({
         commissioner_approved: approved,
