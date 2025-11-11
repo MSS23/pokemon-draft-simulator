@@ -159,7 +159,7 @@ export class LeagueStatsService {
 
     try {
       // Get Pokemon basic info and status
-      const { data: pick, error: pickError } = await supabase
+      const pickResponse = await supabase
         .from('picks')
         .select(`
           id,
@@ -169,25 +169,31 @@ export class LeagueStatsService {
           teams!inner(name)
         `)
         .eq('id', pickId)
-        .single()
+        .single() as any
 
-      if (pickError) throw pickError
-      if (!pick) return null
+      if (pickResponse.error) throw pickResponse.error
+      if (!pickResponse.data) return null
 
-      const { data: status } = await supabase
+      const pick = pickResponse.data
+
+      const statusResponse = await supabase
         .from('team_pokemon_status')
         .select('*')
         .eq('pick_id', pickId)
-        .single()
+        .single() as any
+
+      const status = statusResponse?.data
 
       // Get all KOs this Pokemon has given
-      const { data: kosGiven } = await supabase
+      const kosGivenResponse = await supabase
         .from('match_pokemon_kos')
         .select('ko_count')
-        .eq('pick_id', pickId)
+        .eq('pick_id', pickId) as any
+
+      const kosGiven = kosGivenResponse?.data
 
       // Get all KOs this Pokemon has taken (opponent's KOs)
-      const { data: kosTaken } = await supabase
+      const kosTakenResponse = await supabase
         .from('match_pokemon_kos')
         .select(`
           ko_count,
@@ -196,10 +202,12 @@ export class LeagueStatsService {
             away_team_id
           )
         `)
-        .neq('pick_id', pickId)  // KOs by OTHER Pokemon
+        .neq('pick_id', pickId) as any  // KOs by OTHER Pokemon
+
+      const kosTaken = kosTakenResponse?.data
 
       // Get match history
-      const { data: matches } = await supabase
+      const matchesResponse = await supabase
         .from('matches')
         .select(`
           id,
@@ -214,12 +222,14 @@ export class LeagueStatsService {
           away_team:teams!matches_away_team_id_fkey(id, name)
         `)
         .or(`home_team_id.eq.${pick.team_id},away_team_id.eq.${pick.team_id}`)
-        .order('week_number', { ascending: true })
+        .order('week_number', { ascending: true }) as any
 
-      const totalKOsGiven = kosGiven?.reduce((sum, ko) => sum + ko.ko_count, 0) || 0
-      const totalKOsTaken = kosTaken?.reduce((sum, ko) => sum + ko.ko_count, 0) || 0
+      const matches = matchesResponse?.data
 
-      const matchHistory = (matches || []).map(match => {
+      const totalKOsGiven = kosGiven?.reduce((sum: number, ko: any) => sum + ko.ko_count, 0) || 0
+      const totalKOsTaken = kosTaken?.reduce((sum: number, ko: any) => sum + ko.ko_count, 0) || 0
+
+      const matchHistory = (matches || []).map((match: any) => {
         const isHome = match.home_team_id === pick.team_id
         const opponent = isHome ? match.away_team : match.home_team
         const teamScore = isHome ? match.home_score : match.away_score
@@ -231,10 +241,10 @@ export class LeagueStatsService {
         }
 
         // Get KOs for this specific match
-        const matchKOs = kosGiven?.filter(ko =>
-          matches.some(m => m.id === match.id)
+        const matchKOs = kosGiven?.filter((ko: any) =>
+          matches?.some((m: any) => m.id === match.id)
         ) || []
-        const matchKOsGiven = matchKOs.reduce((sum, ko) => sum + ko.ko_count, 0)
+        const matchKOsGiven = matchKOs.reduce((sum: number, ko: any) => sum + ko.ko_count, 0)
 
         return {
           matchId: match.id,
@@ -248,9 +258,9 @@ export class LeagueStatsService {
         }
       })
 
-      const matchesWon = matchHistory.filter(m => m.result === 'won').length
-      const matchesLost = matchHistory.filter(m => m.result === 'lost').length
-      const matchesDrawn = matchHistory.filter(m => m.result === 'draw').length
+      const matchesWon = matchHistory.filter((m: any) => m.result === 'won').length
+      const matchesLost = matchHistory.filter((m: any) => m.result === 'lost').length
+      const matchesDrawn = matchHistory.filter((m: any) => m.result === 'draw').length
 
       return {
         pickId: pick.id,
@@ -289,18 +299,20 @@ export class LeagueStatsService {
     }
 
     try {
-      const { data: teams } = await supabase
+      const teamsResponse = await supabase
         .from('teams')
         .select('id, name')
-        .in('id', [teamAId, teamBId])
+        .in('id', [teamAId, teamBId]) as any
+
+      const teams = teamsResponse?.data
 
       if (!teams || teams.length !== 2) return null
 
-      const teamA = teams.find(t => t.id === teamAId)!
-      const teamB = teams.find(t => t.id === teamBId)!
+      const teamA = teams.find((t: any) => t.id === teamAId)!
+      const teamB = teams.find((t: any) => t.id === teamBId)!
 
       // Get all matches between these teams
-      const { data: matches } = await supabase
+      const matchesResponse = await supabase
         .from('matches')
         .select(`
           id,
@@ -315,7 +327,9 @@ export class LeagueStatsService {
         `)
         .or(`and(home_team_id.eq.${teamAId},away_team_id.eq.${teamBId}),and(home_team_id.eq.${teamBId},away_team_id.eq.${teamAId})`)
         .eq('status', 'completed')
-        .order('week_number', { ascending: true })
+        .order('week_number', { ascending: true }) as any
+
+      const matches = matchesResponse?.data
 
       if (!matches) {
         return {
@@ -341,7 +355,7 @@ export class LeagueStatsService {
       let pointsFor = 0
       let pointsAgainst = 0
 
-      const matchHistory = matches.map(match => {
+      const matchHistory = matches.map((match: any) => {
         const isTeamAHome = match.home_team_id === teamAId
         const teamAScore = isTeamAHome ? match.home_score : match.away_score
         const teamBScore = isTeamAHome ? match.away_score : match.home_score
@@ -410,22 +424,26 @@ export class LeagueStatsService {
     }
 
     try {
-      const { data: team } = await supabase
+      const teamResponse = await supabase
         .from('teams')
         .select('id, name')
         .eq('id', teamId)
-        .single()
+        .single() as any
+
+      const team = teamResponse?.data
 
       if (!team) return null
 
       // Get last 5 completed matches
-      const { data: matches } = await supabase
+      const matchesResponse = await supabase
         .from('matches')
         .select('id, home_team_id, away_team_id, home_score, away_score, winner_team_id')
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
         .eq('status', 'completed')
         .order('week_number', { ascending: false })
-        .limit(5)
+        .limit(5) as any
+
+      const matches = matchesResponse?.data
 
       if (!matches || matches.length === 0) {
         return {
@@ -450,7 +468,7 @@ export class LeagueStatsService {
       let pointsFor = 0
       let pointsAgainst = 0
 
-      matches.reverse().forEach(match => {
+      matches.reverse().forEach((match: any) => {
         const isHome = match.home_team_id === teamId
         const teamScore = isHome ? match.home_score : match.away_score
         const oppScore = isHome ? match.away_score : match.home_score
@@ -530,53 +548,64 @@ export class LeagueStatsService {
     }
 
     try {
-      const { data: team } = await supabase
+      const teamResponse = await supabase
         .from('teams')
         .select('id, name')
         .eq('id', teamId)
-        .single()
+        .single() as any
+
+      const team = teamResponse?.data
 
       if (!team) return null
 
       // Get team standing for W-L-D record
-      const { data: standing } = await supabase
+      const standingResponse = await supabase
         .from('standings')
         .select('wins, losses, draws, points_for, points_against')
         .eq('team_id', teamId)
-        .single()
+        .single() as any
+
+      const standing = standingResponse?.data
 
       // Get all completed matches
-      const { data: matches } = await supabase
+      const matchesResponse = await supabase
         .from('matches')
         .select('id, home_team_id, away_team_id, home_score, away_score, winner_team_id')
         .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-        .eq('status', 'completed')
+        .eq('status', 'completed') as any
+
+      const matches = matchesResponse?.data
 
       // Get Pokemon KO stats
-      const { data: picks } = await supabase
+      const picksResponse = await supabase
         .from('picks')
         .select('id')
-        .eq('team_id', teamId)
+        .eq('team_id', teamId) as any
 
-      const pickIds = picks?.map(p => p.id) || []
+      const picks = picksResponse?.data
+      const pickIds = picks?.map((p: any) => p.id) || []
 
-      const { data: kosGiven } = await supabase
+      const kosGivenResponse = await supabase
         .from('match_pokemon_kos')
         .select('ko_count')
-        .in('pick_id', pickIds)
+        .in('pick_id', pickIds) as any
+
+      const kosGiven = kosGivenResponse?.data
 
       // Get Pokemon status counts
-      const { data: pokemonStatuses } = await supabase
+      const pokemonStatusesResponse = await supabase
         .from('team_pokemon_status')
         .select('status')
-        .eq('team_id', teamId)
+        .eq('team_id', teamId) as any
 
-      const activePokemon = pokemonStatuses?.filter(p => p.status === 'alive').length || 0
-      const faintedPokemon = pokemonStatuses?.filter(p => p.status === 'fainted').length || 0
-      const deadPokemon = pokemonStatuses?.filter(p => p.status === 'dead').length || 0
+      const pokemonStatuses = pokemonStatusesResponse?.data
+
+      const activePokemon = pokemonStatuses?.filter((p: any) => p.status === 'alive').length || 0
+      const faintedPokemon = pokemonStatuses?.filter((p: any) => p.status === 'fainted').length || 0
+      const deadPokemon = pokemonStatuses?.filter((p: any) => p.status === 'dead').length || 0
       const totalPokemon = pokemonStatuses?.length || 1
 
-      const totalKOsGiven = kosGiven?.reduce((sum, ko) => sum + ko.ko_count, 0) || 0
+      const totalKOsGiven = kosGiven?.reduce((sum: number, ko: any) => sum + ko.ko_count, 0) || 0
 
       const wins = standing?.wins || 0
       const losses = standing?.losses || 0

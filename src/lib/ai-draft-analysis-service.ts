@@ -369,21 +369,23 @@ export class AIDraftAnalysisService {
     }
 
     try {
-      const { data: picks } = await supabase
+      const picksResponse = await supabase
         .from('picks')
         .select(`
           *,
           team:teams!inner(id, name)
         `)
         .eq('draft_id', draftId)
-        .order('pick_order', { ascending: true })
+        .order('pick_order', { ascending: true }) as any
 
-      if (!picks) return []
+      if (!picksResponse?.data) return []
+
+      const picks = picksResponse.data
 
       // Calculate average cost as baseline
-      const avgCost = picks.reduce((sum, p) => sum + p.cost, 0) / picks.length
+      const avgCost = picks.reduce((sum: number, p: any) => sum + p.cost, 0) / picks.length
 
-      const analyses = picks.map(pick => {
+      const analyses = picks.map((pick: any) => {
         const expectedCost = avgCost  // Simplified - would use more complex calculation
         const valueRating = ((expectedCost - pick.cost) / expectedCost) * 100
 
@@ -428,14 +430,18 @@ export class AIDraftAnalysisService {
     }
 
     try {
-      const [{ data: draft }, { data: teams }, { data: picks }] = await Promise.all([
+      const [draftResponse, teamsResponse, picksResponse] = await Promise.all([
         supabase.from('drafts').select('status').eq('id', draftId).single(),
         supabase.from('teams').select('id, name').eq('draft_id', draftId),
         supabase.from('picks').select('cost').eq('draft_id', draftId)
-      ])
+      ]) as any[]
+
+      const draft = draftResponse?.data
+      const teams = teamsResponse?.data
+      const picks = picksResponse?.data
 
       const avgPickCost = picks && picks.length > 0
-        ? picks.reduce((sum, p) => sum + p.cost, 0) / picks.length
+        ? picks.reduce((sum: number, p: any) => sum + p.cost, 0) / picks.length
         : 0
 
       // Get top team from comparison

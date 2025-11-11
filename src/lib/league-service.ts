@@ -709,16 +709,18 @@ export class LeagueService {
 
     // For each team, get their picks and initialize status
     for (const team of league.teams) {
-      const { data: picks } = await supabase
+      const picksResponse = await supabase
         .from('picks')
         .select('*')
-        .eq('team_id', team.id)
+        .eq('team_id', team.id) as any
+
+      const picks = picksResponse?.data
 
       if (picks && picks.length > 0) {
         await MatchKOService.initializePokemonStatus(
           leagueId,
           team.id,
-          picks.map(p => ({
+          picks.map((p: any) => ({
             id: p.id,
             draftId: p.draft_id,
             teamId: p.team_id,
