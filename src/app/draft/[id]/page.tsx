@@ -226,6 +226,11 @@ export default function DraftRoomPage() {
   // Pick timer state
   const [pickTimeRemaining, setPickTimeRemaining] = useState<number>(0)
   const [turnStartTime, setTurnStartTime] = useState<number | null>(null)
+  const [lastTrackedTurn, setLastTrackedTurn] = useState<number | null>(null)
+
+  // Draft start transition detection (to increase debounce during critical transition)
+  const [isDraftStarting, setIsDraftStarting] = useState(false)
+  const lastStatusRef = useRef<'waiting' | 'drafting' | 'completed' | 'paused' | null>(null)
 
   // Stabilized timer value for components (updates max once per second)
   const stabilizedTimeRemaining = useMemo(() => Math.floor(pickTimeRemaining), [pickTimeRemaining])
@@ -610,6 +615,21 @@ export default function DraftRoomPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftState?.teams, pokemon])
 
+  // Detect draft start transition to increase debounce
+  useEffect(() => {
+    if (lastStatusRef.current === 'waiting' && draftState?.status === 'drafting') {
+      console.log('[Draft Start] Transition detected: waiting → drafting')
+      setIsDraftStarting(true)
+      // Give 2 seconds for all updates to settle during draft start
+      const timeoutId = setTimeout(() => {
+        console.log('[Draft Start] Cooldown period ended')
+        setIsDraftStarting(false)
+      }, 2000)
+      return () => clearTimeout(timeoutId)
+    }
+    lastStatusRef.current = draftState?.status || null
+  }, [draftState?.status])
+
   // Subscribe to real-time updates
   useEffect(() => {
     if (!roomCode || !isConnected) return
@@ -755,7 +775,8 @@ export default function DraftRoomPage() {
           mounted = false // Stop further updates
         }
       }
-      }, 500) // 500ms debounce - increased from 100ms to account for network latency and prevent infinite loops
+      // Dynamic debounce: 1000ms during draft start transition, 500ms normally
+      }, isDraftStarting ? 1000 : 500)
     })
 
     return () => {
@@ -772,7 +793,7 @@ export default function DraftRoomPage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomCode, isConnected, userId])
+  }, [roomCode, isConnected, userId, isDraftStarting])
 
   // Load current auction for auction drafts
   useEffect(() => {
@@ -817,10 +838,11 @@ export default function DraftRoomPage() {
 
     let isMounted = true // Memory leak prevention flag
 
-    // Reset timer when turn changes
-    if (draftState.currentTurn !== turnStartTime) {
+    // Reset timer when turn changes (fix: compare turn numbers, not turn to timestamp)
+    if (draftState.currentTurn !== lastTrackedTurn) {
       const serverNow = getServerTime()
       if (isMounted) {
+        setLastTrackedTurn(draftState.currentTurn)
         setTurnStartTime(serverNow)
         setPickTimeRemaining(draftState.draftSettings.timeLimit)
       }
@@ -868,7 +890,7 @@ export default function DraftRoomPage() {
         cancelAnimationFrame(animationFrameId)
       }
     }
-  }, [isAuctionDraft, draftState, turnStartTime, notify, getServerTime])
+  }, [isAuctionDraft, draftState, lastTrackedTurn, turnStartTime, notify, getServerTime])
 
   // Derived state - memoized to prevent unnecessary recalculations
   const allDraftedIds = useMemo(() => {
@@ -895,6 +917,25 @@ export default function DraftRoomPage() {
     if (!currentNominatingTeam || !userTeam) return false
     return currentNominatingTeam.id === userTeam.id
   }, [isAuctionDraft, currentAuction, draftState?.status, currentNominatingTeam, userTeam])
+
+  // Memoize AuctionNomination props to prevent infinite re-renders
+  const nominationUserTeam = useMemo(() => {
+    if (!userTeam) return null
+    return {
+      id: userTeam.id,
+      name: userTeam.name,
+      budgetRemaining: userTeam.budgetRemaining
+    }
+  }, [userTeam])
+
+  const nominationCurrentTeam = useMemo(() => {
+    if (!currentNominatingTeam) return null
+    return {
+      id: currentNominatingTeam.id,
+      name: currentNominatingTeam.name,
+      draftOrder: currentNominatingTeam.draftOrder
+    }
+  }, [currentNominatingTeam])
 
   const availablePokemon = useMemo(() => {
     return pokemon?.filter(p => p.isLegal && !allDraftedIds.includes(p.id)) || []
@@ -1092,7 +1133,23 @@ export default function DraftRoomPage() {
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)
     const canDraft = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
-    if (!canDraft) return
+    if (!canDraft) {
+      console.log('[Draft] Cannot draft:', { isUserTurn, isHost, isProxyPickingEnabled, status: draftState?.status })
+      return
+    }
+
+    // Double-check database status before attempting pick (defensive validation)
+    try {
+      const freshDraftState = await DraftService.getDraftState(roomCode.toLowerCase())
+      if (!freshDraftState || freshDraftState.draft.status !== 'active') {
+        notify.error('Draft Not Active', 'The draft is not currently active. Please wait.')
+        return
+      }
+    } catch (error) {
+      console.error('[Draft] Error validating draft status:', error)
+      notify.error('Connection Error', 'Could not validate draft status. Please try again.')
+      return
+    }
 
     // Determine which team to draft for
     let targetTeam: typeof userTeam
@@ -1412,6 +1469,18 @@ export default function DraftRoomPage() {
   // Removed userName/teamName check - authenticated users are automatically joined
   // The draft state will handle whether they're a participant or spectator
 
+  // Memoize DraftResults teams to prevent re-renders on completed drafts
+  // MUST be before conditional returns (Rules of Hooks)
+  const completedDraftTeams = useMemo(() => {
+    if (!draftState?.teams) return []
+    return draftState.teams.map(team => ({
+      ...team,
+      budgetRemaining: draftState?.draftSettings?.draftType === 'auction'
+        ? 100 - team.picks.length * 10
+        : undefined
+    }))
+  }, [draftState?.teams, draftState?.draftSettings?.draftType])
+
   // Show error state
   if (error) {
     return (
@@ -1454,10 +1523,7 @@ export default function DraftRoomPage() {
 
           <DraftResults
             draftName={`${userName}'s Draft`}
-            teams={draftState?.teams ? draftState.teams.map(team => ({
-              ...team,
-              budgetRemaining: draftState?.draftSettings?.draftType === 'auction' ? 100 - team.picks.length * 10 : undefined
-            })) : []}
+            teams={completedDraftTeams}
             picks={draftState?.teams ? draftState.teams.flatMap(team =>
               team.picks.map((pokemonId, index) => ({
                 id: `${team.id}-${index}`,
@@ -1725,16 +1791,8 @@ export default function DraftRoomPage() {
                   // No active auction - show nomination interface
                   <AuctionNomination
                     selectedPokemon={selectedPokemon}
-                    userTeam={userTeam ? {
-                      id: userTeam.id,
-                      name: userTeam.name,
-                      budgetRemaining: userTeam.budgetRemaining
-                    } : null}
-                    currentNominatingTeam={currentNominatingTeam ? {
-                      id: currentNominatingTeam.id,
-                      name: currentNominatingTeam.name,
-                      draftOrder: currentNominatingTeam.draftOrder
-                    } : null}
+                    userTeam={nominationUserTeam}
+                    currentNominatingTeam={nominationCurrentTeam}
                     canNominate={canNominate}
                     onNominate={handleNominatePokemon}
                   />
