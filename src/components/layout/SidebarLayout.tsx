@@ -3,7 +3,7 @@
 import { ReactNode } from 'react'
 import { Sidebar } from './Sidebar'
 import { MobileSidebar } from './MobileSidebar'
-import { Header } from '@/components/Header'
+import { Header } from '@/components/layout/Header'
 
 interface SidebarLayoutProps {
   children: ReactNode
