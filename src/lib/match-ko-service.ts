@@ -415,7 +415,7 @@ export class MatchKOService {
       throw new Error(`Failed to get KO leaderboard: ${error.message}`)
     }
 
-    return data.map(record => ({
+    return data.map((record: any) => ({
       pickId: record.pick_id,
       pokemonId: (record as any).picks.pokemon_id,
       totalKos: record.total_kos || 0,

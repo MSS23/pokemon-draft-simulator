@@ -153,7 +153,7 @@ export class WeeklyHighlightsService {
 
       if (error) throw error
 
-      return (data || []).map(h => ({
+      return (data || []).map((h: any) => ({
         id: h.id,
         leagueId: h.league_id,
         weekNumber: h.week_number,
@@ -396,7 +396,7 @@ export class WeeklyHighlightsService {
 
       if (error) throw error
 
-      return (data || []).map(d => ({
+      return (data || []).map((d: any) => ({
         id: d.id,
         leagueId: d.league_id,
         weekNumber: d.week_number,
