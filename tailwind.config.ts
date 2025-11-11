@@ -52,6 +52,32 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Custom blue palette for consistency
+        navy: {
+          50: "hsl(217, 100%, 97%)",
+          100: "hsl(217, 95%, 90%)",
+          200: "hsl(217, 90%, 80%)",
+          300: "hsl(217, 85%, 70%)",
+          400: "hsl(217, 85%, 60%)",
+          500: "hsl(217, 91%, 50%)", // Base navy
+          600: "hsl(217, 91%, 40%)",
+          700: "hsl(217, 85%, 30%)",
+          800: "hsl(217, 80%, 20%)",
+          900: "hsl(217, 75%, 10%)",
+          950: "hsl(217, 91%, 5%)", // Deep navy for backgrounds
+        },
+        "slate-blue": {
+          50: "hsl(215, 35%, 95%)",
+          100: "hsl(215, 30%, 85%)",
+          200: "hsl(215, 28%, 70%)",
+          300: "hsl(215, 26%, 55%)",
+          400: "hsl(215, 25%, 40%)",
+          500: "hsl(215, 25%, 27%)", // Base slate-blue
+          600: "hsl(215, 25%, 20%)",
+          700: "hsl(215, 25%, 15%)",
+          800: "hsl(215, 25%, 12%)",
+          900: "hsl(215, 25%, 8%)",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
