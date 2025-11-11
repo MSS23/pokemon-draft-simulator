@@ -116,7 +116,7 @@ export default function LeaguePage() {
       .eq('team_id', match.awayTeamId)
 
     if (homePicks && awayPicks) {
-      setHomeTeamPicks(homePicks.map(p => ({
+      setHomeTeamPicks(homePicks.map((p: any) => ({
         id: p.id,
         draftId: p.draft_id,
         teamId: p.team_id,
@@ -127,7 +127,7 @@ export default function LeaguePage() {
         round: p.round,
         createdAt: p.created_at,
       })))
-      setAwayTeamPicks(awayPicks.map(p => ({
+      setAwayTeamPicks(awayPicks.map((p: any) => ({
         id: p.id,
         draftId: p.draft_id,
         teamId: p.team_id,
