@@ -240,9 +240,9 @@ export default function CreateDraftPage() {
   // Show loading state while checking auth
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Checking authentication...</p>
         </div>
       </div>
@@ -250,7 +250,7 @@ export default function CreateDraftPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 pokemon-bg transition-colors duration-500">
+    <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="relative text-center mb-8">
@@ -262,30 +262,30 @@ export default function CreateDraftPage() {
               Signed in as: {userEmail}
             </div>
           )}
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
             Create Draft Room
           </h1>
-          <p className="text-lg text-slate-700 dark:text-slate-300 mb-6">
+          <p className="text-lg text-muted-foreground mb-6">
             Set up a multiplayer Pokémon draft for your team
           </p>
         </div>
 
         <div className="max-w-2xl mx-auto">
-          <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm shadow-xl border-0">
+          <Card className="shadow-xl">
             <CardHeader className="text-center">
-              <CardTitle className="text-2xl text-slate-800 dark:text-slate-100">
+              <CardTitle className="text-2xl">
                 Draft Configuration
               </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
+              <CardDescription>
                 Configure your draft settings and create a room for teams to join
               </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-6">
               {/* User Identity */}
-              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
                   Your Identity
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -298,7 +298,6 @@ export default function CreateDraftPage() {
                       placeholder="Enter your name"
                       value={formData.userName}
                       onChange={(e) => handleInputChange('userName', e.target.value)}
-                      className="bg-white dark:bg-slate-800"
                     />
                   </div>
                   <div className="space-y-2">
@@ -310,16 +309,15 @@ export default function CreateDraftPage() {
                       placeholder="Enter team name"
                       value={formData.teamName}
                       onChange={(e) => handleInputChange('teamName', e.target.value)}
-                      className="bg-white dark:bg-slate-800"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Draft Settings */}
-              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Trophy className="h-5 w-5" />
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
                   Draft Settings
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -328,7 +326,7 @@ export default function CreateDraftPage() {
                       Number of Teams
                     </Label>
                     <Select value={formData.maxTeams} onValueChange={(value) => handleInputChange('maxTeams', value)}>
-                      <SelectTrigger className="bg-white dark:bg-slate-800">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -344,7 +342,7 @@ export default function CreateDraftPage() {
                       Draft Format
                     </Label>
                     <Select value={formData.draftType} onValueChange={(value) => handleInputChange('draftType', value)}>
-                      <SelectTrigger className="bg-white dark:bg-slate-800">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -357,27 +355,27 @@ export default function CreateDraftPage() {
               </div>
 
               {/* Format/Ruleset Selection */}
-              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
                   Pokemon Format & Rules
                 </h3>
 
                 <div className="space-y-3">
                   {/* Toggle for custom format */}
-                  <div className="flex items-start gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <div className="flex items-start gap-3 p-3 bg-card rounded-lg border">
                     <input
                       type="checkbox"
                       id="useCustomFormat"
                       checked={formData.useCustomFormat}
                       onChange={(e) => handleInputChange('useCustomFormat', e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <div className="flex-1">
                       <Label htmlFor="useCustomFormat" className="text-sm font-medium cursor-pointer">
                         Use Custom Pricing (CSV)
                       </Label>
-                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Upload your own Pokemon pricing instead of using a preset format
                       </p>
                     </div>
@@ -400,11 +398,11 @@ export default function CreateDraftPage() {
                           Competitive Format
                         </Label>
                         <Select value={formData.formatId} onValueChange={(value) => handleInputChange('formatId', value)}>
-                          <SelectTrigger className="bg-white dark:bg-slate-800">
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <div className="p-2 text-xs text-slate-600 dark:text-slate-400 border-b">
+                            <div className="p-2 text-xs text-muted-foreground border-b">
                               Popular Formats
                             </div>
                             {popularFormats.map((format) => (
@@ -418,7 +416,7 @@ export default function CreateDraftPage() {
                                 </div>
                               </SelectItem>
                             ))}
-                            <div className="p-2 text-xs text-slate-600 dark:text-slate-400 border-b border-t">
+                            <div className="p-2 text-xs text-muted-foreground border-b border-t">
                               All Formats
                             </div>
                             {POKEMON_FORMATS.filter(f => !popularFormats.some(p => p.id === f.id)).map((format) => (
@@ -440,15 +438,15 @@ export default function CreateDraftPage() {
 
                   {/* Format Information Display */}
                   {selectedFormat && !formData.useCustomFormat && (
-                    <div className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                    <div className="p-3 bg-card rounded-lg border">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{getCategoryIcon(selectedFormat.category)}</span>
                           <div>
-                            <h4 className="font-semibold text-sm text-slate-800 dark:text-slate-200">
+                            <h4 className="font-semibold text-sm">
                               {selectedFormat.name}
                             </h4>
-                            <p className="text-xs text-slate-600 dark:text-slate-400">
+                            <p className="text-xs text-muted-foreground">
                               Generation {selectedFormat.generation} • {selectedFormat.gameType}
                             </p>
                           </div>
@@ -466,12 +464,12 @@ export default function CreateDraftPage() {
                         </div>
                       </div>
 
-                      <p className="text-xs text-slate-700 dark:text-slate-300 mb-3">
+                      <p className="text-xs text-foreground mb-3">
                         {selectedFormat.description}
                       </p>
 
                       <div className="flex flex-wrap gap-2 text-xs">
-                        <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded">
+                        <div className="flex items-center gap-1 px-2 py-1 bg-muted rounded">
                           <Info className="h-3 w-3" />
                           <span>Cost: {selectedFormat.costConfig.minCost}-{selectedFormat.costConfig.maxCost}</span>
                         </div>
@@ -498,18 +496,18 @@ export default function CreateDraftPage() {
                       </div>
 
                       {/* Export Format Button */}
-                      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
+                      <div className="mt-3 pt-3 border-t">
                         <Button
                           onClick={handleExportFormat}
                           disabled={isExporting}
                           variant="outline"
                           size="sm"
-                          className="w-full border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-400"
+                          className="w-full border-primary/30 text-primary hover:bg-primary/10"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           {isExporting ? `Exporting... ${exportProgress}%` : 'Export Pokemon List (CSV)'}
                         </Button>
-                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">
+                        <p className="text-xs text-muted-foreground mt-2">
                           Download this format's Pokemon list with draft points. Edit it to create your own custom format!
                         </p>
                       </div>
@@ -518,14 +516,14 @@ export default function CreateDraftPage() {
 
                   {/* Custom Format Template Download */}
                   {formData.useCustomFormat && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
                       <div className="flex items-start gap-2 mb-2">
-                        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                        <Info className="h-4 w-4 text-primary mt-0.5" />
                         <div className="flex-1">
-                          <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                          <h4 className="text-sm font-medium text-foreground">
                             Need a template?
                           </h4>
-                          <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Download a template CSV file with example Pokemon to get started
                           </p>
                         </div>
@@ -534,7 +532,7 @@ export default function CreateDraftPage() {
                         onClick={handleDownloadTemplate}
                         variant="outline"
                         size="sm"
-                        className="w-full border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-400"
+                        className="w-full border-primary/30 text-primary hover:bg-primary/10"
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Download Custom Format Template
@@ -545,9 +543,9 @@ export default function CreateDraftPage() {
               </div>
 
               {/* Spectator Mode */}
-              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Eye className="h-5 w-5 text-primary" />
                   Spectator Mode
                 </h3>
                 <div className="space-y-4">
@@ -557,13 +555,13 @@ export default function CreateDraftPage() {
                       id="isPublic"
                       checked={formData.isPublic}
                       onChange={(e) => handleInputChange('isPublic', e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <div className="flex-1">
                       <Label htmlFor="isPublic" className="text-sm font-medium cursor-pointer">
                         Make this draft public
                       </Label>
-                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Allow anyone to watch this draft in real-time as a spectator. They won&apos;t be able to participate, only observe.
                       </p>
                     </div>
@@ -580,9 +578,8 @@ export default function CreateDraftPage() {
                         placeholder="Set a password to protect this private draft"
                         value={formData.password}
                         onChange={(e) => handleInputChange('password', e.target.value)}
-                        className="bg-white dark:bg-slate-800"
                       />
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         If set, users will need this password to join your private draft
                       </p>
                     </div>
@@ -600,7 +597,7 @@ export default function CreateDraftPage() {
                           value={formData.description}
                           onChange={(e) => handleInputChange('description', e.target.value)}
                           rows={3}
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 bg-background border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                         />
                       </div>
                       <div className="space-y-2">
@@ -613,9 +610,8 @@ export default function CreateDraftPage() {
                           placeholder="e.g., tournament, competitive, casual (comma-separated)"
                           value={formData.tags}
                           onChange={(e) => handleInputChange('tags', e.target.value)}
-                          className="bg-white dark:bg-slate-800"
                         />
-                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                        <p className="text-xs text-muted-foreground">
                           Separate tags with commas to help others find your draft
                         </p>
                       </div>
@@ -625,9 +621,9 @@ export default function CreateDraftPage() {
               </div>
 
               {/* Time Settings */}
-              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" />
                   Time Settings
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -636,7 +632,7 @@ export default function CreateDraftPage() {
                       Pick Time Limit
                     </Label>
                     <Select value={formData.timeLimit} onValueChange={(value) => handleInputChange('timeLimit', value)}>
-                      <SelectTrigger className="bg-white dark:bg-slate-800">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -659,7 +655,7 @@ export default function CreateDraftPage() {
                       Pokémon per Team {formData.draftType === 'snake' && <span className="text-xs text-slate-500">(min 6 for points-based)</span>}
                     </Label>
                     <Select value={formData.pokemonPerTeam} onValueChange={(value) => handleInputChange('pokemonPerTeam', value)}>
-                      <SelectTrigger className="bg-white dark:bg-slate-800">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -684,7 +680,7 @@ export default function CreateDraftPage() {
                       Budget per Team (Points) <span className="text-xs text-slate-500">Used to draft Pokémon</span>
                     </Label>
                     <Select value={formData.budgetPerTeam} onValueChange={(value) => handleInputChange('budgetPerTeam', value)}>
-                      <SelectTrigger className="bg-white dark:bg-slate-800">
+                      <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -696,7 +692,7 @@ export default function CreateDraftPage() {
                         <SelectItem value="200">200 points</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-muted-foreground">
                       Each Pokémon has a cost based on its strength. Budget determines what you can draft.
                     </p>
                   </div>
@@ -704,9 +700,9 @@ export default function CreateDraftPage() {
               </div>
 
               {/* League Settings */}
-              <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <Trophy className="h-5 w-5" />
+              <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
                   Post-Draft League
                 </h3>
                 <div className="space-y-4">
@@ -716,13 +712,13 @@ export default function CreateDraftPage() {
                       id="createLeague"
                       checked={formData.createLeague}
                       onChange={(e) => handleInputChange('createLeague', e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     />
                     <div className="flex-1">
                       <Label htmlFor="createLeague" className="text-sm font-medium cursor-pointer">
                         Create league after draft
                       </Label>
-                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      <p className="text-xs text-muted-foreground mt-1">
                         Automatically generate a competitive league schedule with standings when the draft completes
                       </p>
                     </div>
@@ -736,7 +732,7 @@ export default function CreateDraftPage() {
                             League Duration (Weeks)
                           </Label>
                           <Select value={formData.leagueWeeks} onValueChange={(value) => handleInputChange('leagueWeeks', value)}>
-                            <SelectTrigger className="bg-white dark:bg-slate-800">
+                            <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -751,20 +747,20 @@ export default function CreateDraftPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                      <div className="flex items-start gap-3 p-3 bg-card rounded-lg border">
                         <input
                           type="checkbox"
                           id="splitIntoConferences"
                           checked={formData.splitIntoConferences}
                           onChange={(e) => handleInputChange('splitIntoConferences', e.target.checked)}
                           disabled={parseInt(formData.maxTeams) < 4}
-                          className="mt-1 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 disabled:opacity-50"
+                          className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50"
                         />
                         <div className="flex-1">
                           <Label htmlFor="splitIntoConferences" className="text-sm font-medium cursor-pointer">
                             Split into 2 conferences
                           </Label>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {parseInt(formData.maxTeams) < 4
                               ? 'Requires at least 4 teams'
                               : 'Creates separate Conference A and Conference B with their own standings and schedules'}
@@ -777,8 +773,8 @@ export default function CreateDraftPage() {
               </div>
 
               {/* Summary */}
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-slate-700 dark:to-slate-600 rounded-lg">
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-3">
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                <h3 className="font-semibold text-foreground mb-3">
                   Draft Summary
                 </h3>
                 <div className="flex flex-wrap gap-2">
@@ -817,7 +813,7 @@ export default function CreateDraftPage() {
               <Button
                 onClick={handleCreateDraft}
                 disabled={!isFormValid || isCreating}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="flex-1"
               >
                 {isCreating ? 'Creating...' : 'Create Draft Room'}
               </Button>
