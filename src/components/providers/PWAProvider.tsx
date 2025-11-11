@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
@@ -10,36 +10,30 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
 
-  useEffect(() => {
-    // Only run in browser
-    if (typeof window === 'undefined') return
+  const handleUpdate = useCallback(() => {
+    if (!waitingWorker) return
 
-    // Register service worker
-    registerServiceWorker()
+    // Tell the waiting service worker to activate
+    waitingWorker.postMessage({ type: 'SKIP_WAITING' })
 
-    // Listen for install prompt
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-      setShowInstallPrompt(true)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-
-    // Listen for app installed
-    window.addEventListener('appinstalled', () => {
-      console.log('[PWA] App installed successfully')
-      setDeferredPrompt(null)
-      setShowInstallPrompt(false)
-      toast.success('App installed! You can now use it offline.')
+    // Reload the page when the new service worker activates
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload()
     })
+  }, [waitingWorker])
 
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    }
-  }, [])
+  const showUpdateNotification = useCallback(() => {
+    toast('New version available!', {
+      description: 'Click to update to the latest version',
+      action: {
+        label: 'Update',
+        onClick: handleUpdate
+      },
+      duration: Infinity
+    })
+  }, [handleUpdate])
 
-  const registerServiceWorker = async () => {
+  const registerServiceWorker = useCallback(async () => {
     if ('serviceWorker' in navigator) {
       try {
         const registration = await navigator.serviceWorker.register('/sw.js', {
@@ -74,20 +68,9 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
         console.error('[PWA] Service Worker registration failed:', error)
       }
     }
-  }
+  }, [showUpdateNotification])
 
-  const showUpdateNotification = () => {
-    toast('New version available!', {
-      description: 'Click to update to the latest version',
-      action: {
-        label: 'Update',
-        onClick: handleUpdate
-      },
-      duration: Infinity
-    })
-  }
-
-  const handleInstall = async () => {
+  const handleInstall = useCallback(async () => {
     if (!deferredPrompt) return
 
     deferredPrompt.prompt()
@@ -97,19 +80,36 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
 
     setDeferredPrompt(null)
     setShowInstallPrompt(false)
-  }
+  }, [deferredPrompt])
 
-  const handleUpdate = () => {
-    if (!waitingWorker) return
+  useEffect(() => {
+    // Only run in browser
+    if (typeof window === 'undefined') return
 
-    // Tell the waiting service worker to activate
-    waitingWorker.postMessage({ type: 'SKIP_WAITING' })
+    // Register service worker
+    registerServiceWorker()
 
-    // Reload the page when the new service worker activates
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload()
+    // Listen for install prompt
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstallPrompt(true)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+
+    // Listen for app installed
+    window.addEventListener('appinstalled', () => {
+      console.log('[PWA] App installed successfully')
+      setDeferredPrompt(null)
+      setShowInstallPrompt(false)
+      toast.success('App installed! You can now use it offline.')
     })
-  }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    }
+  }, [registerServiceWorker])
 
   // Show install prompt after 30 seconds if not dismissed
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
     }, 30000)
 
     return () => clearTimeout(timer)
-  }, [showInstallPrompt, deferredPrompt])
+  }, [showInstallPrompt, deferredPrompt, handleInstall])
 
   return <>{children}</>
 }

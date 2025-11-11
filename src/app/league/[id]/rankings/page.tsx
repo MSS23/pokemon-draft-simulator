@@ -7,7 +7,7 @@
  * considering record, form, and performance metrics.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,11 +48,7 @@ export default function PowerRankingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadRankings()
-  }, [leagueId])
-
-  const loadRankings = async () => {
+  const loadRankings = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -135,7 +131,11 @@ export default function PowerRankingsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [leagueId])
+
+  useEffect(() => {
+    loadRankings()
+  }, [loadRankings])
 
   if (isLoading) {
     return (

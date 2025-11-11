@@ -143,43 +143,43 @@ export function usePokemonDataManager(
   // Search
   const search = useCallback((query: string, filters?: SearchFilters): SearchResult[] => {
     return PokemonDataManager.search(query, filters)
-  }, [updateCounter])
+  }, [])
 
   // Filter
   const filter = useCallback((filters: SearchFilters): PokemonWithMetadata[] => {
     return PokemonDataManager.filter(filters)
-  }, [updateCounter])
+  }, [])
 
   // Get Pokemon by ID
   const getPokemon = useCallback((id: string): PokemonWithMetadata | null => {
     return PokemonDataManager.getPokemon(id)
-  }, [updateCounter])
+  }, [])
 
   // Get Pokemon by type
   const getPokemonByType = useCallback((type: string): PokemonWithMetadata[] => {
     return PokemonDataManager.getPokemonByType(type)
-  }, [updateCounter])
+  }, [])
 
   // Get Pokemon by ability
   const getPokemonByAbility = useCallback((ability: string): PokemonWithMetadata[] => {
     return PokemonDataManager.getPokemonByAbility(ability)
-  }, [updateCounter])
+  }, [])
 
   // Validate Pokemon
   const validatePokemon = useCallback((id: string) => {
     return PokemonDataManager.validatePokemon(id)
-  }, [updateCounter])
+  }, [])
 
   // Get Pokemon cost
   const getPokemonCost = useCallback((id: string): number => {
     return PokemonDataManager.getPokemonCost(id)
-  }, [updateCounter])
+  }, [])
 
   // Computed values
-  const allPokemon = useMemo(() => PokemonDataManager.getAllPokemon(false), [updateCounter])
-  const legalPokemon = useMemo(() => PokemonDataManager.getAllPokemon(true), [updateCounter])
-  const types = useMemo(() => PokemonDataManager.getAllTypes(), [updateCounter])
-  const abilities = useMemo(() => PokemonDataManager.getAllAbilities(), [updateCounter])
+  const allPokemon = useMemo(() => PokemonDataManager.getAllPokemon(false), [])
+  const legalPokemon = useMemo(() => PokemonDataManager.getAllPokemon(true), [])
+  const types = useMemo(() => PokemonDataManager.getAllTypes(), [])
+  const abilities = useMemo(() => PokemonDataManager.getAllAbilities(), [])
 
   // Get stats
   const [stats, setStats] = useState<any>(null)

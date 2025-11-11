@@ -228,7 +228,7 @@ export default function DraftRoomPage() {
   const [turnStartTime, setTurnStartTime] = useState<number | null>(null)
 
   // Stabilized timer value for components (updates max once per second)
-  const stabilizedTimeRemaining = useMemo(() => Math.floor(pickTimeRemaining), [Math.floor(pickTimeRemaining)])
+  const stabilizedTimeRemaining = useMemo(() => Math.floor(pickTimeRemaining), [pickTimeRemaining])
 
   // Server time synchronization state
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
@@ -385,13 +385,13 @@ export default function DraftRoomPage() {
     if (!draftState?.teams || !draftState.userTeamId) return null
     const team = draftState.teams.find(t => t.id === draftState.userTeamId)
     return team || null
-  }, [teamsSignature, draftState?.userTeamId])
+  }, [draftState?.userTeamId, draftState?.teams])
 
   const currentTeam = useMemo(() => {
     if (!draftState?.teams || !draftState.currentTeam) return null
     const team = draftState.teams.find(t => t.id === draftState.currentTeam)
     return team || null
-  }, [teamsSignature, draftState?.currentTeam])
+  }, [draftState?.currentTeam, draftState?.teams])
 
   const isUserTurn = useMemo(() =>
     draftState?.userTeamId === draftState?.currentTeam,
@@ -523,7 +523,7 @@ export default function DraftRoomPage() {
       mounted = false
       abortController.abort()
     }
-  }, [roomCode, userId, transformDraftState])
+  }, [roomCode, userId, transformDraftState, router])
 
   // Server time synchronization - prevents timer drift
   useEffect(() => {
@@ -949,7 +949,7 @@ export default function DraftRoomPage() {
       console.error('Error adding to wishlist:', error)
       currentNotify.error('Failed to Add', 'Could not add Pokémon to wishlist')
     }
-  }, [roomCode]) // Only roomCode dependency - stable
+  }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef])
 
   // Stable handleRemoveFromWishlist - reads from refs instead of closure
   const handleRemoveFromWishlist = useCallback(async (pokemon: Pokemon) => {
@@ -973,7 +973,7 @@ export default function DraftRoomPage() {
       console.error('Error removing from wishlist:', error)
       currentNotify.error('Failed to Remove', 'Could not remove Pokémon from wishlist')
     }
-  }, [roomCode]) // Only roomCode dependency - stable
+  }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef])
 
   // Get wishlist Pokemon IDs for the current user
   const wishlistPokemonIds = useMemo(() => {
@@ -1040,7 +1040,7 @@ export default function DraftRoomPage() {
     })
 
     return activities.sort((a, b) => b.timestamp - a.timestamp)
-  }, [picksSignature, pokemon])
+  }, [pokemon, draftState?.teams])
 
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)

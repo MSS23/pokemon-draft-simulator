@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,13 +36,7 @@ export function AIDraftAssistant({
   const [isExpanded, setIsExpanded] = useState(true)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
-  useEffect(() => {
-    if (availablePokemon.length > 0 && isYourTurn) {
-      analyzeNow()
-    }
-  }, [currentTeam, availablePokemon.length, isYourTurn])
-
-  const analyzeNow = () => {
+  const analyzeNow = useCallback(() => {
     setIsAnalyzing(true)
     setTimeout(() => {
       const result = generateAssistantAnalysis(
@@ -56,7 +50,13 @@ export function AIDraftAssistant({
       setAnalysis(result)
       setIsAnalyzing(false)
     }, 500)
-  }
+  }, [availablePokemon, currentTeam, opponentTeams, remainingBudget, remainingPicks, format])
+
+  useEffect(() => {
+    if (availablePokemon.length > 0 && isYourTurn) {
+      analyzeNow()
+    }
+  }, [analyzeNow, availablePokemon.length, isYourTurn])
 
   if (!isExpanded) {
     return (

@@ -10,7 +10,7 @@
  * - Propose new trades
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -39,11 +39,7 @@ export default function LeagueTradesPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadTradesData()
-  }, [leagueId])
-
-  const loadTradesData = async () => {
+  const loadTradesData = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -99,7 +95,11 @@ export default function LeagueTradesPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [leagueId])
+
+  useEffect(() => {
+    loadTradesData()
+  }, [loadTradesData])
 
   const handleAcceptTrade = async (tradeId: string, teamId: string) => {
     try {

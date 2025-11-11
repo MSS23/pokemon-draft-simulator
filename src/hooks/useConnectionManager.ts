@@ -46,19 +46,6 @@ export function useConnectionManager(): UseConnectionManagerReturn {
   
   const lastNotificationRef = useRef<string>('')
 
-  // Subscribe to connection changes
-  useEffect(() => {
-    const unsubscribe = connectionManager.subscribe((state) => {
-      setConnectionState(state)
-      setNetworkQuality(connectionManager.getNetworkQuality())
-      
-      // Handle connection state notifications
-      handleConnectionStateChange(state)
-    })
-
-    return unsubscribe
-  }, [])
-
   // Handle connection state change notifications
   const handleConnectionStateChange = useCallback((state: ConnectionState) => {
     const currentStatus = state.status
@@ -122,6 +109,19 @@ export function useConnectionManager(): UseConnectionManagerReturn {
         break
     }
   }, [])
+
+  // Subscribe to connection changes
+  useEffect(() => {
+    const unsubscribe = connectionManager.subscribe((state) => {
+      setConnectionState(state)
+      setNetworkQuality(connectionManager.getNetworkQuality())
+
+      // Handle connection state notifications
+      handleConnectionStateChange(state)
+    })
+
+    return unsubscribe
+  }, [handleConnectionStateChange])
 
   // Wrapped actions with error handling
   const forceReconnect = useCallback(async (): Promise<boolean> => {

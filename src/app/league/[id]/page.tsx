@@ -10,7 +10,7 @@
  * - Quick stats
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -43,11 +43,7 @@ export default function LeaguePage() {
   const [canAdvance, setCanAdvance] = useState(false)
   const [isAdvancing, setIsAdvancing] = useState(false)
 
-  useEffect(() => {
-    loadLeagueData()
-  }, [leagueId])
-
-  const loadLeagueData = async () => {
+  const loadLeagueData = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -88,7 +84,11 @@ export default function LeaguePage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [leagueId])
+
+  useEffect(() => {
+    loadLeagueData()
+  }, [loadLeagueData])
 
   const handleAdvanceWeek = async () => {
     try {

@@ -86,7 +86,7 @@ export default function CreateDraftPage() {
     }
 
     checkAuth()
-  }, [router])
+  }, [router, notify])
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => {

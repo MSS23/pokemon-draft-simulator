@@ -11,7 +11,7 @@
  * - Form indicators
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -62,11 +62,7 @@ export default function TeamDetailPage() {
   const [canAnalyzeTeams, setCanAnalyzeTeams] = useState(false)
   const [accessChecked, setAccessChecked] = useState(false)
 
-  useEffect(() => {
-    loadTeamData()
-  }, [teamId])
-
-  const loadTeamData = async () => {
+  const loadTeamData = useCallback(async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -111,7 +107,11 @@ export default function TeamDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [teamId, leagueId])
+
+  useEffect(() => {
+    loadTeamData()
+  }, [loadTeamData])
 
   const handleAnalyzeTeam = async () => {
     if (!stats) return

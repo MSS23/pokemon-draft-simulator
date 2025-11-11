@@ -108,7 +108,7 @@ export default function AuctionBiddingInterface({
     )
 
     return unsubscribe
-  }, [currentAuction?.id, userTeamId])
+  }, [currentAuction, userTeamId])
 
   const handlePlaceBid = async () => {
     if (!currentAuction || !userTeam || isPlacingBid) return

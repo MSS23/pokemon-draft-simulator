@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,7 @@ export default function WatchDraftsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'setup' | 'active' | 'completed'>('all')
 
-  const loadPublicDrafts = async () => {
+  const loadPublicDrafts = useCallback(async () => {
     try {
       setIsLoading(true)
       const data = await DraftService.getPublicDrafts({
@@ -50,11 +50,11 @@ export default function WatchDraftsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [statusFilter, notify])
 
   useEffect(() => {
     loadPublicDrafts()
-  }, [statusFilter])
+  }, [loadPublicDrafts])
 
   useEffect(() => {
     if (!searchQuery) {
