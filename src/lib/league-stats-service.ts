@@ -670,15 +670,17 @@ export class LeagueStatsService {
     }
 
     try {
-      const { data: teams } = await supabase
+      const teamsResponse = await supabase
         .from('teams')
         .select('id')
-        .eq('draft_id', leagueId)
+        .eq('draft_id', leagueId) as any
+
+      const teams = teamsResponse?.data
 
       if (!teams) return []
 
       const forms = await Promise.all(
-        teams.map(team => this.getTeamForm(team.id))
+        teams.map((team: any) => this.getTeamForm(team.id))
       )
 
       return forms.filter((f): f is TeamFormIndicator => f !== null)

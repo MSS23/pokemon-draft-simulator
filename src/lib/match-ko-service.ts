@@ -42,18 +42,20 @@ export class MatchKOService {
     }
 
     // Get pick details to find pokemon_id
-    const { data: pick, error: pickError } = await supabase
+    const pickResponse = await supabase
       .from('picks')
       .select('pokemon_id')
       .eq('id', pickId)
-      .single()
+      .single() as any
 
-    if (pickError || !pick) {
-      throw new Error(`Failed to find pick: ${pickError?.message || 'Not found'}`)
+    if (pickResponse.error || !pickResponse.data) {
+      throw new Error(`Failed to find pick: ${pickResponse.error?.message || 'Not found'}`)
     }
 
+    const pick = pickResponse.data
+
     // Insert KO record
-    const { data, error } = await supabase
+    const koResponse = (await supabase
       .from('match_pokemon_kos')
       .insert({
         match_id: matchId,
@@ -63,9 +65,12 @@ export class MatchKOService {
         ko_count: koCount,
         is_death: isDeath,
         ko_details: details || null,
-      })
+      } as any)
       .select()
-      .single()
+      .single()) as any
+
+    const data = koResponse?.data
+    const error = koResponse?.error
 
     if (error) {
       throw new Error(`Failed to record Pokemon KO: ${error.message}`)
@@ -115,8 +120,8 @@ export class MatchKOService {
     }
 
     // Update status to 'dead'
-    const { data, error } = await supabase
-      .from('team_pokemon_status')
+    const statusResponse = await (supabase
+      .from('team_pokemon_status') as any)
       .update({
         status: 'dead',
         death_match_id: matchId,
@@ -126,6 +131,9 @@ export class MatchKOService {
       .eq('pick_id', pickId)
       .select()
       .single()
+
+    const data = statusResponse?.data
+    const error = statusResponse?.error
 
     if (error) {
       throw new Error(`Failed to mark Pokemon as dead: ${error.message}`)
@@ -176,18 +184,21 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const response = await supabase
       .from('match_pokemon_kos')
       .select('*')
       .eq('match_id', matchId)
       .order('game_number', { ascending: true })
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: true }) as any
+
+    const data = response?.data
+    const error = response?.error
 
     if (error) {
       throw new Error(`Failed to get match KOs: ${error.message}`)
     }
 
-    return data.map(ko => ({
+    return data.map((ko: any) => ({
       id: ko.id,
       matchId: ko.match_id,
       gameNumber: ko.game_number,
@@ -227,12 +238,14 @@ export class MatchKOService {
       matches_won: 0,
     }))
 
-    const { error } = await supabase
-      .from('team_pokemon_status')
+    const response = await (supabase
+      .from('team_pokemon_status') as any)
       .upsert(statusRecords, {
         onConflict: 'pick_id,league_id',
         ignoreDuplicates: false,
       })
+
+    const error = response?.error
 
     if (error) {
       throw new Error(`Failed to initialize Pokemon status: ${error.message}`)
