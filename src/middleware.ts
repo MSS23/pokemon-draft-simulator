@@ -146,6 +146,9 @@ export async function middleware(request: NextRequest) {
     '/leagues',
     '/friends',
     '/achievements',
+    '/settings',
+    '/dashboard',
+    '/history',
   ]
 
   // Define admin routes that require admin access
