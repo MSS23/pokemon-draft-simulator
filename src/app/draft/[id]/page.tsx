@@ -1075,6 +1075,20 @@ export default function DraftRoomPage() {
       }))
   }, [draftState?.teams, draftState?.userTeamId, pokemon, roomCode])
 
+  // Memoize AI Assistant format and callback props to prevent infinite re-renders
+  const aiFormat = useMemo(() => ({
+    id: formatId,
+    name: formatId
+  } as any), [formatId])
+
+  const handleAISelectPokemon = useCallback((pokemon: Pokemon) => {
+    setSelectedPokemon(pokemon)
+    // Auto-scroll to selection area
+    if (!isAuctionDraft && isUserTurn) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [isAuctionDraft, isUserTurn])
+
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)
     const canDraft = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
@@ -1792,14 +1806,8 @@ export default function DraftRoomPage() {
                 opponentTeams={aiOpponentTeams}
                 remainingBudget={userTeam?.budgetRemaining || 0}
                 remainingPicks={(draftState.draftSettings.pokemonPerTeam || 6) - (userTeam?.picks.length || 0)}
-                format={{ id: formatId, name: formatId } as any}
-                onSelectPokemon={(pokemon) => {
-                  setSelectedPokemon(pokemon)
-                  // Auto-scroll to selection area
-                  if (!isAuctionDraft && isUserTurn) {
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }
-                }}
+                format={aiFormat}
+                onSelectPokemon={handleAISelectPokemon}
                 isYourTurn={isUserTurn}
               />
             </EnhancedErrorBoundary>
