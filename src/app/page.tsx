@@ -145,7 +145,7 @@ export default function Home() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 transition-colors duration-500">
+    <div className="min-h-screen bg-background transition-colors duration-500">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Error Banner */}
         {error && (
@@ -166,7 +166,7 @@ export default function Home() {
 
         {/* Hero Section */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
+          <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
             Pokémon Draft League
           </h1>
           <p className="text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-2">
@@ -189,14 +189,14 @@ export default function Home() {
               }
               window.location.href = '/create-draft'
             }}
-            className="group relative bg-white dark:bg-slate-800 rounded-xl p-6 border-2 border-purple-200 dark:border-purple-800 hover:border-purple-400 dark:hover:border-purple-600 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
+            className="group relative bg-card rounded-xl p-6 border-2 border-primary/20 hover:border-primary/50 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
           >
             <div className="flex flex-col items-center text-center">
-              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div className="h-14 w-14 rounded-full bg-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <Users className="h-7 w-7 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Create Draft</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Set up a new draft room and invite your friends</p>
+              <h3 className="text-lg font-bold text-foreground mb-2">Create Draft</h3>
+              <p className="text-sm text-muted-foreground">Set up a new draft room and invite your friends</p>
             </div>
           </div>
 
@@ -208,28 +208,28 @@ export default function Home() {
                 window.location.href = `/join-draft?code=${code.toUpperCase()}`
               }
             }}
-            className="group relative bg-white dark:bg-slate-800 rounded-xl p-6 border-2 border-blue-200 dark:border-blue-800 hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
+            className="group relative bg-card rounded-xl p-6 border-2 border-accent/20 hover:border-accent/50 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
           >
             <div className="flex flex-col items-center text-center">
-              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div className="h-14 w-14 rounded-full bg-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <Play className="h-7 w-7 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Join Draft</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Enter a room code to join an existing draft</p>
+              <h3 className="text-lg font-bold text-foreground mb-2">Join Draft</h3>
+              <p className="text-sm text-muted-foreground">Enter a room code to join an existing draft</p>
             </div>
           </div>
 
           {/* Watch Drafts Card */}
           <div
             onClick={() => router.push('/watch-drafts')}
-            className="group relative bg-white dark:bg-slate-800 rounded-xl p-6 border-2 border-cyan-200 dark:border-cyan-800 hover:border-cyan-400 dark:hover:border-cyan-600 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
+            className="group relative bg-card rounded-xl p-6 border-2 border-blue-300/20 dark:border-blue-700/20 hover:border-blue-400/50 dark:hover:border-blue-600/50 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
           >
             <div className="flex flex-col items-center text-center">
-              <div className="h-14 w-14 rounded-full bg-gradient-to-r from-cyan-600 to-teal-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+              <div className="h-14 w-14 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                 <Eye className="h-7 w-7 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-2">Watch Live</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Spectate public drafts from the community</p>
+              <h3 className="text-lg font-bold text-foreground mb-2">Watch Live</h3>
+              <p className="text-sm text-muted-foreground">Spectate public drafts from the community</p>
             </div>
           </div>
         </div>
