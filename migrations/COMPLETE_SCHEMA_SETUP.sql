@@ -501,9 +501,12 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trigger_update_match_pokemon_kos_updated_at ON match_pokemon_kos;
-EXCEPTION
-  WHEN undefined_table THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trigger_update_match_pokemon_kos_updated_at'
+  ) THEN
+    DROP TRIGGER trigger_update_match_pokemon_kos_updated_at ON match_pokemon_kos;
+  END IF;
 END $$;
 
 CREATE TRIGGER trigger_update_match_pokemon_kos_updated_at
@@ -521,9 +524,12 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trigger_update_team_pokemon_status_updated_at ON team_pokemon_status;
-EXCEPTION
-  WHEN undefined_table THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trigger_update_team_pokemon_status_updated_at'
+  ) THEN
+    DROP TRIGGER trigger_update_team_pokemon_status_updated_at ON team_pokemon_status;
+  END IF;
 END $$;
 
 CREATE TRIGGER trigger_update_team_pokemon_status_updated_at
@@ -695,9 +701,12 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trigger_update_trades_updated_at ON trades;
-EXCEPTION
-  WHEN undefined_table THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trigger_update_trades_updated_at'
+  ) THEN
+    DROP TRIGGER trigger_update_trades_updated_at ON trades;
+  END IF;
 END $$;
 
 CREATE TRIGGER trigger_update_trades_updated_at
@@ -725,9 +734,12 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trigger_validate_trade_pokemon ON trades;
-EXCEPTION
-  WHEN undefined_table THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trigger_validate_trade_pokemon'
+  ) THEN
+    DROP TRIGGER trigger_validate_trade_pokemon ON trades;
+  END IF;
 END $$;
 
 CREATE TRIGGER trigger_validate_trade_pokemon
@@ -753,9 +765,12 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS trigger_set_trade_responded_at ON trades;
-EXCEPTION
-  WHEN undefined_table THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trigger_set_trade_responded_at'
+  ) THEN
+    DROP TRIGGER trigger_set_trade_responded_at ON trades;
+  END IF;
 END $$;
 
 CREATE TRIGGER trigger_set_trade_responded_at
@@ -955,9 +970,12 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS weekly_summaries_updated_at ON weekly_summaries;
-EXCEPTION
-  WHEN undefined_table THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'weekly_summaries_updated_at'
+  ) THEN
+    DROP TRIGGER weekly_summaries_updated_at ON weekly_summaries;
+  END IF;
 END $$;
 
 CREATE TRIGGER weekly_summaries_updated_at
@@ -967,9 +985,12 @@ CREATE TRIGGER weekly_summaries_updated_at
 
 DO $$
 BEGIN
-  DROP TRIGGER IF EXISTS weekly_highlights_updated_at ON weekly_highlights;
-EXCEPTION
-  WHEN undefined_table THEN NULL;
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'weekly_highlights_updated_at'
+  ) THEN
+    DROP TRIGGER weekly_highlights_updated_at ON weekly_highlights;
+  END IF;
 END $$;
 
 CREATE TRIGGER weekly_highlights_updated_at
