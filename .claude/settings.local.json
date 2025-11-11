@@ -53,7 +53,10 @@
       "Bash(ls:*)",
       "Bash(where convert)",
       "Bash(where magick)",
-      "Bash(node scripts/generate-icons.js)"
+      "Bash(node scripts/generate-icons.js)",
+      "Bash(migrations/COMPLETE_SCHEMA.sql)",
+      "Bash(del:*)",
+      "Bash(git -C \"c:\\Users\\msidh\\Documents\\Projects\\Pokemon Draft\" status --short)"
     ],
     "deny": [],
     "ask": []
