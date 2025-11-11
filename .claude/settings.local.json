@@ -56,7 +56,8 @@
       "Bash(node scripts/generate-icons.js)",
       "Bash(migrations/COMPLETE_SCHEMA.sql)",
       "Bash(del:*)",
-      "Bash(git -C \"c:\\Users\\msidh\\Documents\\Projects\\Pokemon Draft\" status --short)"
+      "Bash(git -C \"c:\\Users\\msidh\\Documents\\Projects\\Pokemon Draft\" status --short)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []
