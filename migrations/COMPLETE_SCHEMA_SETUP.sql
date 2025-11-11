@@ -499,7 +499,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_update_match_pokemon_kos_updated_at ON match_pokemon_kos;
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS trigger_update_match_pokemon_kos_updated_at ON match_pokemon_kos;
+EXCEPTION
+  WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TRIGGER trigger_update_match_pokemon_kos_updated_at
   BEFORE UPDATE ON match_pokemon_kos
   FOR EACH ROW
@@ -513,7 +519,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_update_team_pokemon_status_updated_at ON team_pokemon_status;
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS trigger_update_team_pokemon_status_updated_at ON team_pokemon_status;
+EXCEPTION
+  WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TRIGGER trigger_update_team_pokemon_status_updated_at
   BEFORE UPDATE ON team_pokemon_status
   FOR EACH ROW
@@ -681,7 +693,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_update_trades_updated_at ON trades;
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS trigger_update_trades_updated_at ON trades;
+EXCEPTION
+  WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TRIGGER trigger_update_trades_updated_at
   BEFORE UPDATE ON trades
   FOR EACH ROW
@@ -705,7 +723,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_validate_trade_pokemon ON trades;
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS trigger_validate_trade_pokemon ON trades;
+EXCEPTION
+  WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TRIGGER trigger_validate_trade_pokemon
   BEFORE INSERT OR UPDATE ON trades
   FOR EACH ROW
@@ -727,7 +751,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trigger_set_trade_responded_at ON trades;
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS trigger_set_trade_responded_at ON trades;
+EXCEPTION
+  WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TRIGGER trigger_set_trade_responded_at
   BEFORE UPDATE ON trades
   FOR EACH ROW
@@ -923,13 +953,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS weekly_summaries_updated_at ON weekly_summaries;
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS weekly_summaries_updated_at ON weekly_summaries;
+EXCEPTION
+  WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TRIGGER weekly_summaries_updated_at
   BEFORE UPDATE ON weekly_summaries
   FOR EACH ROW
   EXECUTE FUNCTION update_weekly_summaries_updated_at();
 
-DROP TRIGGER IF EXISTS weekly_highlights_updated_at ON weekly_highlights;
+DO $$
+BEGIN
+  DROP TRIGGER IF EXISTS weekly_highlights_updated_at ON weekly_highlights;
+EXCEPTION
+  WHEN undefined_table THEN NULL;
+END $$;
+
 CREATE TRIGGER weekly_highlights_updated_at
   BEFORE UPDATE ON weekly_highlights
   FOR EACH ROW
