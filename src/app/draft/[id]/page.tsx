@@ -1137,7 +1137,7 @@ export default function DraftRoomPage() {
           cost: pokemon.find(p => p.id === pokemonId)?.cost || 0,
           pickOrder: 0,
           round: 1,
-          createdAt: new Date().toISOString()
+          createdAt: `pick-${t.id}-${pokemonId}` // Stable ID to prevent re-renders
         }))
       }))
   }, [draftState?.teams, draftState?.userTeamId, pokemon, roomCode])

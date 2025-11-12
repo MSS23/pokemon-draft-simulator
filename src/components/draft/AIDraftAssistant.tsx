@@ -85,7 +85,11 @@ export function AIDraftAssistant({
         clearTimeout(analysisTimeoutRef.current)
       }
     }
-  }, [availablePokemon.length, isYourTurn, analyzeNow])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Note: analyzeNow is intentionally omitted to prevent infinite re-render loop
+    // The callback is recreated when its dependencies change (via useCallback deps),
+    // which triggers re-analysis through availablePokemon.length changes
+  }, [availablePokemon.length, isYourTurn])
 
   if (!isExpanded) {
     return (
