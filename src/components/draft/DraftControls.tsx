@@ -161,14 +161,14 @@ const DraftControls = memo(function DraftControls({
   }
 
   const handleDeleteDraft = () => {
-    const confirmed = window.confirm('⚠️ DANGER: Are you sure you want to DELETE this entire draft?\n\nThis will permanently delete:\n- All teams\n- All picks\n- All participants\n- The entire draft room\n\nThis action CANNOT be undone!')
+    const confirmed = window.confirm('⚠️ DANGER: Are you sure you want to DELETE this entire draft?\n\nThis will:\n- Remove the draft room\n- Kick out all participants\n- Remove it from everyone\'s draft list\n\nThis action CANNOT be undone!')
 
     if (confirmed) {
-      const doubleConfirm = window.prompt('Type "DELETE" to confirm permanent deletion:')
+      const doubleConfirm = window.prompt('Type "DELETE" to confirm deletion:')
       if (doubleConfirm === 'DELETE') {
         if (onDeleteDraft) {
+          notify.info('Deleting Draft...', 'Notifying all participants and cleaning up data')
           onDeleteDraft()
-          notify.error('Draft Deleted', 'The draft has been permanently deleted')
         }
       } else {
         notify.info('Cancelled', 'Draft deletion cancelled')

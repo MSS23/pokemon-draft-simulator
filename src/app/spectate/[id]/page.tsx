@@ -80,7 +80,22 @@ export default function SpectateRoomPage() {
   useEffect(() => {
     if (!roomCode || !draftState || !isValidRoomCode) return;
 
-    const unsubscribe = DraftService.subscribeToDraft(roomCode, async () => {
+    const unsubscribe = DraftService.subscribeToDraft(roomCode, async (payload) => {
+      // Handle draft deletion event
+      if (payload?.eventType === 'draft_deleted') {
+        console.log('[Spectator] Draft deletion event received:', payload.new);
+
+        // Show notification
+        setError('This draft has been deleted by the host');
+
+        // Redirect to spectate list after a short delay
+        setTimeout(() => {
+          router.push('/spectate?deleted=true');
+        }, 2000);
+
+        return; // Don't process further
+      }
+
       try {
         const state = await DraftService.getDraftState(roomCode);
         if (state) {
@@ -109,7 +124,7 @@ export default function SpectateRoomPage() {
     });
 
     return unsubscribe;
-  }, [roomCode, draftState, isValidRoomCode]);
+  }, [roomCode, draftState, isValidRoomCode, router]);
 
   if (isLoading) {
     return (

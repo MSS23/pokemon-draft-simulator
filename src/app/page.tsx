@@ -118,11 +118,14 @@ export default function Home() {
       // Optimistically remove from UI first
       setMyDrafts(prev => prev.filter(d => d.draftId !== draftId))
 
-      // Delete from database
-      await DraftService.deleteDraft(draftId)
+      // Delete from database (pass userId for soft delete and broadcast)
+      const userId = user?.id || ''
+      await DraftService.deleteDraft(draftId, userId)
 
       // Remove from local storage
       UserSessionService.removeDraftParticipation(draftId)
+
+      toast.success('Draft deleted. All participants have been notified.')
 
     } catch (error) {
       console.error('Error deleting draft:', error)

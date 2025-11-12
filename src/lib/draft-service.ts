@@ -944,6 +944,15 @@ export class DraftService {
             table: 'auctions',
             filter: `draft_id=eq.${draftUuid}`
           }, callback)
+          .on('broadcast', {
+            event: 'draft_deleted'
+          }, (payload: any) => {
+            console.log('[Subscribe] Draft deletion broadcast received:', payload)
+            callback({
+              eventType: 'draft_deleted',
+              new: payload.payload
+            })
+          })
 
         // Don't subscribe if cleanup already happened
         if (isCleanedUp) {
@@ -1234,7 +1243,66 @@ export class DraftService {
     }
   }
 
-  static async deleteDraft(draftId: string): Promise<void> {
+  static async deleteDraft(draftId: string, userId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    // Get the draft to verify it exists and get the internal ID
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const internalId = draftState.draft.id
+
+    // STEP 1: Broadcast deletion event BEFORE soft-deleting
+    // This ensures participants receive the notification before losing access
+    try {
+      const channel = supabase.channel(`draft:${draftId}`)
+      await channel.send({
+        type: 'broadcast',
+        event: 'draft_deleted',
+        payload: {
+          draftId,
+          deletedBy: userId,
+          deletedAt: new Date().toISOString(),
+          message: 'This draft has been deleted by the host'
+        }
+      })
+
+      // Give time for message to propagate
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Unsubscribe the channel
+      await channel.unsubscribe()
+    } catch (error) {
+      console.warn('Failed to broadcast deletion event:', error)
+      // Continue with deletion even if broadcast fails
+    }
+
+    // STEP 2: Soft delete the draft
+    const { error: draftError } = await (supabase
+      .from('drafts') as any)
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+        status: 'deleted',  // Mark as deleted status for UI
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', internalId)
+
+    if (draftError) {
+      console.error('Error soft-deleting draft:', draftError)
+      throw new Error('Failed to delete draft')
+    }
+
+    console.log(`[DraftService] Draft ${draftId} soft-deleted by user ${userId}`)
+  }
+
+  /**
+   * Hard delete a draft (admin only)
+   * Permanently removes draft and all related data
+   */
+  static async hardDeleteDraft(draftId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 
     // Get the draft to verify it exists and get the internal ID
@@ -1294,9 +1362,11 @@ export class DraftService {
       .eq('id', internalId)
 
     if (draftError) {
-      console.error('Error deleting draft:', draftError)
+      console.error('Error hard-deleting draft:', draftError)
       throw new Error('Failed to delete draft')
     }
+
+    console.log(`[DraftService] Draft ${draftId} hard-deleted (permanent)`)
   }
 
   static async updateTimerSetting(draftId: string, timerSeconds: number): Promise<void> {

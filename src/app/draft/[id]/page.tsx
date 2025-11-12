@@ -671,6 +671,34 @@ export default function DraftRoomPage() {
     }
 
     const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async (payload) => {
+      // CRITICAL: Handle draft deletion event IMMEDIATELY (no debounce)
+      // This ensures participants are kicked out before the draft is fully deleted
+      if (payload?.eventType === 'draft_deleted') {
+        console.log('[Draft] Draft deletion event received:', payload.new)
+
+        // Clean up local state
+        cleanup()
+
+        // Remove from user session
+        if (userId) {
+          UserSessionService.removeDraftParticipation(roomCode.toLowerCase())
+        }
+
+        // Show notification
+        notify.error(
+          'Draft Deleted',
+          payload.new?.message || 'This draft has been deleted by the host',
+          { duration: 6000 }
+        )
+
+        // Redirect to my-drafts page
+        setTimeout(() => {
+          router.push('/my-drafts?deleted=true')
+        }, 1000)
+
+        return // Don't process further
+      }
+
       // Debounce rapid updates to prevent infinite loops
       // Increased to 500ms to account for network latency (was 100ms)
       if (updateTimeoutId) {
@@ -1344,17 +1372,23 @@ export default function DraftRoomPage() {
 
   const handleDeleteDraft = useCallback(async () => {
     try {
-      await DraftService.deleteDraft(roomCode.toLowerCase())
-      notify.success('Draft Deleted', 'The draft has been permanently deleted')
+      // Pass userId for soft delete and broadcast
+      await DraftService.deleteDraft(roomCode.toLowerCase(), userId)
+
+      // Clean up local participation tracking
+      UserSessionService.removeDraftParticipation(roomCode.toLowerCase())
+
+      notify.success('Draft Deleted', 'The draft has been deleted. All participants have been notified.')
+
       // Redirect to home page after deletion
       setTimeout(() => {
-        window.location.href = '/'
-      }, 2000)
+        router.push('/my-drafts')
+      }, 1500)
     } catch (err) {
       console.error('Error deleting draft:', err)
       notify.error('Failed to Delete Draft', err instanceof Error ? err.message : 'Failed to delete draft')
     }
-  }, [roomCode, notify])
+  }, [roomCode, userId, notify, router])
 
   const handleShuffleDraftOrder = useCallback(async () => {
     if (isShuffling) return // Prevent double-clicks

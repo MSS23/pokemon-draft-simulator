@@ -67,9 +67,10 @@ export default function MyDraftsPage() {
             .from('teams')
             .select(`
               *,
-              draft:drafts(*)
+              draft:drafts!inner(*)
             `)
             .eq('owner_id', session.userId)
+            .is('draft.deleted_at', null) // Filter out soft-deleted drafts
 
           if (userTeams) {
             const draftsWithTeams: DraftWithTeam[] = userTeams
