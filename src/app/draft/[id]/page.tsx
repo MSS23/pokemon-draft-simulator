@@ -232,6 +232,10 @@ export default function DraftRoomPage() {
   const [isDraftStarting, setIsDraftStarting] = useState(false)
   const lastStatusRef = useRef<'waiting' | 'drafting' | 'completed' | 'paused' | null>(null)
 
+  // Notification deduplication refs to prevent spam
+  const lastNotifiedTurnRef = useRef<number | null>(null)
+  const lastNotifiedPickCountRef = useRef<number>(0)
+
   // Stabilized timer value for components (updates max once per second)
   const stabilizedTimeRemaining = useMemo(() => Math.floor(pickTimeRemaining), [pickTimeRemaining])
 
@@ -467,7 +471,11 @@ export default function DraftRoomPage() {
           await DraftService.autoSkipTurn(roomCode.toLowerCase())
           notify.warning('Turn Skipped', 'Your time expired and your turn was skipped', { duration: 5000 })
         } catch (error) {
-          console.error('Auto-skip failed:', error)
+          // Don't show error if draft is just not found (may have ended)
+          if (error instanceof Error && !error.message.includes('not found')) {
+            console.error('Auto-skip failed:', error)
+            notify.error('Skip Failed', 'Could not skip turn automatically')
+          }
         }
       }
     }
@@ -703,10 +711,13 @@ export default function DraftRoomPage() {
 
             // Check for pick notifications (only if not the user's own pick)
             if (currentDraftState && newState.teams && currentPokemon) {
-              const oldTotalPicks = currentDraftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
               const newTotalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
+              const oldTotalPicks = currentDraftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
 
-              if (newTotalPicks > oldTotalPicks) {
+              // Only notify if pick count increased AND we haven't already notified for this count
+              if (newTotalPicks > oldTotalPicks && newTotalPicks !== lastNotifiedPickCountRef.current) {
+                lastNotifiedPickCountRef.current = newTotalPicks
+
                 // Find which team made the pick
                 const pickingTeam = newState.teams.find(team => {
                   const oldTeam = currentDraftState.teams.find(t => t.id === team.id)
@@ -729,20 +740,25 @@ export default function DraftRoomPage() {
 
             // Check for turn change notifications (snake draft only)
             if (!currentIsAuctionDraft && currentDraftState && newState.currentTeam !== currentDraftState.currentTeam) {
-              const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
-              if (currentTeam) {
-                if (newState.userTeamId === newState.currentTeam) {
-                  currentNotify.success(
-                    "It's Your Turn!",
-                    "Select a Pokémon to draft",
-                    { duration: 5000 }
-                  )
-                } else {
-                  currentNotify.info(
-                    `${currentTeam.name}'s Turn`,
-                    `Waiting for ${currentTeam.userName} to pick`,
-                    { duration: 3000 }
-                  )
+              // Only notify if turn number actually changed (prevents duplicate notifications)
+              if (newState.currentTurn !== lastNotifiedTurnRef.current) {
+                lastNotifiedTurnRef.current = newState.currentTurn
+
+                const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
+                if (currentTeam) {
+                  if (newState.userTeamId === newState.currentTeam) {
+                    currentNotify.success(
+                      "It's Your Turn!",
+                      "Select a Pokémon to draft",
+                      { duration: 5000 }
+                    )
+                  } else {
+                    currentNotify.info(
+                      `${currentTeam.name}'s Turn`,
+                      `Waiting for ${currentTeam.userName} to pick`,
+                      { duration: 3000 }
+                    )
+                  }
                 }
               }
             }
@@ -1135,6 +1151,12 @@ export default function DraftRoomPage() {
     const canDraft = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
     if (!canDraft) {
       console.log('[Draft] Cannot draft:', { isUserTurn, isHost, isProxyPickingEnabled, status: draftState?.status })
+      // Show user-friendly error message
+      if (draftState?.status !== 'drafting') {
+        notify.warning('Draft Not Active', 'The draft is not currently active')
+      } else if (!isUserTurn) {
+        notify.warning('Not Your Turn', `Please wait for your turn. ${currentTeam?.name} is currently picking.`)
+      }
       return
     }
 
@@ -1213,11 +1235,31 @@ export default function DraftRoomPage() {
       setIsDetailsOpen(false)
     } catch (err) {
       console.error('Error making pick:', err)
-      notify.error(
-        'Draft Failed',
-        err instanceof Error ? err.message : 'Failed to make pick. Please try again.',
-        { duration: 5000 }
-      )
+
+      // Provide specific error messages based on error type
+      const errorMessage = err instanceof Error ? err.message : 'Failed to make pick'
+
+      if (errorMessage.includes('not part of this draft') || errorMessage.includes('not found')) {
+        notify.error(
+          'Session Error',
+          'Your session may have expired. Please refresh the page and rejoin the draft.',
+          { duration: 8000 }
+        )
+      } else if (errorMessage.includes('not your turn')) {
+        notify.warning(
+          'Not Your Turn',
+          `Please wait for your turn. ${currentTeam?.name} is currently picking.`,
+          { duration: 5000 }
+        )
+      } else if (errorMessage.includes('Insufficient budget')) {
+        notify.error('Insufficient Budget', errorMessage, { duration: 5000 })
+      } else if (errorMessage.includes('not legal in this format')) {
+        notify.error('Invalid Pokemon', errorMessage, { duration: 5000 })
+      } else if (errorMessage.includes('maximum number')) {
+        notify.error('Team Full', errorMessage, { duration: 5000 })
+      } else {
+        notify.error('Draft Failed', errorMessage, { duration: 5000 })
+      }
     }
   }, [isUserTurn, isHost, isProxyPickingEnabled, draftState?.status, currentTeam, userTeam, userId, roomCode, notify])
 

@@ -561,29 +561,39 @@ export class DraftService {
   static async getDraftState(roomCodeOrDraftId: string): Promise<DraftState | null> {
     if (!supabase) return null
 
-    const { data, error} = await supabase
-      .from('drafts')
-      .select(`
-        *,
-        teams(*),
-        participants(*),
-        picks(*),
-        auctions(*)
-      `)
-      .eq('room_code', roomCodeOrDraftId.toLowerCase())
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('drafts')
+        .select(`
+          *,
+          teams(*),
+          participants(*),
+          picks(*),
+          auctions(*)
+        `)
+        .eq('room_code', roomCodeOrDraftId.toLowerCase())
+        .maybeSingle()
 
-    if (error || !data) {
-      console.error('Error fetching draft state:', error)
+      if (error) {
+        console.error('Error fetching draft state:', error)
+        return null
+      }
+
+      if (!data) {
+        console.warn(`Draft not found for room code: ${roomCodeOrDraftId}`)
+        return null
+      }
+
+      return {
+        draft: data,
+        teams: (data as any).teams || [],
+        participants: (data as any).participants || [],
+        picks: (data as any).picks || [],
+        auctions: (data as any).auctions || []
+      }
+    } catch (err) {
+      console.error('Unexpected error in getDraftState:', err)
       return null
-    }
-
-    return {
-      draft: data,
-      teams: (data as any).teams || [],
-      participants: (data as any).participants || [],
-      picks: (data as any).picks || [],
-      auctions: (data as any).auctions || []
     }
   }
 
@@ -697,20 +707,24 @@ export class DraftService {
 
   static async makePick(draftId: string, userId: string, pokemonId: string, pokemonName: string, cost: number): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
-    
-    // Validate user can pick and get their team
-    const validation = await this.validateUserCanPick(draftId, userId)
-    if (!validation.canPick) {
-      throw new Error(validation.reason || 'Cannot make pick')
-    }
 
-    const teamId = validation.teamId!
-
-    // Get draft state to validate pick against format
+    // Get draft state first to resolve draftId (room_code) to UUID
     const draftState = await this.getDraftState(draftId)
     if (!draftState) {
       throw new Error('Draft not found')
     }
+
+    // Use the UUID for all database operations
+    const draftUuid = draftState.draft.id
+
+    // Validate user can pick and get their team
+    const validation = await this.validateUserCanPick(draftId, userId)
+    if (!validation.canPick) {
+      console.error('[makePick] Validation failed:', validation.reason)
+      throw new Error(validation.reason || 'Cannot make pick')
+    }
+
+    const teamId = validation.teamId!
 
     // Validate Pokemon against format rules
     const formatValidation = await this.validatePokemonInFormat(draftState.draft, pokemonId, pokemonName, cost)
@@ -751,11 +765,11 @@ export class DraftService {
 
     const pickOrder = draftState.picks.length + 1
 
-    // Create the pick
+    // Create the pick (use UUID for draft_id)
     const { error: pickError } = await (supabase
       .from('picks') as any)
       .insert({
-        draft_id: draftId,
+        draft_id: draftUuid,
         team_id: teamId,
         pokemon_id: pokemonId,
         pokemon_name: pokemonName,
@@ -765,8 +779,8 @@ export class DraftService {
       })
 
     if (pickError) {
-      console.error('Error making pick:', pickError)
-      throw new Error('Failed to make pick')
+      console.error('[makePick] Database error:', pickError)
+      throw new Error(`Failed to make pick: ${pickError.message || pickError.code || 'Unknown error'}`)
     }
 
     // Update team budget
@@ -858,11 +872,15 @@ export class DraftService {
     const channels: any[] = []
     let setupAttempted = false
     let isCleanedUp = false
+    let isSetupComplete = false
 
     // Async function to setup subscriptions
     const setupSubscriptions = async () => {
       // Prevent multiple setup attempts
-      if (setupAttempted || isCleanedUp) return
+      if (setupAttempted || isCleanedUp) {
+        console.debug('[Subscribe] Setup already attempted or cleaned up')
+        return
+      }
       setupAttempted = true
 
       try {
@@ -870,18 +888,28 @@ export class DraftService {
         const draftState = await this.getDraftState(roomCodeOrDraftId)
 
         // Check if cleanup happened while we were waiting
-        if (isCleanedUp) return
+        if (isCleanedUp) {
+          console.debug('[Subscribe] Cleanup called before setup completed')
+          return
+        }
 
         if (!draftState) {
-          console.error('Draft not found for subscription:', roomCodeOrDraftId)
-          // Don't retry if draft doesn't exist
+          console.error('[Subscribe] Draft not found:', roomCodeOrDraftId)
+          // Call callback with error to notify caller
+          callback({
+            eventType: 'error',
+            new: { error: 'Draft not found', roomCode: roomCodeOrDraftId }
+          })
           return
         }
 
         const draftUuid = draftState.draft.id
 
         // Check again if cleanup happened
-        if (isCleanedUp) return
+        if (isCleanedUp) {
+          console.debug('[Subscribe] Cleanup called during channel setup')
+          return
+        }
 
         // Now subscribe using the UUID
         const channel = supabase.channel(`draft-${roomCodeOrDraftId}`)
@@ -917,12 +945,33 @@ export class DraftService {
           }, callback)
 
         // Don't subscribe if cleanup already happened
-        if (isCleanedUp) return
+        if (isCleanedUp) {
+          console.debug('[Subscribe] Cleanup called before subscription')
+          return
+        }
 
-        channel.subscribe()
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            isSetupComplete = true
+            console.log('[Subscribe] Successfully subscribed to draft:', roomCodeOrDraftId)
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('[Subscribe] Channel error for draft:', roomCodeOrDraftId)
+            callback({
+              eventType: 'error',
+              new: { error: 'Channel subscription failed' }
+            })
+          }
+        })
+
         channels.push(channel)
       } catch (error) {
-        console.error('Error setting up draft subscriptions:', error)
+        console.error('[Subscribe] Error setting up subscriptions:', error)
+        if (!isCleanedUp) {
+          callback({
+            eventType: 'error',
+            new: { error: String(error) }
+          })
+        }
       }
     }
 
@@ -933,6 +982,7 @@ export class DraftService {
     return () => {
       isCleanedUp = true
       if (supabase && channels.length > 0) {
+        console.log('[Subscribe] Cleaning up', channels.length, 'channel(s)')
         channels.forEach(channel => {
           try {
             supabase.removeChannel(channel)
@@ -963,16 +1013,37 @@ export class DraftService {
 
   static async getUserTeam(draftId: string, userId: string): Promise<string | null> {
     if (!supabase) return null
-    
+
     const draftState = await this.getDraftState(draftId)
     if (!draftState) return null
-    
-    const { data: participant } = await supabase
+
+    // Debug logging to help troubleshoot participant lookup issues
+    console.log('[getUserTeam] Looking up participant:', {
+      draftId,
+      userId,
+      draftUuid: draftState.draft.id
+    })
+
+    const { data: participant, error } = await supabase
       .from('participants')
-      .select('team_id')
+      .select('team_id, user_id')
       .eq('draft_id', draftState.draft.id)
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
+
+    if (error) {
+      console.error('[getUserTeam] Database error:', error)
+    }
+
+    if (!participant) {
+      console.warn('[getUserTeam] No participant found for user. All participants in draft:',
+        draftState.participants.map(p => ({
+          userId: p.user_id,
+          teamId: p.team_id,
+          displayName: p.display_name
+        }))
+      )
+    }
 
     return (participant as any)?.team_id || null
   }
@@ -2213,21 +2284,31 @@ export class DraftService {
   static async autoSkipTurn(draftId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 
-    // Get current draft state
-    const draftState = await this.getDraftState(draftId)
-    if (!draftState) {
-      throw new Error('Draft not found')
+    try {
+      // Get current draft state
+      const draftState = await this.getDraftState(draftId)
+      if (!draftState) {
+        console.warn(`Auto-skip aborted: Draft ${draftId} not found or has ended`)
+        return // Don't throw, just return silently
+      }
+
+      if (draftState.draft.status !== 'active') {
+        console.warn(`Auto-skip aborted: Draft ${draftId} is not active (status: ${draftState.draft.status})`)
+        return // Don't throw for non-active drafts
+      }
+
+      // Simply advance to the next turn without making a pick
+      // This effectively skips the current team's turn
+      await this.advanceTurn(draftId)
+
+      console.log(`Auto-skipped turn ${draftState.draft.current_turn} for draft ${draftId}`)
+    } catch (error) {
+      console.error(`Auto-skip failed for draft ${draftId}:`, error)
+      // Re-throw only if it's not a "not found" error
+      if (error instanceof Error && !error.message.includes('not found')) {
+        throw error
+      }
     }
-
-    if (draftState.draft.status !== 'active') {
-      throw new Error('Draft is not active')
-    }
-
-    // Simply advance to the next turn without making a pick
-    // This effectively skips the current team's turn
-    await this.advanceTurn(draftId)
-
-    console.log(`Auto-skipped turn ${draftState.draft.current_turn} for draft ${draftId}`)
   }
 
   /**

@@ -44,12 +44,22 @@ class AuctionService {
 
     // Start a transaction-like operation
     try {
+      // Get the draft UUID from room code (draftId might be room_code)
+      const { DraftService } = await import('./draft-service')
+      const draftState = await DraftService.getDraftState(draftId)
+
+      if (!draftState) {
+        throw new Error('Draft not found')
+      }
+
+      const draftUuid = draftState.draft.id
+
       // First, record the bid in history
       const { error: historyError } = await (supabase
         .from('bid_history') as any)
         .insert({
           auction_id: auctionId,
-          draft_id: draftId,
+          draft_id: draftUuid,  // Use UUID instead of room_code
           team_id: teamId,
           team_name: teamName,
           bid_amount: bidAmount,

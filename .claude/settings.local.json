@@ -60,7 +60,13 @@
       "Bash(done)",
       "Bash(npx vercel:*)",
       "Bash(git restore:*)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npm run dev:*)",
+      "Bash(nul)",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "Bash(vercel --version:*)"
     ],
     "deny": [],
     "ask": []

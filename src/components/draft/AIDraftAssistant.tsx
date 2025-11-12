@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,10 +35,24 @@ export function AIDraftAssistant({
   const [analysis, setAnalysis] = useState<AssistantAnalysis | null>(null)
   const [isExpanded, setIsExpanded] = useState(true)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const isAnalyzingRef = useRef(false)
+  const analysisTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const analyzeNow = useCallback(() => {
+    // Prevent overlapping analysis calls
+    if (isAnalyzingRef.current) {
+      return
+    }
+
+    // Clear any pending analysis
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current)
+    }
+
+    isAnalyzingRef.current = true
     setIsAnalyzing(true)
-    setTimeout(() => {
+
+    analysisTimeoutRef.current = setTimeout(() => {
       const result = generateAssistantAnalysis(
         availablePokemon,
         currentTeam,
@@ -49,14 +63,29 @@ export function AIDraftAssistant({
       )
       setAnalysis(result)
       setIsAnalyzing(false)
+      isAnalyzingRef.current = false
     }, 500)
-  }, [availablePokemon, currentTeam, opponentTeams, remainingBudget, remainingPicks, format])
+  }, [
+    availablePokemon.length,
+    currentTeam.length,
+    opponentTeams.length,
+    remainingBudget,
+    remainingPicks,
+    format.id
+  ])
 
   useEffect(() => {
-    if (availablePokemon.length > 0 && isYourTurn) {
+    if (availablePokemon.length > 0 && isYourTurn && !isAnalyzingRef.current) {
       analyzeNow()
     }
-  }, [analyzeNow, availablePokemon.length, isYourTurn])
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (analysisTimeoutRef.current) {
+        clearTimeout(analysisTimeoutRef.current)
+      }
+    }
+  }, [availablePokemon.length, isYourTurn, analyzeNow])
 
   if (!isExpanded) {
     return (
