@@ -62,7 +62,7 @@ export default function CreateDraftPage() {
     teamName: "",
     maxTeams: "4",
     draftType: "snake",
-    timeLimit: "60",
+    timeLimit: "0",
     pokemonPerTeam: "6",
     budgetPerTeam: "100",
     formatId: DEFAULT_FORMAT,
