@@ -231,7 +231,7 @@ export class AutoSkipService {
    */
   static isAutoSkipEnabled(draftSettings: any): boolean {
     // Auto-skip is enabled if there's a time limit
-    return draftSettings?.pickTimeLimitSeconds && draftSettings.pickTimeLimitSeconds > 0
+    return draftSettings?.timeLimit && draftSettings.timeLimit > 0
   }
 
   /**
@@ -243,7 +243,7 @@ export class AutoSkipService {
       return 0
     }
 
-    const timeLimit = draftState.draft.settings?.pickTimeLimitSeconds || 0
+    const timeLimit = draftState.draft.settings?.timeLimit || 0
     if (timeLimit === 0) {
       return Infinity // No time limit
     }

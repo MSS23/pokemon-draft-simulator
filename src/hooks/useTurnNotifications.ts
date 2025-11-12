@@ -137,18 +137,16 @@ export function useTurnNotifications({
   useEffect(() => {
     if (!isUserTurn || draftStatus !== 'drafting') return
 
-    // Grace period for turn 1 to prevent immediate skip on draft start
-    const DRAFT_START_GRACE_PERIOD = 5 // Don't allow auto-skip for first 5 seconds of turn 1
+    // CRITICAL: Never auto-skip turn 1 - always give players time to load
+    // This prevents the race condition where the draft starts and immediately skips before anyone can act
     const isDraftStart = currentTurn === 1
+    if (isDraftStart) {
+      console.log('[AutoSkip] Turn 1 - auto-skip disabled to prevent race condition')
+      return
+    }
 
     // Timer has expired
     if (pickTimeRemaining === 0) {
-      // If it's turn 1, don't auto-skip yet (grace period)
-      if (isDraftStart) {
-        console.log('[AutoSkip] Turn 1 grace period active, not auto-skipping yet')
-        return
-      }
-
       // If connected, skip immediately
       if (isConnected) {
         onAutoSkip?.()
@@ -158,13 +156,6 @@ export function useTurnNotifications({
       // If disconnected, we're at the start of grace period
       // Auto-skip will trigger when pickTimeRemaining <= -GRACE_PERIOD_SECONDS
       // This is handled below
-    }
-
-    // For turn 1, only auto-skip after grace period expires
-    if (isDraftStart && pickTimeRemaining < -DRAFT_START_GRACE_PERIOD) {
-      console.log('[AutoSkip] Turn 1 grace period expired, auto-skipping')
-      onAutoSkip?.()
-      return
     }
 
     // Handle grace period for disconnected users

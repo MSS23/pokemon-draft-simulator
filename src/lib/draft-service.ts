@@ -809,7 +809,7 @@ export class DraftService {
     if (currentSettings.pendingTimerChange !== undefined) {
       updatedSettings = {
         ...currentSettings,
-        pickTimeLimitSeconds: currentSettings.pendingTimerChange,
+        timeLimit: currentSettings.pendingTimerChange,
         pendingTimerChange: undefined // Clear the pending flag
       }
     }
@@ -1315,7 +1315,7 @@ export class DraftService {
     // Otherwise, apply on next turn
     const updatedSettings = {
       ...currentSettings,
-      pickTimeLimitSeconds: timerSeconds,
+      timeLimit: timerSeconds,
       // Only mark as pending if draft is already active
       ...(draftStatus === 'active' && { pendingTimerChange: timerSeconds })
     }
@@ -1357,7 +1357,7 @@ export class DraftService {
     if (currentSettings.pendingTimerChange !== undefined) {
       updatedSettings = {
         ...currentSettings,
-        pickTimeLimitSeconds: currentSettings.pendingTimerChange,
+        timeLimit: currentSettings.pendingTimerChange,
         pendingTimerChange: undefined // Clear the pending flag
       }
     }
