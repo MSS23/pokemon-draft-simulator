@@ -123,6 +123,8 @@ interface DraftUIState {
   draft: {
     id: string
     custom_format_id?: string
+    turn_started_at?: string
+    status: string
   }
 }
 
@@ -353,7 +355,9 @@ export default function DraftRoomPage() {
       timeRemaining: (dbState.draft.settings as any)?.timeLimit || 60,
       draft: {
         id: dbState.draft.id,
-        custom_format_id: (dbState.draft as any).custom_format_id
+        custom_format_id: (dbState.draft as any).custom_format_id,
+        turn_started_at: (dbState.draft as any).turn_started_at,
+        status: dbState.draft.status
       }
     }
   }, [roomCode])
@@ -464,6 +468,7 @@ export default function DraftRoomPage() {
     enableBrowserNotifications: true,
     warningThreshold: 10,
     isConnected: hookConnected && connectionStatus === 'online',
+    currentTurn: draftState?.currentTurn,
     onAutoSkip: async () => {
       // Double check connection status and user turn before auto-skipping
       if (roomCode && isUserTurn && hookConnected && connectionStatus === 'online') {
@@ -856,10 +861,15 @@ export default function DraftRoomPage() {
 
     // Reset timer when turn changes (fix: compare turn numbers, not turn to timestamp)
     if (draftState.currentTurn !== lastTrackedTurn) {
-      const serverNow = getServerTime()
+      // Use database turn_started_at if available, otherwise fallback to current time
+      const dbTurnStartedAt = draftState.draft?.turn_started_at
+      const turnStart = dbTurnStartedAt
+        ? new Date(dbTurnStartedAt).getTime()
+        : getServerTime()
+
       if (isMounted) {
         setLastTrackedTurn(draftState.currentTurn)
-        setTurnStartTime(serverNow)
+        setTurnStartTime(turnStart)
         setPickTimeRemaining(draftState.draftSettings.timeLimit)
       }
     }

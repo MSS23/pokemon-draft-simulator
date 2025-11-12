@@ -9,6 +9,7 @@ interface TurnNotificationOptions {
   warningThreshold?: number // Seconds before auto-skip to show warning
   onAutoSkip?: () => void
   isConnected?: boolean // Only auto-skip if connected to prevent auto-skip during connection issues
+  currentTurn?: number // Current turn number to detect draft start
 }
 
 /**
@@ -21,7 +22,8 @@ export function useTurnNotifications({
   enableBrowserNotifications = true,
   warningThreshold = 10,
   onAutoSkip,
-  isConnected = true
+  isConnected = true,
+  currentTurn
 }: TurnNotificationOptions) {
   const notify = useNotify()
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission>('default')
@@ -135,8 +137,18 @@ export function useTurnNotifications({
   useEffect(() => {
     if (!isUserTurn || draftStatus !== 'drafting') return
 
+    // Grace period for turn 1 to prevent immediate skip on draft start
+    const DRAFT_START_GRACE_PERIOD = 5 // Don't allow auto-skip for first 5 seconds of turn 1
+    const isDraftStart = currentTurn === 1
+
     // Timer has expired
     if (pickTimeRemaining === 0) {
+      // If it's turn 1, don't auto-skip yet (grace period)
+      if (isDraftStart) {
+        console.log('[AutoSkip] Turn 1 grace period active, not auto-skipping yet')
+        return
+      }
+
       // If connected, skip immediately
       if (isConnected) {
         onAutoSkip?.()
@@ -146,6 +158,13 @@ export function useTurnNotifications({
       // If disconnected, we're at the start of grace period
       // Auto-skip will trigger when pickTimeRemaining <= -GRACE_PERIOD_SECONDS
       // This is handled below
+    }
+
+    // For turn 1, only auto-skip after grace period expires
+    if (isDraftStart && pickTimeRemaining < -DRAFT_START_GRACE_PERIOD) {
+      console.log('[AutoSkip] Turn 1 grace period expired, auto-skipping')
+      onAutoSkip?.()
+      return
     }
 
     // Handle grace period for disconnected users
@@ -165,7 +184,7 @@ export function useTurnNotifications({
         )
       }
     }
-  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip, isConnected, notify])
+  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip, isConnected, notify, currentTurn])
 
   return {
     browserNotificationPermission,

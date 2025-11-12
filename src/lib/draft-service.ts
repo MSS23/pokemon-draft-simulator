@@ -695,6 +695,7 @@ export class DraftService {
       .update({
         status: 'active',
         current_turn: 1,
+        turn_started_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', draftUuid)
