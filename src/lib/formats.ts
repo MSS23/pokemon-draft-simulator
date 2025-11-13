@@ -214,7 +214,7 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
         'dialga-origin', 'palkia-origin'
       ],
       bannedTiers: [],
-      allowedGenerations: [9],
+      allowedGenerations: [], // Allow all generations - regional dex is the filter
       allowedRegions: ['paldea', 'kitakami', 'blueberry'],
       legendaryPolicy: 'banned',
       mythicalPolicy: 'banned',

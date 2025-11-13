@@ -46,29 +46,20 @@ CREATE POLICY "Admins can view all drafts including deleted" ON drafts
     auth.jwt() ->> 'role' = 'admin'
   );
 
--- UPDATE policy for soft delete
+-- UPDATE policy - unified for both normal updates and soft delete
 DROP POLICY IF EXISTS "Hosts can update their drafts" ON drafts;
+DROP POLICY IF EXISTS "Hosts can soft-delete their drafts" ON drafts;
 
+-- Unified policy that allows both normal updates and soft-deletes
 CREATE POLICY "Hosts can update their drafts" ON drafts
-  FOR UPDATE
-  USING (
-    deleted_at IS NULL  -- Cannot update already deleted drafts
-    AND host_id = auth.uid()::text
-  )
-  WITH CHECK (
-    host_id = auth.uid()::text
-  );
-
--- Allow hosts to soft-delete their own drafts by setting deleted_at
-CREATE POLICY "Hosts can soft-delete their drafts" ON drafts
   FOR UPDATE
   USING (
     host_id = auth.uid()::text
     OR auth.jwt() ->> 'role' = 'admin'
   )
   WITH CHECK (
-    deleted_at IS NOT NULL  -- Only allow setting deleted_at
-    AND deleted_by IS NOT NULL
+    host_id = auth.uid()::text
+    OR auth.jwt() ->> 'role' = 'admin'
   );
 
 -- Backfill existing data (all current drafts are not deleted)

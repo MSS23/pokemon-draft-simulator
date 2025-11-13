@@ -152,6 +152,7 @@ const PALDEA_COMPLETE_DEX = new Set([
   231, 232, // Phanpy line
   
   // Gen 3+ selections
+  278, 279, // Wingull line (Pelipper)
   280, 281, 282, // Ralts line
   307, 308, // Meditite line
   325, 326, // Spoink line

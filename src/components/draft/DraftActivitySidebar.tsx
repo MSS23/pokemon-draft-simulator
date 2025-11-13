@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,15 +30,16 @@ interface DraftActivitySidebarProps {
 }
 
 /**
- * DraftActivitySidebar - Optimized with Map lookup
+ * DraftActivitySidebar - Optimized with Map lookup and React.memo
  *
  * Performance optimization:
  * - Replace O(n) pokemon.find() with O(1) Map lookup
+ * - Memoized to prevent unnecessary re-renders
  * - Significant improvement when rendering 50+ activities
  *
  * Expected improvement: 60-80% faster rendering for activity list
  */
-export default function DraftActivitySidebar({
+const DraftActivitySidebar = memo(function DraftActivitySidebar({
   isOpen,
   onClose,
   activities,
@@ -271,4 +272,6 @@ export default function DraftActivitySidebar({
       </div>
     </>
   )
-}
+})
+
+export default DraftActivitySidebar

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, memo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Crown, User } from 'lucide-react'
@@ -21,7 +21,7 @@ interface TeamRosterProps {
   maxPokemonPerTeam?: number
 }
 
-export default function TeamRoster({
+const TeamRoster = memo(function TeamRoster({
   team,
   isCurrentTeam = false,
   isUserTeam = false,
@@ -162,4 +162,15 @@ export default function TeamRoster({
       </CardContent>
     </Card>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison to prevent unnecessary re-renders
+  return (
+    prevProps.team.id === nextProps.team.id &&
+    prevProps.team.picks.length === nextProps.team.picks.length &&
+    prevProps.team.picks.join(',') === nextProps.team.picks.join(',') &&
+    prevProps.isCurrentTeam === nextProps.isCurrentTeam &&
+    prevProps.isUserTeam === nextProps.isUserTeam
+  )
+})
+
+export default TeamRoster

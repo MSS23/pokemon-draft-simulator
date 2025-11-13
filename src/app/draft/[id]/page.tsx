@@ -225,10 +225,8 @@ export default function DraftRoomPage() {
   } | null>(null)
   const [auctionTimeRemaining, setAuctionTimeRemaining] = useState(0)
 
-  // Pick timer state
-  const [pickTimeRemaining, setPickTimeRemaining] = useState<number>(0)
-  const [turnStartTime, setTurnStartTime] = useState<number | null>(null)
-  const [lastTrackedTurn, setLastTrackedTurn] = useState<number | null>(null)
+  // Pick timer state - disabled
+  const pickTimeRemaining = 0
 
   // Draft start transition detection (to increase debounce during critical transition)
   const [isDraftStarting, setIsDraftStarting] = useState(false)
@@ -237,15 +235,31 @@ export default function DraftRoomPage() {
   // Notification deduplication refs to prevent spam
   const lastNotifiedTurnRef = useRef<number | null>(null)
   const lastNotifiedPickCountRef = useRef<number>(0)
+  const shownNotifications = useRef<Map<string, number>>(new Map())
 
-  // Stabilized timer value for components (updates max once per second)
-  const stabilizedTimeRemaining = useMemo(() => Math.floor(pickTimeRemaining), [pickTimeRemaining])
+  // Notification deduplication helper - prevents showing the same notification multiple times
+  const shouldShowNotification = useCallback((key: string, dedupWindowMs: number = 3000): boolean => {
+    const now = Date.now()
+    const lastShown = shownNotifications.current.get(key)
+
+    if (lastShown && now - lastShown < dedupWindowMs) {
+      return false // Too recent, skip
+    }
+
+    shownNotifications.current.set(key, now)
+
+    // Cleanup old entries (older than 10 seconds)
+    for (const [k, timestamp] of shownNotifications.current.entries()) {
+      if (now - timestamp > 10000) {
+        shownNotifications.current.delete(k)
+      }
+    }
+
+    return true
+  }, [])
 
   // Server time synchronization state
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
-  const getServerTime = useCallback(() => {
-    return Date.now() + serverTimeOffset
-  }, [serverTimeOffset])
 
   // Spectator mode state
   const [recentActivity, setRecentActivity] = useState<Array<{
@@ -362,37 +376,6 @@ export default function DraftRoomPage() {
     }
   }, [roomCode])
 
-  // Derived variables - use refs to prevent infinite loops in Radix UI
-  // Create stable signature using ref to prevent infinite recalculation
-  const lastTeamsSignatureRef = useRef('')
-  const draftStateTeamsRef = useRef(draftState?.teams)
-
-  // Keep ref in sync
-  useEffect(() => {
-    draftStateTeamsRef.current = draftState?.teams
-  }, [draftState?.teams])
-
-  const teamsSignature = useMemo(() => {
-    const teams = draftStateTeamsRef.current
-    if (!teams) return ''
-
-    // Create signature from team data
-    const newSignature = teams
-      .map(t => `${t.id}:${t.picks.length}:${t.budgetRemaining}`)
-      .join('|')
-
-    // Only update ref if signature actually changed
-    if (newSignature !== lastTeamsSignatureRef.current) {
-      lastTeamsSignatureRef.current = newSignature
-      return newSignature // Return new signature when changed
-    }
-
-    // Return stable ref value (prevents re-renders)
-    return lastTeamsSignatureRef.current
-  }, [draftState?.teams]) // eslint-disable-line react-hooks/exhaustive-deps
-  // Note: We intentionally depend on draftState?.teams to trigger recalculation,
-  // but use refs to prevent infinite loops
-
   // Create stable team references that only change when actual team data changes
   const userTeam = useMemo(() => {
     if (!draftState?.teams || !draftState.userTeamId) return null
@@ -470,19 +453,7 @@ export default function DraftRoomPage() {
     isConnected: hookConnected && connectionStatus === 'online',
     currentTurn: draftState?.currentTurn,
     onAutoSkip: async () => {
-      // Double check connection status and user turn before auto-skipping
-      if (roomCode && isUserTurn && hookConnected && connectionStatus === 'online') {
-        try {
-          await DraftService.autoSkipTurn(roomCode.toLowerCase())
-          notify.warning('Turn Skipped', 'Your time expired and your turn was skipped', { duration: 5000 })
-        } catch (error) {
-          // Don't show error if draft is just not found (may have ended)
-          if (error instanceof Error && !error.message.includes('not found')) {
-            console.error('Auto-skip failed:', error)
-            notify.error('Skip Failed', 'Could not skip turn automatically')
-          }
-        }
-      }
+      // Timer disabled - no auto-skip
     }
   })
 
@@ -870,81 +841,7 @@ export default function DraftRoomPage() {
     loadCurrentAuction()
   }, [isAuctionDraft, roomCode, draftState])
 
-  /**
-   * FIXED TIMER MEMORY LEAK - Memory leak prevention:
-   * 1. Use isMounted flag to prevent state updates after unmount
-   * 2. Properly cleanup animationFrame on unmount
-   * 3. Guard all setState calls with isMounted check
-   *
-   * Expected improvement: Zero memory leaks, prevents React warnings
-   */
-  useEffect(() => {
-    if (isAuctionDraft || !draftState || draftState.status !== 'drafting') {
-      setPickTimeRemaining(0)
-      setTurnStartTime(null)
-      return
-    }
-
-    let isMounted = true // Memory leak prevention flag
-
-    // Reset timer when turn changes (fix: compare turn numbers, not turn to timestamp)
-    if (draftState.currentTurn !== lastTrackedTurn) {
-      // Use database turn_started_at if available, otherwise fallback to current time
-      const dbTurnStartedAt = draftState.draft?.turn_started_at
-      const turnStart = dbTurnStartedAt
-        ? new Date(dbTurnStartedAt).getTime()
-        : getServerTime()
-
-      if (isMounted) {
-        setLastTrackedTurn(draftState.currentTurn)
-        setTurnStartTime(turnStart)
-        setPickTimeRemaining(draftState.draftSettings.timeLimit)
-      }
-    }
-
-    const checkIsUserTurn = draftState?.userTeamId === draftState?.currentTeam
-
-    let animationFrameId: number | null = null
-
-    const updateTimer = () => {
-      // Guard against updates after unmount
-      if (!isMounted || !turnStartTime) {
-        if (animationFrameId !== null) {
-          cancelAnimationFrame(animationFrameId)
-        }
-        return
-      }
-
-      const now = getServerTime()
-      const elapsed = Math.floor((now - turnStartTime) / 1000)
-      const remaining = Math.max(0, draftState.draftSettings.timeLimit - elapsed)
-
-      // Only update state if still mounted
-      if (isMounted) {
-        setPickTimeRemaining(remaining)
-      }
-
-      if (remaining === 0 && checkIsUserTurn && isMounted) {
-        notify.warning('Time Expired!', 'Your turn has been skipped', { duration: 3000 })
-      }
-
-      // Continue updating if time remains and still mounted
-      if (remaining > 0 && isMounted) {
-        animationFrameId = requestAnimationFrame(updateTimer)
-      }
-    }
-
-    // Start the timer
-    animationFrameId = requestAnimationFrame(updateTimer)
-
-    // Cleanup function
-    return () => {
-      isMounted = false // Mark as unmounted
-      if (animationFrameId !== null) {
-        cancelAnimationFrame(animationFrameId)
-      }
-    }
-  }, [isAuctionDraft, draftState, lastTrackedTurn, turnStartTime, notify, getServerTime])
+  // Timer disabled - no turn time limits
 
   // Derived state - memoized to prevent unnecessary recalculations
   const allDraftedIds = useMemo(() => {
@@ -1086,12 +983,6 @@ export default function DraftRoomPage() {
    * Expected improvement: 50-70% fewer recalculations
    */
 
-  // Create a stable string representation of picks for memo dependency
-  const picksSignature = useMemo(() => {
-    if (!draftState?.teams) return ''
-    return draftState.teams.map(t => `${t.id}:${t.picks.length}`).join('|')
-  }, [draftState?.teams])
-
   // Sidebar activities - only recalculate when picks change (not on every draftState update)
   const sidebarActivities = useMemo(() => {
     // Early return for empty states
@@ -1128,7 +1019,8 @@ export default function DraftRoomPage() {
             pokemonName: pokemonData.name,
             pickNumber: totalPickNumber,
             round,
-            timestamp: Date.now() - (totalPickNumber - 1) * 30000
+            // Use pick number as stable ordering instead of Date.now() which causes infinite recalculation
+            timestamp: totalPickNumber
           })
         }
       })
@@ -1277,6 +1169,13 @@ export default function DraftRoomPage() {
       // Provide specific error messages based on error type
       const errorMessage = err instanceof Error ? err.message : 'Failed to make pick'
 
+      // Create a unique key for this specific error to prevent duplicate notifications
+      const errorKey = `pick-error-${errorMessage.substring(0, 50)}`
+
+      if (!shouldShowNotification(errorKey, 3000)) {
+        return // Skip duplicate notification
+      }
+
       if (errorMessage.includes('not part of this draft') || errorMessage.includes('not found')) {
         notify.error(
           'Session Error',
@@ -1299,7 +1198,7 @@ export default function DraftRoomPage() {
         notify.error('Draft Failed', errorMessage, { duration: 5000 })
       }
     }
-  }, [isUserTurn, isHost, isProxyPickingEnabled, draftState?.status, currentTeam, userTeam, userId, roomCode, notify])
+  }, [isUserTurn, isHost, isProxyPickingEnabled, draftState?.status, currentTeam, userTeam, userId, roomCode, notify, shouldShowNotification])
 
   const copyRoomCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode)
@@ -1745,7 +1644,7 @@ export default function DraftRoomPage() {
               totalTeams={draftState?.teams?.length || 0}
               maxRounds={draftState?.draftSettings?.pokemonPerTeam}
               draftStatus={draftState?.status}
-              timeRemaining={pickTimeRemaining}
+              timeRemaining={0}
               teams={draftState?.teams || []}
             />
           </div>
@@ -1819,7 +1718,7 @@ export default function DraftRoomPage() {
               currentTeam={draftState?.currentTeam}
               teams={draftState?.teams || []}
               isHost={isHost}
-              timeRemaining={stabilizedTimeRemaining}
+              timeRemaining={0}
               onStartDraft={startDraft}
               onShuffleDraftOrder={handleShuffleDraftOrder}
               onPauseDraft={handlePauseDraft}
