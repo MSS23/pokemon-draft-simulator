@@ -1,12 +1,12 @@
 {
-  "pokemonIndexHash": "b21862bd",
+  "pokemonIndexHash": "55727d67",
   "formats": [
     {
       "id": "vgc-reg-h",
       "label": "VGC 2024 Regulation H",
       "version": "1.0.0",
-      "hash": "f856441e"
+      "hash": "c314454e"
     }
   ],
-  "builtAt": "2025-11-12T18:33:10.254Z"
+  "builtAt": "2025-11-13T12:32:24.261Z"
 }
