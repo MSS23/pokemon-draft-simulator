@@ -612,25 +612,28 @@ export default function DraftRoomPage() {
   }, [draftState?.teams, pokemon])
 
   // Detect draft start transition to increase debounce
+  const hasNotifiedDraftStart = useRef(false)
   useEffect(() => {
     if (lastStatusRef.current === 'waiting' && draftState?.status === 'drafting') {
       console.log('[Draft Start] Transition detected: waiting → drafting')
       setIsDraftStarting(true)
 
-      // Reset isStarting state now that draft has started
-      setIsStarting(false)
+      // Show success notification only once using idempotency guard
+      if (!hasNotifiedDraftStart.current) {
+        hasNotifiedDraftStart.current = true
+        notify.success(
+          'Draft Started!',
+          'The draft is now active. Good luck with your picks!'
+        )
+      }
 
-      // Show success notification
-      notify.success(
-        'Draft Started!',
-        'The draft is now active. Good luck with your picks!'
-      )
-
-      // Give 2 seconds for all updates to settle during draft start
+      // Give 3 seconds for all updates to settle during draft start (increased from 2s)
       const timeoutId = setTimeout(() => {
         console.log('[Draft Start] Cooldown period ended')
         setIsDraftStarting(false)
-      }, 2000)
+        // Reset notification guard for potential future transitions
+        hasNotifiedDraftStart.current = false
+      }, 3000)
       return () => clearTimeout(timeoutId)
     }
     lastStatusRef.current = draftState?.status || null
@@ -817,8 +820,9 @@ export default function DraftRoomPage() {
           mounted = false // Stop further updates
         }
       }
-      // Dynamic debounce: 1000ms during draft start transition, 500ms normally
-      }, isDraftStarting ? 1000 : 500)
+      // Dynamic debounce: 2000ms during draft start transition, 500ms normally
+      // Increased from 1000ms to reduce race conditions during status change
+      }, isDraftStarting ? 2000 : 500)
     })
 
     return () => {
@@ -1257,13 +1261,19 @@ export default function DraftRoomPage() {
       await DraftService.startDraft(roomCode.toLowerCase())
       // Don't show success immediately - wait for subscription to confirm status change
       console.log('[startDraft] Start request sent, waiting for subscription confirmation...')
+
+      // Reset isStarting after a delay to allow status transition to complete
+      // The transition useEffect will handle the final state stabilization
+      setTimeout(() => {
+        setIsStarting(false)
+      }, 1000)
     } catch (err) {
       console.error('Error starting draft:', err)
       notify.error(
         'Failed to Start Draft',
         err instanceof Error ? err.message : 'Failed to start draft. Please try again.'
       )
-      setIsStarting(false) // Re-enable button on error
+      setIsStarting(false) // Re-enable button immediately on error
     }
   }, [draftState, roomCode, notify, isStarting])
 

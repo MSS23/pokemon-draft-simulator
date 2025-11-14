@@ -791,32 +791,26 @@ export class DraftService {
         throw new Error('Failed to shuffle team draft order')
       }
 
-      // Update draft settings to mark as shuffled
-      const updatedSettings = {
-        ...(draftState.draft.settings || {}),
-        draftOrderShuffled: true
-      }
-
-      const { error: settingsError } = await (supabase as any)
-        .from('drafts')
-        .update({ settings: updatedSettings })
-        .eq('id', draftUuid)
-
-      if (settingsError) {
-        console.error('[startDraft] Error updating shuffle flag:', settingsError)
-        // Non-fatal, continue
-      }
-    } else {
-      console.log('[startDraft] Skipping auto-shuffle (already manually shuffled)')
+      console.log('[startDraft] Team draft order shuffled successfully')
     }
 
-    // Atomically set draft to active with first turn
+    // Prepare updated settings (mark as shuffled if we just shuffled)
+    const updatedSettings = needsShuffle
+      ? {
+          ...(draftState.draft.settings || {}),
+          draftOrderShuffled: true
+        }
+      : draftState.draft.settings
+
+    // Atomically set draft to active with first turn AND update settings in single operation
+    // This reduces subscription triggers from 2 to 1, preventing race conditions
     const { error } = await (supabase as any)
       .from('drafts')
       .update({
         status: 'active',
         current_turn: 1,
         turn_started_at: new Date().toISOString(),
+        settings: updatedSettings,
         updated_at: new Date().toISOString()
       })
       .eq('id', draftUuid)
