@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useRouter } from 'next/navigation'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface League {
   id: string
@@ -32,24 +33,18 @@ interface League {
 export function Sidebar() {
   const router = useRouter()
   const pathname = usePathname()
-  const [user, setUser] = useState<any>(null)
+  const { user, signOut } = useAuth()
   const [leagues, setLeagues] = useState<League[]>([])
   const [authModalOpen, setAuthModalOpen] = useState(false)
 
+  // Load user's leagues when user changes
   useEffect(() => {
-    loadUserData()
-  }, [])
-
-  async function loadUserData() {
-    if (!supabase) return
-
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (user) {
-      setUser(user)
-      await loadUserLeagues(user.id)
+    if (user?.id) {
+      loadUserLeagues(user.id)
+    } else {
+      setLeagues([])
     }
-  }
+  }, [user?.id])
 
   async function loadUserLeagues(userId: string) {
     if (!supabase) return
@@ -82,8 +77,7 @@ export function Sidebar() {
   }
 
   async function handleSignOut() {
-    if (!supabase) return
-    await supabase.auth.signOut()
+    await signOut()
     router.push('/')
   }
 
