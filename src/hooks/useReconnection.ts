@@ -39,6 +39,13 @@ export function useReconnection({
   const retryTimeoutRef = useRef<NodeJS.Timeout>()
   const countdownIntervalRef = useRef<NodeJS.Timeout>()
   const hasShownDisconnectNotification = useRef(false)
+  // Use refs for values that change during reconnection to prevent infinite loops
+  const connectionStateRef = useRef(connectionState)
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    connectionStateRef.current = connectionState
+  }, [connectionState])
 
   // Calculate exponential backoff delay
   const getRetryDelay = useCallback((retryCount: number): number => {
@@ -48,9 +55,10 @@ export function useReconnection({
 
   // Attempt to reconnect
   const attemptReconnection = useCallback(async () => {
-    if (!enabled || connectionState.isConnected) return
+    // Use ref to avoid dependency loop
+    if (!enabled || connectionStateRef.current.isConnected) return
 
-    const currentRetry = connectionState.retryCount
+    const currentRetry = connectionStateRef.current.retryCount
 
     if (currentRetry >= maxRetries) {
       setConnectionState(prev => ({
@@ -119,10 +127,10 @@ export function useReconnection({
         attemptReconnection()
       }, delay)
     }
+  // Remove connectionState from dependencies to prevent infinite loop
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     enabled,
-    connectionState.isConnected,
-    connectionState.retryCount,
     maxRetries,
     getRetryDelay,
     onReconnect,
@@ -131,7 +139,8 @@ export function useReconnection({
 
   // Manually trigger connection loss
   const markAsDisconnected = useCallback(() => {
-    if (!connectionState.isConnected) return
+    // Use ref to avoid dependency on connectionState
+    if (!connectionStateRef.current.isConnected) return
 
     setConnectionState({
       isConnected: false,
@@ -161,7 +170,9 @@ export function useReconnection({
     retryTimeoutRef.current = setTimeout(() => {
       attemptReconnection()
     }, initialDelay)
-  }, [connectionState.isConnected, onConnectionLost, notify, getRetryDelay])
+  // Remove connectionState from dependencies to prevent circular dependency
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onConnectionLost, notify, getRetryDelay, attemptReconnection])
   // Note: attemptReconnection is called inside but not in deps to avoid circular dependency
 
   // Manually trigger successful connection

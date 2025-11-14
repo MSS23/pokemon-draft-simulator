@@ -612,10 +612,15 @@ export const useDraftStore = create<DraftStore>()(
             return (pickA?.pickOrder || 0) - (pickB?.pickOrder || 0)
           })
 
-          // Update team budget
+          // Update team budget with defensive null checks
           const team = state.teamsById[teamId]
-          if (team) {
+          if (team && typeof team.budgetRemaining === 'number' && typeof pick.cost === 'number') {
             team.budgetRemaining -= pick.cost
+          } else if (team) {
+            console.error(`[addPick] Invalid budget or cost values for team ${teamId}:`, {
+              budgetRemaining: team.budgetRemaining,
+              cost: pick.cost
+            })
           }
 
           // Mark Pokemon as drafted in wishlist

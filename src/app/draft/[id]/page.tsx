@@ -243,6 +243,7 @@ export default function DraftRoomPage() {
   // Notification deduplication refs to prevent spam
   const lastNotifiedTurnRef = useRef<number | null>(null)
   const lastNotifiedPickCountRef = useRef<number>(0)
+  const lastTurnNotificationTime = useRef<number>(0) // Timestamp of last turn notification for time-based throttling
   const shownNotifications = useRef<Map<string, number>>(new Map())
 
   // Notification deduplication helper - prevents showing the same notification multiple times
@@ -650,6 +651,7 @@ export default function DraftRoomPage() {
     const MAX_ERRORS = 5
     let updateTimeoutId: NodeJS.Timeout | null = null
     let lastProcessedTimestamp: string | null = null // Track last processed update to prevent duplicates
+    let lastProcessedStateHash: string | null = null // Track state hash to prevent duplicate events from multi-table updates
 
     // Create cleanup function for this subscription
     const cleanup = () => {
@@ -696,7 +698,8 @@ export default function DraftRoomPage() {
       }
 
       // Debounce rapid updates to prevent infinite loops
-      // Increased to 500ms to account for network latency (was 100ms)
+      // Increased to 1500ms to aggregate multi-table updates from a single pick operation
+      // (picks table + teams table + drafts table all trigger separate events)
       if (updateTimeoutId) {
         clearTimeout(updateTimeoutId)
       }
@@ -736,6 +739,20 @@ export default function DraftRoomPage() {
             const currentNotify = notifyRef.current
 
             const newState = currentTransformDraftState(dbState, currentUserId)
+
+            // Create state hash to deduplicate events from multi-table updates
+            // Hash combines: turn number, total picks, and sum of all team budgets
+            const totalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
+            const totalBudget = newState.teams.reduce((sum, team) => sum + team.budgetRemaining, 0)
+            const stateHash = `${newState.currentTurn}-${totalPicks}-${totalBudget}`
+
+            // Skip processing if this exact state has already been processed
+            if (stateHash === lastProcessedStateHash) {
+              console.log('[Draft Subscription] Duplicate state hash ignored:', stateHash)
+              return
+            }
+
+            lastProcessedStateHash = stateHash
             console.log('[Draft Subscription] State updated, teams:', newState.teams.map(t => ({ name: t.name, order: t.draftOrder })))
 
             // Check for pick notifications (only if not the user's own pick)
@@ -771,23 +788,34 @@ export default function DraftRoomPage() {
             if (!currentIsAuctionDraft && currentDraftState && newState.currentTeam !== currentDraftState.currentTeam) {
               // Only notify if turn number actually changed (prevents duplicate notifications)
               if (newState.currentTurn !== lastNotifiedTurnRef.current) {
-                lastNotifiedTurnRef.current = newState.currentTurn
+                // Add time-based throttling: minimum 2 seconds between turn notifications
+                // This prevents notification spam during rapid turn transitions
+                const now = Date.now()
+                const MIN_NOTIFICATION_INTERVAL = 2000 // 2 seconds
+                const timeSinceLastNotification = now - lastTurnNotificationTime.current
 
-                const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
-                if (currentTeam) {
-                  if (newState.userTeamId === newState.currentTeam) {
-                    currentNotify.success(
-                      "It's Your Turn!",
-                      "Select a Pokémon to draft",
-                      { duration: 5000 }
-                    )
-                  } else {
-                    currentNotify.info(
-                      `${currentTeam.name}'s Turn`,
-                      `Waiting for ${currentTeam.userName} to pick`,
-                      { duration: 3000 }
-                    )
+                if (timeSinceLastNotification >= MIN_NOTIFICATION_INTERVAL || lastTurnNotificationTime.current === 0) {
+                  lastNotifiedTurnRef.current = newState.currentTurn
+                  lastTurnNotificationTime.current = now
+
+                  const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
+                  if (currentTeam) {
+                    if (newState.userTeamId === newState.currentTeam) {
+                      currentNotify.success(
+                        "It's Your Turn!",
+                        "Select a Pokémon to draft",
+                        { duration: 5000 }
+                      )
+                    } else {
+                      currentNotify.info(
+                        `${currentTeam.name}'s Turn`,
+                        `Waiting for ${currentTeam.userName} to pick`,
+                        { duration: 3000 }
+                      )
+                    }
                   }
+                } else {
+                  console.log(`[Notification Throttle] Skipping turn notification (${timeSinceLastNotification}ms < ${MIN_NOTIFICATION_INTERVAL}ms)`)
                 }
               }
             }
@@ -820,9 +848,9 @@ export default function DraftRoomPage() {
           mounted = false // Stop further updates
         }
       }
-      // Dynamic debounce: 2000ms during draft start transition, 500ms normally
-      // Increased from 1000ms to reduce race conditions during status change
-      }, isDraftStarting ? 2000 : 500)
+      // Dynamic debounce: 2000ms during draft start transition, 1500ms normally
+      // 1500ms allows multi-table updates (picks + teams + drafts) to aggregate into one state update
+      }, isDraftStarting ? 2000 : 1500)
     })
 
     return () => {

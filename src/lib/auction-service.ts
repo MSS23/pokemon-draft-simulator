@@ -52,6 +52,15 @@ class AuctionService {
         throw new Error('Draft not found')
       }
 
+      // Validate draft is active and not deleted
+      if (draftState.draft.status !== 'active') {
+        throw new Error(`Draft is not active (status: ${draftState.draft.status})`)
+      }
+
+      if ((draftState.draft as any).deleted_at) {
+        throw new Error('Draft has been deleted')
+      }
+
       const draftUuid = draftState.draft.id
 
       // First, record the bid in history

@@ -28,6 +28,28 @@ export interface DraftParticipation {
 const USER_SESSION_KEY = 'pokemon-draft-user-session'
 const DRAFT_PARTICIPATION_KEY = 'pokemon-draft-participation'
 
+/**
+ * Generate a cryptographically secure guest user ID to prevent collisions
+ * Falls back to timestamp + random if crypto.randomUUID is unavailable
+ */
+function generateSecureGuestId(): string {
+  // Use crypto.randomUUID if available (supported in modern browsers)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `guest-${crypto.randomUUID()}`
+  }
+
+  // Fallback: Use crypto.getRandomValues for better randomness
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint32Array(4)
+    crypto.getRandomValues(array)
+    const randomStr = Array.from(array).map(n => n.toString(36)).join('')
+    return `guest-${Date.now()}-${randomStr}`
+  }
+
+  // Final fallback (should rarely happen in modern browsers)
+  return `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${Math.random().toString(36).substr(2, 9)}`
+}
+
 export class UserSessionService {
   /**
    * Get or create a persistent user session
@@ -37,7 +59,7 @@ export class UserSessionService {
     if (typeof window === 'undefined') {
       // Server-side fallback
       return {
-        userId: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        userId: generateSecureGuestId(),
         displayName: displayName || 'Guest',
         createdAt: new Date().toISOString(),
         lastActivity: new Date().toISOString(),
@@ -94,7 +116,7 @@ export class UserSessionService {
 
     // No authenticated user and no stored session - create new guest session
     const guestSession: UserSession = {
-      userId: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId: generateSecureGuestId(),
       displayName: displayName || 'Guest',
       createdAt: new Date().toISOString(),
       lastActivity: new Date().toISOString(),
@@ -305,7 +327,7 @@ export class UserSessionService {
     }
 
     // Generate new ID
-    const newId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    const newId = generateSecureGuestId()
 
     // Store in sessionStorage for backward compatibility
     if (typeof window !== 'undefined') {

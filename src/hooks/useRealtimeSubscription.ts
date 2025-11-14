@@ -56,7 +56,8 @@ export function useRealtimeSubscription({
       return
     }
 
-    let subscribed = false
+    // Track subscriptions immediately to prevent memory leaks
+    const pendingUnsubscribes: (() => void)[] = []
 
     const setupSubscriptions = async () => {
       try {
@@ -78,6 +79,9 @@ export function useRealtimeSubscription({
             }
           }
         )
+        // Track immediately to prevent leak if component unmounts during setup
+        pendingUnsubscribes.push(unsubDrafts)
+        if (isMountedRef.current) unsubscribeRef.current.push(unsubDrafts)
 
         // Subscribe to teams table
         const unsubTeams = await realtimeManager.subscribeToTable(
@@ -95,6 +99,8 @@ export function useRealtimeSubscription({
             }
           }
         )
+        pendingUnsubscribes.push(unsubTeams)
+        if (isMountedRef.current) unsubscribeRef.current.push(unsubTeams)
 
         // Subscribe to picks table
         const unsubPicks = await realtimeManager.subscribeToTable(
@@ -112,6 +118,8 @@ export function useRealtimeSubscription({
             }
           }
         )
+        pendingUnsubscribes.push(unsubPicks)
+        if (isMountedRef.current) unsubscribeRef.current.push(unsubPicks)
 
         // Subscribe to participants table
         const unsubParticipants = await realtimeManager.subscribeToTable(
@@ -129,6 +137,8 @@ export function useRealtimeSubscription({
             }
           }
         )
+        pendingUnsubscribes.push(unsubParticipants)
+        if (isMountedRef.current) unsubscribeRef.current.push(unsubParticipants)
 
         // Subscribe to auctions table
         const unsubAuctions = await realtimeManager.subscribeToTable(
@@ -146,23 +156,15 @@ export function useRealtimeSubscription({
             }
           }
         )
-
-        // Store all unsubscribe functions
-        if (isMountedRef.current) {
-          unsubscribeRef.current = [
-            unsubDrafts,
-            unsubTeams,
-            unsubPicks,
-            unsubParticipants,
-            unsubAuctions
-          ]
-          subscribed = true
-        }
+        pendingUnsubscribes.push(unsubAuctions)
+        if (isMountedRef.current) unsubscribeRef.current.push(unsubAuctions)
 
         console.log(`[useRealtimeSubscription] Subscriptions set up successfully for draft ${draftId}`)
 
       } catch (error) {
         console.error('[useRealtimeSubscription] Error setting up subscriptions:', error)
+        // Clean up any subscriptions that were created before the error
+        pendingUnsubscribes.forEach(unsub => unsub())
       }
     }
 
@@ -171,11 +173,19 @@ export function useRealtimeSubscription({
     return () => {
       isMountedRef.current = false
 
-      if (subscribed && unsubscribeRef.current.length > 0) {
-        console.log(`[useRealtimeSubscription] Cleaning up subscriptions for draft ${draftId}`)
+      // Clean up all subscriptions (both from ref and pending array)
+      console.log(`[useRealtimeSubscription] Cleaning up subscriptions for draft ${draftId}`)
+
+      // Clean up completed subscriptions
+      if (unsubscribeRef.current.length > 0) {
         unsubscribeRef.current.forEach(unsub => unsub())
         unsubscribeRef.current = []
       }
+
+      // Clean up any pending subscriptions that weren't added to ref yet
+      pendingUnsubscribes.forEach(unsub => {
+        if (typeof unsub === 'function') unsub()
+      })
     }
   }, [draftId, enabled])
 
