@@ -23,6 +23,9 @@ interface PokemonDetailsModalProps {
   onSelect?: (pokemon: Pokemon) => void
   isDrafted?: boolean
   isDisabled?: boolean
+  isAtPickLimit?: boolean
+  currentPicks?: number
+  maxPicks?: number
 }
 
 export default function PokemonDetailsModal({
@@ -32,6 +35,9 @@ export default function PokemonDetailsModal({
   onSelect,
   isDrafted = false,
   isDisabled = false,
+  isAtPickLimit = false,
+  currentPicks,
+  maxPicks,
 }: PokemonDetailsModalProps) {
   const [imageError, setImageError] = useState(false)
   const [showOfficialArt, setShowOfficialArt] = useState(true)
@@ -249,9 +255,13 @@ export default function PokemonDetailsModal({
             </Button>
             <Button
               onClick={() => onSelect(pokemon)}
-              className="px-6 bg-blue-600 hover:bg-blue-700 text-white"
+              disabled={isAtPickLimit}
+              className="px-6 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Draft {pokemon.name}
+              {isAtPickLimit
+                ? `Pick Limit Reached (${currentPicks}/${maxPicks})`
+                : `Draft ${pokemon.name}`
+              }
             </Button>
           </div>
         )}

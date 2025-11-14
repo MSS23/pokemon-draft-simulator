@@ -747,11 +747,24 @@ export class DraftService {
       throw new Error(`Insufficient budget! You have ${team.budget_remaining} points remaining but this Pokémon costs ${validatedCost} points.`)
     }
 
-    // Validate Pokémon count limit
+    // Validate Pokémon count limit with ATOMIC database query to prevent race conditions
     const maxPokemonPerTeam = draftState.draft.settings?.maxPokemonPerTeam || 10
-    const currentPickCount = draftState.picks.filter(p => p.team_id === teamId).length
+
+    // Get LATEST pick count directly from database (not from potentially stale draftState)
+    const { count: currentPickCount, error: countError } = await (supabase as any)
+      .from('picks')
+      .select('*', { count: 'exact', head: true })
+      .eq('draft_id', draftUuid)
+      .eq('team_id', teamId)
+
+    if (countError) {
+      console.error('[makePick] Error counting picks:', countError)
+      throw new Error('Failed to validate pick count')
+    }
+
+    // Enforce strict limit - prevent any picks beyond maximum
     if (currentPickCount >= maxPokemonPerTeam) {
-      throw new Error(`Team already has maximum number of Pokémon (${maxPokemonPerTeam})`)
+      throw new Error(`Team has reached maximum picks (${currentPickCount}/${maxPokemonPerTeam})`)
     }
 
     const totalTeams = draftState.teams.length
@@ -767,6 +780,7 @@ export class DraftService {
     const pickOrder = draftState.picks.length + 1
 
     // Create the pick (use UUID for draft_id)
+    // This happens immediately after count check to minimize race condition window
     const { error: pickError } = await (supabase
       .from('picks') as any)
       .insert({

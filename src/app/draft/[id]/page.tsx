@@ -1886,6 +1886,9 @@ export default function DraftRoomPage() {
           onClose={() => setIsDetailsOpen(false)}
           onSelect={!draftState || isAuctionDraft ? undefined : ((isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting' ? handleDraftPokemon : undefined)}
           isDrafted={detailsPokemon && draftState ? allDraftedIds.includes(detailsPokemon.id) : false}
+          isAtPickLimit={userTeam ? userTeam.picks.length >= (draftState?.draftSettings?.pokemonPerTeam || 6) : false}
+          currentPicks={userTeam?.picks.length || 0}
+          maxPicks={draftState?.draftSettings?.pokemonPerTeam || 6}
         />
 
         {/* Wishlist Manager - Fixed Position */}
