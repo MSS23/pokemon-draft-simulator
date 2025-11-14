@@ -161,7 +161,8 @@ export function useReconnection({
     retryTimeoutRef.current = setTimeout(() => {
       attemptReconnection()
     }, initialDelay)
-  }, [connectionState.isConnected, onConnectionLost, notify, getRetryDelay, attemptReconnection])
+  }, [connectionState.isConnected, onConnectionLost, notify, getRetryDelay])
+  // Note: attemptReconnection is called inside but not in deps to avoid circular dependency
 
   // Manually trigger successful connection
   const markAsConnected = useCallback(() => {
@@ -205,7 +206,9 @@ export function useReconnection({
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [enabled, connectionState.isConnected, attemptReconnection, markAsDisconnected, notify])
+  }, [enabled, connectionState.isConnected, notify])
+  // Note: attemptReconnection and markAsDisconnected are stable due to useCallback,
+  // but excluded from deps to prevent circular re-subscriptions
 
   // Cleanup on unmount
   useEffect(() => {

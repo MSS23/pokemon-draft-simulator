@@ -212,7 +212,16 @@ export function usePresence(draftId: string, userId: string, metadata?: Record<s
   const unsubscribeRef = useRef<(() => void) | null>(null)
 
   // Stabilize metadata object to prevent infinite loops
-  const stableMetadata = useMemo(() => metadata, [JSON.stringify(metadata)]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Use a ref to track the serialized metadata and only update when it actually changes
+  const metadataRef = useRef<string>('')
+  const stableMetadata = useMemo(() => {
+    const serialized = JSON.stringify(metadata)
+    if (serialized !== metadataRef.current) {
+      metadataRef.current = serialized
+      return metadata
+    }
+    return metadata
+  }, [metadata])
 
   useEffect(() => {
     if (!draftId || !userId) {

@@ -18,7 +18,7 @@ export function useLatest<T>(value: T): React.MutableRefObject<T> {
 
   useEffect(() => {
     ref.current = value
-  })
+  }, [value]) // Only update when value actually changes
 
   return ref
 }
