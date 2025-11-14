@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { SidebarLayout } from '@/components/layout/SidebarLayout'
 
 // Lazy load heavy components for better initial load performance
 const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), {
@@ -263,7 +264,7 @@ export default function Home() {
   }, [user])
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-500">
+    <SidebarLayout>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Error Banner */}
         {error && (
@@ -644,6 +645,6 @@ export default function Home() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
       />
-    </div>
+    </SidebarLayout>
   )
 }
