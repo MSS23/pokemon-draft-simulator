@@ -7,7 +7,17 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "@radix-ui/react-icons
 
 const Select = SelectPrimitive.Root
 
-const SelectGroup = SelectPrimitive.Group
+const SelectGroup = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Group>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Group>
+>((props, ref) => (
+  <SelectPrimitive.Group
+    ref={ref}
+    suppressHydrationWarning
+    {...props}
+  />
+))
+SelectGroup.displayName = SelectPrimitive.Group.displayName
 
 const SelectValue = SelectPrimitive.Value
 
@@ -107,6 +117,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
+    suppressHydrationWarning
     className={cn("px-2 py-1.5 text-sm font-semibold", className)}
     {...props}
   />
