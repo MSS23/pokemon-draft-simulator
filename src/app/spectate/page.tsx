@@ -78,8 +78,12 @@ export default function SpectatePage() {
 
     try {
       const { data, error } = await supabase
-        .from("active_public_drafts")
+        .from("drafts")
         .select("*")
+        .eq("is_public", true)
+        .in("status", ["setup", "active"])
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
         .limit(20);
 
       if (error) {
