@@ -312,7 +312,7 @@ export default function Home() {
                 setAuthModalOpen(true)
                 return
               }
-              window.location.href = '/create-draft'
+              router.push('/create-draft')
             }}
             className="group relative bg-card rounded-xl p-6 border-2 border-primary/20 hover:border-primary/50 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
           >
@@ -330,7 +330,7 @@ export default function Home() {
             onClick={() => {
               const code = prompt('Enter 6-character room code:')
               if (code) {
-                window.location.href = `/join-draft?code=${code.toUpperCase()}`
+                router.push(`/join-draft?code=${code.toUpperCase()}`)
               }
             }}
             className="group relative bg-card rounded-xl p-6 border-2 border-accent/20 hover:border-accent/50 transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1"
@@ -494,7 +494,7 @@ export default function Home() {
               </p>
               <div className="flex gap-3 justify-center">
                 <Button
-                  onClick={() => window.location.href = '/create-draft'}
+                  onClick={() => router.push('/create-draft')}
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Create Draft
@@ -504,7 +504,7 @@ export default function Home() {
                   onClick={() => {
                     const code = prompt('Enter room code:')
                     if (code) {
-                      window.location.href = `/join-draft?code=${code.toUpperCase()}`
+                      router.push(`/join-draft?code=${code.toUpperCase()}`)
                     }
                   }}
                 >

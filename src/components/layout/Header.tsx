@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
@@ -24,10 +24,10 @@ export function Header() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  // Prevent hydration mismatch
-  useState(() => {
+  // Prevent hydration mismatch - only render user-dependent UI after client mount
+  useEffect(() => {
     setMounted(true)
-  })
+  }, [])
 
   return (
     <>
@@ -54,17 +54,18 @@ export function Header() {
             <ImageTypeToggle />
             <ThemeToggle />
 
-            {!mounted || loading ? (
-              // Placeholder during loading to prevent hydration mismatch
-              <>
-                <Button variant="ghost" size="sm" disabled>
-                  Sign In
-                </Button>
-                <Button size="sm" disabled>
-                  Sign Up
-                </Button>
-              </>
-            ) : user ? (
+            <div suppressHydrationWarning>
+              {!mounted || loading ? (
+                // Placeholder during loading to prevent hydration mismatch
+                <>
+                  <Button variant="ghost" size="sm" disabled>
+                    Sign In
+                  </Button>
+                  <Button size="sm" disabled>
+                    Sign Up
+                  </Button>
+                </>
+              ) : user ? (
               // User is signed in
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -94,6 +95,7 @@ export function Header() {
                 Sign In
               </Button>
             )}
+            </div>
           </div>
         </div>
       </header>
