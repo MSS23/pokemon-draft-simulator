@@ -25,6 +25,8 @@ export interface DraftSettings {
   createLeague?: boolean
   splitIntoConferences?: boolean
   leagueWeeks?: number
+  // Shuffle tracking
+  draftOrderShuffled?: boolean
 }
 
 export interface CreateDraftParams {
@@ -657,57 +659,158 @@ export class DraftService {
     const results = await Promise.all(updatePromises)
     console.log('[Shuffle] Team updates completed:', results.map(r => ({ error: r.error, count: r.count })))
 
-    // Update draft timestamp to trigger refresh
+    // Update draft settings to mark as manually shuffled
+    const updatedSettings = {
+      ...(draftState.draft.settings || {}),
+      draftOrderShuffled: true
+    }
+
     const { error: draftUpdateError } = await (supabase as any)
       .from('drafts')
-      .update({ updated_at: new Date().toISOString() })
+      .update({
+        settings: updatedSettings,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', draftUuid)
 
-    console.log('[Shuffle] Draft timestamp update:', { error: draftUpdateError, draftId: draftUuid })
+    console.log('[Shuffle] Draft update:', { error: draftUpdateError, draftId: draftUuid })
   }
 
+  /**
+   * Validate that a draft can be started
+   * Returns validation result with detailed error messages
+   */
+  private static async validateDraftCanStart(draftState: any): Promise<{ valid: boolean; error?: string }> {
+    const { draft, teams, participants } = draftState
+
+    // Check 1: Draft must be in setup status
+    if (draft.status !== 'setup') {
+      if (draft.status === 'active') {
+        // Idempotency: if already started, treat as success
+        return { valid: true }
+      }
+      return { valid: false, error: `Draft is in '${draft.status}' status and cannot be started` }
+    }
+
+    // Check 2: Must have at least 2 teams
+    if (!teams || teams.length < 2) {
+      return { valid: false, error: 'At least 2 teams are required to start the draft' }
+    }
+
+    // Check 3: Each team must have at least one participant
+    const teamsWithoutParticipants = teams.filter((team: any) => {
+      const teamParticipants = participants.filter((p: any) => p.team_id === team.id)
+      return teamParticipants.length === 0
+    })
+
+    if (teamsWithoutParticipants.length > 0) {
+      const teamNames = teamsWithoutParticipants.map((t: any) => t.name).join(', ')
+      return { valid: false, error: `The following teams have no participants: ${teamNames}` }
+    }
+
+    // Check 4: Draft order values must be valid (1 to N, no gaps, no duplicates)
+    const draftOrders = teams.map((t: any) => t.draft_order).sort((a: number, b: number) => a - b)
+    const expectedOrders = Array.from({ length: teams.length }, (_, i) => i + 1)
+
+    if (JSON.stringify(draftOrders) !== JSON.stringify(expectedOrders)) {
+      return { valid: false, error: 'Team draft order is invalid (must be 1 to N with no gaps or duplicates)' }
+    }
+
+    // Check 5: All participants must have valid team_id
+    const orphanedParticipants = participants.filter((p: any) => {
+      return p.team_id && !teams.find((t: any) => t.id === p.team_id)
+    })
+
+    if (orphanedParticipants.length > 0) {
+      return { valid: false, error: `Found ${orphanedParticipants.length} participant(s) assigned to non-existent teams` }
+    }
+
+    return { valid: true }
+  }
+
+  /**
+   * Start a draft (transition from setup to active)
+   * Performs comprehensive validation and atomic state update
+   */
   static async startDraft(roomCodeOrDraftId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 
-    // Get draft by room code
+    // Get draft state
     const draftState = await this.getDraftState(roomCodeOrDraftId)
     if (!draftState) {
       throw new Error('Draft not found')
     }
 
     const draftUuid = draftState.draft.id
-
-    // Get all teams for this draft
     const teams = draftState.teams
 
-    if (!teams || teams.length === 0) {
-      throw new Error('No teams in draft')
+    // Validate draft can be started
+    const validation = await this.validateDraftCanStart(draftState)
+    if (!validation.valid) {
+      if (validation.error) {
+        throw new Error(validation.error)
+      }
+      throw new Error('Draft cannot be started')
     }
 
-    // Check if draft order has been set (shuffled)
-    // If all teams have draft_order = their index + 1, it hasn't been shuffled
-    const needsShuffle = teams.every((team, index) => (team as any).draft_order === index + 1)
+    // If draft is already active, return success (idempotency)
+    if (draftState.draft.status === 'active') {
+      console.log('[startDraft] Draft already active, returning success (idempotent)')
+      return
+    }
+
+    // Check if draft order needs to be shuffled
+    // Only auto-shuffle if the host hasn't manually shuffled (check settings flag)
+    const draftOrderShuffled = draftState.draft.settings?.draftOrderShuffled || false
+    const needsShuffle = !draftOrderShuffled
 
     if (needsShuffle) {
-      // Auto-shuffle if not done manually
-      const randomizedOrder = teams.map((_, index) => index + 1)
+      console.log('[startDraft] Auto-shuffling draft order (not manually shuffled)')
+
+      // Generate randomized order
+      const randomizedOrder = teams.map((_: any, index: number) => index + 1)
       for (let i = randomizedOrder.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [randomizedOrder[i], randomizedOrder[j]] = [randomizedOrder[j], randomizedOrder[i]]
       }
 
       // Update each team with new randomized draft order
-      const updatePromises = teams.map((team, index) =>
+      const updatePromises = teams.map((team: any, index: number) =>
         (supabase as any)
           .from('teams')
           .update({ draft_order: randomizedOrder[index] })
-          .eq('id', (team as any).id)
+          .eq('id', team.id)
       )
 
-      await Promise.all(updatePromises)
+      const results = await Promise.all(updatePromises)
+
+      // Check for errors in shuffle updates
+      const shuffleErrors = results.filter(r => r.error)
+      if (shuffleErrors.length > 0) {
+        console.error('[startDraft] Error shuffling teams:', shuffleErrors)
+        throw new Error('Failed to shuffle team draft order')
+      }
+
+      // Update draft settings to mark as shuffled
+      const updatedSettings = {
+        ...(draftState.draft.settings || {}),
+        draftOrderShuffled: true
+      }
+
+      const { error: settingsError } = await (supabase as any)
+        .from('drafts')
+        .update({ settings: updatedSettings })
+        .eq('id', draftUuid)
+
+      if (settingsError) {
+        console.error('[startDraft] Error updating shuffle flag:', settingsError)
+        // Non-fatal, continue
+      }
+    } else {
+      console.log('[startDraft] Skipping auto-shuffle (already manually shuffled)')
     }
 
-    // Set draft to active with first turn
+    // Atomically set draft to active with first turn
     const { error } = await (supabase as any)
       .from('drafts')
       .update({
@@ -717,11 +820,20 @@ export class DraftService {
         updated_at: new Date().toISOString()
       })
       .eq('id', draftUuid)
+      .eq('status', 'setup') // Only update if still in setup (prevent race conditions)
 
     if (error) {
-      console.error('Error starting draft:', error)
-      throw new Error('Failed to start draft')
+      console.error('[startDraft] Error updating draft status:', error)
+
+      // Check if it's an RLS policy error
+      if (error.code === '42501' || error.message?.includes('policy')) {
+        throw new Error('Permission denied: You do not have permission to start this draft')
+      }
+
+      throw new Error(`Failed to start draft: ${error.message || 'Unknown error'}`)
     }
+
+    console.log('[startDraft] Draft started successfully:', { draftId: draftUuid, roomCode: roomCodeOrDraftId })
   }
 
   static async makePick(draftId: string, userId: string, pokemonId: string, pokemonName: string, cost: number): Promise<void> {

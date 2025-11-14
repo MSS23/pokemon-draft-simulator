@@ -36,6 +36,7 @@ interface DraftControlsProps {
     picks: string[]
   }>
   isHost: boolean
+  isStarting?: boolean
   timeRemaining?: number
   onStartDraft: () => void
   onShuffleDraftOrder?: () => void
@@ -63,6 +64,7 @@ const DraftControls = memo(function DraftControls({
   currentTeam,
   teams,
   isHost,
+  isStarting = false,
   timeRemaining = 60,
   onStartDraft,
   onShuffleDraftOrder,
@@ -207,11 +209,11 @@ const DraftControls = memo(function DraftControls({
               </Button>
               <Button
                 onClick={onStartDraft}
-                disabled={teams.length < 2}
+                disabled={teams.length < 2 || isStarting}
                 className="bg-green-600 hover:bg-green-700"
               >
-                <Play className="h-4 w-4 mr-2" />
-                Start Draft ({teams.length} teams)
+                <Play className={`h-4 w-4 mr-2 ${isStarting ? 'animate-spin' : ''}`} />
+                {isStarting ? 'Starting...' : `Start Draft (${teams.length} teams)`}
               </Button>
             </>
           )}

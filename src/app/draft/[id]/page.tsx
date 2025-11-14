@@ -214,6 +214,7 @@ export default function DraftRoomPage() {
   const [error, setError] = useState('')
   const [isProxyPickingEnabled, setIsProxyPickingEnabled] = useState(false)
   const [isShuffling, setIsShuffling] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
 
   // Real draft state from Supabase
   const [draftState, setDraftState] = useState<DraftUIState | null>(null)
@@ -615,6 +616,16 @@ export default function DraftRoomPage() {
     if (lastStatusRef.current === 'waiting' && draftState?.status === 'drafting') {
       console.log('[Draft Start] Transition detected: waiting → drafting')
       setIsDraftStarting(true)
+
+      // Reset isStarting state now that draft has started
+      setIsStarting(false)
+
+      // Show success notification
+      notify.success(
+        'Draft Started!',
+        'The draft is now active. Good luck with your picks!'
+      )
+
       // Give 2 seconds for all updates to settle during draft start
       const timeoutId = setTimeout(() => {
         console.log('[Draft Start] Cooldown period ended')
@@ -623,7 +634,7 @@ export default function DraftRoomPage() {
       return () => clearTimeout(timeoutId)
     }
     lastStatusRef.current = draftState?.status || null
-  }, [draftState?.status])
+  }, [draftState?.status, notify])
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -1235,17 +1246,26 @@ export default function DraftRoomPage() {
       return
     }
 
+    // Prevent multiple simultaneous start attempts
+    if (isStarting) {
+      console.log('[startDraft] Already starting, ignoring duplicate call')
+      return
+    }
+
+    setIsStarting(true)
     try {
       await DraftService.startDraft(roomCode.toLowerCase())
-      notify.success('Draft Started!', 'The Pokémon draft has begun. Good luck!', { duration: 4000 })
+      // Don't show success immediately - wait for subscription to confirm status change
+      console.log('[startDraft] Start request sent, waiting for subscription confirmation...')
     } catch (err) {
       console.error('Error starting draft:', err)
       notify.error(
         'Failed to Start Draft',
         err instanceof Error ? err.message : 'Failed to start draft. Please try again.'
       )
+      setIsStarting(false) // Re-enable button on error
     }
-  }, [draftState, roomCode, notify])
+  }, [draftState, roomCode, notify, isStarting])
 
   // Draft Control Functions
   const handlePauseDraft = useCallback(async () => {
