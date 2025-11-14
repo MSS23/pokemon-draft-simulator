@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Search, Trophy } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface LeagueHistory {
   id: string
@@ -28,33 +29,26 @@ interface LeagueHistory {
 
 export default function HistoryPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
   const [leagues, setLeagues] = useState<LeagueHistory[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'date' | 'placement' | 'all'>('date')
   const [filterPlacement, setFilterPlacement] = useState<'all' | '1' | '2' | '3'>('all')
 
   useEffect(() => {
-    checkUserAndLoadData()
-  }, [])
+    // Wait for auth to finish loading
+    if (authLoading) return
 
-  async function checkUserAndLoadData() {
-    if (!supabase) {
-      router.push('/auth/login')
-      return
-    }
-
-    const { data: { user } } = await supabase.auth.getUser()
-
+    // Redirect if not authenticated
     if (!user) {
       router.push('/auth/login')
       return
     }
 
-    setUser(user)
-    await loadUserHistory(user.id)
-  }
+    // Load user's league history
+    loadUserHistory(user.id)
+  }, [authLoading, user, router])
 
   async function loadUserHistory(userId: string) {
     if (!supabase) return

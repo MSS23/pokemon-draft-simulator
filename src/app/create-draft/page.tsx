@@ -50,12 +50,12 @@ import {
 } from "@/lib/format-export";
 import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function CreateDraftPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
   const notify = useNotify();
   const [formData, setFormData] = useState({
     userName: "",
@@ -89,51 +89,38 @@ export default function CreateDraftPage() {
   // Track if notification was shown to prevent spam
   const hasShownAuthNotification = useRef(false);
 
-  // Check authentication on mount
+  // Check authentication and pre-fill user data
   useEffect(() => {
-    const checkAuth = async () => {
-      if (!supabase) {
-        setIsCheckingAuth(false);
-        return;
+    // Wait for auth to finish loading
+    if (authLoading) return;
+
+    // Redirect if not authenticated
+    if (!user) {
+      // Only show notification once
+      if (!hasShownAuthNotification.current) {
+        notify.warning(
+          "Authentication Required",
+          "Please sign in to create a draft",
+        );
+        hasShownAuthNotification.current = true;
       }
+      router.push("/");
+      return;
+    }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user) {
-        // Only show notification once
-        if (!hasShownAuthNotification.current) {
-          notify.warning(
-            "Authentication Required",
-            "Please sign in to create a draft",
-          );
-          hasShownAuthNotification.current = true;
-        }
-        router.push("/");
-        return;
-      }
-
-      const user = session.user;
-      setUserEmail(user.email || null);
-
-      // Pre-fill userName with display name if available
-      if (user.user_metadata?.display_name) {
-        setFormData((prev) => ({
-          ...prev,
-          userName: user.user_metadata.display_name,
-        }));
-      } else if (user.email) {
-        setFormData((prev) => ({
-          ...prev,
-          userName: user.email?.split("@")[0] || "User",
-        }));
-      }
-
-      setIsCheckingAuth(false);
-    };
-
-    checkAuth();
-  }, [router, notify]);
+    // Pre-fill userName with display name if available
+    if (user.user_metadata?.display_name) {
+      setFormData((prev) => ({
+        ...prev,
+        userName: user.user_metadata.display_name,
+      }));
+    } else if (user.email) {
+      setFormData((prev) => ({
+        ...prev,
+        userName: user.email?.split("@")[0] || "User",
+      }));
+    }
+  }, [authLoading, user, router, notify]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => {
@@ -327,7 +314,7 @@ export default function CreateDraftPage() {
   const isFormValid = formData.userName.trim() && formData.teamName.trim();
 
   // Show loading state while checking auth
-  if (isCheckingAuth) {
+  if (authLoading) {
     return (
       <SidebarLayout>
         <div className="min-h-screen bg-background flex items-center justify-center">
@@ -349,9 +336,9 @@ export default function CreateDraftPage() {
             <div className="absolute top-0 right-0">
               <ThemeToggle />
             </div>
-            {userEmail && (
+            {user?.email && (
               <div className="absolute top-0 left-0 text-sm text-muted-foreground">
-                Signed in as: {userEmail}
+                Signed in as: {user.email}
               </div>
             )}
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-4">

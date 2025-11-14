@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Plus, Users, Trophy, Clock } from 'lucide-react'
 import Link from 'next/link'
-import type { User } from '@supabase/supabase-js'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface UserDraft {
   id: string
@@ -25,25 +25,20 @@ interface UserDraft {
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
+  const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState<UserDraft[]>([])
 
   useEffect(() => {
-    const checkUser = async () => {
-      if (!supabase) {
-        router.push('/auth/login')
-        return
-      }
+    const loadDashboardData = async () => {
+      // Wait for auth to finish loading
+      if (authLoading) return
 
-      const { data: { user } } = await supabase.auth.getUser()
-
+      // Redirect if not authenticated
       if (!user) {
         router.push('/auth/login')
         return
       }
-
-      setUser(user)
 
       // Fetch ALL drafts user participates in (via teams table)
       const { data: userTeams } = await supabase
@@ -87,10 +82,10 @@ export default function DashboardPage() {
       setLoading(false)
     }
 
-    checkUser()
-  }, [router])
+    loadDashboardData()
+  }, [authLoading, user, router])
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

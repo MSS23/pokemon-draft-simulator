@@ -6,7 +6,7 @@ import { Trophy, Users, Clock, ChevronRight, Eye, Calendar } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { UserSessionService } from '@/lib/user-session'
+import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 
@@ -27,15 +27,19 @@ interface CompletedDraft {
 
 export default function DraftHistoryPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [completedDrafts, setCompletedDrafts] = useState<CompletedDraft[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const loadCompletedDrafts = async () => {
       try {
-        const session = await UserSessionService.getSession()
-        if (!session?.userId) {
-          router.push('/')
+        // Wait for auth to finish loading
+        if (authLoading) return
+
+        // Redirect if not authenticated
+        if (!user) {
+          router.push('/auth/login')
           return
         }
 
@@ -63,7 +67,7 @@ export default function DraftHistoryPage() {
               updated_at
             )
           `)
-          .eq('owner_id', session.userId)
+          .eq('owner_id', user.id)
           .eq('draft.status', 'completed')
           .is('draft.deleted_at', null)
           .order('draft(updated_at)', { ascending: false })
@@ -101,7 +105,7 @@ export default function DraftHistoryPage() {
               createdAt: draft.created_at,
               teamId: team.id,
               teamName: team.name,
-              isHost: draft.host_id === session.userId,
+              isHost: draft.host_id === user.id,
               totalTeams: teamCount || 0,
               totalPicks: pickCount || 0
             }
@@ -117,7 +121,7 @@ export default function DraftHistoryPage() {
     }
 
     loadCompletedDrafts()
-  }, [router])
+  }, [authLoading, user, router])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -157,14 +161,14 @@ export default function DraftHistoryPage() {
         </div>
 
         {/* Loading State */}
-        {isLoading && (
+        {(authLoading || isLoading) && (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           </div>
         )}
 
         {/* Empty State */}
-        {!isLoading && completedDrafts.length === 0 && (
+        {!authLoading && !isLoading && completedDrafts.length === 0 && (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
@@ -184,7 +188,7 @@ export default function DraftHistoryPage() {
         )}
 
         {/* Completed Drafts List */}
-        {!isLoading && completedDrafts.length > 0 && (
+        {!authLoading && !isLoading && completedDrafts.length > 0 && (
           <div className="space-y-4">
             {completedDrafts.map((draft) => (
               <Card
