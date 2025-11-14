@@ -871,9 +871,7 @@ export default function CreateDraftPage() {
                         <SelectContent>
                           <SelectItem value="50">50 points</SelectItem>
                           <SelectItem value="75">75 points</SelectItem>
-                          <SelectItem value="100">
-                            100 points (Default)
-                          </SelectItem>
+                          <SelectItem value="100">100 points (Default)</SelectItem>
                           <SelectItem value="120">120 points</SelectItem>
                           <SelectItem value="150">150 points</SelectItem>
                           <SelectItem value="200">200 points</SelectItem>

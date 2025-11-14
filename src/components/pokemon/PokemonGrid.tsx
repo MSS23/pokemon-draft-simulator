@@ -537,13 +537,7 @@ export default function PokemonGrid({
                     <SelectItem value="all">All types</SelectItem>
                     {POKEMON_TYPES.map(type => (
                       <SelectItem key={type} value={type} className="capitalize">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: `var(--type-${type})` }}
-                          />
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </div>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -558,42 +552,12 @@ export default function PokemonGrid({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All costs</SelectItem>
-                    <SelectItem value="0-5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-gray-400" />
-                        0-5 points
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="6-10">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-green-400" />
-                        6-10 points
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="11-15">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-blue-400" />
-                        11-15 points
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="16-20">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-purple-400" />
-                        16-20 points
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="21-25">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-orange-400" />
-                        21-25 points
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="26">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                        26+ points
-                      </div>
-                    </SelectItem>
+                    <SelectItem value="0-5">⚪ 0-5 points</SelectItem>
+                    <SelectItem value="6-10">🟢 6-10 points</SelectItem>
+                    <SelectItem value="11-15">🔵 11-15 points</SelectItem>
+                    <SelectItem value="16-20">🟣 16-20 points</SelectItem>
+                    <SelectItem value="21-25">🟠 21-25 points</SelectItem>
+                    <SelectItem value="26">🟡 26+ points</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
