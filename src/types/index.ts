@@ -10,6 +10,7 @@ export interface Pokemon {
   moves?: Move[]
   isLegendary?: boolean
   isMythical?: boolean
+  isParadox?: boolean
   generation?: number
   tier?: string
 }

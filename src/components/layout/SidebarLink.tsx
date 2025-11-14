@@ -10,7 +10,7 @@ interface SidebarLinkProps {
   icon: LucideIcon
   label: string
   badge?: string | number
-  onClick?: () => void
+  onClick?: (e: React.MouseEvent) => void
 }
 
 export function SidebarLink({ href, icon: Icon, label, badge, onClick }: SidebarLinkProps) {

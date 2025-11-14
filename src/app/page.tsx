@@ -15,6 +15,7 @@ import { POKEMON_FORMATS, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
 
 // Lazy load heavy components for better initial load performance
 const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), {
@@ -130,8 +131,51 @@ export default function Home() {
     } catch (error) {
       console.error('Error deleting draft:', error)
 
-      // Revert UI on error by reloading from storage (excluding abandoned)
-      setMyDrafts(UserSessionService.getVisibleDraftParticipations())
+      // Revert UI on error by reloading from database (if authenticated)
+      if (user?.id && supabase) {
+        try {
+          const { data: userTeams } = await supabase
+            .from('teams')
+            .select(`
+              id,
+              name,
+              owner_id,
+              draft_id,
+              draft:drafts!inner(
+                id,
+                room_code,
+                status,
+                created_at,
+                deleted_at,
+                host_id
+              )
+            `)
+            .eq('owner_id', user.id)
+            .is('draft.deleted_at', null)
+
+          if (userTeams) {
+            const dbDrafts: DraftParticipation[] = userTeams.map((team: any) => ({
+              draftId: team.draft.room_code || team.draft.id,
+              userId: user.id,
+              teamId: team.id,
+              teamName: team.name,
+              displayName: user.email?.split('@')[0] || 'User',
+              isHost: team.draft.host_id === user.id,
+              status: team.draft.status,
+              lastActivity: team.draft.created_at,
+              joinedAt: team.draft.created_at
+            }))
+            setMyDrafts(dbDrafts)
+          }
+        } catch (reloadError) {
+          console.error('Error reloading drafts:', reloadError)
+          // Final fallback to localStorage
+          setMyDrafts(UserSessionService.getVisibleDraftParticipations())
+        }
+      } else {
+        // For non-authenticated users, reload from localStorage
+        setMyDrafts(UserSessionService.getVisibleDraftParticipations())
+      }
 
       toast.error('Failed to delete draft. You may not have permission to delete this draft.')
     }
@@ -139,13 +183,84 @@ export default function Home() {
 
   // Load user's drafts on component mount (excluding abandoned ones)
   useEffect(() => {
-    // Auto-cleanup abandoned drafts from local storage
-    UserSessionService.cleanupAbandonedDrafts()
+    const loadDrafts = async () => {
+      // Auto-cleanup abandoned drafts from local storage
+      UserSessionService.cleanupAbandonedDrafts()
 
-    // Load only visible (non-abandoned) drafts
-    const drafts = UserSessionService.getVisibleDraftParticipations()
-    setMyDrafts(drafts)
-  }, [])
+      // Get drafts from localStorage first
+      const localDrafts = UserSessionService.getVisibleDraftParticipations()
+
+      // If user is authenticated and Supabase is available, validate against database
+      if (user?.id && supabase) {
+        try {
+          // Query database for user's teams (joined with drafts, filtering out soft-deleted)
+          const { data: userTeams, error } = await supabase
+            .from('teams')
+            .select(`
+              id,
+              name,
+              owner_id,
+              draft_id,
+              draft:drafts!inner(
+                id,
+                room_code,
+                status,
+                created_at,
+                deleted_at,
+                host_id
+              )
+            `)
+            .eq('owner_id', user.id)
+            .is('draft.deleted_at', null) // Filter out soft-deleted drafts
+
+          if (error) {
+            console.error('Error loading drafts from database:', error)
+            // Fall back to localStorage on error
+            setMyDrafts(localDrafts)
+            return
+          }
+
+          // Transform database results to DraftParticipation format
+          const validDraftIds = new Set<string>()
+          const dbDrafts: DraftParticipation[] = (userTeams || []).map((team: any) => {
+            const draftId = team.draft.room_code || team.draft.id
+            validDraftIds.add(draftId)
+
+            return {
+              draftId,
+              userId: user.id,
+              teamId: team.id,
+              teamName: team.name,
+              displayName: user.email?.split('@')[0] || 'User',
+              isHost: team.draft.host_id === user.id,
+              status: team.draft.status,
+              lastActivity: team.draft.created_at,
+              joinedAt: team.draft.created_at
+            }
+          })
+
+          // Remove any drafts from localStorage that are deleted in the database
+          localDrafts.forEach(draft => {
+            if (!validDraftIds.has(draft.draftId)) {
+              UserSessionService.removeDraftParticipation(draft.draftId)
+            }
+          })
+
+          // Update state with database-validated drafts
+          setMyDrafts(dbDrafts)
+        } catch (error) {
+          console.error('Error validating drafts:', error)
+          // Fall back to localStorage on error
+          setMyDrafts(localDrafts)
+        }
+      } else {
+        // For non-authenticated users, use localStorage only
+        setMyDrafts(localDrafts)
+      }
+    }
+
+    loadDrafts()
+  }, [user])
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-500">

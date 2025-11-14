@@ -7,6 +7,7 @@
 
 import { getFormatById, type PokemonFormat } from '@/lib/formats'
 import type { Pokemon } from '@/types'
+import { FormatValidator } from '@/lib/format-validator'
 
 export interface ValidationResult {
   isLegal: boolean
@@ -45,6 +46,7 @@ export class FormatRulesEngine {
   isLegal(pokemon: Pokemon): boolean {
     const pokemonId = pokemon.id.toLowerCase()
     const pokemonName = pokemon.name.toLowerCase()
+    const pokemonNumericId = parseInt(pokemon.id)
 
     // Check if explicitly banned
     if (this.format.ruleset.bannedPokemon.some(banned =>
@@ -53,22 +55,30 @@ export class FormatRulesEngine {
       return false
     }
 
-    // Check legendary/mythical policy (if properties exist)
-    const isLegendary = (pokemon as any).isLegendary
-    const isMythical = (pokemon as any).isMythical
-
+    // Check legendary policy with FormatValidator fallback
+    const isLegendary = pokemon.isLegendary || FormatValidator.isLegendary(pokemonNumericId)
     if (isLegendary && this.format.ruleset.legendaryPolicy === 'banned') {
       return false
     }
 
+    // Check mythical policy with FormatValidator fallback
+    const isMythical = pokemon.isMythical || FormatValidator.isMythical(pokemonNumericId)
     if (isMythical && this.format.ruleset.mythicalPolicy === 'banned') {
       return false
     }
 
-    // Check generation restrictions (if property exists)
-    const generation = (pokemon as any).generation
-    if (generation && !this.format.ruleset.allowedGenerations.includes(generation)) {
+    // Check paradox policy with FormatValidator fallback
+    const isParadox = pokemon.isParadox || FormatValidator.isParadox(pokemonNumericId)
+    if (isParadox && this.format.ruleset.paradoxPolicy === 'banned') {
       return false
+    }
+
+    // Check generation restrictions (only if allowedGenerations is explicitly set)
+    const generation = pokemon.generation
+    if (this.format.ruleset.allowedGenerations.length > 0) {
+      if (generation && !this.format.ruleset.allowedGenerations.includes(generation)) {
+        return false
+      }
     }
 
     // If allowedPokemon is set, only those are legal

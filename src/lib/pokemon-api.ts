@@ -6,6 +6,22 @@ import { supabase } from '@/lib/supabase'
 
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2'
 
+/**
+ * Get the generation number from a National Dex number
+ * More accurate than simple division by 100
+ */
+function getGenerationFromDexNumber(dex: number): number {
+  if (dex <= 151) return 1   // Gen 1: Bulbasaur - Mew
+  if (dex <= 251) return 2   // Gen 2: Chikorita - Celebi
+  if (dex <= 386) return 3   // Gen 3: Treecko - Deoxys
+  if (dex <= 493) return 4   // Gen 4: Turtwig - Arceus
+  if (dex <= 649) return 5   // Gen 5: Victini - Genesect
+  if (dex <= 721) return 6   // Gen 6: Chespin - Volcanion
+  if (dex <= 809) return 7   // Gen 7: Rowlet - Melmetal
+  if (dex <= 905) return 8   // Gen 8: Grookey - Enamorus
+  return 9                    // Gen 9: Sprigatito onwards
+}
+
 interface PokeAPIResponse {
   id: number
   name: string
@@ -548,7 +564,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
             isLegal: true,
             isLegendary: pokemonData.flags.isLegendary,
             isMythical: pokemonData.flags.isMythical,
-            generation: Math.ceil(pokemonData.nationalDex / 100) // Rough estimation
+            generation: getGenerationFromDexNumber(pokemonData.nationalDex)
           }
 
           pokemonList.push(pokemon)
