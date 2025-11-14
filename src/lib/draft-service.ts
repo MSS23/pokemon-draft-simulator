@@ -1738,6 +1738,15 @@ export class DraftService {
     if (!supabase) throw new Error('Supabase not available')
 
     try {
+      // Get draft state to verify format
+      const draftState = await this.getDraftState(draftId)
+
+      // Only create leagues from snake drafts
+      if (draftState?.draft?.format !== 'snake') {
+        console.log('League auto-creation skipped: Only snake drafts supported')
+        return
+      }
+
       const { LeagueService } = await import('./league-service')
 
       const leagueWeeks = settings.leagueWeeks || 4
@@ -1746,7 +1755,8 @@ export class DraftService {
       await LeagueService.createLeagueFromDraft(draftId, {
         splitIntoConferences,
         totalWeeks: leagueWeeks,
-        matchFormat: 'best_of_3'
+        matchFormat: 'best_of_3',
+        maxMatchesPerWeek: 1  // Limit each team to 1 match per week
       })
 
       console.log('League created successfully for draft:', draftId)

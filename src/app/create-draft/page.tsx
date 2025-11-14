@@ -126,13 +126,15 @@ export default function CreateDraftPage() {
     setFormData((prev) => {
       const newData = { ...prev, [field]: value };
 
-      // If switching to snake draft and pokemonPerTeam is less than 6, set it to 6
-      if (
-        field === "draftType" &&
-        value === "snake" &&
-        parseInt(prev.pokemonPerTeam) < 6
-      ) {
-        newData.pokemonPerTeam = "6";
+      // If switching to snake draft, enforce league creation and minimum 6 Pokemon
+      if (field === "draftType" && value === "snake") {
+        // Force league creation for snake drafts
+        newData.createLeague = true;
+
+        // Ensure minimum 6 Pokemon per team
+        if (parseInt(prev.pokemonPerTeam) < 6) {
+          newData.pokemonPerTeam = "6";
+        }
       }
 
       return newData;
@@ -920,7 +922,8 @@ export default function CreateDraftPage() {
                         onChange={(e) =>
                           handleInputChange("createLeague", e.target.checked)
                         }
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        disabled={formData.draftType === "snake"}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <div className="flex-1">
                         <Label
@@ -928,10 +931,16 @@ export default function CreateDraftPage() {
                           className="text-sm font-medium cursor-pointer"
                         >
                           Create league after draft
+                          {formData.draftType === "snake" && (
+                            <Badge variant="secondary" className="ml-2 text-xs">
+                              Required for Snake
+                            </Badge>
+                          )}
                         </Label>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Automatically generate a competitive league schedule
-                          with standings when the draft completes
+                          {formData.draftType === "snake"
+                            ? "Snake drafts automatically create a league with 1 match per team per week"
+                            : "Automatically generate a competitive league schedule with standings when the draft completes"}
                         </p>
                       </div>
                     </div>

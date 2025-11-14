@@ -353,6 +353,7 @@ export interface ExtendedLeagueSettings extends LeagueSettings {
   enableTrades?: boolean // Allow Pokemon trading between teams
   tradeDeadlineWeek?: number // Week after which trades are locked
   requireCommissionerApproval?: boolean // Trades need approval
+  maxMatchesPerWeek?: number // Limit matches per team per week (default: 1)
 }
 
 // Trade with team details (for UI)
