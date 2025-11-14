@@ -161,13 +161,19 @@ export function Sidebar() {
           <SidebarLink
             href="/my-drafts"
             icon={FileText}
-            label="My Drafts"
+            label="League Matches"
+            onClick={(e) => handleProtectedClick(e, true)}
+          />
+          <SidebarLink
+            href="/draft-history"
+            icon={Trophy}
+            label="Draft History"
             onClick={(e) => handleProtectedClick(e, true)}
           />
           <SidebarLink
             href="/history"
             icon={History}
-            label="History"
+            label="League History"
             onClick={(e) => handleProtectedClick(e, true)}
           />
         </SidebarSection>

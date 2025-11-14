@@ -19,6 +19,8 @@ interface UserDraft {
   format: string
   max_teams: number
   room_code: string
+  isHost: boolean
+  teamName: string
 }
 
 export default function DashboardPage() {
@@ -43,15 +45,43 @@ export default function DashboardPage() {
 
       setUser(user)
 
-      // Fetch user's drafts
-      const { data: userDrafts } = await (supabase
-        .from('drafts') as any)
-        .select('*')
-        .eq('host_id', user.id)
-        .order('created_at', { ascending: false })
+      // Fetch ALL drafts user participates in (via teams table)
+      const { data: userTeams } = await supabase
+        .from('teams')
+        .select(`
+          id,
+          name,
+          owner_id,
+          draft_id,
+          draft:drafts!inner(
+            id,
+            name,
+            room_code,
+            status,
+            format,
+            max_teams,
+            host_id,
+            created_at,
+            deleted_at
+          )
+        `)
+        .eq('owner_id', user.id)
+        .is('draft.deleted_at', null)
+        .order('draft(created_at)', { ascending: false })
 
-      if (userDrafts) {
-        setDrafts(userDrafts)
+      if (userTeams) {
+        const formattedDrafts: UserDraft[] = userTeams.map((team: any) => ({
+          id: team.draft.id,
+          name: team.draft.name || 'Unnamed Draft',
+          status: team.draft.status,
+          created_at: team.draft.created_at,
+          format: team.draft.format || 'custom',
+          max_teams: team.draft.max_teams || 0,
+          room_code: team.draft.room_code || team.draft.id,
+          isHost: team.draft.host_id === user.id,
+          teamName: team.name
+        }))
+        setDrafts(formattedDrafts)
       }
 
       setLoading(false)
@@ -153,6 +183,11 @@ export default function DashboardPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold">{draft.name}</h3>
+                              {draft.isHost && (
+                                <Badge variant="outline" className="text-xs">
+                                  Host
+                                </Badge>
+                              )}
                               <Badge
                                 variant={draft.status === 'active' ? 'default' : 'secondary'}
                               >
@@ -163,6 +198,10 @@ export default function DashboardPage() {
                               </Badge>
                             </div>
                             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Trophy className="h-3 w-3" />
+                                Team: {draft.teamName}
+                              </span>
                               <span className="flex items-center gap-1">
                                 <Users className="h-3 w-3" />
                                 {draft.max_teams} teams

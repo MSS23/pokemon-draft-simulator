@@ -6,13 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ArrowLeft, Home, Trophy } from 'lucide-react'
+import { ArrowLeft, Home, Trophy, ChevronRight } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { LeagueService } from '@/lib/league-service'
 import DraftResults from '@/components/draft/DraftResults'
 import { CreateLeagueModal } from '@/components/league/CreateLeagueModal'
 import { useNotify } from '@/components/providers/NotificationProvider'
 import { LoadingScreen } from '@/components/ui/loading-states'
+import Link from 'next/link'
 
 export default function DraftResultsPage() {
   const params = useParams()
@@ -141,16 +142,33 @@ export default function DraftResultsPage() {
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
       <div className="container mx-auto px-4 py-6">
+        {/* Breadcrumb Navigation */}
+        <div className="mb-4">
+          <nav className="flex items-center text-sm text-slate-600 dark:text-slate-400">
+            <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              <Home className="h-4 w-4" />
+            </Link>
+            <ChevronRight className="h-4 w-4 mx-2" />
+            <Link href="/draft-history" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              Draft History
+            </Link>
+            <ChevronRight className="h-4 w-4 mx-2" />
+            <span className="text-slate-900 dark:text-white font-medium">
+              {draftState.draft.name || 'Draft Results'}
+            </span>
+          </nav>
+        </div>
+
         {/* Header */}
         <div className="relative text-center mb-6">
           <div className="absolute top-0 left-0">
             <Button
               variant="outline"
-              onClick={() => router.push(`/draft/${roomCode}`)}
+              onClick={() => router.push('/draft-history')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Draft
+              Back to Draft History
             </Button>
           </div>
           <div className="absolute top-0 right-0">

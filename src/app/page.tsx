@@ -418,6 +418,26 @@ export default function Home() {
                         Resume
                       </Button>
                     )}
+                    {draft.status === 'completed' && (
+                      <Button
+                        size="sm"
+                        onClick={() => router.push(`/draft/${draft.draftId}/results`)}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Trophy className="h-3 w-3 mr-1" />
+                        View Results
+                      </Button>
+                    )}
+                    {draft.status !== 'completed' && draft.status !== 'active' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleResumeDraft(draft.draftId)}
+                        className="flex-1"
+                      >
+                        <Play className="h-3 w-3 mr-1" />
+                        Open
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -426,7 +446,7 @@ export default function Home() {
                         navigator.clipboard.writeText(`${window.location.origin}${url}`)
                         toast.success('Draft link copied to clipboard!')
                       }}
-                      className="flex-1"
+                      className={draft.status === 'completed' ? '' : 'flex-1'}
                     >
                       Share
                     </Button>
