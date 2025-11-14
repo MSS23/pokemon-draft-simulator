@@ -11,16 +11,27 @@ interface SidebarLinkProps {
   label: string
   badge?: string | number
   onClick?: (e: React.MouseEvent) => void
+  isProtected?: boolean
+  onProtectedClick?: (e: React.MouseEvent, href: string) => void
 }
 
-export function SidebarLink({ href, icon: Icon, label, badge, onClick }: SidebarLinkProps) {
+export function SidebarLink({ href, icon: Icon, label, badge, onClick, isProtected, onProtectedClick }: SidebarLinkProps) {
   const pathname = usePathname()
   const isActive = pathname === href || pathname.startsWith(href + '/')
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isProtected && onProtectedClick) {
+      onProtectedClick(e, href)
+    }
+    if (onClick) {
+      onClick(e)
+    }
+  }
 
   return (
     <Link
       href={href}
-      onClick={onClick}
+      onClick={handleClick}
       className={cn(
         'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm',
         isActive

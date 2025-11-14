@@ -47,6 +47,7 @@ export default function Home() {
   const [myDrafts, setMyDrafts] = useState<DraftParticipation[]>([])
   const [selectedFormatId, setSelectedFormatId] = useState<string>(DEFAULT_FORMAT)
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authRedirectTo, setAuthRedirectTo] = useState<string | undefined>(undefined)
 
   // Draft settings
   const totalBudget = 100
@@ -309,6 +310,7 @@ export default function Home() {
           <div
             onClick={() => {
               if (!user) {
+                setAuthRedirectTo('/create-draft')
                 setAuthModalOpen(true)
                 return
               }
@@ -651,6 +653,7 @@ export default function Home() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
+        redirectTo={authRedirectTo}
       />
     </SidebarLayout>
   )

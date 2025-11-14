@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   Dialog,
@@ -18,15 +19,31 @@ import { toast } from 'sonner'
 interface AuthModalProps {
   isOpen: boolean
   onClose: () => void
+  redirectTo?: string
 }
 
-export function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const { signIn } = useAuth()
+export function AuthModal({ isOpen, onClose, redirectTo }: AuthModalProps) {
+  const router = useRouter()
+  const { signIn, user } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Auto-close and redirect when user becomes authenticated
+  useEffect(() => {
+    if (user && isOpen && !loading) {
+      // Close modal
+      onClose()
+
+      // Navigate if redirect specified
+      if (redirectTo) {
+        router.push(redirectTo)
+        router.refresh()
+      }
+    }
+  }, [user, isOpen, loading, onClose, redirectTo, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,9 +67,15 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
           duration: 3000,
         })
 
-        // Small delay before closing so toast appears
+        // Small delay before closing and redirecting
         setTimeout(() => {
           onClose()
+
+          // Navigate to intended page if specified
+          if (redirectTo) {
+            router.push(redirectTo)
+            router.refresh()
+          }
 
           // Reset form
           setEmail('')

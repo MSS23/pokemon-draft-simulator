@@ -36,6 +36,7 @@ export function Sidebar() {
   const { user, signOut } = useAuth()
   const [leagues, setLeagues] = useState<League[]>([])
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authRedirectTo, setAuthRedirectTo] = useState<string>('/dashboard')
 
   // Load user's leagues when user changes
   useEffect(() => {
@@ -88,9 +89,10 @@ export function Sidebar() {
   }
 
   // Helper function to handle protected link clicks
-  const handleProtectedClick = (e: React.MouseEvent, isProtected: boolean) => {
-    if (isProtected && !user) {
+  const handleProtectedClick = (e: React.MouseEvent, href: string) => {
+    if (!user) {
       e.preventDefault()
+      setAuthRedirectTo(href)
       setAuthModalOpen(true)
     }
   }
@@ -133,6 +135,8 @@ export function Sidebar() {
             href="/create-draft"
             icon={Plus}
             label="Create Draft"
+            isProtected={true}
+            onProtectedClick={handleProtectedClick}
           />
           <SidebarLink
             href="/join-draft"
@@ -153,21 +157,29 @@ export function Sidebar() {
             href="/dashboard"
             icon={LayoutDashboard}
             label="Dashboard"
+            isProtected={true}
+            onProtectedClick={handleProtectedClick}
           />
           <SidebarLink
             href="/my-drafts"
             icon={FileText}
             label="League Matches"
+            isProtected={true}
+            onProtectedClick={handleProtectedClick}
           />
           <SidebarLink
             href="/draft-history"
             icon={Trophy}
             label="Draft History"
+            isProtected={true}
+            onProtectedClick={handleProtectedClick}
           />
           <SidebarLink
             href="/history"
             icon={History}
             label="League History"
+            isProtected={true}
+            onProtectedClick={handleProtectedClick}
           />
         </SidebarSection>
 
@@ -202,6 +214,8 @@ export function Sidebar() {
             href="/settings"
             icon={Settings}
             label="Settings"
+            isProtected={true}
+            onProtectedClick={handleProtectedClick}
           />
           <Button
             variant="ghost"
@@ -218,6 +232,7 @@ export function Sidebar() {
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
+        redirectTo={authRedirectTo}
       />
     </aside>
   )
