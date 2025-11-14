@@ -21,6 +21,10 @@ export interface DraftSettings {
   pokemonPerTeam: number
   budgetPerTeam?: number
   formatId?: string
+  // League settings (optional)
+  createLeague?: boolean
+  splitIntoConferences?: boolean
+  leagueWeeks?: number
 }
 
 export interface CreateDraftParams {
@@ -180,6 +184,7 @@ export class DraftService {
         .insert({
           name: customFormat.name,
           description: customFormat.description,
+          created_by_user_id: hostId,
           created_by_display_name: hostName,
           is_public: false,
           pokemon_pricing: customFormat.pokemonPricing
@@ -208,7 +213,12 @@ export class DraftService {
       settings: {
         timeLimit: settings.timeLimit,
         pokemonPerTeam: settings.pokemonPerTeam,
-        formatId: settings.formatId || DEFAULT_FORMAT
+        maxPokemonPerTeam: settings.pokemonPerTeam, // Required for pick validation
+        formatId: settings.formatId || DEFAULT_FORMAT,
+        // League settings
+        createLeague: settings.createLeague,
+        splitIntoConferences: settings.splitIntoConferences,
+        leagueWeeks: settings.leagueWeeks
       }
     }
 
@@ -249,7 +259,7 @@ export class DraftService {
     }
 
     // Create host participant
-    const { error: participantError } = await (supabase
+    const { data: participant, error: participantError } = await (supabase
       .from('participants') as any)
       .insert({
         draft_id: (draft as any).id,
@@ -259,10 +269,12 @@ export class DraftService {
         is_host: true,
         last_seen: new Date().toISOString()
       })
+      .select()
+      .single()
 
     if (participantError) {
       console.error('Error creating participant:', participantError)
-      throw new Error('Failed to create participant')
+      throw new Error(`Failed to create participant: ${participantError.message || JSON.stringify(participantError)}`)
     }
 
     // Record draft participation in user session

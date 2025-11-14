@@ -74,12 +74,15 @@ export type Database = {
           status: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
           current_turn: number | null
           current_round: number
+          turn_started_at: string | null
           settings: DraftSettings | null
           room_code: string | null
           is_public: boolean
           spectator_count: number
           description: string | null
           tags: string[] | null
+          password: string | null
+          custom_format_id: string | null
           deleted_at: string | null
           deleted_by: string | null
         }
@@ -96,12 +99,15 @@ export type Database = {
           status?: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
           current_turn?: number | null
           current_round?: number
+          turn_started_at?: string | null
           settings?: DraftSettings | null
           room_code?: string | null
           is_public?: boolean
           spectator_count?: number
           description?: string | null
           tags?: string[] | null
+          password?: string | null
+          custom_format_id?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
         }
@@ -118,12 +124,15 @@ export type Database = {
           status?: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
           current_turn?: number | null
           current_round?: number
+          turn_started_at?: string | null
           settings?: DraftSettings | null
           room_code?: string | null
           is_public?: boolean
           spectator_count?: number
           description?: string | null
           tags?: string[] | null
+          password?: string | null
+          custom_format_id?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
         }
