@@ -21,23 +21,19 @@
     'data-bitwarden-watching'
   ];
 
-  // Override console.error immediately to suppress hydration warnings
+  // Override console.error to suppress ONLY extension-related hydration warnings
   if (typeof console !== 'undefined' && console.error) {
     const originalError = console.error;
     console.error = function(...args) {
       const message = args[0]?.toString() || '';
-      
-      // Suppress hydration errors related to browser extensions
-      if (
-        message.includes('hydrated') || 
-        message.includes('server rendered HTML') ||
-        message.includes('client properties') ||
-        EXTENSION_ATTRIBUTES.some(attr => message.includes(attr))
-      ) {
-        return; // Completely suppress these errors
+
+      // ONLY suppress hydration errors explicitly caused by extension attributes
+      // This allows us to see real hydration errors that need to be fixed
+      if (EXTENSION_ATTRIBUTES.some(attr => message.includes(attr))) {
+        return; // Suppress extension-specific errors only
       }
-      
-      // Allow other errors through
+
+      // Allow ALL other errors through (including hydration errors we need to debug)
       originalError.apply(console, args);
     };
   }
