@@ -494,7 +494,13 @@ export default function Home() {
               </p>
               <div className="flex gap-3 justify-center">
                 <Button
-                  onClick={() => router.push('/create-draft')}
+                  onClick={() => {
+                    if (!user) {
+                      setAuthModalOpen(true)
+                      return
+                    }
+                    router.push('/create-draft')
+                  }}
                 >
                   <Users className="h-4 w-4 mr-2" />
                   Create Draft

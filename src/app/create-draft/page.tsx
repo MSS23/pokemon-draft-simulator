@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,27 +89,10 @@ export default function CreateDraftPage() {
   // Apply hydration fix for browser extensions
   useHydrationFix();
 
-  // Track if notification was shown to prevent spam
-  const hasShownAuthNotification = useRef(false);
-
-  // Check authentication and pre-fill user data
+  // Pre-fill user data when authenticated
   useEffect(() => {
     // Wait for auth to finish loading
-    if (authLoading) return;
-
-    // Redirect if not authenticated
-    if (!user) {
-      // Only show notification once
-      if (!hasShownAuthNotification.current) {
-        notify.warning(
-          "Authentication Required",
-          "Please sign in to create a draft",
-        );
-        hasShownAuthNotification.current = true;
-      }
-      router.push("/");
-      return;
-    }
+    if (authLoading || !user) return;
 
     // Pre-fill userName with display name if available
     if (user.user_metadata?.display_name) {
@@ -123,7 +106,7 @@ export default function CreateDraftPage() {
         userName: user.email?.split("@")[0] || "User",
       }));
     }
-  }, [authLoading, user, router, notify]);
+  }, [authLoading, user]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => {
@@ -332,6 +315,52 @@ export default function CreateDraftPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-muted-foreground">Checking authentication...</p>
           </div>
+        </div>
+      </SidebarLayout>
+    );
+  }
+
+  // Show login required if not authenticated
+  if (!user) {
+    return (
+      <SidebarLayout>
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-6 w-6 text-yellow-500" />
+                Authentication Required
+              </CardTitle>
+              <CardDescription>
+                Please sign in to create a draft
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Creating a draft requires an authenticated account. This ensures that:
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+                <li>You can manage and track your drafts</li>
+                <li>Teams can join your draft room</li>
+                <li>Your draft settings are saved securely</li>
+              </ul>
+            </CardContent>
+            <CardFooter className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => router.push("/")}
+                className="flex-1"
+              >
+                Go Back Home
+              </Button>
+              <Button
+                onClick={() => router.push("/auth/login")}
+                className="flex-1"
+              >
+                Sign In
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
       </SidebarLayout>
     );
