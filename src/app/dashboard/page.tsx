@@ -10,6 +10,7 @@ import { Loader2, Plus, Users, Trophy, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 interface UserDraft {
   id: string
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState<UserDraft[]>([])
+  const [authModalOpen, setAuthModalOpen] = useState(false)
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -141,13 +143,18 @@ export default function DashboardPage() {
               </p>
               <Button
                 className="w-full"
-                onClick={() => router.push('/auth/login')}
+                onClick={() => setAuthModalOpen(true)}
               >
-                Go to Login
+                Sign In
               </Button>
             </CardContent>
           </Card>
         </div>
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          redirectTo="/dashboard"
+        />
       </SidebarLayout>
     )
   }

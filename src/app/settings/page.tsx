@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Pencil } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 interface UserProfile {
   user_id: string
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
 
   useEffect(() => {
     // Wait for auth to finish loading
@@ -133,13 +135,18 @@ export default function SettingsPage() {
               </p>
               <Button
                 className="w-full bg-yellow-500 hover:bg-yellow-600 text-slate-900 font-semibold"
-                onClick={() => router.push('/auth/login')}
+                onClick={() => setAuthModalOpen(true)}
               >
-                Go to Login
+                Sign In
               </Button>
             </CardContent>
           </Card>
         </div>
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          redirectTo="/settings"
+        />
       </SidebarLayout>
     )
   }

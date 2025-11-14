@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Search, Trophy } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 interface LeagueHistory {
   id: string
@@ -35,6 +36,7 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'date' | 'placement' | 'all'>('date')
   const [filterPlacement, setFilterPlacement] = useState<'all' | '1' | '2' | '3'>('all')
+  const [authModalOpen, setAuthModalOpen] = useState(false)
 
   useEffect(() => {
     // Wait for auth to finish loading
@@ -178,14 +180,19 @@ export default function HistoryPage() {
                 </p>
                 <Button
                   className="w-full bg-yellow-500 hover:bg-yellow-600 text-slate-900 font-semibold"
-                  onClick={() => router.push('/auth/login')}
+                  onClick={() => setAuthModalOpen(true)}
                 >
-                  Go to Login
+                  Sign In
                 </Button>
               </div>
             </Card>
           </div>
         </div>
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          redirectTo="/history"
+        />
       </SidebarLayout>
     )
   }

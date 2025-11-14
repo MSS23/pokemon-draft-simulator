@@ -11,6 +11,7 @@ import { LeagueService } from '@/lib/league-service'
 import { supabase } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
+import { AuthModal } from '@/components/auth/AuthModal'
 import type { Match, League, Team, Draft } from '@/types'
 import { format, isPast, isFuture, isToday } from 'date-fns'
 
@@ -33,6 +34,7 @@ export default function MyDraftsPage() {
   const [matches, setMatches] = useState<MatchWithDetails[]>([])
   const [drafts, setDrafts] = useState<DraftWithTeam[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
 
   useEffect(() => {
     // Wait for auth to finish loading
@@ -167,14 +169,19 @@ export default function MyDraftsPage() {
                 </p>
                 <Button
                   className="w-full max-w-xs"
-                  onClick={() => router.push('/auth/login')}
+                  onClick={() => setAuthModalOpen(true)}
                 >
-                  Go to Login
+                  Sign In
                 </Button>
               </CardContent>
             </Card>
           </div>
         </div>
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          redirectTo="/my-drafts"
+        />
       </SidebarLayout>
     )
   }
