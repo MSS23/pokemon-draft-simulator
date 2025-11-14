@@ -127,6 +127,11 @@ export default function CreateDraftPage() {
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => {
+      // Prevent unnecessary updates if value hasn't changed
+      if (prev[field as keyof typeof prev] === value) {
+        return prev;
+      }
+
       const newData = { ...prev, [field]: value };
 
       // If switching to snake draft, enforce league creation and minimum 6 Pokemon
@@ -419,7 +424,7 @@ export default function CreateDraftPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select number of teams" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="2">2 Teams</SelectItem>
@@ -443,7 +448,7 @@ export default function CreateDraftPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select draft format" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="snake">Snake Draft</SelectItem>
@@ -513,7 +518,7 @@ export default function CreateDraftPage() {
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue />
+                              <SelectValue placeholder="Select format" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectGroup>
@@ -792,7 +797,7 @@ export default function CreateDraftPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select time limit" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="30">30 seconds</SelectItem>
@@ -828,7 +833,7 @@ export default function CreateDraftPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select Pokémon per team" />
                         </SelectTrigger>
                         <SelectContent>
                           {formData.draftType === "auction" && (
@@ -866,7 +871,7 @@ export default function CreateDraftPage() {
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select budget per team" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="50">50 points</SelectItem>
@@ -942,7 +947,7 @@ export default function CreateDraftPage() {
                               }
                             >
                               <SelectTrigger>
-                                <SelectValue />
+                                <SelectValue placeholder="Select league duration" />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="3">3 weeks</SelectItem>
