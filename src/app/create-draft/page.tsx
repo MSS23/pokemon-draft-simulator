@@ -19,6 +19,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectLabel,
+  SelectSeparator,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -513,49 +515,22 @@ export default function CreateDraftPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <div className="p-2 text-xs text-muted-foreground border-b">
-                                Popular Formats
-                              </div>
+                              <SelectLabel>Popular Formats</SelectLabel>
                               {popularFormats.map((format) => (
                                 <SelectItem key={format.id} value={format.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span>
-                                      {getCategoryIcon(format.category)}
-                                    </span>
-                                    <span>{format.shortName}</span>
-                                    {format.meta.isOfficial && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        Official
-                                      </Badge>
-                                    )}
-                                  </div>
+                                  {getCategoryIcon(format.category)} {format.shortName}
+                                  {format.meta.isOfficial && " ⭐"}
                                 </SelectItem>
                               ))}
-                              <div className="p-2 text-xs text-muted-foreground border-b border-t">
-                                All Formats
-                              </div>
+                              <SelectSeparator />
+                              <SelectLabel>All Formats</SelectLabel>
                               {POKEMON_FORMATS.filter(
                                 (f) =>
                                   !popularFormats.some((p) => p.id === f.id),
                               ).map((format) => (
                                 <SelectItem key={format.id} value={format.id}>
-                                  <div className="flex items-center gap-2">
-                                    <span>
-                                      {getCategoryIcon(format.category)}
-                                    </span>
-                                    <span>{format.shortName}</span>
-                                    {format.meta.isOfficial && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        Official
-                                      </Badge>
-                                    )}
-                                  </div>
+                                  {getCategoryIcon(format.category)} {format.shortName}
+                                  {format.meta.isOfficial && " ⭐"}
                                 </SelectItem>
                               ))}
                             </SelectContent>
