@@ -57,7 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Clear draft participation data from localStorage
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('draftParticipations')
+      localStorage.removeItem('pokemon-draft-participation')
+      localStorage.removeItem('pokemon-draft-user-session')
       localStorage.removeItem('guestUserId')
     }
   }

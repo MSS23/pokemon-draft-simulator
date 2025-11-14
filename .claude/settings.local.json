@@ -68,7 +68,8 @@
       "Bash(curl:*)",
       "Bash(vercel --version:*)",
       "Bash(node -e:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(if exist \".next\" rmdir /s /q \".next\")"
     ],
     "deny": [],
     "ask": []
