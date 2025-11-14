@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -43,13 +44,21 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
         setError(errorMessage)
       } else {
-        // Success - close modal
-        onClose()
+        // Success - show toast notification
+        toast.success('Login Successful!', {
+          description: 'Welcome back! You are now signed in.',
+          duration: 3000,
+        })
 
-        // Reset form
-        setEmail('')
-        setPassword('')
-        setShowPassword(false)
+        // Small delay before closing so toast appears
+        setTimeout(() => {
+          onClose()
+
+          // Reset form
+          setEmail('')
+          setPassword('')
+          setShowPassword(false)
+        }, 300)
       }
     } catch (err) {
       const error = err as Error

@@ -12,6 +12,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { HydrationErrorFilter } from "./hydration-error-filter";
 import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
+import { Toaster } from "sonner";
 // import ErrorBoundary from "@/components/ui/error-boundary";
 
 const geistSans = Geist({
@@ -86,6 +87,7 @@ export default function RootLayout({
                 <ImagePreferenceProvider>
                   <AuthProvider>
                     <NotificationProvider>
+                      <Toaster position="top-right" richColors />
                       <QueryProvider>
                         <Header />
                         {children}
