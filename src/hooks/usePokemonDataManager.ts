@@ -4,7 +4,7 @@
  * Provides easy access to optimized Pokemon data fetching, caching, and search.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   PokemonDataManager,
   type PokemonWithMetadata,
@@ -58,13 +58,27 @@ export function usePokemonDataManager(
   const [pokemon, setPokemon] = useState<PokemonWithMetadata[]>([])
   const [updateCounter, setUpdateCounter] = useState(0)
 
+  // Stabilize options object to prevent infinite loops
+  const optionsRef = useRef(options)
+  const stableOptions = useMemo(() => {
+    // Deep comparison: only update if actual content changed
+    const optionsStr = JSON.stringify(options)
+    const prevStr = JSON.stringify(optionsRef.current)
+
+    if (optionsStr !== prevStr) {
+      optionsRef.current = options
+    }
+
+    return optionsRef.current
+  }, [JSON.stringify(options)]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Initialize on mount
   useEffect(() => {
     let mounted = true
 
     const init = async () => {
       try {
-        await PokemonDataManager.initialize(options)
+        await PokemonDataManager.initialize(stableOptions)
         if (mounted) {
           setIsInitialized(true)
           setPokemon(PokemonDataManager.getAllPokemon(true))
@@ -79,7 +93,7 @@ export function usePokemonDataManager(
     return () => {
       mounted = false
     }
-  }, [options])
+  }, [stableOptions])
 
   // Load format
   const loadFormat = useCallback(async (formatOptions: LoadFormatOptions) => {
@@ -175,11 +189,11 @@ export function usePokemonDataManager(
     return PokemonDataManager.getPokemonCost(id)
   }, [])
 
-  // Computed values
-  const allPokemon = useMemo(() => PokemonDataManager.getAllPokemon(false), [])
-  const legalPokemon = useMemo(() => PokemonDataManager.getAllPokemon(true), [])
-  const types = useMemo(() => PokemonDataManager.getAllTypes(), [])
-  const abilities = useMemo(() => PokemonDataManager.getAllAbilities(), [])
+  // Computed values - depend on updateCounter to refresh when data changes
+  const allPokemon = useMemo(() => PokemonDataManager.getAllPokemon(false), [updateCounter])
+  const legalPokemon = useMemo(() => PokemonDataManager.getAllPokemon(true), [updateCounter])
+  const types = useMemo(() => PokemonDataManager.getAllTypes(), [updateCounter])
+  const abilities = useMemo(() => PokemonDataManager.getAllAbilities(), [updateCounter])
 
   // Get stats
   const [stats, setStats] = useState<any>(null)
@@ -284,7 +298,10 @@ export function usePokemonSearch(
  * Hook for Pokemon filtering
  */
 export function usePokemonFilter(filters: SearchFilters): PokemonWithMetadata[] {
+  // Stabilize filters object with JSON comparison to prevent infinite loops
+  const stableFilters = useMemo(() => filters, [JSON.stringify(filters)]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return useMemo(() => {
-    return PokemonDataManager.filter(filters)
-  }, [filters])
+    return PokemonDataManager.filter(stableFilters)
+  }, [stableFilters])
 }

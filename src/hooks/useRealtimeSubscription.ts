@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useCallback, useState } from 'react'
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { realtimeManager, type RealtimeManagerState } from '@/lib/realtime-manager'
 import { requestDeduplicator } from '@/lib/request-deduplicator'
 
@@ -211,6 +211,9 @@ export function usePresence(draftId: string, userId: string, metadata?: Record<s
   const isMountedRef = useRef(true)
   const unsubscribeRef = useRef<(() => void) | null>(null)
 
+  // Stabilize metadata object to prevent infinite loops
+  const stableMetadata = useMemo(() => metadata, [JSON.stringify(metadata)]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!draftId || !userId) {
       return
@@ -221,7 +224,7 @@ export function usePresence(draftId: string, userId: string, metadata?: Record<s
         const { unsubscribe, getOnlineUsers } = await realtimeManager.subscribeToPresence(
           draftId,
           userId,
-          metadata
+          stableMetadata
         )
 
         if (isMountedRef.current) {
@@ -256,7 +259,7 @@ export function usePresence(draftId: string, userId: string, metadata?: Record<s
         unsubscribeRef.current = null
       }
     }
-  }, [draftId, userId, metadata])
+  }, [draftId, userId, stableMetadata])
 
   useEffect(() => {
     return () => {
