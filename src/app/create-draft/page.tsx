@@ -906,17 +906,19 @@ export default function CreateDraftPage() {
                         className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                       <div className="flex-1">
-                        <Label
-                          htmlFor="createLeague"
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          Create league after draft
+                        <div className="flex items-center gap-2">
+                          <Label
+                            htmlFor="createLeague"
+                            className="text-sm font-medium cursor-pointer"
+                          >
+                            Create league after draft
+                          </Label>
                           {formData.draftType === "snake" && (
-                            <Badge variant="secondary" className="ml-2 text-xs">
+                            <Badge variant="secondary" className="text-xs">
                               Required for Snake
                             </Badge>
                           )}
-                        </Label>
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">
                           {formData.draftType === "snake"
                             ? "Snake drafts automatically create a league with 1 match per team per week"
