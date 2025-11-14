@@ -814,7 +814,7 @@ export class LeagueService {
       .eq('draft_id', draftId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (!league) return null
 

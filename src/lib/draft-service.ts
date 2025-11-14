@@ -1439,7 +1439,6 @@ export class DraftService {
       .update({
         deleted_at: new Date().toISOString(),
         deleted_by: userId,
-        status: 'deleted',  // Mark as deleted status for UI
         updated_at: new Date().toISOString()
       })
       .eq('id', internalId)

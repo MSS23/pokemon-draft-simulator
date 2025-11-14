@@ -61,7 +61,7 @@ export default function PowerRankingsPage() {
         .from('leagues')
         .select('draft_id')
         .eq('id', leagueId)
-        .single()
+        .maybeSingle()
 
       if (leagueResponse.error) throw leagueResponse.error
       const league = leagueResponse.data as { draft_id: string } | null

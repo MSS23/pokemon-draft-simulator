@@ -58,7 +58,7 @@ export class AIAccessControl {
         .from('leagues')
         .select('draft_id')
         .eq('id', context.leagueId)
-        .single() as any
+        .maybeSingle() as any
 
       if (leagueResponse.error || !leagueResponse.data) {
         return {
@@ -290,7 +290,7 @@ export class AIAccessControl {
         .from('leagues')
         .select('draft_id')
         .eq('id', leagueId)
-        .single() as any
+        .maybeSingle() as any
 
       if (!leagueResponse?.data || !effectiveUserId) {
         return {
