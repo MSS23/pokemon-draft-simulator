@@ -51,7 +51,7 @@ export default function SettingsPage() {
     const response = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single() as any
 
     if (response?.data) {
