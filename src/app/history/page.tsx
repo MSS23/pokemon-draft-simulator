@@ -51,80 +51,74 @@ export default function HistoryPage() {
   }, [authLoading, user, router])
 
   async function loadUserHistory(userId: string) {
-    if (!supabase) return
+    if (!supabase) {
+      console.error('[History] Supabase not available')
+      setLoading(false)
+      return
+    }
 
-    // Load user's league participations through junction table
-    const leaguesResponse = await supabase
-      .from('league_teams')
-      .select(`
-        id,
-        team_id,
-        league_id,
-        final_placement,
-        teams!inner (
+    try {
+      console.log('[History] Fetching league history for user:', userId)
+
+      // Load user's league participations through junction table
+      const { data: leagueTeams, error } = await supabase
+        .from('league_teams')
+        .select(`
           id,
-          name,
-          owner_id
-        ),
-        leagues!inner (
-          id,
-          name,
-          status,
-          ended_at
-        )
-      `)
-      .eq('teams.owner_id', userId) as any
+          team_id,
+          league_id,
+          final_placement,
+          teams!inner (
+            id,
+            name,
+            owner_id
+          ),
+          leagues!inner (
+            id,
+            name,
+            status,
+            ended_at
+          )
+        `)
+        .eq('teams.owner_id', userId)
 
-    // Mock data for demonstration
-    const mockLeagues: LeagueHistory[] = [
-      {
-        id: '1',
-        name: 'Kanto Classic - Season 5',
-        placement: 1,
-        status: 'completed',
-        ended_at: '2024-05-15',
-        total_teams: 8,
-        wins: 8,
-        losses: 2,
-        drafted_team: [
-          { id: '6', name: 'Charizard', sprite_url: '/pokemon/charizard.png' },
-          { id: '134', name: 'Blastoise', sprite_url: '/pokemon/blastoise.png' },
-          { id: '3', name: 'Venusaur', sprite_url: '/pokemon/venusaur.png' },
-          { id: '25', name: 'Pikachu', sprite_url: '/pokemon/pikachu.png' },
-          { id: '149', name: 'Dragonite', sprite_url: '/pokemon/dragonite.png' },
-          { id: '143', name: 'Snorlax', sprite_url: '/pokemon/snorlax.png' },
-        ]
-      },
-      {
-        id: '2',
-        name: 'Sinnoh Superstars S3',
-        placement: 3,
-        status: 'completed',
-        ended_at: '2024-03-20',
-        total_teams: 12,
-        wins: 6,
-        losses: 4,
-        drafted_team: [
-          { id: '448', name: 'Lucario', sprite_url: '/pokemon/lucario.png' },
-          { id: '445', name: 'Garchomp', sprite_url: '/pokemon/garchomp.png' },
-          { id: '392', name: 'Infernape', sprite_url: '/pokemon/infernape.png' },
-        ]
-      },
-      {
-        id: '3',
-        name: 'Johto Journey League',
-        placement: 4,
-        status: 'completed',
-        ended_at: '2023-12-01',
-        total_teams: 12,
-        wins: 4,
-        losses: 8,
-        drafted_team: []
-      },
-    ]
+      if (error) {
+        console.error('[History] Error fetching league history:', error)
+        setLeagues([])
+        setLoading(false)
+        return
+      }
 
-    setLeagues(mockLeagues)
-    setLoading(false)
+      console.log('[History] Fetched league teams:', leagueTeams)
+
+      if (!leagueTeams || leagueTeams.length === 0) {
+        console.log('[History] No league history found for user')
+        setLeagues([])
+        setLoading(false)
+        return
+      }
+
+      // Transform data to match LeagueHistory interface
+      const formattedLeagues: LeagueHistory[] = leagueTeams.map((lt: any) => ({
+        id: lt.leagues.id,
+        name: lt.leagues.name || 'Unnamed League',
+        placement: lt.final_placement || 0,
+        status: lt.leagues.status || 'completed',
+        ended_at: lt.leagues.ended_at || new Date().toISOString(),
+        total_teams: 0, // TODO: Calculate from league data
+        wins: 0, // TODO: Calculate from match history
+        losses: 0, // TODO: Calculate from match history
+        drafted_team: [] // TODO: Fetch team picks from league
+      }))
+
+      setLeagues(formattedLeagues)
+      console.log('[History] Formatted leagues:', formattedLeagues)
+    } catch (err) {
+      console.error('[History] Unexpected error:', err)
+      setLeagues([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const stats = {

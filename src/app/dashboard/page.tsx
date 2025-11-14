@@ -32,54 +32,78 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadDashboardData = async () => {
       // Wait for auth to finish loading
-      if (authLoading) return
+      if (authLoading) {
+        console.log('[Dashboard] Auth still loading, skipping data fetch')
+        return
+      }
 
       // Skip data fetch if not authenticated (will show empty state)
       if (!user) {
+        console.log('[Dashboard] No user authenticated, showing empty state')
         setLoading(false)
         return
       }
 
-      // Fetch ALL drafts user participates in (via teams table)
-      const { data: userTeams } = await supabase
-        .from('teams')
-        .select(`
-          id,
-          name,
-          owner_id,
-          draft_id,
-          draft:drafts!inner(
+      try {
+        console.log('[Dashboard] Fetching drafts for user:', user.id)
+
+        // Fetch ALL drafts user participates in (via teams table)
+        const { data: userTeams, error } = await supabase
+          .from('teams')
+          .select(`
             id,
             name,
-            room_code,
-            status,
-            format,
-            max_teams,
-            host_id,
-            created_at,
-            deleted_at
-          )
-        `)
-        .eq('owner_id', user.id)
-        .is('draft.deleted_at', null)
-        .order('draft(created_at)', { ascending: false })
+            owner_id,
+            draft_id,
+            draft:drafts!inner(
+              id,
+              name,
+              room_code,
+              status,
+              format,
+              max_teams,
+              host_id,
+              created_at,
+              deleted_at
+            )
+          `)
+          .eq('owner_id', user.id)
+          .is('draft.deleted_at', null)
+          .order('draft(created_at)', { ascending: false })
 
-      if (userTeams) {
-        const formattedDrafts: UserDraft[] = userTeams.map((team: any) => ({
-          id: team.draft.id,
-          name: team.draft.name || 'Unnamed Draft',
-          status: team.draft.status,
-          created_at: team.draft.created_at,
-          format: team.draft.format || 'custom',
-          max_teams: team.draft.max_teams || 0,
-          room_code: team.draft.room_code || team.draft.id,
-          isHost: team.draft.host_id === user.id,
-          teamName: team.name
-        }))
-        setDrafts(formattedDrafts)
+        if (error) {
+          console.error('[Dashboard] Error fetching drafts:', error)
+          setDrafts([])
+          setLoading(false)
+          return
+        }
+
+        console.log('[Dashboard] Fetched teams:', userTeams)
+
+        if (userTeams && userTeams.length > 0) {
+          const formattedDrafts: UserDraft[] = userTeams.map((team: any) => ({
+            id: team.draft.id,
+            name: team.draft.name || 'Unnamed Draft',
+            status: team.draft.status,
+            created_at: team.draft.created_at,
+            format: team.draft.format || 'custom',
+            max_teams: team.draft.max_teams || 0,
+            room_code: team.draft.room_code || team.draft.id,
+            isHost: team.draft.host_id === user.id,
+            teamName: team.name
+          }))
+          setDrafts(formattedDrafts)
+          console.log('[Dashboard] Formatted drafts:', formattedDrafts)
+        } else {
+          console.log('[Dashboard] No drafts found for user')
+          setDrafts([])
+        }
+      } catch (err) {
+        console.error('[Dashboard] Unexpected error:', err)
+        setDrafts([])
+      } finally {
+        setLoading(false)
       }
-
-      setLoading(false)
     }
 
     loadDashboardData()
