@@ -35,9 +35,9 @@ export default function SettingsPage() {
     // Wait for auth to finish loading
     if (authLoading) return
 
-    // Redirect if not authenticated
+    // Skip profile load if not authenticated
     if (!user) {
-      router.push('/auth/login')
+      setLoading(false)
       return
     }
 

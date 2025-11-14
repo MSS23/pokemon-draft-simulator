@@ -37,9 +37,9 @@ export default function DraftHistoryPage() {
         // Wait for auth to finish loading
         if (authLoading) return
 
-        // Redirect if not authenticated
+        // Skip data fetch if not authenticated (will show empty state)
         if (!user) {
-          router.push('/auth/login')
+          setIsLoading(false)
           return
         }
 
