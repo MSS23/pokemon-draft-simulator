@@ -21,6 +21,7 @@ import {
   SelectValue,
   SelectLabel,
   SelectSeparator,
+  SelectGroup,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -515,24 +516,28 @@ export default function CreateDraftPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectLabel>Popular Formats</SelectLabel>
-                              {popularFormats.map((format) => (
-                                <SelectItem key={format.id} value={format.id}>
-                                  {getCategoryIcon(format.category)} {format.shortName}
-                                  {format.meta.isOfficial && " ⭐"}
-                                </SelectItem>
-                              ))}
+                              <SelectGroup>
+                                <SelectLabel>Popular Formats</SelectLabel>
+                                {popularFormats.map((format) => (
+                                  <SelectItem key={format.id} value={format.id}>
+                                    {getCategoryIcon(format.category)} {format.shortName}
+                                    {format.meta.isOfficial && " ⭐"}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
                               <SelectSeparator />
-                              <SelectLabel>All Formats</SelectLabel>
-                              {POKEMON_FORMATS.filter(
-                                (f) =>
-                                  !popularFormats.some((p) => p.id === f.id),
-                              ).map((format) => (
-                                <SelectItem key={format.id} value={format.id}>
-                                  {getCategoryIcon(format.category)} {format.shortName}
-                                  {format.meta.isOfficial && " ⭐"}
-                                </SelectItem>
-                              ))}
+                              <SelectGroup>
+                                <SelectLabel>All Formats</SelectLabel>
+                                {POKEMON_FORMATS.filter(
+                                  (f) =>
+                                    !popularFormats.some((p) => p.id === f.id),
+                                ).map((format) => (
+                                  <SelectItem key={format.id} value={format.id}>
+                                    {getCategoryIcon(format.category)} {format.shortName}
+                                    {format.meta.isOfficial && " ⭐"}
+                                  </SelectItem>
+                                ))}
+                              </SelectGroup>
                             </SelectContent>
                           </Select>
                         </div>
