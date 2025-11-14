@@ -488,8 +488,8 @@ export default function DraftRoomPage() {
         const isPublic = (dbState.draft as any).is_public
         const hasPassword = !!(dbState.draft as any).password
 
-        if (!isPublic || hasPassword) {
-          // Private or password-protected draft - verify access
+        if (!isPublic) {
+          // Private draft - verify access
           const { hasVerifiedAccess } = await import('@/lib/draft-access')
 
           if (!hasVerifiedAccess(roomCode)) {
@@ -499,6 +499,8 @@ export default function DraftRoomPage() {
             return
           }
         }
+        // Note: Public drafts with passwords allow viewing/spectating
+        // Password verification happens during the join flow for participation
 
         setDraftState(transformDraftState(dbState, userId))
         setIsConnected(true)
