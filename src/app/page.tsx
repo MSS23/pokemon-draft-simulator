@@ -569,12 +569,7 @@ export default function Home() {
                 <SelectContent>
                   {POKEMON_FORMATS.map((format) => (
                     <SelectItem key={format.id} value={format.id}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{format.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {format.category.toUpperCase()}
-                        </Badge>
-                      </div>
+                      {format.name} - {format.category.toUpperCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
