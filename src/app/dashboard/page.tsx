@@ -1,35 +1,63 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Plus, Users, Trophy, Clock } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Progress } from '@/components/ui/progress'
+import { Loader2, Plus, Users, Trophy, Clock, Zap, Calendar, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 
-interface UserDraft {
-  id: string
-  name: string
-  status: string
-  created_at: string
-  format: string
-  max_teams: number
+interface DraftSummary {
+  // Draft metadata
+  draft_id: string
+  draft_name: string
+  status: 'setup' | 'active' | 'completed' | 'paused'
+  format: 'snake' | 'auction'
+  ruleset: string
   room_code: string
-  isHost: boolean
-  teamName: string
+  host_id: string
+  created_at: string
+  updated_at: string
+  max_teams: number
+  pokemon_per_team: number
+  current_turn: number | null
+  spectator_count: number
+
+  // User's team
+  user_team_id: string
+  user_team_name: string
+  user_id: string
+  budget_remaining: number
+  draft_order: number
+  is_host: boolean
+
+  // Statistics
+  picks_made: number
+  total_picks: number
+  max_possible_picks: number
+  progress_percent: number
+  active_participant_count: number
+  total_participant_count: number
+
+  // League association
+  league_id: string | null
+  league_status: string | null
 }
 
 export default function DashboardPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [drafts, setDrafts] = useState<UserDraft[]>([])
+  const [drafts, setDrafts] = useState<DraftSummary[]>([])
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -39,39 +67,29 @@ export default function DashboardPage() {
         return
       }
 
-      // Skip data fetch if not authenticated (will show empty state)
+      // Skip data fetch if not authenticated
       if (!user) {
-        console.log('[Dashboard] No user authenticated, showing empty state')
+        console.log('[Dashboard] No user authenticated')
         setLoading(false)
         return
       }
 
       try {
-        console.log('[Dashboard] Fetching drafts for user:', user.id)
+        console.log('[Dashboard] Loading drafts for user:', user.id)
 
-        // Fetch ALL drafts user participates in (via teams table)
-        const { data: userTeams, error } = await supabase
-          .from('teams')
-          .select(`
-            id,
-            name,
-            owner_id,
-            draft_id,
-            draft:drafts!inner(
-              id,
-              name,
-              room_code,
-              status,
-              format,
-              max_teams,
-              host_id,
-              created_at,
-              deleted_at
-            )
-          `)
-          .eq('owner_id', user.id)
-          .is('draft.deleted_at', null)
-          .order('draft(created_at)', { ascending: false })
+        if (!supabase) {
+          console.error('[Dashboard] Supabase not available')
+          setDrafts([])
+          setLoading(false)
+          return
+        }
+
+        // Query the user_draft_summary view for efficient data retrieval
+        const { data: draftSummaries, error } = await supabase
+          .from('user_draft_summary')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false }) as any
 
         if (error) {
           console.error('[Dashboard] Error fetching drafts:', error)
@@ -80,26 +98,8 @@ export default function DashboardPage() {
           return
         }
 
-        console.log('[Dashboard] Fetched teams:', userTeams)
-
-        if (userTeams && userTeams.length > 0) {
-          const formattedDrafts: UserDraft[] = userTeams.map((team: any) => ({
-            id: team.draft.id,
-            name: team.draft.name || 'Unnamed Draft',
-            status: team.draft.status,
-            created_at: team.draft.created_at,
-            format: team.draft.format || 'custom',
-            max_teams: team.draft.max_teams || 0,
-            room_code: team.draft.room_code || team.draft.id,
-            isHost: team.draft.host_id === user.id,
-            teamName: team.name
-          }))
-          setDrafts(formattedDrafts)
-          console.log('[Dashboard] Formatted drafts:', formattedDrafts)
-        } else {
-          console.log('[Dashboard] No drafts found for user')
-          setDrafts([])
-        }
+        console.log('[Dashboard] Fetched draft summaries:', draftSummaries)
+        setDrafts(draftSummaries || [])
       } catch (err) {
         console.error('[Dashboard] Unexpected error:', err)
         setDrafts([])
@@ -125,15 +125,15 @@ export default function DashboardPage() {
   if (!user) {
     return (
       <SidebarLayout>
-        <div className="container mx-auto px-4 py-8">
+        <div className="min-h-screen p-8">
           <Card className="max-w-md mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-primary" />
+                <Trophy className="h-5 w-5" />
                 Dashboard Access Required
               </CardTitle>
               <CardDescription>
-                You need to be logged in to view your dashboard
+                Sign in to view your drafts and league activity
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -161,129 +161,334 @@ export default function DashboardPage() {
 
   const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User'
 
-  return (
-    <SidebarLayout>
-      {/* Page Header */}
-      <div className="border-b bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Welcome back, {displayName}!</p>
-        </div>
-      </div>
+  // Filter drafts by status
+  const activeDrafts = drafts.filter(d => d.status === 'active' || d.status === 'setup')
+  const completedDrafts = drafts.filter(d => d.status === 'completed')
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link href="/create-draft">
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="h-5 w-5" />
-                    Create Draft
-                  </CardTitle>
-                  <CardDescription>Start a new Pokemon draft</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
+  // Calculate statistics
+  const totalDrafts = drafts.length
+  const totalActive = activeDrafts.length
+  const totalCompleted = completedDrafts.length
+  const draftsWithLeagues = drafts.filter(d => d.league_id).length
 
-            <Link href="/join-draft">
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Join Draft
-                  </CardTitle>
-                  <CardDescription>Enter a room code to join</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { label: string; className: string }> = {
+      setup: { label: 'Setup', className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
+      active: { label: 'Active', className: 'bg-green-500/10 text-green-500 border-green-500/20' },
+      completed: { label: 'Completed', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
+      paused: { label: 'Paused', className: 'bg-gray-500/10 text-gray-500 border-gray-500/20' }
+    }
+    const variant = variants[status] || variants.setup
+    return <Badge variant="outline" className={variant.className}>{variant.label}</Badge>
+  }
 
-            <Link href="/spectate">
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5" />
-                    Spectate
-                  </CardTitle>
-                  <CardDescription>Watch live drafts</CardDescription>
-                </CardHeader>
-              </Card>
-            </Link>
+  const DraftCard = ({ draft }: { draft: DraftSummary }) => {
+    const progressColor = draft.progress_percent >= 100 ? 'bg-green-500' : 'bg-blue-500'
+
+    return (
+      <Card
+        className="hover:shadow-lg transition-shadow cursor-pointer"
+        onClick={() => router.push(`/draft/${draft.room_code.toLowerCase()}`)}
+      >
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <CardTitle className="text-xl">{draft.draft_name}</CardTitle>
+                {draft.is_host && (
+                  <Badge variant="secondary" className="text-xs">
+                    Host
+                  </Badge>
+                )}
+              </div>
+              <CardDescription className="flex items-center gap-2">
+                <span className="font-mono text-sm">{draft.room_code}</span>
+                <span>•</span>
+                <span>{draft.user_team_name}</span>
+              </CardDescription>
+            </div>
+            {getStatusBadge(draft.status)}
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {/* Progress Bar */}
+          {draft.status !== 'setup' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Draft Progress</span>
+                <span className="font-medium">{draft.progress_percent}%</span>
+              </div>
+              <Progress value={draft.progress_percent} className={progressColor} />
+              <div className="text-xs text-muted-foreground">
+                {draft.total_picks} / {draft.max_possible_picks} picks made
+              </div>
+            </div>
+          )}
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Your Picks */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Trophy className="h-3 w-3" />
+                <span>Your Picks</span>
+              </div>
+              <div className="text-lg font-semibold">
+                {draft.picks_made}/{draft.pokemon_per_team}
+              </div>
+            </div>
+
+            {/* Budget */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <TrendingUp className="h-3 w-3" />
+                <span>Budget</span>
+              </div>
+              <div className="text-lg font-semibold">
+                {draft.budget_remaining}
+              </div>
+            </div>
+
+            {/* Participants */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Users className="h-3 w-3" />
+                <span>Teams</span>
+              </div>
+              <div className="text-lg font-semibold">
+                {draft.total_participant_count}/{draft.max_teams}
+              </div>
+            </div>
+
+            {/* Format */}
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Zap className="h-3 w-3" />
+                <span>Format</span>
+              </div>
+              <div className="text-sm font-semibold capitalize">
+                {draft.format}
+              </div>
+            </div>
           </div>
 
-          {/* My Drafts */}
+          {/* League Status */}
+          {draft.league_id && (
+            <div className="flex items-center gap-2 p-2 bg-purple-500/10 rounded-md border border-purple-500/20">
+              <Trophy className="h-4 w-4 text-purple-500" />
+              <span className="text-sm text-purple-500 font-medium">
+                League Created - {draft.league_status}
+              </span>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            {draft.status === 'active' && (
+              <Button
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/draft/${draft.room_code.toLowerCase()}`)
+                }}
+              >
+                Continue Draft
+              </Button>
+            )}
+
+            {draft.status === 'setup' && (
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/draft/${draft.room_code.toLowerCase()}`)
+                }}
+              >
+                Setup Draft
+              </Button>
+            )}
+
+            {draft.status === 'completed' && !draft.league_id && (
+              <>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    router.push(`/draft/${draft.room_code.toLowerCase()}/results`)
+                  }}
+                >
+                  View Results
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // TODO: Implement league creation
+                    alert('League creation coming soon!')
+                  }}
+                >
+                  Create League
+                </Button>
+              </>
+            )}
+
+            {draft.status === 'completed' && draft.league_id && (
+              <Button
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/league/${draft.league_id}`)
+                }}
+              >
+                View League
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <SidebarLayout>
+      <main className="min-h-screen p-8">
+        <div className="max-w-7xl mx-auto space-y-8">
+          {/* Header */}
+          <div>
+            <h1 className="text-4xl font-bold mb-2">Welcome back, {displayName}!</h1>
+            <p className="text-muted-foreground">
+              Manage your drafts, view your teams, and track your progress.
+            </p>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Drafts</CardTitle>
+                <Trophy className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalDrafts}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Drafts</CardTitle>
+                <Zap className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-500">{totalActive}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Completed</CardTitle>
+                <Clock className="h-4 w-4 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-500">{totalCompleted}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Leagues</CardTitle>
+                <Users className="h-4 w-4 text-purple-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-500">{draftsWithLeagues}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Drafts Section */}
           <Card>
             <CardHeader>
-              <CardTitle>My Drafts</CardTitle>
-              <CardDescription>
-                {drafts.length === 0
-                  ? "You haven't created any drafts yet"
-                  : `You have ${drafts.length} draft${drafts.length === 1 ? '' : 's'}`
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {drafts.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>Create your first draft to get started!</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>My Drafts</CardTitle>
+                  <CardDescription>View and manage all your draft rooms</CardDescription>
+                </div>
+                <Button asChild>
                   <Link href="/create-draft">
-                    <Button className="mt-4">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Draft
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent>
+              {totalDrafts === 0 ? (
+                <div className="text-center py-12">
+                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No drafts yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create your first draft to get started!
+                  </p>
+                  <Button asChild>
+                    <Link href="/create-draft">
                       <Plus className="h-4 w-4 mr-2" />
                       Create Draft
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {drafts.map((draft) => (
-                    <Card key={draft.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{draft.name}</h3>
-                              {draft.isHost && (
-                                <Badge variant="outline" className="text-xs">
-                                  Host
-                                </Badge>
-                              )}
-                              <Badge
-                                variant={draft.status === 'active' ? 'default' : 'secondary'}
-                              >
-                                {draft.status}
-                              </Badge>
-                              <Badge variant="outline">
-                                {draft.format}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Trophy className="h-3 w-3" />
-                                Team: {draft.teamName}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Users className="h-3 w-3" />
-                                {draft.max_teams} teams
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {new Date(draft.created_at).toLocaleDateString()}
-                              </span>
-                              <span className="font-mono text-xs">
-                                Room: {draft.room_code}
-                              </span>
-                            </div>
-                          </div>
-                          <Link href={`/draft/${draft.id}`}>
-                            <Button>Open</Button>
-                          </Link>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="active">
+                      Active ({totalActive})
+                    </TabsTrigger>
+                    <TabsTrigger value="completed">
+                      Completed ({totalCompleted})
+                    </TabsTrigger>
+                    <TabsTrigger value="all">
+                      All ({totalDrafts})
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="active" className="space-y-4">
+                    {activeDrafts.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No active drafts. Create one to get started!
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {activeDrafts.map(draft => (
+                          <DraftCard key={draft.draft_id} draft={draft} />
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="completed" className="space-y-4">
+                    {completedDrafts.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No completed drafts yet.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {completedDrafts.map(draft => (
+                          <DraftCard key={draft.draft_id} draft={draft} />
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="all" className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {drafts.map(draft => (
+                        <DraftCard key={draft.draft_id} draft={draft} />
+                      ))}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               )}
             </CardContent>
           </Card>
