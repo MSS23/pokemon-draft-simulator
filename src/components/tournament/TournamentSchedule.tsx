@@ -143,11 +143,11 @@ export default function TournamentSchedule({ teams, onMatchComplete }: Tournamen
 
       <Tabs defaultValue="schedule" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="schedule">
+          <TabsTrigger value="schedule" suppressHydrationWarning>
             <Calendar className="h-4 w-4 mr-2" />
             Schedule
           </TabsTrigger>
-          <TabsTrigger value="standings">
+          <TabsTrigger value="standings" suppressHydrationWarning>
             <Users className="h-4 w-4 mr-2" />
             Standings
           </TabsTrigger>

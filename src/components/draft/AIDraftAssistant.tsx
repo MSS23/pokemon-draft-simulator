@@ -144,15 +144,15 @@ export function AIDraftAssistant({
         {analysis && (
           <Tabs defaultValue="recommendations" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="recommendations">
+              <TabsTrigger value="recommendations" suppressHydrationWarning>
                 <Sparkles className="mr-1 h-3 w-3" />
                 Picks
               </TabsTrigger>
-              <TabsTrigger value="needs">
+              <TabsTrigger value="needs" suppressHydrationWarning>
                 <Target className="mr-1 h-3 w-3" />
                 Needs
               </TabsTrigger>
-              <TabsTrigger value="opponents">
+              <TabsTrigger value="opponents" suppressHydrationWarning>
                 <Shield className="mr-1 h-3 w-3" />
                 Counter
               </TabsTrigger>
