@@ -109,7 +109,7 @@ export default function DashboardPage() {
     }
 
     loadDashboardData()
-  }, [authLoading, user, router])
+  }, [authLoading, user])
 
   if (authLoading || loading) {
     return (

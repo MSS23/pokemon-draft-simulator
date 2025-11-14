@@ -45,7 +45,7 @@ export default function SettingsPage() {
 
     // Load user profile
     loadProfile(user.id)
-  }, [authLoading, user, router])
+  }, [authLoading, user])
 
   async function loadProfile(userId: string) {
     if (!supabase) return

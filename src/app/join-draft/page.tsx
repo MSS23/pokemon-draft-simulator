@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,7 @@ function JoinDraftForm() {
     }
   };
 
-  const lookupDraft = async () => {
+  const lookupDraft = useCallback(async () => {
     if (!formData.roomCode.trim()) {
       setError("Please enter a room code");
       return;
@@ -88,7 +88,7 @@ function JoinDraftForm() {
     } finally {
       setIsJoining(false);
     }
-  };
+  }, [formData.roomCode]);
 
   const handleJoinDraft = async () => {
     if (!userDisplayName.trim()) {
@@ -225,8 +225,7 @@ function JoinDraftForm() {
     if (formData.roomCode && !authLoading && user) {
       lookupDraft();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData.roomCode, authLoading, user]);
+  }, [formData.roomCode, authLoading, user, lookupDraft]);
 
   const isFormValid =
     userDisplayName.trim() &&
