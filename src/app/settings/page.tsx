@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Pencil } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface UserProfile {
   id: string
@@ -25,29 +26,24 @@ interface UserProfile {
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
 
   useEffect(() => {
-    checkUser()
-  }, [])
+    // Wait for auth to finish loading
+    if (authLoading) return
 
-  async function checkUser() {
-    if (!supabase) {
-      router.push('/auth/login')
-      return
-    }
-
-    const { data: { user } } = await supabase.auth.getUser()
-
+    // Redirect if not authenticated
     if (!user) {
       router.push('/auth/login')
       return
     }
 
-    await loadProfile(user.id)
-  }
+    // Load user profile
+    loadProfile(user.id)
+  }, [authLoading, user, router])
 
   async function loadProfile(userId: string) {
     if (!supabase) return
@@ -104,7 +100,8 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) {
+  // Show loading while auth or profile is loading
+  if (authLoading || loading) {
     return (
       <SidebarLayout>
         <div className="min-h-full bg-slate-950 flex items-center justify-center">
@@ -114,6 +111,7 @@ export default function SettingsPage() {
     )
   }
 
+  // Don't render if no profile (waiting for data or redirecting)
   if (!profile) return null
 
   return (
