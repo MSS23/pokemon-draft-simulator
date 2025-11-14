@@ -108,12 +108,15 @@ export class DraftService {
    * Get server-authoritative time with draft timing information
    * This prevents client-side timer drift
    */
-  static async getServerTime(roomCode: string): Promise<ServerTime> {
+  static async getServerTime(roomCodeOrDraftId: string): Promise<ServerTime> {
     try {
+      // Detect if input is a UUID
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(roomCodeOrDraftId)
+
       const { data: draft } = await supabase
         .from('drafts')
         .select('settings, updated_at')
-        .eq('room_code', roomCode.toLowerCase())
+        .eq(isUuid ? 'id' : 'room_code', isUuid ? roomCodeOrDraftId : roomCodeOrDraftId.toLowerCase())
         .single()
 
       if (!draft) {
@@ -562,6 +565,9 @@ export class DraftService {
     if (!supabase) return null
 
     try {
+      // Detect if input is a UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(roomCodeOrDraftId)
+
       const { data, error } = await supabase
         .from('drafts')
         .select(`
@@ -571,7 +577,7 @@ export class DraftService {
           picks(*),
           auctions(*)
         `)
-        .eq('room_code', roomCodeOrDraftId.toLowerCase())
+        .eq(isUuid ? 'id' : 'room_code', isUuid ? roomCodeOrDraftId : roomCodeOrDraftId.toLowerCase())
         .maybeSingle()
 
       if (error) {
@@ -580,7 +586,7 @@ export class DraftService {
       }
 
       if (!data) {
-        console.warn(`Draft not found for room code: ${roomCodeOrDraftId}`)
+        console.warn(`Draft not found for ${isUuid ? 'ID' : 'room code'}: ${roomCodeOrDraftId}`)
         return null
       }
 

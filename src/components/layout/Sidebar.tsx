@@ -49,28 +49,34 @@ export function Sidebar() {
   async function loadUserLeagues(userId: string) {
     if (!supabase) return
 
-    // Load user's active leagues through their teams
-    const teamsResponse = await supabase
-      .from('teams')
+    // Load user's active leagues through junction table
+    const leagueTeamsResponse = await supabase
+      .from('league_teams')
       .select(`
         id,
+        team_id,
         league_id,
+        teams!inner (
+          id,
+          name,
+          owner_id
+        ),
         leagues!inner (
           id,
           name,
           status
         )
       `)
-      .eq('owner_id', userId) as any
+      .eq('teams.owner_id', userId) as any
 
-    if (teamsResponse?.data) {
+    if (leagueTeamsResponse?.data) {
       // Filter for active/upcoming leagues in JavaScript
-      const userLeagues = teamsResponse.data
-        .filter((team: any) => team.leagues && (team.leagues.status === 'active' || team.leagues.status === 'upcoming'))
-        .map((team: any) => ({
-          id: team.leagues.id,
-          name: team.leagues.name,
-          team_id: team.id
+      const userLeagues = leagueTeamsResponse.data
+        .filter((item: any) => item.leagues && (item.leagues.status === 'active' || item.leagues.status === 'upcoming'))
+        .map((item: any) => ({
+          id: item.leagues.id,
+          name: item.leagues.name,
+          team_id: item.team_id
         }))
       setLeagues(userLeagues)
     }

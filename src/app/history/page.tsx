@@ -53,13 +53,19 @@ export default function HistoryPage() {
   async function loadUserHistory(userId: string) {
     if (!supabase) return
 
-    // Load user's league participations
+    // Load user's league participations through junction table
     const leaguesResponse = await supabase
-      .from('teams')
+      .from('league_teams')
       .select(`
         id,
+        team_id,
         league_id,
         final_placement,
+        teams!inner (
+          id,
+          name,
+          owner_id
+        ),
         leagues!inner (
           id,
           name,
@@ -67,7 +73,7 @@ export default function HistoryPage() {
           ended_at
         )
       `)
-      .eq('owner_id', userId) as any
+      .eq('teams.owner_id', userId) as any
 
     // Mock data for demonstration
     const mockLeagues: LeagueHistory[] = [
