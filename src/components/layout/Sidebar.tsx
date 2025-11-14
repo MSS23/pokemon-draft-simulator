@@ -133,19 +133,16 @@ export function Sidebar() {
             href="/create-draft"
             icon={Plus}
             label="Create Draft"
-            onClick={(e) => handleProtectedClick(e, true)}
           />
           <SidebarLink
             href="/join-draft"
             icon={UserPlus}
             label="Join Draft"
-            onClick={(e) => handleProtectedClick(e, false)}
           />
           <SidebarLink
             href="/watch-drafts"
             icon={Eye}
             label="Watch Live"
-            onClick={(e) => handleProtectedClick(e, false)}
           />
         </SidebarSection>
 
@@ -156,25 +153,21 @@ export function Sidebar() {
             href="/dashboard"
             icon={LayoutDashboard}
             label="Dashboard"
-            onClick={(e) => handleProtectedClick(e, true)}
           />
           <SidebarLink
             href="/my-drafts"
             icon={FileText}
             label="League Matches"
-            onClick={(e) => handleProtectedClick(e, true)}
           />
           <SidebarLink
             href="/draft-history"
             icon={Trophy}
             label="Draft History"
-            onClick={(e) => handleProtectedClick(e, true)}
           />
           <SidebarLink
             href="/history"
             icon={History}
             label="League History"
-            onClick={(e) => handleProtectedClick(e, true)}
           />
         </SidebarSection>
 
@@ -209,7 +202,6 @@ export function Sidebar() {
             href="/settings"
             icon={Settings}
             label="Settings"
-            onClick={(e) => handleProtectedClick(e, true)}
           />
           <Button
             variant="ghost"

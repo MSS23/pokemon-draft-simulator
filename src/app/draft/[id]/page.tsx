@@ -51,6 +51,11 @@ import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
 
 // Heavy components - lazy load with loading states
+const DraftConfirmationModal = dynamic(() => import('@/components/draft/DraftConfirmationModal'), {
+  ssr: false,
+  loading: () => <div className="h-64 bg-muted rounded-lg animate-pulse" />
+})
+
 const DraftControls = dynamic(() => import('@/components/draft/DraftControls'), {
   ssr: false,
   loading: () => <div className="h-20 bg-muted rounded-lg animate-pulse" />
@@ -202,6 +207,8 @@ export default function DraftRoomPage() {
   const [selectedPokemon, setSelectedPokemon] = useState<Pokemon | null>(null)
   const [detailsPokemon, setDetailsPokemon] = useState<Pokemon | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [confirmationPokemon, setConfirmationPokemon] = useState<Pokemon | null>(null)
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -1078,6 +1085,13 @@ export default function DraftRoomPage() {
     }
   }, [isAuctionDraft, isUserTurn])
 
+  // Handler to show confirmation modal before drafting
+  const handleInitiateDraft = useCallback((pokemon: Pokemon) => {
+    setConfirmationPokemon(pokemon)
+    setIsConfirmationOpen(true)
+    setIsDetailsOpen(false) // Close details modal when showing confirmation
+  }, [])
+
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn or proxy picking enabled)
     const canDraft = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
@@ -1884,11 +1898,25 @@ export default function DraftRoomPage() {
           pokemon={detailsPokemon}
           isOpen={isDetailsOpen}
           onClose={() => setIsDetailsOpen(false)}
-          onSelect={!draftState || isAuctionDraft ? undefined : ((isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting' ? handleDraftPokemon : undefined)}
+          onSelect={!draftState || isAuctionDraft ? undefined : ((isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting' ? handleInitiateDraft : undefined)}
           isDrafted={detailsPokemon && draftState ? allDraftedIds.includes(detailsPokemon.id) : false}
           isAtPickLimit={userTeam ? userTeam.picks.length >= (draftState?.draftSettings?.pokemonPerTeam || 6) : false}
           currentPicks={userTeam?.picks.length || 0}
           maxPicks={draftState?.draftSettings?.pokemonPerTeam || 6}
+        />
+
+        {/* Draft Confirmation Modal */}
+        <DraftConfirmationModal
+          pokemon={confirmationPokemon}
+          isOpen={isConfirmationOpen}
+          onClose={() => setIsConfirmationOpen(false)}
+          onConfirm={(pokemon) => {
+            setIsConfirmationOpen(false)
+            handleDraftPokemon(pokemon)
+          }}
+          currentBudget={userTeam?.budgetRemaining || 100}
+          draftedCount={userTeam?.picks.length || 0}
+          maxDrafts={draftState?.draftSettings?.pokemonPerTeam || 6}
         />
 
         {/* Wishlist Manager - Fixed Position */}
