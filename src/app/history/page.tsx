@@ -167,7 +167,36 @@ export default function HistoryPage() {
     )
   }
 
-  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'ash_ketchum'
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <SidebarLayout>
+        <div className="min-h-full bg-slate-950 p-8">
+          <div className="container mx-auto px-4 py-8">
+            <Card className="max-w-md mx-auto bg-slate-900 border-slate-800">
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Trophy className="h-6 w-6 text-yellow-500" />
+                  <h2 className="text-xl font-bold text-white">League History Access Required</h2>
+                </div>
+                <p className="text-slate-400 mb-6">
+                  You need to be logged in to view your league history, past performances, and drafted teams.
+                </p>
+                <Button
+                  className="w-full bg-yellow-500 hover:bg-yellow-600 text-slate-900 font-semibold"
+                  onClick={() => router.push('/auth/login')}
+                >
+                  Go to Login
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </SidebarLayout>
+    )
+  }
+
+  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'ash_ketchum'
 
   return (
     <SidebarLayout>

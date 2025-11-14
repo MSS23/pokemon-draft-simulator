@@ -87,13 +87,48 @@ export default function DashboardPage() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <SidebarLayout>
+        <div className="min-h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </SidebarLayout>
     )
   }
 
-  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <SidebarLayout>
+        <div className="container mx-auto px-4 py-8">
+          <Card className="max-w-md mx-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                Dashboard Access Required
+              </CardTitle>
+              <CardDescription>
+                You need to be logged in to view your dashboard
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Your dashboard shows your active drafts, league participation, and recent activity.
+                Please log in to access these features.
+              </p>
+              <Button
+                className="w-full"
+                onClick={() => router.push('/auth/login')}
+              >
+                Go to Login
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </SidebarLayout>
+    )
+  }
+
+  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User'
 
   return (
     <SidebarLayout>
