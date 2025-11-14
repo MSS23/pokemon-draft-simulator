@@ -71,7 +71,7 @@ export type Database = {
           ruleset: string
           budget_per_team: number
           max_teams: number
-          status: 'setup' | 'active' | 'completed' | 'paused'
+          status: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
           current_turn: number | null
           current_round: number
           settings: DraftSettings | null
@@ -80,6 +80,8 @@ export type Database = {
           spectator_count: number
           description: string | null
           tags: string[] | null
+          deleted_at: string | null
+          deleted_by: string | null
         }
         Insert: {
           id?: string
@@ -91,7 +93,7 @@ export type Database = {
           ruleset?: string
           budget_per_team?: number
           max_teams?: number
-          status?: 'setup' | 'active' | 'completed' | 'paused'
+          status?: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
           current_turn?: number | null
           current_round?: number
           settings?: DraftSettings | null
@@ -100,6 +102,8 @@ export type Database = {
           spectator_count?: number
           description?: string | null
           tags?: string[] | null
+          deleted_at?: string | null
+          deleted_by?: string | null
         }
         Update: {
           id?: string
@@ -111,7 +115,7 @@ export type Database = {
           ruleset?: string
           budget_per_team?: number
           max_teams?: number
-          status?: 'setup' | 'active' | 'completed' | 'paused'
+          status?: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
           current_turn?: number | null
           current_round?: number
           settings?: DraftSettings | null
@@ -120,6 +124,8 @@ export type Database = {
           spectator_count?: number
           description?: string | null
           tags?: string[] | null
+          deleted_at?: string | null
+          deleted_by?: string | null
         }
       }
       teams: {

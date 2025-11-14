@@ -113,6 +113,12 @@ export default function Home() {
   const handleDeleteDraft = async (draftId: string, event: React.MouseEvent) => {
     event.stopPropagation()
 
+    // Prevent deletion if not authenticated
+    if (!user) {
+      toast.error('Please log in to delete drafts')
+      return
+    }
+
     const confirmed = window.confirm('Delete this draft permanently? This will remove the draft for all participants and cannot be undone.')
     if (!confirmed) return
 
@@ -121,7 +127,7 @@ export default function Home() {
       setMyDrafts(prev => prev.filter(d => d.draftId !== draftId))
 
       // Delete from database (pass userId for soft delete and broadcast)
-      const userId = user?.id || ''
+      const userId = user.id
       await DraftService.deleteDraft(draftId, userId)
 
       // Remove from local storage

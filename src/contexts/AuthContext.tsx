@@ -54,6 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+
+    // Clear draft participation data from localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('draftParticipations')
+      localStorage.removeItem('guestUserId')
+    }
   }
 
   return (
