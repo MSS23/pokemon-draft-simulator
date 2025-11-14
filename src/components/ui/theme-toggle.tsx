@@ -30,6 +30,7 @@ export function ThemeToggle() {
         <DropdownMenuItem
           onClick={() => setTheme('light')}
           className="cursor-pointer hover:bg-gray-50"
+          suppressHydrationWarning
         >
           <Sun className="mr-2 h-4 w-4" />
           <span>Light</span>
@@ -38,6 +39,7 @@ export function ThemeToggle() {
         <DropdownMenuItem
           onClick={() => setTheme('dark')}
           className="cursor-pointer hover:bg-gray-50"
+          suppressHydrationWarning
         >
           <Moon className="mr-2 h-4 w-4" />
           <span>Dark</span>
@@ -46,6 +48,7 @@ export function ThemeToggle() {
         <DropdownMenuItem
           onClick={() => setTheme('system')}
           className="cursor-pointer hover:bg-gray-50"
+          suppressHydrationWarning
         >
           <Monitor className="mr-2 h-4 w-4" />
           <span>System</span>

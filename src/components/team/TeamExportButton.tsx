@@ -138,7 +138,7 @@ export default function TeamExportButton({
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem onClick={handleCopyToClipboard} className="cursor-pointer">
+        <DropdownMenuItem onClick={handleCopyToClipboard} className="cursor-pointer" suppressHydrationWarning>
           {copied ? (
             <>
               <Check className="h-4 w-4 mr-2 text-green-600" />

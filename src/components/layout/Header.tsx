@@ -76,10 +76,13 @@ export function Header() {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={async () => {
-                    await signOut()
-                    router.push('/')
-                  }}>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      await signOut()
+                      router.push('/')
+                    }}
+                    suppressHydrationWarning
+                  >
                     <LogOut className="h-4 w-4 mr-2" />
                     Sign Out
                   </DropdownMenuItem>
