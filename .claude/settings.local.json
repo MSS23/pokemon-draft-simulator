@@ -69,7 +69,9 @@
       "Bash(vercel --version:*)",
       "Bash(node -e:*)",
       "Bash(python3:*)",
-      "Bash(if exist \".next\" rmdir /s /q \".next\")"
+      "Bash(if exist \".next\" rmdir /s /q \".next\")",
+      "Bash(git log:*)",
+      "Bash(cmd /c \"if exist .next rmdir /s /q .next\")"
     ],
     "deny": [],
     "ask": []

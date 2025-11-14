@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Card } from '@/components/ui/card'
+import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Pencil } from 'lucide-react'
@@ -14,7 +14,7 @@ import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface UserProfile {
-  id: string
+  user_id: string
   username: string
   display_name: string
   avatar_url: string | null
@@ -59,7 +59,7 @@ export default function SettingsPage() {
     } else {
       // Create default profile
       const defaultProfile: Partial<UserProfile> = {
-        id: userId,
+        user_id: userId,
         username: '',
         display_name: '',
         avatar_url: null,
@@ -82,7 +82,7 @@ export default function SettingsPage() {
     const updateResponse = await (supabase
       .from('user_profiles') as any)
       .upsert({
-        id: profile.id,
+        user_id: profile.user_id,
         username: profile.username,
         display_name: profile.display_name,
         avatar_url: profile.avatar_url,
@@ -106,6 +106,39 @@ export default function SettingsPage() {
       <SidebarLayout>
         <div className="min-h-full bg-slate-950 flex items-center justify-center">
           <div className="text-white">Loading...</div>
+        </div>
+      </SidebarLayout>
+    )
+  }
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <SidebarLayout>
+        <div className="min-h-full bg-slate-950 p-8 flex items-center justify-center">
+          <Card className="max-w-md bg-slate-900 border-slate-800">
+            <CardHeader>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <Pencil className="h-5 w-5 text-yellow-500" />
+                Login Required
+              </h2>
+              <p className="text-slate-400">
+                You need to be logged in to view your profile settings
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-slate-400">
+                Your profile allows you to customize your display name, avatar, and connect your social media accounts.
+                Please log in to access these settings.
+              </p>
+              <Button
+                className="w-full bg-yellow-500 hover:bg-yellow-600 text-slate-900 font-semibold"
+                onClick={() => router.push('/auth/login')}
+              >
+                Go to Login
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </SidebarLayout>
     )

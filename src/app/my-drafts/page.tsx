@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
-import { UserSessionService } from '@/lib/user-session'
 import { supabase } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Match, League, Team, Draft } from '@/types'
 import { format, isPast, isFuture, isToday } from 'date-fns'
 
@@ -29,28 +29,31 @@ interface DraftWithTeam extends Draft {
 
 export default function MyDraftsPage() {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [matches, setMatches] = useState<MatchWithDetails[]>([])
   const [drafts, setDrafts] = useState<DraftWithTeam[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
+    // Wait for auth to finish loading
+    if (authLoading) return
+
+    // Redirect if not authenticated
+    if (!user) {
+      setIsLoading(false)
+      return
+    }
+
     const loadData = async () => {
       try {
-        const session = await UserSessionService.getSession()
-        if (!session?.userId) {
-          router.push('/')
-          return
-        }
-
-        setUserId(session.userId)
+        const userId = user.id
 
         // Load matches
-        const { matches: userMatches } = await LeagueService.getUserMatches(session.userId)
+        const { matches: userMatches } = await LeagueService.getUserMatches(userId)
 
         // Enrich matches with user context
         const enrichedMatches: MatchWithDetails[] = userMatches.map(match => {
-          const isUserHome = match.homeTeam.ownerId === session.userId
+          const isUserHome = match.homeTeam.ownerId === userId
           return {
             ...match,
             isUserHome,
@@ -69,7 +72,7 @@ export default function MyDraftsPage() {
               *,
               draft:drafts!inner(*)
             `)
-            .eq('owner_id', session.userId)
+            .eq('owner_id', userId)
             .is('draft.deleted_at', null) // Filter out soft-deleted drafts
 
           if (userTeams) {
@@ -113,7 +116,7 @@ export default function MyDraftsPage() {
     }
 
     loadData()
-  }, [router])
+  }, [user, authLoading])
 
   const upcomingMatches = matches.filter(m =>
     m.status === 'scheduled' &&
@@ -127,13 +130,49 @@ export default function MyDraftsPage() {
     router.push(`/match/${matchId}`)
   }
 
-  if (isLoading) {
+  // Show loading while auth is loading
+  if (authLoading || isLoading) {
     return (
       <SidebarLayout>
         <div className="bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 min-h-full flex items-center justify-center">
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-600 dark:text-slate-400">Loading your matches...</p>
+            <p className="text-slate-600 dark:text-slate-400">Loading your drafts...</p>
+          </div>
+        </div>
+      </SidebarLayout>
+    )
+  }
+
+  // Show login prompt if not authenticated
+  if (!user) {
+    return (
+      <SidebarLayout>
+        <div className="bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 min-h-full">
+          <div className="max-w-4xl mx-auto pt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-6 w-6 text-yellow-500" />
+                  Login Required
+                </CardTitle>
+                <CardDescription>
+                  You need to be logged in to view your drafts and league matches
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Your drafts page shows all your active and completed drafts, as well as your league matches and standings.
+                  Please log in to access these features.
+                </p>
+                <Button
+                  className="w-full max-w-xs"
+                  onClick={() => router.push('/auth/login')}
+                >
+                  Go to Login
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </SidebarLayout>

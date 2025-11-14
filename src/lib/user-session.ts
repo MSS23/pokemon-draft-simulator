@@ -92,14 +92,23 @@ export class UserSessionService {
       console.warn('Failed to load user session from localStorage:', error)
     }
 
-    // No authenticated user and no stored session - return unauthenticated session
-    return {
-      userId: '',
+    // No authenticated user and no stored session - create new guest session
+    const guestSession: UserSession = {
+      userId: `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       displayName: displayName || 'Guest',
       createdAt: new Date().toISOString(),
       lastActivity: new Date().toISOString(),
       isAuthenticated: false
     }
+
+    // Store the new guest session for persistence
+    try {
+      localStorage.setItem(USER_SESSION_KEY, JSON.stringify(guestSession))
+    } catch (error) {
+      console.warn('Failed to save guest session to localStorage:', error)
+    }
+
+    return guestSession
   }
 
   /**

@@ -442,12 +442,16 @@ export type Database = {
       }
       user_profiles: {
         Row: {
-          id: string
+          user_id: string
           created_at: string
           updated_at: string
           email: string | null
           display_name: string | null
           avatar_url: string | null
+          username: string | null
+          bio: string | null
+          twitter_profile: string | null
+          twitch_channel: string | null
           is_verified: boolean
           total_drafts_created: number
           total_drafts_participated: number
@@ -456,12 +460,16 @@ export type Database = {
           preferences: any
         }
         Insert: {
-          id: string
+          user_id: string
           created_at?: string
           updated_at?: string
           email?: string | null
           display_name?: string | null
           avatar_url?: string | null
+          username?: string | null
+          bio?: string | null
+          twitter_profile?: string | null
+          twitch_channel?: string | null
           is_verified?: boolean
           total_drafts_created?: number
           total_drafts_participated?: number
@@ -470,12 +478,16 @@ export type Database = {
           preferences?: any
         }
         Update: {
-          id?: string
+          user_id?: string
           created_at?: string
           updated_at?: string
           email?: string | null
           display_name?: string | null
           avatar_url?: string | null
+          username?: string | null
+          bio?: string | null
+          twitter_profile?: string | null
+          twitch_channel?: string | null
           is_verified?: boolean
           total_drafts_created?: number
           total_drafts_participated?: number
