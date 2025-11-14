@@ -3,6 +3,37 @@ import { WishlistItem, Pokemon } from '@/types'
 
 export class WishlistService {
   /**
+   * Helper method to resolve draft ID from room code if needed
+   */
+  private static async resolveDraftId(draftId: string): Promise<string> {
+    if (!supabase) {
+      throw new Error('Supabase not configured')
+    }
+
+    // If it looks like a UUID (contains hyphens), return as-is
+    if (draftId.includes('-')) {
+      return draftId
+    }
+
+    // Otherwise, look up the UUID by room code
+    const { data: draftData, error: draftError } = await supabase
+      .from('drafts')
+      .select('id')
+      .eq('room_code', draftId)
+      .single()
+
+    if (draftError) {
+      throw new Error(`Draft lookup error: ${draftError.message}`)
+    }
+
+    if (!draftData) {
+      throw new Error('Draft not found')
+    }
+
+    return (draftData as { id: string }).id
+  }
+
+  /**
    * Add a Pokemon to a participant's wishlist
    */
   static async addToWishlist(
@@ -16,11 +47,14 @@ export class WishlistService {
     }
 
     try {
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
+
       // Get current max priority for this participant
       const { data: existingItems } = await supabase
         .from('wishlist_items')
         .select('priority')
-        .eq('draft_id', draftId)
+        .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .order('priority', { ascending: false })
         .limit(1)
@@ -30,7 +64,7 @@ export class WishlistService {
         : 1
 
       const newItem = {
-        draft_id: draftId,
+        draft_id: actualDraftId,
         participant_id: participantId,
         pokemon_id: pokemon.id,
         pokemon_name: pokemon.name,
@@ -82,10 +116,13 @@ export class WishlistService {
     }
 
     try {
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
+
       const { error } = await supabase
         .from('wishlist_items')
         .delete()
-        .eq('draft_id', draftId)
+        .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .eq('pokemon_id', pokemonId)
 
@@ -95,7 +132,7 @@ export class WishlistService {
       }
 
       // Reorder remaining items to close gaps
-      await this.reorderWishlist(draftId, participantId)
+      await this.reorderWishlist(actualDraftId, participantId)
 
       return true
     } catch (error) {
@@ -154,25 +191,8 @@ export class WishlistService {
     }
 
     try {
-      // First get the actual draft UUID from room code if needed
-      let actualDraftId = draftId
-      if (!draftId.includes('-')) { // Room code doesn't contain hyphens, UUIDs do
-        const { data: draftData, error: draftError } = await supabase
-          .from('drafts')
-          .select('id')
-          .eq('room_code', draftId)
-          .single()
-
-        if (draftError) {
-          throw new Error(`Draft lookup error: ${draftError.message}`)
-        }
-
-        if (!draftData) {
-          throw new Error('Draft not found')
-        }
-
-        actualDraftId = (draftData as { id: string }).id
-      }
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
 
       const { data, error } = await supabase
         .from('wishlist_items')
@@ -217,15 +237,18 @@ export class WishlistService {
     }
 
     try {
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
+
       const updateData = {
         is_available: false,
         updated_at: new Date().toISOString()
       }
-      
+
       const { error } = await (supabase as any)
         .from('wishlist_items')
         .update(updateData)
-        .eq('draft_id', draftId)
+        .eq('draft_id', actualDraftId)
         .eq('pokemon_id', pokemonId)
 
       if (error) {
@@ -253,10 +276,13 @@ export class WishlistService {
     }
 
     try {
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
+
       const { data, error } = await supabase
         .from('wishlist_items')
         .select('*')
-        .eq('draft_id', draftId)
+        .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .eq('is_available', true)
         .order('priority', { ascending: true })
@@ -325,10 +351,13 @@ export class WishlistService {
     if (!supabase) return []
 
     try {
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
+
       const { data, error } = await (supabase as any)
         .from('wishlist_items')
         .select('*')
-        .eq('draft_id', draftId)
+        .eq('draft_id', actualDraftId)
         .order('participant_id, priority')
 
       if (error) {
@@ -364,10 +393,13 @@ export class WishlistService {
     if (!supabase) return
 
     try {
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
+
       const { data, error } = await (supabase as any)
         .from('wishlist_items')
         .select('*')
-        .eq('draft_id', draftId)
+        .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .order('priority', { ascending: true })
 

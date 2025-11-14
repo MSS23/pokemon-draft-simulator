@@ -784,16 +784,25 @@ export class DraftService {
       throw new Error(`Failed to make pick: ${pickError.message || pickError.code || 'Unknown error'}`)
     }
 
-    // Update team budget
-    const { error: teamError } = await (supabase
-      .from('teams') as any)
-      .update({
-        budget_remaining: (supabase as any).sql`budget_remaining - ${validatedCost}`
-      })
+    // Update team budget (read-update pattern since supabase-js doesn't support SQL expressions)
+    const { data: teamBudgetData, error: teamFetchError } = await supabase
+      .from('teams')
+      .select('budget_remaining')
       .eq('id', teamId)
+      .single()
 
-    if (teamError) {
-      console.error('Error updating team budget:', teamError)
+    if (teamFetchError || !teamBudgetData) {
+      console.error('Error fetching team budget:', teamFetchError)
+    } else {
+      const newBudget = (teamBudgetData as any).budget_remaining - validatedCost
+      const { error: teamError } = await (supabase as any)
+        .from('teams')
+        .update({ budget_remaining: newBudget })
+        .eq('id', teamId)
+
+      if (teamError) {
+        console.error('Error updating team budget:', teamError)
+      }
     }
 
     // Calculate next turn using proper snake draft logic
@@ -825,7 +834,8 @@ export class DraftService {
           current_turn: nextTurn,
           current_round: nextRound,
           updated_at: new Date().toISOString(),
-          settings: updatedSettings
+          settings: updatedSettings,
+          turn_started_at: new Date().toISOString() // Reset turn timer for next player
         }
 
     const { error: draftError } = await (supabase
@@ -1920,16 +1930,25 @@ export class DraftService {
         throw new Error('Failed to create pick from auction')
       }
 
-      // Update team budget
-      const { error: teamError } = await (supabase as any)
+      // Update team budget (read-update pattern since supabase-js doesn't support SQL expressions)
+      const { data: team, error: teamFetchError } = await supabase
         .from('teams')
-        .update({
-          budget_remaining: (supabase as any).sql`budget_remaining - ${(auction as any).current_bid}`
-        })
+        .select('budget_remaining')
         .eq('id', (auction as any).current_bidder)
+        .single()
 
-      if (teamError) {
-        console.error('Error updating team budget after auction:', teamError)
+      if (teamFetchError || !team) {
+        console.error('Error fetching team budget after auction:', teamFetchError)
+      } else {
+        const newBudget = (team as any).budget_remaining - (auction as any).current_bid
+        const { error: teamError } = await (supabase as any)
+          .from('teams')
+          .update({ budget_remaining: newBudget })
+          .eq('id', (auction as any).current_bidder)
+
+        if (teamError) {
+          console.error('Error updating team budget after auction:', teamError)
+        }
       }
     }
 
@@ -2181,16 +2200,25 @@ export class DraftService {
       throw new Error('Failed to undo pick')
     }
 
-    // Restore team budget
-    const { error: budgetError } = await (supabase
-      .from('teams') as any)
-      .update({
-        budget_remaining: (supabase as any).sql`budget_remaining + ${lastPick.cost}`
-      })
+    // Restore team budget (read-update pattern since supabase-js doesn't support SQL expressions)
+    const { data: teamBudgetData, error: teamFetchError } = await supabase
+      .from('teams')
+      .select('budget_remaining')
       .eq('id', lastPick.team_id)
+      .single()
 
-    if (budgetError) {
-      console.error('Error restoring budget:', budgetError)
+    if (teamFetchError || !teamBudgetData) {
+      console.error('Error fetching team budget for undo:', teamFetchError)
+    } else {
+      const newBudget = (teamBudgetData as any).budget_remaining + lastPick.cost
+      const { error: budgetError } = await (supabase as any)
+        .from('teams')
+        .update({ budget_remaining: newBudget })
+        .eq('id', lastPick.team_id)
+
+      if (budgetError) {
+        console.error('Error restoring budget:', budgetError)
+      }
     }
 
     // Revert draft turn

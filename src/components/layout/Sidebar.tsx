@@ -66,15 +66,17 @@ export function Sidebar() {
           status
         )
       `)
-      .eq('owner_id', userId)
-      .in('leagues.status', ['active', 'upcoming']) as any
+      .eq('owner_id', userId) as any
 
     if (teamsResponse?.data) {
-      const userLeagues = teamsResponse.data.map((team: any) => ({
-        id: team.leagues.id,
-        name: team.leagues.name,
-        team_id: team.id
-      }))
+      // Filter for active/upcoming leagues in JavaScript
+      const userLeagues = teamsResponse.data
+        .filter((team: any) => team.leagues && (team.leagues.status === 'active' || team.leagues.status === 'upcoming'))
+        .map((team: any) => ({
+          id: team.leagues.id,
+          name: team.leagues.name,
+          team_id: team.id
+        }))
       setLeagues(userLeagues)
     }
   }

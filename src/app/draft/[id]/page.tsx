@@ -563,6 +563,9 @@ export default function DraftRoomPage() {
     }
   }, [draftState?.status, roomCode])
 
+  // Track previous activity IDs to prevent infinite loops
+  const previousActivityIdsRef = useRef<string>('')
+
   // Track picks and populate recent activity for spectator mode
   useEffect(() => {
     if (!draftState?.teams || !pokemon) return
@@ -590,13 +593,12 @@ export default function DraftRoomPage() {
 
     // Create stable ID string for comparison
     const newActivityIds = newActivities.map(a => a.id).join(',')
-    const currentActivityIds = recentActivity.map(a => a.id).join(',')
 
     // Only update if the activity has actually changed
-    if (newActivityIds !== currentActivityIds) {
+    if (newActivityIds !== previousActivityIdsRef.current) {
+      previousActivityIdsRef.current = newActivityIds
       setRecentActivity(newActivities)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftState?.teams, pokemon])
 
   // Detect draft start transition to increase debounce
