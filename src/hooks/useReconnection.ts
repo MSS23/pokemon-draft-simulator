@@ -200,7 +200,8 @@ export function useReconnection({
     if (!enabled) return
 
     const handleOnline = () => {
-      if (!connectionState.isConnected) {
+      // Use ref to avoid dependency on connectionState
+      if (!connectionStateRef.current.isConnected) {
         notify.info('Network Back Online', 'Reconnecting...', { duration: 2000 })
         attemptReconnection()
       }
@@ -217,9 +218,8 @@ export function useReconnection({
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [enabled, connectionState.isConnected, notify])
-  // Note: attemptReconnection and markAsDisconnected are stable due to useCallback,
-  // but excluded from deps to prevent circular re-subscriptions
+  }, [enabled, notify, attemptReconnection, markAsDisconnected])
+  // Include all dependencies to prevent stale closures
 
   // Cleanup on unmount
   useEffect(() => {

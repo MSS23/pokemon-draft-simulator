@@ -296,7 +296,25 @@ export default function DraftRoomPage() {
   const isDemoMode = false
 
   // Transform database state to UI state (defined early so hooks can use it)
+  // Store previous transformed state to prevent unnecessary re-renders
+  const prevTransformedStateRef = useRef<{ dbStateHash: string, uiState: DraftUIState } | null>(null)
+
   const transformDraftState = useCallback((dbState: DBDraftState, userId: string): DraftUIState => {
+    // Create a hash of the database state to detect changes
+    // Only transform if database state actually changed
+    const dbStateHash = JSON.stringify({
+      updated_at: dbState.draft.updated_at,
+      current_turn: dbState.draft.current_turn,
+      status: dbState.draft.status,
+      picks_count: dbState.picks.length,
+      teams_budgets: dbState.teams.map(t => ({ id: t.id, budget: t.budget_remaining }))
+    })
+
+    // Return cached state if database hasn't changed
+    if (prevTransformedStateRef.current?.dbStateHash === dbStateHash) {
+      return prevTransformedStateRef.current.uiState
+    }
+
     const teams = dbState.teams.map(team => {
       const participant = dbState.participants.find(p => p.team_id === team.id)
       const teamPicks = dbState.picks
@@ -354,7 +372,7 @@ export default function DraftRoomPage() {
       dbState.draft.status === 'active' ? 'drafting' :
       dbState.draft.status === 'paused' ? 'paused' : 'completed'
 
-    return {
+    const uiState: DraftUIState = {
       roomCode,
       status,
       currentTurn,
@@ -383,6 +401,11 @@ export default function DraftRoomPage() {
         status: dbState.draft.status
       }
     }
+
+    // Cache the transformed state with its hash
+    prevTransformedStateRef.current = { dbStateHash, uiState }
+
+    return uiState
   }, [roomCode])
 
   // Create stable team references that only change when actual team data changes
@@ -652,6 +675,7 @@ export default function DraftRoomPage() {
     let updateTimeoutId: NodeJS.Timeout | null = null
     let lastProcessedTimestamp: string | null = null // Track last processed update to prevent duplicates
     let lastProcessedStateHash: string | null = null // Track state hash to prevent duplicate events from multi-table updates
+    let lastStateUpdateTime = 0 // Track last setDraftState call for throttling
 
     // Create cleanup function for this subscription
     const cleanup = () => {
@@ -742,9 +766,10 @@ export default function DraftRoomPage() {
 
             // Create state hash to deduplicate events from multi-table updates
             // Hash combines: turn number, total picks, and sum of all team budgets
+            // Use Math.round() to avoid floating-point precision issues
             const totalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
             const totalBudget = newState.teams.reduce((sum, team) => sum + team.budgetRemaining, 0)
-            const stateHash = `${newState.currentTurn}-${totalPicks}-${totalBudget}`
+            const stateHash = `${newState.currentTurn}-${totalPicks}-${Math.round(totalBudget * 100)}`
 
             // Skip processing if this exact state has already been processed
             if (stateHash === lastProcessedStateHash) {
@@ -820,11 +845,28 @@ export default function DraftRoomPage() {
               }
             }
 
-            // Use startTransition to defer state updates and prevent infinite loops
-            // This allows React to complete current renders before processing new updates
-            startTransition(() => {
-              setDraftState(newState)
-            })
+            // Throttle state updates to prevent rapid-fire changes during multi-table updates
+            // Allow immediate updates for important changes (turn changes, status changes)
+            const now = Date.now()
+            const timeSinceLastUpdate = now - lastStateUpdateTime
+            const MIN_UPDATE_INTERVAL = 300 // 300ms minimum between state updates
+
+            const isImportantUpdate =
+              !currentDraftState ||
+              newState.currentTurn !== currentDraftState.currentTurn ||
+              newState.status !== currentDraftState.status
+
+            if (isImportantUpdate || timeSinceLastUpdate >= MIN_UPDATE_INTERVAL) {
+              lastStateUpdateTime = now
+
+              // Use startTransition to defer state updates and prevent infinite loops
+              // This allows React to complete current renders before processing new updates
+              startTransition(() => {
+                setDraftState(newState)
+              })
+            } else {
+              console.log(`[Draft] Throttling state update (${timeSinceLastUpdate}ms < ${MIN_UPDATE_INTERVAL}ms)`)
+            }
           } else {
             // Draft not found - increment error count
             errorCount++
@@ -952,14 +994,21 @@ export default function DraftRoomPage() {
    */
 
   // Store latest values in refs to avoid callback recreation
-  // Use useLatest to always have fresh values in callbacks (prevents stale closures)
-  const draftStateRef = useLatest(draftState)
+  // CRITICAL FIX: Don't use useLatest for draftState to prevent infinite loop
+  // useLatest creates useEffect that triggers on EVERY change, causing circular updates
+  const draftStateRef = useRef(draftState)
   const userIdRef = useLatest(userId)
   const isSpectatorRef = useLatest(isSpectator)
   const notifyRef = useLatest(notify)
   const transformDraftStateRef = useLatest(transformDraftState)
   const pokemonRef = useLatest(pokemon)
   const isAuctionDraftRef = useLatest(isAuctionDraft)
+
+  // Manually update draftStateRef only when needed (not on every render)
+  // This breaks the infinite loop: subscription → setDraftState → useLatest → subscription
+  useEffect(() => {
+    draftStateRef.current = draftState
+  }, [draftState])
 
   // Stable handleViewDetails - never changes
   const handleViewDetails = useCallback((pokemon: Pokemon) => {
