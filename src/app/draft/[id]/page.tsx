@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
-import ConnectionStatus from '@/components/ui/ConnectionStatus'
+// ConnectionStatus from ui/ConnectionStatus is replaced by DraftConnectionStatusBadge
 import { Copy, Share2, History } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
@@ -25,6 +25,8 @@ import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 import { useTurnNotifications } from '@/hooks/useTurnNotifications'
 import { useReconnection } from '@/hooks/useReconnection'
 import { useLatest } from '@/hooks/useLatest'
+import { useDraftRealtime } from '@/hooks/useDraftRealtime'
+import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
 
 /**
  * OPTIMIZED DYNAMIC IMPORTS - Strategic code splitting:
@@ -468,12 +470,54 @@ export default function DraftRoomPage() {
     }
   })
 
-  // Derive connection status
+  // New unified real-time system for better multi-device sync
+  const {
+    connectionStatus: realtimeConnectionStatus,
+    onlineUsers,
+    reconnect: realtimeReconnect,
+    isUserOnline
+  } = useDraftRealtime(draftState?.draft?.id || null, userId, {
+    enabled: !!draftState?.draft?.id && !isDemoMode,
+    refreshDebounce: 300, // Reduced from 1500ms for faster updates
+    onRefreshNeeded: async () => {
+      // Refresh draft state when real-time events arrive
+      if (!roomCode) return
+      try {
+        const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
+        if (dbState) {
+          startTransition(() => {
+            setDraftState(transformDraftState(dbState, userId))
+          })
+        }
+      } catch (error) {
+        console.error('[DraftRealtime] Error refreshing state:', error)
+      }
+    },
+    onTurnChange: (newTurn) => {
+      console.log('[DraftRealtime] Turn changed to:', newTurn)
+    },
+    onStatusChange: (newStatus) => {
+      console.log('[DraftRealtime] Status changed to:', newStatus)
+      if (newStatus === 'completed') {
+        notify.success('Draft Complete!', 'All picks have been made.')
+      }
+    },
+    onDraftDeleted: () => {
+      notify.error('Draft Deleted', 'This draft has been deleted by the host', { duration: 6000 })
+      setTimeout(() => router.push('/my-drafts?deleted=true'), 1000)
+    }
+  })
+
+  // Derive connection status (combine old and new systems)
   const connectionStatus = useMemo(() => {
+    // Prefer new realtime status if connected
+    if (realtimeConnectionStatus.status === 'connected') return 'online'
+    if (realtimeConnectionStatus.status === 'reconnecting') return 'reconnecting'
+    // Fall back to old system
     if (isReconnecting) return 'reconnecting'
     if (hookConnected) return 'online'
     return 'offline'
-  }, [hookConnected, isReconnecting])
+  }, [hookConnected, isReconnecting, realtimeConnectionStatus.status])
 
   // Turn notifications with browser notifications
   const { requestBrowserNotificationPermission } = useTurnNotifications({
@@ -1754,7 +1798,11 @@ export default function DraftRoomPage() {
                   Results
                 </Button>
               )}
-              <ConnectionStatus className="mr-2" />
+              <DraftConnectionStatusBadge
+                status={realtimeConnectionStatus}
+                onReconnect={realtimeReconnect}
+                className="mr-2"
+              />
               <ImageTypeToggle />
               <ThemeToggle />
             </div>

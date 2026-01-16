@@ -830,248 +830,110 @@ export class DraftService {
     console.log('[startDraft] Draft started successfully:', { draftId: draftUuid, roomCode: roomCodeOrDraftId })
   }
 
-  static async makePick(draftId: string, userId: string, pokemonId: string, pokemonName: string, cost: number): Promise<void> {
+  /**
+   * Make a pick using the atomic database function.
+   * This eliminates race conditions by performing all operations in a single transaction.
+   */
+  static async makePick(draftId: string, userId: string, pokemonId: string, pokemonName: string, cost: number): Promise<{
+    pickId: string
+    newBudget: number
+    nextTurn: number
+    isComplete: boolean
+  }> {
     if (!supabase) throw new Error('Supabase not available')
 
-    // Get draft state first to resolve draftId (room_code) to UUID
+    // Get draft state to resolve room_code to UUID and get team info
     const draftState = await this.getDraftState(draftId)
     if (!draftState) {
       throw new Error('Draft not found')
     }
 
-    // Use the UUID for all database operations
     const draftUuid = draftState.draft.id
+    const currentTurn = draftState.draft.current_turn || 1
 
-    // CRITICAL FIX: Refetch fresh draft state immediately before validation
-    // to prevent race conditions where stale state causes "not your turn" errors
-    const freshDraftState = await this.getDraftState(draftId)
-    if (!freshDraftState) {
-      throw new Error('Draft not found')
+    // Get user's team
+    const teamId = await this.getUserTeam(draftId, userId)
+    if (!teamId) {
+      throw new Error('User not in this draft')
     }
 
-    // Validate user can pick and get their team (uses fresh state via internal getDraftState call)
-    const validation = await this.validateUserCanPick(draftId, userId)
-    if (!validation.canPick) {
-      console.error('[makePick] Validation failed:', validation.reason)
-      throw new Error(validation.reason || 'Cannot make pick')
-    }
-
-    const teamId = validation.teamId!
-
-    // Validate Pokemon against format rules (use fresh state)
-    const formatValidation = await this.validatePokemonInFormat(freshDraftState.draft, pokemonId, pokemonName, cost)
+    // Validate Pokemon against format rules (client-side pre-check)
+    const formatValidation = await this.validatePokemonInFormat(draftState.draft, pokemonId, pokemonName, cost)
     if (!formatValidation.isValid) {
       throw new Error(formatValidation.reason || 'Pokemon is not legal in this format')
     }
 
-    // Use the validated cost from format rules
     const validatedCost = formatValidation.validatedCost
 
-    // Get team info to validate budget and pick count (use fresh state)
-    const team = freshDraftState.teams.find(t => t.id === teamId)
-    if (!team) {
-      throw new Error('Team not found')
+    // Call the atomic database function
+    // This performs all validation and updates in a single transaction with row-level locking
+    const { data, error } = await (supabase as any).rpc('make_draft_pick', {
+      p_draft_id: draftUuid,
+      p_team_id: teamId,
+      p_user_id: userId,
+      p_pokemon_id: pokemonId,
+      p_pokemon_name: pokemonName,
+      p_cost: validatedCost,
+      p_expected_turn: currentTurn
+    })
+
+    if (error) {
+      console.error('[makePick] Database RPC error:', error)
+      throw new Error(error.message || 'Failed to make pick')
     }
 
-    // Validate budget remaining
-    if (team.budget_remaining < validatedCost) {
-      throw new Error(`Insufficient budget! You have ${team.budget_remaining} points remaining but this Pokémon costs ${validatedCost} points.`)
+    // The function returns a JSONB object with success/error info
+    if (!data) {
+      throw new Error('No response from pick function')
     }
 
-    // Validate Pokémon count limit with database query
-    // NOTE: There's still a small race condition window between this check and the insert
-    // RECOMMENDED: Add database CHECK constraint or trigger to enforce limit atomically:
-    //   ALTER TABLE picks ADD CONSTRAINT team_pick_limit
-    //   CHECK ((SELECT COUNT(*) FROM picks p2 WHERE p2.team_id = picks.team_id) <= max_pokemon);
-    const maxPokemonPerTeam = freshDraftState.draft.settings?.maxPokemonPerTeam || 10
+    if (!data.success) {
+      // The atomic function returned an error (validation failed)
+      const errorMessage = data.error || 'Failed to make pick'
+      console.error('[makePick] Atomic function error:', errorMessage, data)
 
-    // Get LATEST pick count directly from database (not from potentially stale draftState)
-    const { count: currentPickCount, error: countError } = await (supabase as any)
-      .from('picks')
-      .select('*', { count: 'exact', head: true })
-      .eq('draft_id', draftUuid)
-      .eq('team_id', teamId)
-
-    if (countError) {
-      console.error('[makePick] Error counting picks:', countError)
-      throw new Error('Failed to validate pick count')
-    }
-
-    // Enforce strict limit - prevent any picks beyond maximum
-    if (currentPickCount >= maxPokemonPerTeam) {
-      throw new Error(`Team has reached maximum picks (${currentPickCount}/${maxPokemonPerTeam})`)
-    }
-
-    const totalTeams = freshDraftState.teams.length
-    const maxRounds = maxPokemonPerTeam
-    const currentTurn = freshDraftState.draft.current_turn || 1
-
-    // Generate snake draft order for all rounds
-    const draftOrder = generateSnakeDraftOrder(freshDraftState.teams as any, maxRounds)
-
-    // Get current pick info
-    const pickInfo = getCurrentPick(draftOrder, currentTurn)
-
-    const pickOrder = freshDraftState.picks.length + 1
-
-    // Create the pick (use UUID for draft_id)
-    // This happens immediately after count check to minimize race condition window
-    const { data: pickData, error: pickError } = await (supabase
-      .from('picks') as any)
-      .insert({
-        draft_id: draftUuid,
-        team_id: teamId,
-        pokemon_id: pokemonId,
-        pokemon_name: pokemonName,
-        cost: validatedCost,
-        pick_order: pickOrder,
-        round: pickInfo.round
-      })
-      .select()
-      .single()
-
-    if (pickError) {
-      console.error('[makePick] Database error:', pickError)
-      throw new Error(`Failed to make pick: ${pickError.message || pickError.code || 'Unknown error'}`)
-    }
-
-    // RACE CONDITION DETECTION: Verify pick count after insert
-    // If a concurrent pick occurred, we may have exceeded the limit
-    const { count: finalPickCount } = await (supabase as any)
-      .from('picks')
-      .select('*', { count: 'exact', head: true })
-      .eq('draft_id', draftUuid)
-      .eq('team_id', teamId)
-
-    if (finalPickCount > maxPokemonPerTeam) {
-      // Rollback: Delete the pick we just created
-      console.error(`[makePick] Race condition detected! Team ${teamId} has ${finalPickCount} picks (max: ${maxPokemonPerTeam}). Rolling back...`)
-      await (supabase as any)
-        .from('picks')
-        .delete()
-        .eq('id', pickData.id)
-
-      throw new Error(`Team has reached maximum picks. Please refresh and try again.`)
-    }
-
-    // Update team budget with optimistic locking to prevent race conditions
-    // NOTE: This is not fully atomic. RECOMMENDED: Use PostgreSQL function:
-    //   CREATE FUNCTION decrement_team_budget(team_id uuid, cost int)
-    //   RETURNS boolean AS $$
-    //   BEGIN
-    //     UPDATE teams SET budget_remaining = budget_remaining - cost
-    //     WHERE id = team_id AND budget_remaining >= cost;
-    //     RETURN FOUND;
-    //   END; $$ LANGUAGE plpgsql;
-
-    const oldBudget = team.budget_remaining
-    const newBudget = oldBudget - validatedCost
-
-    // Use optimistic locking: only update if budget hasn't changed since we read it
-    const { data: budgetUpdateResult, error: teamError } = await (supabase as any)
-      .from('teams')
-      .update({ budget_remaining: newBudget })
-      .eq('id', teamId)
-      .eq('budget_remaining', oldBudget) // Optimistic lock: only update if unchanged
-      .select()
-
-    if (teamError) {
-      // Budget update failed - this could be a race condition
-      console.error('[makePick] Budget update failed (possible race condition):', teamError)
-
-      // Rollback the pick we just created
-      await (supabase as any)
-        .from('picks')
-        .delete()
-        .eq('id', pickData.id)
-
-      throw new Error('Failed to update team budget. Please refresh and try again.')
-    }
-
-    if (!budgetUpdateResult || budgetUpdateResult.length === 0) {
-      // Optimistic lock failed - budget was modified by another process
-      console.error('[makePick] Optimistic lock failed - budget was modified concurrently')
-
-      // Rollback the pick
-      await (supabase as any)
-        .from('picks')
-        .delete()
-        .eq('id', pickData.id)
-
-      throw new Error('Budget was modified by another process. Please refresh and try again.')
-    }
-
-    // Verify budget didn't go negative due to race condition
-    const updatedBudget = budgetUpdateResult[0].budget_remaining
-    if (updatedBudget < 0) {
-      console.error(`[makePick] Budget went negative! Team ${teamId} budget: ${updatedBudget}`)
-
-      // Rollback both the pick and budget update
-      await (supabase as any)
-        .from('picks')
-        .delete()
-        .eq('id', pickData.id)
-
-      await (supabase as any)
-        .from('teams')
-        .update({ budget_remaining: oldBudget })
-        .eq('id', teamId)
-
-      throw new Error('Insufficient budget. Please refresh and try again.')
-    }
-
-    // Calculate next turn using proper snake draft logic
-    const nextTurn = currentTurn + 1
-    const nextRound = Math.floor((nextTurn - 1) / totalTeams) + 1
-
-    // Check if draft is complete
-    const isComplete = nextTurn > draftOrder.length
-
-    // Apply any pending timer changes when advancing to next turn
-    const currentSettings = freshDraftState.draft.settings || {}
-    let updatedSettings = currentSettings
-    if (currentSettings.pendingTimerChange !== undefined) {
-      updatedSettings = {
-        ...currentSettings,
-        timeLimit: currentSettings.pendingTimerChange,
-        pendingTimerChange: undefined // Clear the pending flag
+      // Provide user-friendly error messages
+      if (errorMessage.includes('Not your turn')) {
+        throw new Error('Not your turn! The turn may have changed. Please wait for your turn.')
       }
+      if (errorMessage.includes('Insufficient budget')) {
+        throw new Error(`Insufficient budget! You have ${data.budgetRemaining || 0} points but this costs ${data.cost || validatedCost} points.`)
+      }
+      if (errorMessage.includes('Maximum picks reached')) {
+        throw new Error(`Your team has reached the maximum number of picks (${data.maxPicks || 6}).`)
+      }
+      if (errorMessage.includes('already drafted')) {
+        throw new Error('This Pokemon has already been drafted by your team.')
+      }
+      if (errorMessage.includes('not active')) {
+        throw new Error('Draft is not active. It may have been paused or completed.')
+      }
+
+      throw new Error(errorMessage)
     }
 
-    // Update draft turn and round with optimistic locking to prevent concurrent updates
-    const updateData = isComplete
-      ? {
-          status: 'completed' as const,
-          updated_at: new Date().toISOString(),
-          settings: updatedSettings
-        }
-      : {
-          current_turn: nextTurn,
-          current_round: nextRound,
-          updated_at: new Date().toISOString(),
-          settings: updatedSettings,
-          turn_started_at: new Date().toISOString() // Reset turn timer for next player
-        }
-
-    // Add optimistic locking: only update if current_turn matches expected value
-    const { error: draftError } = await (supabase
-      .from('drafts') as any)
-      .update(updateData)
-      .eq('id', freshDraftState.draft.id)
-      .eq('current_turn', currentTurn) // Optimistic lock: ensure turn hasn't changed
-
-    if (draftError) {
-      console.error('Error updating draft turn:', draftError)
-    }
+    console.log('[makePick] Success:', {
+      pickId: data.pickId,
+      newBudget: data.newBudget,
+      nextTurn: data.nextTurn,
+      isComplete: data.isComplete
+    })
 
     // If draft is complete and league creation is enabled, create the league
-    if (isComplete && freshDraftState.draft.settings?.createLeague) {
+    if (data.isComplete && draftState.draft.settings?.createLeague) {
       try {
-        await this.createLeagueForCompletedDraft(draftId, freshDraftState.draft.settings)
+        await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
       } catch (leagueError) {
         console.error('Error creating league:', leagueError)
         // Don't fail the pick if league creation fails
       }
+    }
+
+    return {
+      pickId: data.pickId,
+      newBudget: data.newBudget,
+      nextTurn: data.nextTurn,
+      isComplete: data.isComplete
     }
   }
 
