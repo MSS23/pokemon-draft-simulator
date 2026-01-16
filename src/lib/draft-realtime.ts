@@ -204,8 +204,8 @@ export class DraftRealtimeManager {
     if (this.abortController.signal.aborted) return
 
     // Create unique event ID for deduplication
-    const record = payload.new || payload.old || {}
-    const recordId = record.id as string || ''
+    const record = (payload.new || payload.old || {}) as Record<string, unknown>
+    const recordId = (record.id as string) || ''
     const updatedAt = (record.updated_at || record.created_at || Date.now()) as string | number
     const eventId = `${table}-${payload.eventType}-${recordId}-${updatedAt}`
 
@@ -273,15 +273,16 @@ export class DraftRealtimeManager {
    */
   private handlePresenceJoin(
     key: string,
-    newPresences: Array<{ online_at?: number; user_id?: string }>
+    newPresences: Array<Record<string, unknown>>
   ): void {
     if (this.abortController.signal.aborted) return
 
     this.presenceState.onlineUsers.add(key)
     if (newPresences.length > 0) {
+      const presence = newPresences[0]
       this.presenceState.userPresence.set(key, {
-        online_at: newPresences[0].online_at || Date.now(),
-        user_id: newPresences[0].user_id || key
+        online_at: (presence.online_at as number) || Date.now(),
+        user_id: (presence.user_id as string) || key
       })
     }
     this.callbacks.onPresenceChange?.(this.presenceState)

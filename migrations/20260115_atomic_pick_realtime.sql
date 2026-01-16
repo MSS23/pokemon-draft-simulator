@@ -185,6 +185,17 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Team not found');
   END IF;
 
+  -- SECURITY: Verify user is a participant of this team
+  -- This prevents users from making picks for teams they don't belong to
+  IF NOT EXISTS (
+    SELECT 1 FROM participants
+    WHERE draft_id = p_draft_id
+      AND team_id = p_team_id
+      AND user_id = p_user_id
+  ) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'You are not a member of this team');
+  END IF;
+
   IF v_team.budget_remaining < p_cost THEN
     RETURN jsonb_build_object(
       'success', false,

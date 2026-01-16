@@ -7,6 +7,7 @@ import { Pokemon } from '@/types'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { generateRoomCode } from '@/lib/room-utils'
 import { fetchPokemon } from '@/lib/pokemon-api'
+import bcrypt from 'bcryptjs'
 
 type Draft = Database['public']['Tables']['drafts']['Row']
 type Team = Database['public']['Tables']['teams']['Row']
@@ -99,8 +100,8 @@ export class DraftService {
       return true
     }
 
-    // Compare passwords (simple string comparison for now)
-    return draft.password === password
+    // Securely compare passwords using bcrypt
+    return await bcrypt.compare(password, draft.password)
   }
 
   /**
@@ -228,7 +229,8 @@ export class DraftService {
     if (isPublic !== undefined) draftInsert.is_public = isPublic || false
     if (description) draftInsert.description = description
     if (tags) draftInsert.tags = tags
-    if (password) draftInsert.password = password
+    // Hash password before storing for security
+    if (password) draftInsert.password = await bcrypt.hash(password, 10)
     if (customFormatId) draftInsert.custom_format_id = customFormatId
 
     const { data: draft, error: draftError } = await (supabase

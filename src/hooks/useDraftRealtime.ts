@@ -321,7 +321,7 @@ export function useDraftStateWithRealtime(
     draftState,
     isLoading,
     loadError,
-    refresh: fetchDraftState,
+    refetchDraftState: fetchDraftState,
     ...realtime
   }
 }
