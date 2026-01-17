@@ -100,18 +100,37 @@ export function useDraftRealtime(
   const lastStatusRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
 
-  // Debounced refresh callback
+  // Callback refs - store callbacks in refs to avoid dependency changes
+  // This prevents infinite re-render loops when parent passes new callback references
+  const onRefreshNeededRef = useRef(onRefreshNeeded)
+  const onPickEventRef = useRef(onPickEvent)
+  const onTurnChangeRef = useRef(onTurnChange)
+  const onStatusChangeRef = useRef(onStatusChange)
+  const onDraftDeletedRef = useRef(onDraftDeleted)
+  const onErrorRef = useRef(onError)
+
+  // Keep refs updated without triggering effects
+  useEffect(() => {
+    onRefreshNeededRef.current = onRefreshNeeded
+    onPickEventRef.current = onPickEvent
+    onTurnChangeRef.current = onTurnChange
+    onStatusChangeRef.current = onStatusChange
+    onDraftDeletedRef.current = onDraftDeleted
+    onErrorRef.current = onError
+  })
+
+  // Debounced refresh callback - uses ref to avoid dependency on onRefreshNeeded
   const debouncedRefresh = useMemo(
     () =>
       debounce(() => {
         if (isMountedRef.current) {
-          onRefreshNeeded?.()
+          onRefreshNeededRef.current?.()
         }
       }, refreshDebounce),
-    [onRefreshNeeded, refreshDebounce]
+    [refreshDebounce] // Only depends on refreshDebounce, not the callback
   )
 
-  // Handle draft events
+  // Handle draft events - uses refs to avoid unstable dependencies
   const handleDraftEvent = useCallback(
     (event: DraftEvent) => {
       if (!isMountedRef.current) return
@@ -120,13 +139,13 @@ export function useDraftRealtime(
 
       // Handle draft deletion
       if (event.table === 'drafts' && event.eventType === 'DELETE') {
-        onDraftDeleted?.()
+        onDraftDeletedRef.current?.()
         return
       }
 
       // Handle pick events - notify immediately
       if (event.table === 'picks' && event.eventType === 'INSERT') {
-        onPickEvent?.(event)
+        onPickEventRef.current?.(event)
       }
 
       // Handle turn changes - process immediately
@@ -137,20 +156,20 @@ export function useDraftRealtime(
         // Detect turn change
         if (newTurn !== undefined && newTurn !== lastTurnRef.current) {
           lastTurnRef.current = newTurn
-          onTurnChange?.(newTurn)
+          onTurnChangeRef.current?.(newTurn)
         }
 
         // Detect status change
         if (newStatus !== undefined && newStatus !== lastStatusRef.current) {
           lastStatusRef.current = newStatus
-          onStatusChange?.(newStatus)
+          onStatusChangeRef.current?.(newStatus)
         }
       }
 
       // Request a debounced refresh for all events
       debouncedRefresh()
     },
-    [onPickEvent, onTurnChange, onStatusChange, onDraftDeleted, debouncedRefresh]
+    [debouncedRefresh] // Only depends on debouncedRefresh, which is now stable
   )
 
   // Handle connection status changes
@@ -165,14 +184,14 @@ export function useDraftRealtime(
     setOnlineUsers(new Set(presence.onlineUsers))
   }, [])
 
-  // Handle errors
+  // Handle errors - uses ref to avoid unstable dependency
   const handleError = useCallback(
     (err: Error) => {
       if (!isMountedRef.current) return
       setError(err)
-      onError?.(err)
+      onErrorRef.current?.(err)
     },
-    [onError]
+    [] // Empty dependency array - stable callback
   )
 
   // Setup subscription
