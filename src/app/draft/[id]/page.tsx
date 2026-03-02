@@ -23,7 +23,6 @@ import { useNotify } from '@/components/providers/NotificationProvider'
 import { DraftRoomLoading, TeamStatusSkeleton } from '@/components/ui/loading-states'
 import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 import { useTurnNotifications } from '@/hooks/useTurnNotifications'
-import { useReconnection } from '@/hooks/useReconnection'
 import { useLatest } from '@/hooks/useLatest'
 import { useDraftRealtime } from '@/hooks/useDraftRealtime'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
@@ -135,30 +134,7 @@ interface DraftUIState {
   }
 }
 
-// Global subscription tracker to prevent leaks across page refreshes
-declare global {
-  interface Window {
-    __draftSubscriptionCleanup?: (() => void)[]
-  }
-}
-
-// Initialize global cleanup array
-if (typeof window !== 'undefined' && !window.__draftSubscriptionCleanup) {
-  window.__draftSubscriptionCleanup = []
-
-  // Global cleanup on page unload (handles hard refresh, tab close, navigation)
-  window.addEventListener('beforeunload', () => {
-    console.log('[Draft Cleanup] Page unloading, cleaning up subscriptions:', window.__draftSubscriptionCleanup?.length)
-    window.__draftSubscriptionCleanup?.forEach(cleanup => {
-      try {
-        cleanup()
-      } catch (error) {
-        console.error('[Draft Cleanup] Error during cleanup:', error)
-      }
-    })
-    window.__draftSubscriptionCleanup = []
-  })
-}
+// No global subscription tracker needed - useDraftRealtime handles cleanup via AbortController
 
 export default function DraftRoomPage() {
   const params = useParams()
@@ -455,22 +431,7 @@ export default function DraftRoomPage() {
     return participantOnlineStatus.get(draftState.currentTeam) ?? true
   }, [draftState?.currentTeam, participantOnlineStatus])
 
-  // Connection management with auto-reconnect
-  const { isConnected: hookConnected, isReconnecting } = useReconnection({
-    enabled: !!roomCode && !isDemoMode,
-    onReconnect: async () => {
-      try {
-        const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
-        if (dbState) {
-          setDraftState(transformDraftState(dbState, userId))
-        }
-      } catch (error) {
-        console.error('Failed to reload draft state on reconnect:', error)
-      }
-    }
-  })
-
-  // New unified real-time system for better multi-device sync
+  // Unified real-time system - single source of truth for connection & events
   const {
     connectionStatus: realtimeConnectionStatus,
     onlineUsers,
@@ -478,9 +439,8 @@ export default function DraftRoomPage() {
     isUserOnline
   } = useDraftRealtime(draftState?.draft?.id || null, userId, {
     enabled: !!draftState?.draft?.id && !isDemoMode,
-    refreshDebounce: 300, // Reduced from 1500ms for faster updates
+    refreshDebounce: 300,
     onRefreshNeeded: async () => {
-      // Refresh draft state when real-time events arrive
       if (!roomCode) return
       try {
         const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
@@ -493,31 +453,27 @@ export default function DraftRoomPage() {
         console.error('[DraftRealtime] Error refreshing state:', error)
       }
     },
-    onTurnChange: (newTurn) => {
-      console.log('[DraftRealtime] Turn changed to:', newTurn)
-    },
     onStatusChange: (newStatus) => {
-      console.log('[DraftRealtime] Status changed to:', newStatus)
       if (newStatus === 'completed') {
         notify.success('Draft Complete!', 'All picks have been made.')
       }
     },
     onDraftDeleted: () => {
       notify.error('Draft Deleted', 'This draft has been deleted by the host', { duration: 6000 })
+      if (userId) {
+        UserSessionService.removeDraftParticipation(roomCode.toLowerCase())
+      }
       setTimeout(() => router.push('/my-drafts?deleted=true'), 1000)
     }
   })
 
-  // Derive connection status (combine old and new systems)
+  // Derive connection status from the single real-time system
   const connectionStatus = useMemo(() => {
-    // Prefer new realtime status if connected
     if (realtimeConnectionStatus.status === 'connected') return 'online'
     if (realtimeConnectionStatus.status === 'reconnecting') return 'reconnecting'
-    // Fall back to old system
-    if (isReconnecting) return 'reconnecting'
-    if (hookConnected) return 'online'
+    if (realtimeConnectionStatus.status === 'connecting') return 'reconnecting'
     return 'offline'
-  }, [hookConnected, isReconnecting, realtimeConnectionStatus.status])
+  }, [realtimeConnectionStatus.status])
 
   // Turn notifications with browser notifications
   const { requestBrowserNotificationPermission } = useTurnNotifications({
@@ -526,7 +482,7 @@ export default function DraftRoomPage() {
     draftStatus: draftState?.status || 'waiting',
     enableBrowserNotifications: true,
     warningThreshold: 10,
-    isConnected: hookConnected && connectionStatus === 'online',
+    isConnected: connectionStatus === 'online',
     currentTurn: draftState?.currentTurn,
     onAutoSkip: async () => {
       // Timer disabled - no auto-skip
@@ -707,253 +663,66 @@ export default function DraftRoomPage() {
     lastStatusRef.current = draftState?.status || null
   }, [draftState?.status, notify])
 
-  // Subscribe to real-time updates
+  // Notification logic - watches draftState changes and shows pick/turn notifications
+  // This replaces the old DraftService.subscribeToDraft notification logic
+  const prevDraftStateRef = useRef<DraftUIState | null>(null)
   useEffect(() => {
-    if (!roomCode || !isConnected) return
+    const prevState = prevDraftStateRef.current
+    if (!draftState || !prevState || !pokemon) {
+      prevDraftStateRef.current = draftState
+      return
+    }
 
-    let mounted = true
-    const abortController = new AbortController()
+    // Check for pick notifications (only for other teams' picks)
+    const newTotalPicks = draftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
+    const oldTotalPicks = prevState.teams.reduce((sum, team) => sum + team.picks.length, 0)
 
-    let errorCount = 0
-    const MAX_ERRORS = 5
-    let updateTimeoutId: NodeJS.Timeout | null = null
-    let lastProcessedTimestamp: string | null = null // Track last processed update to prevent duplicates
-    let lastProcessedStateHash: string | null = null // Track state hash to prevent duplicate events from multi-table updates
-    let lastStateUpdateTime = 0 // Track last setDraftState call for throttling
+    if (newTotalPicks > oldTotalPicks && newTotalPicks !== lastNotifiedPickCountRef.current) {
+      lastNotifiedPickCountRef.current = newTotalPicks
 
-    // Create cleanup function for this subscription
-    const cleanup = () => {
-      mounted = false
-      abortController.abort()
-      if (updateTimeoutId) {
-        clearTimeout(updateTimeoutId)
+      const pickingTeam = draftState.teams.find(team => {
+        const oldTeam = prevState.teams.find(t => t.id === team.id)
+        return oldTeam && team.picks.length > oldTeam.picks.length
+      })
+
+      if (pickingTeam && pickingTeam.id !== draftState.userTeamId) {
+        const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
+        const pickedPokemon = pokemon.find(p => p.id === latestPickId)
+        if (pickedPokemon) {
+          notify.success(
+            `${pickingTeam.name} drafted ${pickedPokemon.name}!`,
+            `${pickingTeam.userName} selected ${pickedPokemon.name}`,
+            { duration: 4000 }
+          )
+        }
       }
     }
 
-    // Register cleanup globally to prevent leaks on page refresh
-    if (typeof window !== 'undefined') {
-      window.__draftSubscriptionCleanup = window.__draftSubscriptionCleanup || []
-      window.__draftSubscriptionCleanup.push(cleanup)
-    }
+    // Check for turn change notifications (snake draft only)
+    if (!isAuctionDraft && draftState.currentTeam !== prevState.currentTeam) {
+      if (draftState.currentTurn !== lastNotifiedTurnRef.current) {
+        const now = Date.now()
+        const MIN_NOTIFICATION_INTERVAL = 2000
+        const timeSinceLastNotification = now - lastTurnNotificationTime.current
 
-    const unsubscribe = DraftService.subscribeToDraft(roomCode.toLowerCase(), async (payload) => {
-      // CRITICAL: Handle draft deletion event IMMEDIATELY (no debounce)
-      // This ensures participants are kicked out before the draft is fully deleted
-      if (payload?.eventType === 'draft_deleted') {
-        console.log('[Draft] Draft deletion event received:', payload.new)
+        if (timeSinceLastNotification >= MIN_NOTIFICATION_INTERVAL || lastTurnNotificationTime.current === 0) {
+          lastNotifiedTurnRef.current = draftState.currentTurn
+          lastTurnNotificationTime.current = now
 
-        // Clean up local state
-        cleanup()
-
-        // Remove from user session
-        if (userId) {
-          UserSessionService.removeDraftParticipation(roomCode.toLowerCase())
-        }
-
-        // Show notification
-        notify.error(
-          'Draft Deleted',
-          payload.new?.message || 'This draft has been deleted by the host',
-          { duration: 6000 }
-        )
-
-        // Redirect to my-drafts page
-        setTimeout(() => {
-          router.push('/my-drafts?deleted=true')
-        }, 1000)
-
-        return // Don't process further
-      }
-
-      // Debounce rapid updates to prevent infinite loops
-      // Increased to 1500ms to aggregate multi-table updates from a single pick operation
-      // (picks table + teams table + drafts table all trigger separate events)
-      if (updateTimeoutId) {
-        clearTimeout(updateTimeoutId)
-      }
-
-      updateTimeoutId = setTimeout(async () => {
-        // Deduplicate events by updated_at timestamp
-        const newTimestamp = payload?.new?.updated_at || payload?.new?.created_at
-        if (newTimestamp && newTimestamp === lastProcessedTimestamp) {
-          console.log('[Draft Subscription] Duplicate event ignored:', newTimestamp)
-          return
-        }
-
-        // Reload draft state when changes occur
-        console.log('[Draft Subscription] Change detected:', payload?.eventType, payload?.new || payload?.old)
-
-        // Update last processed timestamp
-        if (newTimestamp) {
-          lastProcessedTimestamp = newTimestamp
-        }
-
-        try {
-          const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
-
-          // Check if component is still mounted before updating state
-          if (!mounted || abortController.signal.aborted) return
-
-          // Reset error count on successful fetch
-          errorCount = 0
-
-          if (dbState) {
-            // Use refs to get current values without creating dependencies
-            const currentUserId = userIdRef.current
-            const currentTransformDraftState = transformDraftStateRef.current
-            const currentDraftState = draftStateRef.current
-            const currentPokemon = pokemonRef.current
-            const currentIsAuctionDraft = isAuctionDraftRef.current
-            const currentNotify = notifyRef.current
-
-            const newState = currentTransformDraftState(dbState, currentUserId)
-
-            // Create state hash to deduplicate events from multi-table updates
-            // Hash combines: turn number, total picks, and sum of all team budgets
-            // Use Math.round() to avoid floating-point precision issues
-            const totalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
-            const totalBudget = newState.teams.reduce((sum, team) => sum + team.budgetRemaining, 0)
-            const stateHash = `${newState.currentTurn}-${totalPicks}-${Math.round(totalBudget * 100)}`
-
-            // Skip processing if this exact state has already been processed
-            if (stateHash === lastProcessedStateHash) {
-              console.log('[Draft Subscription] Duplicate state hash ignored:', stateHash)
-              return
-            }
-
-            lastProcessedStateHash = stateHash
-            console.log('[Draft Subscription] State updated, teams:', newState.teams.map(t => ({ name: t.name, order: t.draftOrder })))
-
-            // Check for pick notifications (only if not the user's own pick)
-            if (currentDraftState && newState.teams && currentPokemon) {
-              const newTotalPicks = newState.teams.reduce((sum, team) => sum + team.picks.length, 0)
-              const oldTotalPicks = currentDraftState.teams.reduce((sum, team) => sum + team.picks.length, 0)
-
-              // Only notify if pick count increased AND we haven't already notified for this count
-              if (newTotalPicks > oldTotalPicks && newTotalPicks !== lastNotifiedPickCountRef.current) {
-                lastNotifiedPickCountRef.current = newTotalPicks
-
-                // Find which team made the pick
-                const pickingTeam = newState.teams.find(team => {
-                  const oldTeam = currentDraftState.teams.find(t => t.id === team.id)
-                  return oldTeam && team.picks.length > oldTeam.picks.length
-                })
-
-                if (pickingTeam && pickingTeam.id !== newState.userTeamId) {
-                  const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
-                  const pickedPokemon = currentPokemon.find(p => p.id === latestPickId)
-                  if (pickedPokemon) {
-                    currentNotify.success(
-                      `${pickingTeam.name} drafted ${pickedPokemon.name}!`,
-                      `${pickingTeam.userName} selected ${pickedPokemon.name}`,
-                      { duration: 4000 }
-                    )
-                  }
-                }
-              }
-            }
-
-            // Check for turn change notifications (snake draft only)
-            if (!currentIsAuctionDraft && currentDraftState && newState.currentTeam !== currentDraftState.currentTeam) {
-              // Only notify if turn number actually changed (prevents duplicate notifications)
-              if (newState.currentTurn !== lastNotifiedTurnRef.current) {
-                // Add time-based throttling: minimum 2 seconds between turn notifications
-                // This prevents notification spam during rapid turn transitions
-                const now = Date.now()
-                const MIN_NOTIFICATION_INTERVAL = 2000 // 2 seconds
-                const timeSinceLastNotification = now - lastTurnNotificationTime.current
-
-                if (timeSinceLastNotification >= MIN_NOTIFICATION_INTERVAL || lastTurnNotificationTime.current === 0) {
-                  lastNotifiedTurnRef.current = newState.currentTurn
-                  lastTurnNotificationTime.current = now
-
-                  const currentTeam = newState.teams.find(t => t.id === newState.currentTeam)
-                  if (currentTeam) {
-                    if (newState.userTeamId === newState.currentTeam) {
-                      currentNotify.success(
-                        "It's Your Turn!",
-                        "Select a Pokémon to draft",
-                        { duration: 5000 }
-                      )
-                    } else {
-                      currentNotify.info(
-                        `${currentTeam.name}'s Turn`,
-                        `Waiting for ${currentTeam.userName} to pick`,
-                        { duration: 3000 }
-                      )
-                    }
-                  }
-                } else {
-                  console.log(`[Notification Throttle] Skipping turn notification (${timeSinceLastNotification}ms < ${MIN_NOTIFICATION_INTERVAL}ms)`)
-                }
-              }
-            }
-
-            // Throttle state updates to prevent rapid-fire changes during multi-table updates
-            // Allow immediate updates for important changes (turn changes, status changes)
-            const now = Date.now()
-            const timeSinceLastUpdate = now - lastStateUpdateTime
-            const MIN_UPDATE_INTERVAL = 300 // 300ms minimum between state updates
-
-            const isImportantUpdate =
-              !currentDraftState ||
-              newState.currentTurn !== currentDraftState.currentTurn ||
-              newState.status !== currentDraftState.status
-
-            if (isImportantUpdate || timeSinceLastUpdate >= MIN_UPDATE_INTERVAL) {
-              lastStateUpdateTime = now
-
-              // Use startTransition to defer state updates and prevent infinite loops
-              // This allows React to complete current renders before processing new updates
-              startTransition(() => {
-                setDraftState(newState)
-              })
+          const team = draftState.teams.find(t => t.id === draftState.currentTeam)
+          if (team) {
+            if (draftState.userTeamId === draftState.currentTeam) {
+              notify.success("It's Your Turn!", "Select a Pokémon to draft", { duration: 5000 })
             } else {
-              console.log(`[Draft] Throttling state update (${timeSinceLastUpdate}ms < ${MIN_UPDATE_INTERVAL}ms)`)
-            }
-          } else {
-            // Draft not found - increment error count
-            errorCount++
-            if (errorCount >= MAX_ERRORS) {
-              console.error('Draft not found after multiple attempts, stopping updates')
-              setError('Draft room not found or has been deleted')
-              mounted = false // Stop further updates
-              return
+              notify.info(`${team.name}'s Turn`, `Waiting for ${team.userName} to pick`, { duration: 3000 })
             }
           }
-        } catch (err) {
-        if (!mounted || abortController.signal.aborted) return
-
-        errorCount++
-        console.error('Error updating draft state:', err, `(${errorCount}/${MAX_ERRORS})`)
-
-        if (errorCount >= MAX_ERRORS) {
-          const currentNotify = notifyRef.current
-          currentNotify.error('Connection Error', 'Unable to connect to draft. Please refresh the page.')
-          setError('Failed to connect to draft after multiple attempts')
-          mounted = false // Stop further updates
-        }
-      }
-      // Dynamic debounce: 2000ms during draft start transition, 1500ms normally
-      // 1500ms allows multi-table updates (picks + teams + drafts) to aggregate into one state update
-      }, isDraftStarting ? 2000 : 1500)
-    })
-
-    return () => {
-      // Run cleanup
-      cleanup()
-      unsubscribe()
-
-      // Remove from global cleanup list
-      if (typeof window !== 'undefined' && window.__draftSubscriptionCleanup) {
-        const index = window.__draftSubscriptionCleanup.indexOf(cleanup)
-        if (index > -1) {
-          window.__draftSubscriptionCleanup.splice(index, 1)
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomCode, isConnected, userId, isDraftStarting])
+
+    prevDraftStateRef.current = draftState
+  }, [draftState, pokemon, isAuctionDraft, notify])
 
   // Load current auction for auction drafts
   useEffect(() => {
@@ -1044,9 +813,6 @@ export default function DraftRoomPage() {
   const userIdRef = useLatest(userId)
   const isSpectatorRef = useLatest(isSpectator)
   const notifyRef = useLatest(notify)
-  const transformDraftStateRef = useLatest(transformDraftState)
-  const pokemonRef = useLatest(pokemon)
-  const isAuctionDraftRef = useLatest(isAuctionDraft)
 
   // Manually update draftStateRef only when needed (not on every render)
   // This breaks the infinite loop: subscription → setDraftState → useLatest → subscription

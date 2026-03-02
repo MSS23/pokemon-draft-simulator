@@ -55,7 +55,7 @@ describe('DraftStore', () => {
 
     it('should compute snake draft order correctly', () => {
       const draft = createMockDraft({
-        settings: { maxPokemonPerTeam: 2, timeLimit: 60, pokemonPerTeam: 2, formatId: 'vgc-reg-h' }
+        settings: { maxPokemonPerTeam: 2, timePerPick: 60 }
       })
       const teams = [
         createMockTeam({ id: 'team-1', draftOrder: 1 }),
@@ -268,7 +268,7 @@ describe('DraftStore', () => {
       const draft = createMockDraft({
         id: 'draft-1',
         currentTurn: 1,
-        settings: { maxPokemonPerTeam: 2, timeLimit: 60, pokemonPerTeam: 2, formatId: 'vgc-reg-h' }
+        settings: { maxPokemonPerTeam: 2, timePerPick: 60 }
       })
       const teams = [
         createMockTeam({ id: 'team-1', draftOrder: 1, ownerId: 'user-1' }),
@@ -296,7 +296,7 @@ describe('DraftStore', () => {
       it('should return correct team for turn 2 (still team 2 in snake)', () => {
         useDraftStore.getState().setDraft(createMockDraft({
           currentTurn: 2,
-          settings: { maxPokemonPerTeam: 2, timeLimit: 60, pokemonPerTeam: 2, formatId: 'vgc-reg-h' }
+          settings: { maxPokemonPerTeam: 2, timePerPick: 60 }
         }))
 
         const state = useDraftStore.getState()
@@ -308,7 +308,7 @@ describe('DraftStore', () => {
       it('should return correct team for turn 3 (reversed to team 2)', () => {
         useDraftStore.getState().setDraft(createMockDraft({
           currentTurn: 3,
-          settings: { maxPokemonPerTeam: 2, timeLimit: 60, pokemonPerTeam: 2, formatId: 'vgc-reg-h' }
+          settings: { maxPokemonPerTeam: 2, timePerPick: 60 }
         }))
 
         const state = useDraftStore.getState()
@@ -320,7 +320,7 @@ describe('DraftStore', () => {
       it('should return null if turn exceeds draft length', () => {
         useDraftStore.getState().setDraft(createMockDraft({
           currentTurn: 999,
-          settings: { maxPokemonPerTeam: 2, timeLimit: 60, pokemonPerTeam: 2, formatId: 'vgc-reg-h' }
+          settings: { maxPokemonPerTeam: 2, timePerPick: 60 }
         }))
 
         const state = useDraftStore.getState()

@@ -59,7 +59,7 @@ export class DraftRealtimeManager {
   private maxReconnectDelay = 30000
   private isSubscribed = false
   private lastEventIds = new Map<string, number>() // For deduplication
-  private eventDedupeWindow = 1000 // 1 second window for deduplication
+  private eventDedupeWindow = 3000 // 3 second window for deduplication
   private presenceState: PresenceState = {
     onlineUsers: new Set(),
     userPresence: new Map()

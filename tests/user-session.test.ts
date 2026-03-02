@@ -27,7 +27,8 @@ describe('UserSessionService', () => {
 
       expect(session.displayName).toBe('TestUser')
       expect(session.isAuthenticated).toBe(false)
-      expect(session.userId).toBe('')
+      // Service now generates a guest ID instead of returning empty string
+      expect(session.userId).toMatch(/^guest-/)
     })
 
     it('should return stored session from localStorage if exists', async () => {
@@ -432,7 +433,8 @@ describe('UserSessionService', () => {
     it('should generate new userId if no session exists', () => {
       const userId = UserSessionService.getUserIdForDraft('draft-1')
 
-      expect(userId).toMatch(/^guest-\d+-[a-z0-9]+$/)
+      // generateSecureGuestId uses crypto.randomUUID() producing guest-{uuid} format
+      expect(userId).toMatch(/^guest-/)
     })
 
     it('should store generated userId in sessionStorage', () => {

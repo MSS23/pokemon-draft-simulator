@@ -1,19 +1,21 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ArrowLeft, Eye, RefreshCw } from "lucide-react";
-import { DraftService, type DraftState } from "@/lib/draft-service";
 import { usePokemonList } from "@/hooks/usePokemon";
+import { useDraftStateWithRealtime } from "@/hooks/useDraftRealtime";
+import { DraftConnectionStatusBadge } from "@/components/draft/ConnectionStatus";
 import SpectatorDraftGrid from "@/components/spectator/SpectatorDraftGrid";
 import SpectatorMode from "@/components/draft/SpectatorMode";
 import TeamRoster from "@/components/team/TeamRoster";
 import DraftProgress from "@/components/team/DraftProgress";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
+import type { DraftEvent } from "@/lib/draft-realtime";
 
 export default function SpectateRoomPage() {
   const params = useParams();
@@ -24,8 +26,6 @@ export default function SpectateRoomPage() {
   const isValidRoomCode =
     roomCode && roomCode.length === 6 && !/[^a-z0-9]/.test(roomCode);
 
-  const [draftState, setDraftState] = useState<DraftState | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recentActivity, setRecentActivity] = useState<
     Array<{
@@ -40,91 +40,59 @@ export default function SpectateRoomPage() {
 
   const { data: pokemon } = usePokemonList();
 
-  // Load draft state
-  useEffect(() => {
-    const loadDraft = async () => {
-      if (!roomCode) return;
+  // Generate a spectator user ID for presence tracking
+  const spectatorId = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    let id = sessionStorage.getItem("spectator-id");
+    if (!id) {
+      id = `spectator-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      sessionStorage.setItem("spectator-id", id);
+    }
+    return id;
+  }, []);
 
-      // Validate room code format before making the request
-      if (!isValidRoomCode) {
-        setError(
-          "Invalid room code format. Room codes should be 6 characters (e.g., CC7A5I)",
-        );
-        setIsLoading(false);
-        return;
-      }
+  // Track pick activity from real-time events
+  const handlePickEvent = useCallback((event: DraftEvent) => {
+    const data = event.data;
+    setRecentActivity((prev) => [
+      {
+        id: (data.id as string) || `pick-${Date.now()}`,
+        type: "pick",
+        teamName: (data.team_name as string) || "Unknown",
+        pokemonName: (data.pokemon_name as string) || "Unknown",
+        timestamp: (data.created_at as string) || new Date().toISOString(),
+      },
+      ...prev.slice(0, 9),
+    ]);
+  }, []);
 
-      try {
-        setIsLoading(true);
-        const state = await DraftService.getDraftState(roomCode);
+  // Handle draft deletion
+  const handleDraftDeleted = useCallback(() => {
+    setError("This draft has been deleted by the host");
+    setTimeout(() => {
+      router.push("/spectate?deleted=true");
+    }, 2000);
+  }, [router]);
 
-        if (!state) {
-          setError("Draft room not found");
-          return;
-        }
+  // Validate room code format before subscribing
+  const validatedRoomCode = isValidRoomCode ? roomCode : null;
 
-        setDraftState(state);
-        setError(null);
-      } catch (err) {
-        console.error("Error loading draft:", err);
-        setError("Failed to load draft room");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Single hook handles initial fetch + real-time subscription
+  const {
+    draftState,
+    isLoading,
+    loadError,
+    connectionStatus,
+  } = useDraftStateWithRealtime(validatedRoomCode, spectatorId, {
+    enabled: !!validatedRoomCode,
+    onPickEvent: handlePickEvent,
+    onDraftDeleted: handleDraftDeleted,
+  });
 
-    loadDraft();
-  }, [roomCode, isValidRoomCode]);
-
-  // Subscribe to real-time updates
-  useEffect(() => {
-    if (!roomCode || !draftState || !isValidRoomCode) return;
-
-    const unsubscribe = DraftService.subscribeToDraft(roomCode, async (payload) => {
-      // Handle draft deletion event
-      if (payload?.eventType === 'draft_deleted') {
-        console.log('[Spectator] Draft deletion event received:', payload.new);
-
-        // Show notification
-        setError('This draft has been deleted by the host');
-
-        // Redirect to spectate list after a short delay
-        setTimeout(() => {
-          router.push('/spectate?deleted=true');
-        }, 2000);
-
-        return; // Don't process further
-      }
-
-      try {
-        const state = await DraftService.getDraftState(roomCode);
-        if (state) {
-          // Track pick activity
-          if (draftState && state.picks.length > draftState.picks.length) {
-            const newPick = state.picks[state.picks.length - 1];
-            const team = state.teams.find((t) => t.id === newPick.team_id);
-
-            setRecentActivity((prev) => [
-              {
-                id: newPick.id,
-                type: "pick",
-                teamName: team?.name || "Unknown",
-                pokemonName: newPick.pokemon_name,
-                timestamp: newPick.created_at,
-              },
-              ...prev.slice(0, 9),
-            ]);
-          }
-
-          setDraftState(state);
-        }
-      } catch (err) {
-        console.error("Error updating draft state:", err);
-      }
-    });
-
-    return unsubscribe;
-  }, [roomCode, draftState, isValidRoomCode, router]);
+  // Show room code validation error
+  const displayError = error || (roomCode && !isValidRoomCode
+    ? "Invalid room code format. Room codes should be 6 characters (e.g., CC7A5I)"
+    : loadError?.message || (!draftState && !isLoading ? "Draft room not found" : null));
 
   if (isLoading) {
     return (
@@ -146,7 +114,7 @@ export default function SpectateRoomPage() {
     );
   }
 
-  if (error || !draftState) {
+  if (displayError || !draftState) {
     return (
       <SidebarLayout>
         <div className="min-h-screen bg-background flex items-center justify-center">
@@ -156,7 +124,7 @@ export default function SpectateRoomPage() {
             </CardHeader>
             <CardContent>
               <p className="text-slate-600 dark:text-slate-400 mb-4">
-                {error || "Draft room not found"}
+                {displayError || "Draft room not found"}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -234,6 +202,7 @@ export default function SpectateRoomPage() {
                   ? "Snake Draft"
                   : "Auction Draft"}
               </Badge>
+              <DraftConnectionStatusBadge status={connectionStatus} showLabel={false} />
             </div>
           </div>
 
