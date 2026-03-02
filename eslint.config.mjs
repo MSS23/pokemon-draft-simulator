@@ -21,6 +21,7 @@ const eslintConfig = [
       "public/workbox-*.js",
       "public/worker-*.js",
       "public/hydration-fix.js",
+      "scripts/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),

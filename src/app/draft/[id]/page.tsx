@@ -1053,9 +1053,7 @@ export default function DraftRoomPage() {
 
       notify.success(
         `${pokemon.name} Drafted!`,
-        false // kept for ternary structure below
-          ? `Successfully drafted ${pokemon.name} for ${teamName}`
-          : `Successfully added ${pokemon.name} to ${teamName}`,
+        `Successfully added ${pokemon.name} to ${teamName}`,
         { duration: 3000 }
       )
 
@@ -1074,6 +1072,16 @@ export default function DraftRoomPage() {
         return // Skip duplicate notification
       }
 
+      // Auto-refresh state on pick errors so the device gets the latest state
+      try {
+        const freshState = await DraftService.getDraftState(roomCode.toLowerCase())
+        if (freshState) {
+          setDraftState(transformDraftState(freshState, userId))
+        }
+      } catch (refreshErr) {
+        console.warn('[Draft] Failed to refresh state after pick error:', refreshErr)
+      }
+
       if (errorMessage.includes('not part of this draft') || errorMessage.includes('not found')) {
         notify.error(
           'Session Error',
@@ -1082,9 +1090,9 @@ export default function DraftRoomPage() {
         )
       } else if (errorMessage.includes('not your turn')) {
         notify.warning(
-          'Not Your Turn',
-          `Please wait for your turn. ${currentTeam?.name} is currently picking.`,
-          { duration: 5000 }
+          'Turn Changed',
+          'The turn has advanced. Refreshing your view...',
+          { duration: 3000 }
         )
       } else if (errorMessage.includes('Insufficient budget')) {
         notify.error('Insufficient Budget', errorMessage, { duration: 5000 })
@@ -1096,7 +1104,7 @@ export default function DraftRoomPage() {
         notify.error('Draft Failed', errorMessage, { duration: 5000 })
       }
     }
-  }, [isUserTurn, isHost, draftState?.status, currentTeam, userTeam, userId, roomCode, notify, shouldShowNotification])
+  }, [isUserTurn, isHost, draftState?.status, currentTeam, userTeam, userId, roomCode, notify, shouldShowNotification, transformDraftState])
 
   const copyRoomCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode)
