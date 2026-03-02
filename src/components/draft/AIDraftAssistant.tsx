@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkles, TrendingUp, Shield, Zap, Target, Brain, ChevronDown, ChevronUp } from 'lucide-react'
 import { generateAssistantAnalysis, type PickRecommendation, type AssistantAnalysis } from '@/lib/ai-draft-assistant'
-import type { Pokemon, Team, Draft, Format } from '@/types'
+import type { Pokemon, Team, Format } from '@/types'
 
 interface AIDraftAssistantProps {
   availablePokemon: Pokemon[]

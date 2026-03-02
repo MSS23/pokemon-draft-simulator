@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React from 'react'
 import { WishlistItem } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,8 +11,6 @@ import {
   X,
   GripVertical,
   Crown,
-  AlertTriangle,
-  Star,
   ChevronUp,
   ChevronDown,
   Zap,

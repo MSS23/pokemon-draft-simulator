@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { LeagueStatsService } from '@/lib/league-stats-service'
-import { AIAnalysisService } from '@/lib/ai-analysis-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import {
   ArrowLeft,

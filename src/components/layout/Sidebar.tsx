@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
 import {
   Plus,
   Users,
@@ -32,7 +31,6 @@ interface League {
 
 export function Sidebar() {
   const router = useRouter()
-  const pathname = usePathname()
   const { user, signOut } = useAuth()
   const [leagues, setLeagues] = useState<League[]>([])
   const [authModalOpen, setAuthModalOpen] = useState(false)

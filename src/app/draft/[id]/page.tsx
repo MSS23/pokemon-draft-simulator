@@ -187,7 +187,7 @@ export default function DraftRoomPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [confirmationPokemon, setConfirmationPokemon] = useState<Pokemon | null>(null)
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
+  const [, setIsConnected] = useState(false)
   const [, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isProxyPickingEnabled, setIsProxyPickingEnabled] = useState(false)
@@ -215,7 +215,7 @@ export default function DraftRoomPage() {
   const pickTimeRemaining = 0
 
   // Draft start transition detection (to increase debounce during critical transition)
-  const [isDraftStarting, setIsDraftStarting] = useState(false)
+  const [, setIsDraftStarting] = useState(false)
   const lastStatusRef = useRef<'waiting' | 'drafting' | 'completed' | 'paused' | null>(null)
 
   // Notification deduplication refs to prevent spam
@@ -246,7 +246,7 @@ export default function DraftRoomPage() {
   }, [])
 
   // Server time synchronization state
-  const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
+  const [, setServerTimeOffset] = useState<number>(0)
 
   // Spectator mode state
   const [recentActivity, setRecentActivity] = useState<Array<{
@@ -425,18 +425,11 @@ export default function DraftRoomPage() {
     )
   }, [draftState?.participants])
 
-  // Check if current turn user is online
-  const isCurrentUserOnline = useMemo(() => {
-    if (!draftState?.currentTeam) return true
-    return participantOnlineStatus.get(draftState.currentTeam) ?? true
-  }, [draftState?.currentTeam, participantOnlineStatus])
 
   // Unified real-time system - single source of truth for connection & events
   const {
     connectionStatus: realtimeConnectionStatus,
-    onlineUsers,
     reconnect: realtimeReconnect,
-    isUserOnline
   } = useDraftRealtime(draftState?.draft?.id || null, userId, {
     enabled: !!draftState?.draft?.id && !isDemoMode,
     refreshDebounce: 300,
@@ -511,7 +504,6 @@ export default function DraftRoomPage() {
 
         // Check if draft is private and requires access verification
         const isPublic = (dbState.draft as any).is_public
-        const hasPassword = !!(dbState.draft as any).password
 
         if (!isPublic) {
           // Private draft - verify access

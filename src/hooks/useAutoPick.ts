@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useDraftStore } from '@/stores/draftStore'
 import { selectIsUserTurn, selectNextAutoPickPokemon } from '@/stores/selectors'
-import { Pokemon, WishlistItem } from '@/types'
+import { WishlistItem } from '@/types'
 
 interface UseAutoPickOptions {
   participantId: string

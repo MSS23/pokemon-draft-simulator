@@ -6,7 +6,6 @@ import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Upload, Download, FileText, Check, X, AlertCircle } from 'lucide-react'
 import { processCustomPricingFile, downloadSampleCSV, type ParsedCSVResult } from '@/lib/csv-parser'
-import { Badge } from '@/components/ui/badge'
 
 interface CSVUploadProps {
   onPricingParsed: (pricing: Record<string, number>, stats: ParsedCSVResult['stats']) => void

@@ -38,7 +38,7 @@ export default function SpectateRoomPage() {
     }>
   >([]);
 
-  const { data: pokemon } = usePokemonList();
+  usePokemonList();
 
   // Generate a spectator user ID for presence tracking
   const spectatorId = useMemo(() => {

@@ -1,8 +1,8 @@
 'use client'
 
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { pokemonCache, pokemonCacheManager, type CacheStats } from '@/lib/pokemon-cache'
+import { pokemonCacheManager, type CacheStats } from '@/lib/pokemon-cache'
 import { fetchPokemon, fetchPokemonList, pokemonQueries } from '@/lib/pokemon-api'
 import { Pokemon } from '@/types'
 

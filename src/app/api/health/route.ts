@@ -7,7 +7,6 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     supabaseConfigured: !!supabaseUrl && hasAnonKey,
-    supabaseUrl: supabaseUrl || 'NOT_SET',
     hasAnonKey: hasAnonKey,
     timestamp: new Date().toISOString()
   })

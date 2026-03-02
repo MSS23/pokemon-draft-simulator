@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Clock, Play, Pause, RotateCcw, AlertTriangle } from 'lucide-react'
+import { Clock, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AuctionTimerProps {

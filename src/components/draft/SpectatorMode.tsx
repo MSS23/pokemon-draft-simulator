@@ -16,8 +16,7 @@ import {
   Volume2,
   VolumeX,
   Maximize2,
-  Minimize2,
-  RefreshCw
+  Minimize2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { notificationService } from '@/lib/notification-service'

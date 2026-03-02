@@ -71,7 +71,12 @@
       "Bash(python3:*)",
       "Bash(if exist \".next\" rmdir /s /q \".next\")",
       "Bash(git log:*)",
-      "Bash(cmd /c \"if exist .next rmdir /s /q .next\")"
+      "Bash(cmd /c \"if exist .next rmdir /s /q .next\")",
+      "Bash(grep:*)",
+      "Bash(git diff:*)",
+      "Bash(npm audit:*)",
+      "Bash(npm view:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

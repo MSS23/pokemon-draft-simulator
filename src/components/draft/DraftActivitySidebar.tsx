@@ -3,7 +3,7 @@
 import { useState, useMemo, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { X, History, Clock, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'

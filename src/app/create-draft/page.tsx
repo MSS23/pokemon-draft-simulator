@@ -51,7 +51,6 @@ import {
   downloadFormatCSV,
   createCustomFormatTemplate,
 } from "@/lib/format-export";
-import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { useAuth } from "@/contexts/AuthContext";
 

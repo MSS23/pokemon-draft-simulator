@@ -6,11 +6,11 @@ import { Pokemon } from '@/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getStatColor, getPokemonCardClass, getPokemonRarityClass, isPokemonShiny } from '@/utils/pokemon'
+import { getPokemonCardClass, getPokemonRarityClass, isPokemonShiny } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
 import { usePendingActionFeedback } from '@/hooks/useOptimisticUpdates'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
-import { Clock, AlertCircle, CheckCircle, Eye, Heart } from 'lucide-react'
+import { Clock, AlertCircle, Heart } from 'lucide-react'
 
 interface PokemonCardProps {
   pokemon: Pokemon

@@ -13,7 +13,7 @@ import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import type { Match, League, Team, Draft } from '@/types'
-import { format, isPast, isFuture, isToday } from 'date-fns'
+import { format, isFuture, isToday } from 'date-fns'
 
 interface MatchWithDetails extends Match {
   league: League

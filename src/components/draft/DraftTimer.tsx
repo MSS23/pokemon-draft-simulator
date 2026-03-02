@@ -45,7 +45,7 @@ export default function DraftTimer({
   pauseOnHover = false,
   className
 }: DraftTimerProps) {
-  const [isPaused, setIsPaused] = useState(false)
+  const [, setIsPaused] = useState(false)
 
   // Format time as MM:SS
   const formattedTime = useMemo(() => {

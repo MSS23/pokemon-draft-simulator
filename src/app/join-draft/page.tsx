@@ -28,7 +28,7 @@ function JoinDraftForm() {
   const [draftInfo, setDraftInfo] = useState<any>(null);
   const [error, setError] = useState("");
   const [userDisplayName, setUserDisplayName] = useState("");
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [, setLoadingProfile] = useState(true);
 
   const [formData, setFormData] = useState({
     teamName: "",

@@ -5,7 +5,9 @@ import { cookies } from 'next/headers'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const redirectTo = requestUrl.searchParams.get('redirectTo') || '/dashboard'
+  const rawRedirect = requestUrl.searchParams.get('redirectTo') || '/dashboard'
+  // Prevent open redirect: only allow relative paths, reject absolute URLs and protocol-relative URLs
+  const redirectTo = rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : '/dashboard'
 
   if (code) {
     const cookieStore = await cookies()

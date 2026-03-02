@@ -22,7 +22,7 @@ import { TradeService } from '@/lib/trade-service'
 import { LeagueService } from '@/lib/league-service'
 import { TradeProposalModal } from '@/components/league/TradeProposalModal'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Repeat, Check, X, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Repeat, Check, X, Clock, CheckCircle } from 'lucide-react'
 import type { TradeWithDetails, League, Team, Pick } from '@/types'
 
 export default function LeagueTradesPage() {

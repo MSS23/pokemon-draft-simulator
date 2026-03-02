@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useDraftStore } from '@/stores/draftStore'
-import { Draft, Team, Participant, Auction, Pick } from '@/types'
+import { Draft, Team, Participant, Auction } from '@/types'
 
 export const useRealtimeDraft = (draftId: string) => {
   const [isConnected, setIsConnected] = useState(false)

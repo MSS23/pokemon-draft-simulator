@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Bell, X, Clock, DollarSign, Gavel, Trophy, AlertTriangle, Users, Archive } from 'lucide-react'
+import { Bell, X, Clock, DollarSign, Gavel, Trophy, AlertTriangle, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { notificationService, DraftNotification } from '@/lib/notification-service'
 

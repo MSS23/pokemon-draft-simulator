@@ -19,6 +19,19 @@ class RateLimiter {
 
     validTimestamps.push(now)
     this.requests.set(key, validTimestamps)
+
+    // Prevent memory leak: purge stale entries when the map grows too large
+    if (this.requests.size > 10000) {
+      for (const [entryKey, entryTimestamps] of this.requests) {
+        const valid = entryTimestamps.filter(t => now - t < windowMs)
+        if (valid.length === 0) {
+          this.requests.delete(entryKey)
+        } else {
+          this.requests.set(entryKey, valid)
+        }
+      }
+    }
+
     return true
   }
 }

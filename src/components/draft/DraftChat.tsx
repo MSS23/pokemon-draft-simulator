@@ -11,10 +11,6 @@ import {
   Send,
   Smile,
   Crown,
-  ThumbsUp,
-  Heart,
-  Zap,
-  X,
   Minimize2,
   Maximize2
 } from 'lucide-react'

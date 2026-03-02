@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 
 export default function PWAProvider({ children }: { children: React.ReactNode }) {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
