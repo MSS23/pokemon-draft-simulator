@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react'
 import { X, CheckCircle, XCircle, AlertCircle, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -168,7 +168,7 @@ export function NotificationProvider({ children }: NotificationProviderProps) {
 export function useNotify() {
   const { addNotification } = useNotifications()
 
-  return {
+  return useMemo(() => ({
     success: (title: string, message?: string, options?: Partial<Notification>) =>
       addNotification({ type: 'success', title, message, ...options }),
 
@@ -180,5 +180,5 @@ export function useNotify() {
 
     info: (title: string, message?: string, options?: Partial<Notification>) =>
       addNotification({ type: 'info', title, message, ...options }),
-  }
+  }), [addNotification])
 }

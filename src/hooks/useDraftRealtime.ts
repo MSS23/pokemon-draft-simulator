@@ -243,10 +243,10 @@ export function useDraftRealtime(
     handleError
   ])
 
-  // Manual refresh function
+  // Manual refresh function - uses ref to avoid unstable dependency
   const refresh = useCallback(async () => {
-    onRefreshNeeded?.()
-  }, [onRefreshNeeded])
+    onRefreshNeededRef.current?.()
+  }, [])
 
   // Manual reconnect function
   const reconnect = useCallback(async () => {
