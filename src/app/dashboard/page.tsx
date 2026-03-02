@@ -56,6 +56,7 @@ export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState<DraftSummary[]>([])
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
 
@@ -93,15 +94,18 @@ export default function DashboardPage() {
 
         if (error) {
           console.error('[Dashboard] Error fetching drafts:', error)
+          setFetchError(`Failed to load your drafts: ${error.message}`)
           setDrafts([])
           setLoading(false)
           return
         }
+        setFetchError(null)
 
         console.log('[Dashboard] Fetched draft summaries:', draftSummaries)
         setDrafts(draftSummaries || [])
       } catch (err) {
         console.error('[Dashboard] Unexpected error:', err)
+        setFetchError('An unexpected error occurred while loading your drafts. Please try again.')
         setDrafts([])
       } finally {
         setLoading(false)
@@ -363,6 +367,23 @@ export default function DashboardPage() {
               Manage your drafts, view your teams, and track your progress.
             </p>
           </div>
+
+          {/* Error Display */}
+          {fetchError && (
+            <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <Trophy className="h-5 w-5 text-red-500" />
+                  <div>
+                    <p className="font-medium text-red-800 dark:text-red-200">{fetchError}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+                      This may be due to a database issue. Try refreshing the page.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

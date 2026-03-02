@@ -106,6 +106,11 @@ function JoinDraftForm() {
       return;
     }
 
+    if (!user?.id) {
+      setError("Please sign in to join a draft");
+      return;
+    }
+
     setIsJoining(true);
     try {
       const { DraftService } = await import("@/lib/draft-service");
@@ -132,7 +137,7 @@ function JoinDraftForm() {
         // Join as spectator (no team)
         await DraftService.joinAsSpectator({
           roomCode: formData.roomCode,
-          userId: user!.id,
+          userId: user.id,
         });
 
         router.push(`/draft/${formData.roomCode.toLowerCase()}?spectator=true`);
@@ -140,7 +145,7 @@ function JoinDraftForm() {
         // Join as participant with team
         const result = await DraftService.joinDraft({
           roomCode: formData.roomCode,
-          userId: user!.id,
+          userId: user.id,
           teamName: formData.teamName,
         });
 

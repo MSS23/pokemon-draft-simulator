@@ -19,6 +19,7 @@ import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
 import { Copy, Share2, History } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
+import { useAuth } from '@/contexts/AuthContext'
 import { useNotify } from '@/components/providers/NotificationProvider'
 import { DraftRoomLoading, TeamStatusSkeleton } from '@/components/ui/loading-states'
 import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
@@ -146,15 +147,24 @@ export default function DraftRoomPage() {
   const isHost = searchParams.get('isHost') === 'true'
   const isSpectator = searchParams.get('spectator') === 'true'
 
-  // Get or create persistent user session - SYNCHRONOUS to prevent race conditions
-  const [userId] = useState<string>(() => {
-    // Try to get from existing participation first
+  // Get authenticated user - PRIMARY source for userId
+  const { user: authUser } = useAuth()
+
+  // Get or create persistent user session
+  // Priority: 1) Supabase auth ID, 2) stored participation, 3) stored session, 4) sessionStorage, 5) guest ID
+  const userId = useMemo(() => {
+    // Primary: Supabase auth user ID (matches participant records)
+    if (authUser?.id) {
+      return authUser.id
+    }
+
+    // Secondary: existing draft participation from localStorage
     const participation = UserSessionService.getDraftParticipation(roomCode?.toLowerCase() || '')
     if (participation && participation.userId) {
       return participation.userId
     }
 
-    // Try to get current session from localStorage (synchronous)
+    // Tertiary: current session from localStorage
     const currentSession = UserSessionService.getCurrentSession()
     if (currentSession && currentSession.userId) {
       return currentSession.userId
@@ -169,8 +179,7 @@ export default function DraftRoomPage() {
       }
     }
 
-    // Generate a stable guest ID (synchronous)
-    // Use combination of timestamp and random for uniqueness
+    // Last resort: generate a stable guest ID
     const guestId = `guest-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
 
     // Store in sessionStorage immediately for this draft (works in incognito)
@@ -180,7 +189,7 @@ export default function DraftRoomPage() {
     }
 
     return guestId
-  })
+  }, [authUser?.id, roomCode])
 
   const [selectedPokemon, setSelectedPokemon] = useState<Pokemon | null>(null)
   const [detailsPokemon, setDetailsPokemon] = useState<Pokemon | null>(null)
@@ -190,7 +199,7 @@ export default function DraftRoomPage() {
   const [, setIsConnected] = useState(false)
   const [, setIsLoading] = useState(true)
   const [error, setError] = useState('')
-  const [isProxyPickingEnabled, setIsProxyPickingEnabled] = useState(false)
+  // Proxy picking removed - feature not implemented on backend
   const [isShuffling, setIsShuffling] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
 
@@ -989,10 +998,10 @@ export default function DraftRoomPage() {
   }, [])
 
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
-    // Check if user can draft (their turn or proxy picking enabled)
-    const canDraft = (isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting'
+    // Check if user can draft (their turn)
+    const canDraft = isUserTurn && draftState?.status === 'drafting'
     if (!canDraft) {
-      console.log('[Draft] Cannot draft:', { isUserTurn, isHost, isProxyPickingEnabled, status: draftState?.status })
+      console.log('[Draft] Cannot draft:', { isUserTurn, isHost, status: draftState?.status })
       // Show user-friendly error message
       if (draftState?.status !== 'drafting') {
         notify.warning('Draft Not Active', 'The draft is not currently active')
@@ -1015,60 +1024,37 @@ export default function DraftRoomPage() {
       return
     }
 
-    // Determine which team to draft for
-    let targetTeam: typeof userTeam
-    let targetUserId: string
-
-    if (isHost && isProxyPickingEnabled && !isUserTurn) {
-      // Proxy picking: draft for the current team
-      targetTeam = currentTeam
-      if (!targetTeam) return
-
-      // For proxy picking, we need to modify the approach
-      // Instead of creating a proxy user ID, let's use the host's user ID
-      // and modify the service call to specify the target team
-      targetUserId = userId // Host's user ID
-    } else {
-      // Normal picking: draft for user's own team
-      targetTeam = userTeam
-      targetUserId = userId
-      if (!targetTeam) return
-    }
+    // Draft for user's own team
+    const targetTeam = userTeam
+    const targetUserId = userId
+    if (!targetTeam) return
 
     // Mark Pokemon as drafted in all wishlists
     const { WishlistService } = await import('@/lib/wishlist-service')
     await WishlistService.markPokemonDrafted(roomCode.toLowerCase(), pokemon.id)
 
     try {
-      if (isHost && isProxyPickingEnabled && !isUserTurn) {
-        // Use proxy picking for the current team
-        await DraftService.makeProxyPick(
-          roomCode.toLowerCase(),
-          userId, // Host's user ID
-          targetTeam.id, // Target team ID
-          pokemon.id,
-          pokemon.name,
-          pokemon.cost || 1
-        )
-      } else {
-        // Normal picking for user's own team
-        await DraftService.makePick(
-          roomCode.toLowerCase(),
-          targetUserId,
-          pokemon.id,
-          pokemon.name,
-          pokemon.cost || 1
-        )
+      // Validate cost data
+      const pickCost = pokemon.cost || 1
+      if (!pokemon.cost) {
+        console.warn(`[Draft] Pokemon "${pokemon.name}" (id: ${pokemon.id}) has no cost data. Using minimum cost of 1.`)
       }
+
+      await DraftService.makePick(
+        roomCode.toLowerCase(),
+        targetUserId,
+        pokemon.id,
+        pokemon.name,
+        pickCost
+      )
 
       // Show success notification
       const teamName = targetTeam.name
-      const isProxyPick = isHost && isProxyPickingEnabled && !isUserTurn
 
       notify.success(
         `${pokemon.name} Drafted!`,
-        isProxyPick
-          ? `Successfully drafted ${pokemon.name} for ${teamName} (proxy pick)`
+        false // kept for ternary structure below
+          ? `Successfully drafted ${pokemon.name} for ${teamName}`
           : `Successfully added ${pokemon.name} to ${teamName}`,
         { duration: 3000 }
       )
@@ -1110,7 +1096,7 @@ export default function DraftRoomPage() {
         notify.error('Draft Failed', errorMessage, { duration: 5000 })
       }
     }
-  }, [isUserTurn, isHost, isProxyPickingEnabled, draftState?.status, currentTeam, userTeam, userId, roomCode, notify, shouldShowNotification])
+  }, [isUserTurn, isHost, draftState?.status, currentTeam, userTeam, userId, roomCode, notify, shouldShowNotification])
 
   const copyRoomCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode)
@@ -1264,13 +1250,7 @@ export default function DraftRoomPage() {
     }
   }, [roomCode, notify, draftState?.status])
 
-  const handleEnableProxyPicking = useCallback(() => {
-    setIsProxyPickingEnabled(true)
-  }, [])
-
-  const handleDisableProxyPicking = useCallback(() => {
-    setIsProxyPickingEnabled(false)
-  }, [])
+  // Proxy picking handlers removed - feature not implemented
 
   // Auction-specific handlers
   const handleNominatePokemon = useCallback(async (pokemon: Pokemon, startingBid: number, duration: number) => {
@@ -1659,9 +1639,9 @@ export default function DraftRoomPage() {
               onDeleteDraft={handleDeleteDraft}
               onAdvanceTurn={handleAdvanceTurn}
               onSetTimer={handleSetTimer}
-              onEnableProxyPicking={handleEnableProxyPicking}
-              onDisableProxyPicking={handleDisableProxyPicking}
-              isProxyPickingEnabled={isProxyPickingEnabled}
+              onEnableProxyPicking={() => {}}
+              onDisableProxyPicking={() => {}}
+              isProxyPickingEnabled={false}
               isShuffling={isShuffling}
               onUndoLastPick={handleUndoLastPick}
               onRequestNotificationPermission={handleRequestNotificationPermission}
@@ -1717,33 +1697,20 @@ export default function DraftRoomPage() {
             ) : (
               // Snake Draft Controls
               <div className="p-4 bg-card rounded-lg shadow">
-                <h3 className="font-semibold mb-3">
-                  {isHost && isProxyPickingEnabled && !isUserTurn
-                    ? `Proxy Selection for ${currentTeam?.name}`
-                    : 'Your Selection'
-                  }
-                </h3>
+                <h3 className="font-semibold mb-3">Your Selection</h3>
                 <div className="flex gap-3 flex-wrap">
-                  {selectedPokemon && (isUserTurn || (isHost && isProxyPickingEnabled)) ? (
+                  {selectedPokemon && isUserTurn ? (
                     <Button
                       onClick={() => handleDraftPokemon(selectedPokemon)}
                     >
-                      {isHost && isProxyPickingEnabled && !isUserTurn
-                        ? `Draft ${selectedPokemon.name} for ${currentTeam?.name}`
-                        : `Draft ${selectedPokemon.name}`
-                      }
+                      Draft {selectedPokemon.name}
                     </Button>
                   ) : (
                     <p className="text-muted-foreground">
-                      {!isUserTurn && !(isHost && isProxyPickingEnabled)
+                      {!isUserTurn
                         ? `Waiting for ${currentTeam?.name} to pick...`
                         : 'Select a Pokémon to draft'
                       }
-                    </p>
-                  )}
-                  {isHost && isProxyPickingEnabled && !isUserTurn && (
-                    <p className="text-xs text-primary bg-primary/10 px-2 py-1 rounded">
-                      Proxy picking enabled - You can pick for {currentTeam?.name}
                     </p>
                   )}
                 </div>
@@ -1813,7 +1780,7 @@ export default function DraftRoomPage() {
           pokemon={detailsPokemon}
           isOpen={isDetailsOpen}
           onClose={() => setIsDetailsOpen(false)}
-          onSelect={!draftState || isAuctionDraft ? undefined : ((isUserTurn || (isHost && isProxyPickingEnabled)) && draftState?.status === 'drafting' ? handleInitiateDraft : undefined)}
+          onSelect={!draftState || isAuctionDraft ? undefined : (isUserTurn && draftState?.status === 'drafting' ? handleInitiateDraft : undefined)}
           isDrafted={detailsPokemon && draftState ? allDraftedIds.includes(detailsPokemon.id) : false}
           isAtPickLimit={userTeam ? userTeam.picks.length >= (draftState?.draftSettings?.pokemonPerTeam || 6) : false}
           currentPicks={userTeam?.picks.length || 0}
