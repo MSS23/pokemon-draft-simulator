@@ -89,11 +89,15 @@ export function validateEnv(): { isValid: boolean; missing: string[] } {
     return { isValid: true, missing: [] }
   }
 
-  if (env.app.isProduction) {
+  // In production at runtime, throw. During build (SSG phase), only warn.
+  const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
+  if (env.app.isProduction && !isBuildPhase) {
     throw new Error(
       `Missing required environment variables: ${missing.join(', ')}. ` +
       'Set these in your deployment environment.'
     )
+  } else if (isBuildPhase) {
+    log.warn(`Missing environment variables during build: ${missing.join(', ')}`)
   }
 
   // Development: warn but don't throw
