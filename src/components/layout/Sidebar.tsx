@@ -29,7 +29,7 @@ interface League {
 
 export function Sidebar() {
   const router = useRouter()
-  const { user, signOut } = useAuth()
+  const { user, signOut, loading: authLoading } = useAuth()
   const [leagues, setLeagues] = useState<League[]>([])
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authRedirectTo, setAuthRedirectTo] = useState<string>('/dashboard')
@@ -82,6 +82,8 @@ export function Sidebar() {
   }
 
   const handleProtectedClick = (e: React.MouseEvent, href: string) => {
+    // Don't block navigation while auth is still loading
+    if (authLoading) return
     if (!user) {
       e.preventDefault()
       setAuthRedirectTo(href)
@@ -122,42 +124,16 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
         <SidebarSection title="Draft">
-          <SidebarLink
-            href="/create-draft"
-            icon={Plus}
-            label="Create Draft"
-            isProtected={true}
-            onProtectedClick={handleProtectedClick}
-          />
-          <SidebarLink
-            href="/join-draft"
-            icon={UserPlus}
-            label="Join Draft"
-          />
-          <SidebarLink
-            href="/watch-drafts"
-            icon={Eye}
-            label="Watch Live"
-          />
+          <SidebarLink href="/create-draft" icon={Plus} label="Create Draft" />
+          <SidebarLink href="/join-draft" icon={UserPlus} label="Join Draft" />
+          <SidebarLink href="/watch-drafts" icon={Eye} label="Watch Live" />
         </SidebarSection>
 
         <Separator className="my-1" />
 
         <SidebarSection title="My Activity">
-          <SidebarLink
-            href="/dashboard"
-            icon={LayoutDashboard}
-            label="Dashboard"
-            isProtected={true}
-            onProtectedClick={handleProtectedClick}
-          />
-          <SidebarLink
-            href="/history"
-            icon={History}
-            label="History"
-            isProtected={true}
-            onProtectedClick={handleProtectedClick}
-          />
+          <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+          <SidebarLink href="/history" icon={History} label="History" />
         </SidebarSection>
 
         {leagues.length > 0 && (
@@ -180,13 +156,7 @@ export function Sidebar() {
       {/* Bottom */}
       {user && (
         <div className="p-2 border-t border-border space-y-0.5">
-          <SidebarLink
-            href="/settings"
-            icon={Settings}
-            label="Settings"
-            isProtected={true}
-            onProtectedClick={handleProtectedClick}
-          />
+          <SidebarLink href="/settings" icon={Settings} label="Settings" />
           <button
             onClick={handleSignOut}
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
