@@ -375,17 +375,17 @@ export default function DraftRoomPage() {
       })),
       draftSettings: {
         maxTeams: dbState.draft.max_teams,
-        timeLimit: (dbState.draft.settings as any)?.timeLimit || 60,
-        pokemonPerTeam: (dbState.draft.settings as any)?.pokemonPerTeam || 6,
+        timeLimit: dbState.draft.settings?.timeLimit || 60,
+        pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
         draftType: dbState.draft.format,
-        formatId: (dbState.draft.settings as any)?.formatId,
-        customFormatId: (dbState.draft as any).custom_format_id
+        formatId: dbState.draft.settings?.formatId,
+        customFormatId: dbState.draft.custom_format_id ?? undefined
       },
-      timeRemaining: (dbState.draft.settings as any)?.timeLimit || 60,
+      timeRemaining: dbState.draft.settings?.timeLimit || 60,
       draft: {
         id: dbState.draft.id,
-        custom_format_id: (dbState.draft as any).custom_format_id,
-        turn_started_at: (dbState.draft as any).turn_started_at,
+        custom_format_id: dbState.draft.custom_format_id ?? undefined,
+        turn_started_at: dbState.draft.turn_started_at ?? undefined,
         status: dbState.draft.status
       }
     }
@@ -420,7 +420,7 @@ export default function DraftRoomPage() {
   )
 
   // Track participant online status based on last_seen timestamps
-  const participantOnlineStatus = useMemo(() => {
+  const _participantOnlineStatus = useMemo(() => {
     if (!draftState?.participants) return new Map<string, boolean>()
 
     const OFFLINE_THRESHOLD_MS = 45000 // 45 seconds (30s heartbeat + 15s buffer)
@@ -513,7 +513,7 @@ export default function DraftRoomPage() {
         }
 
         // Check if draft is private and requires access verification
-        const isPublic = (dbState.draft as any).is_public
+        const isPublic = dbState.draft.is_public
 
         if (!isPublic) {
           // Private draft - verify access
@@ -963,6 +963,7 @@ export default function DraftRoomPage() {
         ownerId: null,
         budgetRemaining: t.budgetRemaining,
         draftOrder: t.draftOrder,
+        undosRemaining: 0,
         picks: t.picks.map(pokemonId => ({
           id: pokemonId,
           draftId: roomCode.toLowerCase(),
@@ -981,7 +982,7 @@ export default function DraftRoomPage() {
   const aiFormat = useMemo(() => ({
     id: formatId,
     name: formatId
-  } as any), [formatId])
+  } as unknown as import('@/types').Format), [formatId])
 
   const handleAISelectPokemon = useCallback((pokemon: Pokemon) => {
     setSelectedPokemon(pokemon)
@@ -1189,7 +1190,7 @@ export default function DraftRoomPage() {
       log.error('Error resetting draft:', err)
       notify.error('Failed to Reset Draft', err instanceof Error ? err.message : 'Failed to reset draft')
     }
-  }, [roomCode])
+  }, [roomCode, router])
 
   const handleDeleteDraft = useCallback(async () => {
     try {

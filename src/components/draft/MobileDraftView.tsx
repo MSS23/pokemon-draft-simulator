@@ -151,6 +151,7 @@ export default function MobileDraftView({
                     onClick={() => onPokemonSelect?.(poke)}
                     className="bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-lg p-3 active:scale-95 transition-transform"
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${poke.id}.png`}
                       alt={poke.name}
@@ -233,6 +234,7 @@ export default function MobileDraftView({
                               >
                                 {pokemonData && (
                                   <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
                                       src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
                                       alt={pokemonData.name}
@@ -279,6 +281,7 @@ export default function MobileDraftView({
                       <CardContent className="pt-4">
                         <div className="flex items-start gap-3">
                           {pokemonData && (
+                            /* eslint-disable-next-line @next/next/no-img-element */
                             <img
                               src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
                               alt={pokemonData.name}

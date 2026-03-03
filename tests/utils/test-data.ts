@@ -19,6 +19,16 @@ export const mockDraft: Draft = {
     timePerPick: 60,
     maxPokemonPerTeam: 6,
   },
+  roomCode: null,
+  isPublic: false,
+  spectatorCount: 0,
+  description: null,
+  tags: null,
+  password: null,
+  customFormatId: null,
+  turnStartedAt: null,
+  deletedAt: null,
+  deletedBy: null,
   createdAt: '2025-01-01T00:00:00Z',
   updatedAt: '2025-01-01T00:00:00Z',
 }
@@ -31,6 +41,7 @@ export const mockTeams: Team[] = [
     ownerId: 'user-1',
     draftOrder: 1,
     budgetRemaining: 100,
+    undosRemaining: 0,
     picks: [],
   },
   {
@@ -40,6 +51,7 @@ export const mockTeams: Team[] = [
     ownerId: 'user-2',
     draftOrder: 2,
     budgetRemaining: 100,
+    undosRemaining: 0,
     picks: [],
   },
   {
@@ -49,6 +61,7 @@ export const mockTeams: Team[] = [
     ownerId: 'user-3',
     draftOrder: 3,
     budgetRemaining: 100,
+    undosRemaining: 0,
     picks: [],
   },
   {
@@ -58,6 +71,7 @@ export const mockTeams: Team[] = [
     ownerId: 'user-4',
     draftOrder: 4,
     budgetRemaining: 100,
+    undosRemaining: 0,
     picks: [],
   },
 ]

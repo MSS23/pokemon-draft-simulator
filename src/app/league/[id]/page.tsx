@@ -23,6 +23,7 @@ import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { ArrowLeft, Trophy, Calendar, TrendingUp, Skull, Swords, Users, Repeat, Loader2 } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
+import type { PickRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('LeaguePage')
@@ -118,7 +119,7 @@ export default function LeaguePage() {
       .eq('team_id', match.awayTeamId)
 
     if (homePicks && awayPicks) {
-      setHomeTeamPicks(homePicks.map((p: any) => ({
+      const mapPick = (p: PickRow): Pick => ({
         id: p.id,
         draftId: p.draft_id,
         teamId: p.team_id,
@@ -128,18 +129,9 @@ export default function LeaguePage() {
         pickOrder: p.pick_order,
         round: p.round,
         createdAt: p.created_at,
-      })))
-      setAwayTeamPicks(awayPicks.map((p: any) => ({
-        id: p.id,
-        draftId: p.draft_id,
-        teamId: p.team_id,
-        pokemonId: p.pokemon_id,
-        pokemonName: p.pokemon_name,
-        cost: p.cost,
-        pickOrder: p.pick_order,
-        round: p.round,
-        createdAt: p.created_at,
-      })))
+      })
+      setHomeTeamPicks(homePicks.map(mapPick))
+      setAwayTeamPicks(awayPicks.map(mapPick))
       setSelectedMatch(match)
     }
   }
@@ -295,7 +287,7 @@ export default function LeaguePage() {
 
         <Tabs defaultValue="fixtures" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="fixtures">This Week's Fixtures</TabsTrigger>
+            <TabsTrigger value="fixtures">This Week&apos;s Fixtures</TabsTrigger>
             <TabsTrigger value="standings">Standings</TabsTrigger>
             <TabsTrigger value="teams">Teams & Pokemon</TabsTrigger>
           </TabsList>

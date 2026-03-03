@@ -94,8 +94,8 @@ export default function MatchDetailPage() {
 
   const isUserHomeTeam = match.homeTeam.ownerId === userId
   const isUserAwayTeam = match.awayTeam.ownerId === userId
-  const userTeam = isUserHomeTeam ? match.homeTeam : isUserAwayTeam ? match.awayTeam : null
-  const opponentTeam = isUserHomeTeam ? match.awayTeam : isUserAwayTeam ? match.homeTeam : null
+  const _userTeam = isUserHomeTeam ? match.homeTeam : isUserAwayTeam ? match.awayTeam : null
+  const _opponentTeam = isUserHomeTeam ? match.awayTeam : isUserAwayTeam ? match.homeTeam : null
 
   const homeStanding = standings.find(s => s.teamId === match.homeTeam.id)
   const awayStanding = standings.find(s => s.teamId === match.awayTeam.id)

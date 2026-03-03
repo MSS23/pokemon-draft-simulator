@@ -41,7 +41,7 @@ const TeamRoster = memo(function TeamRoster({
   const totalValue = teamPokemon.reduce((sum, pokemon) => sum + (pokemon.cost || 1), 0)
   const averageCost = teamPokemon.length > 0 ? Math.round(totalValue / teamPokemon.length) : 0
 
-  const getPokemonTypeColors = (types: Pokemon['types']) => {
+  const _getPokemonTypeColors = (types: Pokemon['types']) => {
     if (!types.length) return 'bg-gray-100 text-gray-800'
     const primaryType = types[0]
     return `bg-${primaryType.color}-100 text-${primaryType.color}-800 dark:bg-${primaryType.color}-900 dark:text-${primaryType.color}-100`
@@ -78,6 +78,7 @@ const TeamRoster = memo(function TeamRoster({
                 className="relative group"
                 title={pokemon.name}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={pokemon.sprite}
                   alt={pokemon.name}
@@ -107,11 +108,12 @@ const TeamRoster = memo(function TeamRoster({
         {/* Pokemon List */}
         {teamPokemon.length > 0 ? (
           <div className="space-y-1.5">
-            {teamPokemon.map((pokemon, index) => (
+            {teamPokemon.map((pokemon) => (
               <div
                 key={pokemon.id}
                 className="flex items-center gap-2 p-1.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={pokemon.sprite}
                   alt={pokemon.name}

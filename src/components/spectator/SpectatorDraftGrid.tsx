@@ -13,13 +13,29 @@ import { usePokemonList } from '@/hooks/usePokemon'
 import { getFormatById } from '@/lib/formats'
 import { FormatRulesEngine } from '@/domain/rules/format-rules-engine'
 
+interface DraftSettings {
+  formatId?: string
+  [key: string]: unknown
+}
+
+interface DraftPick {
+  pokemon_id: string
+  [key: string]: unknown
+}
+
+interface DraftTeam {
+  id: string
+  name: string
+  [key: string]: unknown
+}
+
 interface SpectatorDraftGridProps {
   draftData: {
     id: string
     format: string
-    settings: any
-    picks: any[]
-    teams: any[]
+    settings: DraftSettings
+    picks: DraftPick[]
+    teams: DraftTeam[]
   }
   onPokemonView?: (pokemon: Pokemon) => void
 }
@@ -38,7 +54,7 @@ export default function SpectatorDraftGrid({ draftData, onPokemonView }: Spectat
   const [rulesEngine, setRulesEngine] = useState<FormatRulesEngine | null>(() =>
     format ? new FormatRulesEngine(draftData.settings?.formatId || 'vgc-reg-h') : null
   )
-  const [filteredPokemon, setFilteredPokemon] = useState<any[]>([])
+  const [filteredPokemon, setFilteredPokemon] = useState<(Pokemon & { isLegal: boolean; cost: number; isDrafted: boolean })[]>([])
 
   // Update format and rules engine when draftData changes
   useEffect(() => {

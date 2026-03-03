@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
-import { supabase } from '@/lib/supabase'
+import { supabase, type Database } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { createLogger } from '@/lib/logger'
 
@@ -83,8 +83,12 @@ export default function DraftHistoryPage() {
 
         // Get team counts and pick counts for each draft
         const draftsWithDetails = await Promise.all(
-          (userTeams || []).map(async (team: any) => {
-            const draft = team.draft
+          (userTeams || []).map(async (team) => {
+            type TeamWithDraft = Database['public']['Tables']['teams']['Row'] & {
+              draft: Database['public']['Tables']['drafts']['Row']
+            }
+            const typedTeam = team as unknown as TeamWithDraft
+            const draft = typedTeam.draft
 
             // Get total teams in draft
             const { count: teamCount } = await supabase

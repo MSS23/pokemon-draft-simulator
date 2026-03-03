@@ -22,7 +22,6 @@ export class UndoService {
   static async undoLastPick({
     draftId,
     teamId,
-    participantId
   }: UndoPickParams): Promise<UndoPickResult> {
     if (!supabase) {
       return {
@@ -32,10 +31,9 @@ export class UndoService {
     }
 
     try {
-      const { data, error } = await (supabase.rpc as any)('undo_last_pick', {
+      const { data, error } = await supabase.rpc('undo_last_pick', {
         p_draft_id: draftId,
         p_team_id: teamId,
-        p_participant_id: participantId
       })
 
       if (error) {
@@ -46,12 +44,12 @@ export class UndoService {
         }
       }
 
-      const result = Array.isArray(data) ? data[0] : data
+      const result = data as Record<string, unknown> | null
 
       return {
-        success: result?.success || false,
-        message: result?.message || 'Unknown error',
-        pickId: result?.pick_id
+        success: (result?.success as boolean) || false,
+        message: (result?.message as string) || 'Unknown error',
+        pickId: result?.pick_id as string | undefined
       }
     } catch (error) {
       log.error('Error undoing pick:', error)
@@ -71,7 +69,7 @@ export class UndoService {
     }
 
     try {
-      const { data, error } = await (supabase.rpc as any)('get_draft_history', {
+      const { data, error } = await supabase.rpc('get_draft_history', {
         p_draft_id: draftId
       })
 
@@ -100,24 +98,26 @@ export class UndoService {
     cost?: number
     roundNumber?: number
     pickNumber?: number
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   }) {
     if (!supabase) {
       return null
     }
 
     try {
-      const { data, error } = await (supabase.rpc as any)('record_draft_action', {
+      const { data, error } = await supabase.rpc('record_draft_action', {
         p_draft_id: params.draftId,
         p_action_type: params.actionType,
-        p_team_id: params.teamId,
-        p_participant_id: params.participantId,
-        p_pokemon_id: params.pokemonId || null,
-        p_pokemon_name: params.pokemonName || null,
-        p_cost: params.cost || null,
-        p_round_number: params.roundNumber || null,
-        p_pick_number: params.pickNumber || null,
-        p_metadata: params.metadata || {}
+        p_action_data: {
+          team_id: params.teamId,
+          participant_id: params.participantId,
+          pokemon_id: params.pokemonId || null,
+          pokemon_name: params.pokemonName || null,
+          cost: params.cost || null,
+          round_number: params.roundNumber || null,
+          pick_number: params.pickNumber || null,
+          ...(params.metadata || {})
+        }
       })
 
       if (error) {
@@ -141,7 +141,7 @@ export class UndoService {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('teams')
         .select('undos_remaining')
         .eq('id', teamId)
@@ -151,7 +151,7 @@ export class UndoService {
         return 0
       }
 
-      return (data as { undos_remaining: number }).undos_remaining || 0
+      return data.undos_remaining || 0
     } catch (error) {
       log.error('Error getting undos remaining:', error)
       return 0

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { WishlistItem, Pokemon } from '@/types'
+import type { WishlistItemRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WishlistService')
@@ -33,7 +34,7 @@ export class WishlistService {
       throw new Error('Draft not found')
     }
 
-    return (draftData as { id: string }).id
+    return draftData.id
   }
 
   /**
@@ -63,7 +64,7 @@ export class WishlistService {
         .limit(1)
 
       const nextPriority = existingItems && existingItems.length > 0
-        ? (existingItems[0] as any).priority + 1
+        ? existingItems[0].priority + 1
         : 1
 
       const newItem = {
@@ -78,7 +79,7 @@ export class WishlistService {
 
       const { data, error } = await supabase
         .from('wishlist_items')
-        .insert(newItem as any)
+        .insert(newItem)
         .select()
         .single()
 
@@ -88,16 +89,16 @@ export class WishlistService {
       }
 
       return {
-        id: (data as any).id,
-        draftId: (data as any).draft_id,
-        participantId: (data as any).participant_id,
-        pokemonId: (data as any).pokemon_id,
-        pokemonName: (data as any).pokemon_name,
-        priority: (data as any).priority,
-        isAvailable: (data as any).is_available,
-        cost: (data as any).cost,
-        createdAt: (data as any).created_at,
-        updatedAt: (data as any).updated_at
+        id: data.id,
+        draftId: data.draft_id,
+        participantId: data.participant_id,
+        pokemonId: data.pokemon_id,
+        pokemonName: data.pokemon_name,
+        priority: data.priority,
+        isAvailable: data.is_available,
+        cost: data.cost,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       }
     } catch (error) {
       log.error('Error adding to wishlist:', error)
@@ -158,16 +159,24 @@ export class WishlistService {
     }
 
     try {
-      // Update each item with its new priority
+      // Resolve draft ID from room code if needed
+      const actualDraftId = await this.resolveDraftId(draftId)
+
+      // Update each item with its new priority (upsert requires all non-optional fields)
       const updates = reorderedItems.map((item, index) => ({
         id: item.id,
+        draft_id: actualDraftId,
+        participant_id: participantId,
+        pokemon_id: item.pokemonId,
+        pokemon_name: item.pokemonName,
+        cost: item.cost,
         priority: index + 1,
         updated_at: new Date().toISOString()
       }))
 
       const { error } = await supabase
         .from('wishlist_items')
-        .upsert(updates as any, { onConflict: 'id' })
+        .upsert(updates, { onConflict: 'id' })
 
       if (error) {
         log.error('Error updating wishlist order:', error)
@@ -209,17 +218,17 @@ export class WishlistService {
         return []
       }
 
-      return data.map(item => ({
-        id: (item as any).id,
-        draftId: (item as any).draft_id,
-        participantId: (item as any).participant_id,
-        pokemonId: (item as any).pokemon_id,
-        pokemonName: (item as any).pokemon_name,
-        priority: (item as any).priority,
-        isAvailable: (item as any).is_available,
-        cost: (item as any).cost,
-        createdAt: (item as any).created_at,
-        updatedAt: (item as any).updated_at
+      return data.map((item: WishlistItemRow) => ({
+        id: item.id,
+        draftId: item.draft_id,
+        participantId: item.participant_id,
+        pokemonId: item.pokemon_id,
+        pokemonName: item.pokemon_name,
+        priority: item.priority,
+        isAvailable: item.is_available,
+        cost: item.cost,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at
       }))
     } catch (error) {
       log.error('Error getting wishlist:', error)
@@ -248,7 +257,7 @@ export class WishlistService {
         updated_at: new Date().toISOString()
       }
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('wishlist_items')
         .update(updateData)
         .eq('draft_id', actualDraftId)
@@ -300,16 +309,16 @@ export class WishlistService {
       if (!data) return null
 
       return {
-        id: (data as any).id,
-        draftId: (data as any).draft_id,
-        participantId: (data as any).participant_id,
-        pokemonId: (data as any).pokemon_id,
-        pokemonName: (data as any).pokemon_name,
-        priority: (data as any).priority,
-        isAvailable: (data as any).is_available,
-        cost: (data as any).cost,
-        createdAt: (data as any).created_at,
-        updatedAt: (data as any).updated_at
+        id: data.id,
+        draftId: data.draft_id,
+        participantId: data.participant_id,
+        pokemonId: data.pokemon_id,
+        pokemonName: data.pokemon_name,
+        priority: data.priority,
+        isAvailable: data.is_available,
+        cost: data.cost,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
       }
     } catch (error) {
       log.error('Error getting next auto-pick Pokemon:', error)
@@ -341,7 +350,9 @@ export class WishlistService {
         },
         () => {
           // Refetch all wishlist items for this draft
-          this.getAllWishlistItems(draftId).then(callback)
+          this.getAllWishlistItems(draftId).then(callback).catch((error) => {
+            log.error('Error in wishlist subscription callback:', error)
+          })
         }
       )
       .subscribe()
@@ -357,18 +368,18 @@ export class WishlistService {
       // Resolve draft ID from room code if needed
       const actualDraftId = await this.resolveDraftId(draftId)
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('wishlist_items')
         .select('*')
         .eq('draft_id', actualDraftId)
-        .order('participant_id, priority')
+        .order('priority', { ascending: true })
 
       if (error) {
         log.error('Error getting all wishlist items:', error)
         return []
       }
 
-      return (data || []).map((item: any) => ({
+      return (data || []).map((item: WishlistItemRow) => ({
         id: item.id,
         draftId: item.draft_id,
         participantId: item.participant_id,
@@ -399,7 +410,7 @@ export class WishlistService {
       // Resolve draft ID from room code if needed
       const actualDraftId = await this.resolveDraftId(draftId)
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('wishlist_items')
         .select('*')
         .eq('draft_id', actualDraftId)
@@ -408,14 +419,19 @@ export class WishlistService {
 
       if (error || !data) return
 
-      // Update priorities to be sequential
-      const updates = (data || []).map((item: any, index: number) => ({
+      // Update priorities to be sequential (upsert requires all non-optional fields)
+      const updates = data.map((item: WishlistItemRow, index: number) => ({
         id: item.id,
+        draft_id: item.draft_id,
+        participant_id: item.participant_id,
+        pokemon_id: item.pokemon_id,
+        pokemon_name: item.pokemon_name,
+        cost: item.cost,
         priority: index + 1,
         updated_at: new Date().toISOString()
       }))
 
-      await (supabase as any)
+      await supabase
         .from('wishlist_items')
         .upsert(updates, { onConflict: 'id' })
     } catch (error) {

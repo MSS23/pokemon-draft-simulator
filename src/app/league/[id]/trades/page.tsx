@@ -77,7 +77,7 @@ export default function LeagueTradesPage() {
             .eq('team_id', team.id)
 
           if (picksResponse.data) {
-            picks[team.id] = (picksResponse.data as any[]).map((p: any) => ({
+            picks[team.id] = picksResponse.data.map((p): Pick => ({
               id: p.id,
               draftId: p.draft_id,
               teamId: p.team_id,

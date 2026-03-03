@@ -12,6 +12,7 @@ import type {
   TradeWithDetails,
   Pick,
 } from '@/types'
+import type { TradeRow, TradeHistoryViewRow } from '@/types/supabase-helpers'
 
 export class TradeService {
   /**
@@ -50,7 +51,7 @@ export class TradeService {
     }
 
     // Insert trade proposal
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trades')
       .insert({
         league_id: leagueId,
@@ -85,7 +86,7 @@ export class TradeService {
     }
 
     // Get trade to verify the accepting team is correct
-    const { data: trade, error: fetchError } = await (supabase as any)
+    const { data: trade, error: fetchError } = await supabase
       .from('trades')
       .select('*')
       .eq('id', tradeId)
@@ -109,7 +110,7 @@ export class TradeService {
     }
 
     // Update trade status to accepted
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trades')
       .update({
         status: 'accepted',
@@ -143,7 +144,7 @@ export class TradeService {
     }
 
     // Get trade to verify the rejecting team is correct
-    const { data: trade, error: fetchError } = await (supabase as any)
+    const { data: trade, error: fetchError } = await supabase
       .from('trades')
       .select('*')
       .eq('id', tradeId)
@@ -162,7 +163,7 @@ export class TradeService {
     }
 
     // Update trade status to rejected
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trades')
       .update({
         status: 'rejected',
@@ -191,7 +192,7 @@ export class TradeService {
     }
 
     // Call the database function to execute the trade
-    const { error } = await (supabase as any).rpc('execute_trade', {
+    const { error } = await supabase.rpc('execute_trade', {
       trade_uuid: tradeId,
     })
 
@@ -212,7 +213,7 @@ export class TradeService {
     }
 
     // Get trade to verify the canceling team is the proposer
-    const { data: trade, error: fetchError } = await (supabase as any)
+    const { data: trade, error: fetchError } = await supabase
       .from('trades')
       .select('*')
       .eq('id', tradeId)
@@ -233,7 +234,7 @@ export class TradeService {
     }
 
     // Update trade status to cancelled
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trades')
       .update({
         status: 'cancelled',
@@ -259,7 +260,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trade_history')
       .select('*')
       .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`)
@@ -287,7 +288,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    let query = (supabase as any)
+    let query = supabase
       .from('trade_history')
       .select('*')
       .eq('league_id', leagueId)
@@ -326,7 +327,7 @@ export class TradeService {
     }
 
     // Check if any of the Pokemon are dead
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('team_pokemon_status')
       .select('pick_id, status')
       .eq('league_id', leagueId)
@@ -366,7 +367,7 @@ export class TradeService {
     }
 
     // Insert approval record
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trade_approvals')
       .insert({
         trade_id: tradeId,
@@ -383,7 +384,7 @@ export class TradeService {
     }
 
     // Update trade record with commissioner approval
-    const { error: updateError } = await (supabase as any)
+    const { error: updateError } = await supabase
       .from('trades')
       .update({
         commissioner_approved: approved,
@@ -418,7 +419,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trade_history')
       .select('*')
       .eq('league_id', leagueId)
@@ -443,7 +444,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from('trade_history')
       .select('*')
       .eq('id', tradeId)
@@ -487,7 +488,7 @@ export class TradeService {
    *
    * @private
    */
-  private static mapToTrade(data: any): Trade {
+  private static mapToTrade(data: TradeRow): Trade {
     return {
       id: data.id,
       leagueId: data.league_id,
@@ -515,7 +516,7 @@ export class TradeService {
    *
    * @private
    */
-  private static mapToTradeWithDetails(data: any): TradeWithDetails {
+  private static mapToTradeWithDetails(data: TradeHistoryViewRow): TradeWithDetails {
     return {
       id: data.id,
       leagueId: data.league_id,
@@ -524,7 +525,7 @@ export class TradeService {
       teamBId: data.team_b_id,
       teamAGives: data.team_a_gives || [],
       teamBGives: data.team_b_gives || [],
-      status: data.status,
+      status: data.status as Trade['status'],
       proposedBy: data.proposed_by,
       proposedAt: data.proposed_at,
       respondedAt: data.responded_at,

@@ -303,7 +303,7 @@ export default function SpectatorMode({
               👁️ Spectator Mode Active
             </h4>
             <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-              <li>• You're watching this draft in real-time</li>
+              <li>• You&apos;re watching this draft in real-time</li>
               <li>• Enable notifications to stay updated when the tab is inactive</li>
               <li>• All picks, bids, and auction results are shown as they happen</li>
               <li>• Join as a participant next time to play!</li>

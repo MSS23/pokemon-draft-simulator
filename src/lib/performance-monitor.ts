@@ -29,7 +29,7 @@ interface PerformanceMetrics {
   domComplete?: number
 }
 
-interface PerformanceEntry {
+interface PerformanceMetricEntry {
   name: string
   value: number
   rating: 'good' | 'needs-improvement' | 'poor'
@@ -38,7 +38,7 @@ interface PerformanceEntry {
 
 class PerformanceMonitor {
   private metrics: PerformanceMetrics = {}
-  private entries: PerformanceEntry[] = []
+  private entries: PerformanceMetricEntry[] = []
   private observers: PerformanceObserver[] = []
 
   constructor() {
@@ -60,8 +60,8 @@ class PerformanceMonitor {
       if ('PerformanceObserver' in window) {
         const lcpObserver = new PerformanceObserver((list) => {
           const entries = list.getEntries()
-          const lastEntry = entries[entries.length - 1] as any
-          const lcp = lastEntry.renderTime || lastEntry.loadTime
+          const lastEntry = entries[entries.length - 1] as PerformanceEntry & { renderTime?: number; loadTime?: number }
+          const lcp = lastEntry.renderTime || lastEntry.loadTime || 0
 
           this.recordMetric('lcp', lcp, this.rateLCP(lcp))
           this.metrics.lcp = lcp
@@ -70,15 +70,15 @@ class PerformanceMonitor {
         try {
           lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true })
           this.observers.push(lcpObserver)
-        } catch (e) {
+        } catch (_e) {
           // LCP not supported
         }
 
         // First Input Delay (FID)
         const fidObserver = new PerformanceObserver((list) => {
           const entries = list.getEntries()
-          entries.forEach((entry: any) => {
-            const fid = entry.processingStart - entry.startTime
+          entries.forEach((entry) => {
+            const fid = (entry as PerformanceEntry & { processingStart: number }).processingStart - entry.startTime
             this.recordMetric('fid', fid, this.rateFID(fid))
             this.metrics.fid = fid
           })
@@ -87,14 +87,14 @@ class PerformanceMonitor {
         try {
           fidObserver.observe({ type: 'first-input', buffered: true })
           this.observers.push(fidObserver)
-        } catch (e) {
+        } catch (_e) {
           // FID not supported
         }
 
         // Cumulative Layout Shift (CLS)
         let clsValue = 0
         const clsObserver = new PerformanceObserver((list) => {
-          for (const entry of list.getEntries() as any[]) {
+          for (const entry of list.getEntries() as (PerformanceEntry & { hadRecentInput?: boolean; value: number })[]) {
             if (!entry.hadRecentInput) {
               clsValue += entry.value
               this.metrics.cls = clsValue
@@ -107,7 +107,7 @@ class PerformanceMonitor {
         try {
           clsObserver.observe({ type: 'layout-shift', buffered: true })
           this.observers.push(clsObserver)
-        } catch (e) {
+        } catch (_e) {
           // CLS not supported
         }
       }
@@ -296,11 +296,10 @@ class PerformanceMonitor {
    */
   private sendToAnalytics(): void {
     // Send to Google Analytics if available
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      const gtag = (window as any).gtag
-
+    const win = typeof window !== 'undefined' ? window as Window & { gtag?: (...args: unknown[]) => void; Sentry?: { setContext: (name: string, ctx: Record<string, unknown>) => void } } : undefined
+    if (win?.gtag) {
       this.entries.forEach(entry => {
-        gtag('event', 'timing_complete', {
+        win.gtag!('event', 'timing_complete', {
           name: entry.name,
           value: Math.round(entry.value),
           event_category: 'Performance',
@@ -311,10 +310,8 @@ class PerformanceMonitor {
     }
 
     // Send to Sentry if available
-    if (typeof window !== 'undefined' && (window as any).Sentry) {
-      const Sentry = (window as any).Sentry
-
-      Sentry.setContext('performance', {
+    if (win?.Sentry) {
+      win.Sentry.setContext('performance', {
         metrics: this.metrics,
         entries: this.entries.slice(0, 10) // Limit to 10 most recent
       })
@@ -331,7 +328,7 @@ class PerformanceMonitor {
   /**
    * Get metric entries
    */
-  public getEntries(): PerformanceEntry[] {
+  public getEntries(): PerformanceMetricEntry[] {
     return [...this.entries]
   }
 

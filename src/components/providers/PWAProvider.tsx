@@ -8,8 +8,9 @@ const log = createLogger('PWA')
 
 export default function PWAProvider({ children }: { children: React.ReactNode }) {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false)
+  const [_isUpdateAvailable, setIsUpdateAvailable] = useState(false)
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null)
 
   const handleUpdate = useCallback(() => {
@@ -146,6 +147,7 @@ export function useIsPWA() {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches
 
       // Check iOS standalone
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isIOSStandalone = (window.navigator as any).standalone === true
 
       // Check if launched from home screen (Android)

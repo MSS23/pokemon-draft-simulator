@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
-import { supabase } from '@/lib/supabase'
+import { supabase, type Database } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -81,9 +81,12 @@ export default function MyDraftsPage() {
             .is('draft.deleted_at', null) // Filter out soft-deleted drafts
 
           if (userTeams) {
-            const draftsWithTeams: DraftWithTeam[] = userTeams
-              .filter((t: any) => t.draft)
-              .map((t: any) => {
+            type TeamWithDraft = Database['public']['Tables']['teams']['Row'] & {
+              draft: Database['public']['Tables']['drafts']['Row'] | Database['public']['Tables']['drafts']['Row'][]
+            }
+            const draftsWithTeams: DraftWithTeam[] = (userTeams as unknown as TeamWithDraft[])
+              .filter((t) => t.draft)
+              .map((t) => {
                 const draftData = Array.isArray(t.draft) ? t.draft[0] : t.draft
                 return {
                   id: draftData.id,
@@ -97,6 +100,16 @@ export default function MyDraftsPage() {
                   currentTurn: draftData.current_turn,
                   currentRound: draftData.current_round,
                   settings: draftData.settings || {},
+                  roomCode: draftData.room_code ?? null,
+                  isPublic: draftData.is_public ?? false,
+                  spectatorCount: draftData.spectator_count ?? 0,
+                  description: draftData.description ?? null,
+                  tags: draftData.tags ?? null,
+                  password: draftData.password ?? null,
+                  customFormatId: draftData.custom_format_id ?? null,
+                  turnStartedAt: draftData.turn_started_at ?? null,
+                  deletedAt: draftData.deleted_at ?? null,
+                  deletedBy: draftData.deleted_by ?? null,
                   createdAt: draftData.created_at,
                   updatedAt: draftData.updated_at,
                   team: {
@@ -106,6 +119,7 @@ export default function MyDraftsPage() {
                     ownerId: t.owner_id,
                     budgetRemaining: t.budget_remaining,
                     draftOrder: t.draft_order,
+                    undosRemaining: t.undos_remaining ?? 0,
                     picks: []
                   }
                 }
@@ -205,7 +219,7 @@ export default function MyDraftsPage() {
                   My Drafts
                 </CardTitle>
                 <CardDescription>
-                  You haven't joined any drafts yet. Create or join a draft to get started!
+                  You haven&apos;t joined any drafts yet. Create or join a draft to get started!
                 </CardDescription>
               </CardHeader>
               <CardContent>

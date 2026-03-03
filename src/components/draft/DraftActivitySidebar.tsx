@@ -180,6 +180,7 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
                           {/* Pokemon Image */}
                           {pokemonData && (
                             <div className="flex-shrink-0">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
                                 alt={pokemonData.name}

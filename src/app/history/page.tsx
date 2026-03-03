@@ -94,11 +94,12 @@ export default function HistoryPage() {
       log.info('Fetching league history for user:', userId)
 
       // Query the user_league_history view
-      const { data: leagueData, error } = await (supabase as any)
-        .from('user_league_history')
+      // user_league_history is a custom view not in generated Database types
+      const { data: leagueData, error } = await supabase
+        .from('user_league_history' as never)
         .select('*')
         .eq('user_id', userId)
-        .order('end_date', { ascending: false, nullsFirst: false })
+        .order('end_date', { ascending: false, nullsFirst: false }) as unknown as { data: LeagueHistory[] | null; error: { message: string } | null }
 
       if (error) {
         log.error('Error fetching league history:', error)
@@ -123,7 +124,7 @@ export default function HistoryPage() {
       const { data: picksData, error: picksError } = await supabase
         .from('picks')
         .select('id, pokemon_id, pokemon_name, team_id')
-        .in('team_id', teamIds) as any
+        .in('team_id', teamIds)
 
       if (picksError) {
         log.error('Error fetching picks:', picksError)
@@ -348,6 +349,7 @@ export default function HistoryPage() {
               <CardContent>
                 {stats.mostPicked ? (
                   <div className="flex items-center gap-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={getPokemonSprite(stats.mostPicked.id)}
                       alt={stats.mostPicked.name}
@@ -407,7 +409,7 @@ export default function HistoryPage() {
               </CardHeader>
 
               <CardContent>
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'all' | 'active' | 'completed')}>
                   <TabsList className="mb-4">
                     <TabsTrigger value="all">
                       All ({leagues.length})
@@ -467,6 +469,7 @@ export default function HistoryPage() {
                                         {teamPicks.slice(0, 8).map((pick) => (
                                           <div key={pick.id} className="group relative">
                                             <div className="w-14 h-14 bg-secondary rounded-lg flex items-center justify-center overflow-hidden">
+                                              {/* eslint-disable-next-line @next/next/no-img-element */}
                                               <img
                                                 src={getPokemonSprite(pick.pokemon_id)}
                                                 alt={pick.pokemon_name}

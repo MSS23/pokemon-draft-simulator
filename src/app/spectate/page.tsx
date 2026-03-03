@@ -128,7 +128,7 @@ export default function SpectatePage() {
               error,
             }: {
               data: { room_code: string | null } | null;
-              error: any;
+              error: unknown;
             }) => {
               if (error || !data?.room_code) {
                 log.error("Failed to fetch room_code:", error);
@@ -387,7 +387,7 @@ export default function SpectatePage() {
                 </h3>
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   As a spectator, you can watch live picks, see team builds, and
-                  follow auction bidding in real-time. You won't be able to
+                  follow auction bidding in real-time. You won&apos;t be able to
                   participate, but you can learn strategies from experienced
                   players!
                 </p>

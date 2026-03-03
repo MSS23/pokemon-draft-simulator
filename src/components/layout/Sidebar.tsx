@@ -45,6 +45,14 @@ export function Sidebar() {
   async function loadUserLeagues(userId: string) {
     if (!supabase) return
 
+    type LeagueTeamJoin = {
+      id: string
+      team_id: string
+      league_id: string
+      teams: { id: string; name: string; owner_id: string | null } | null
+      leagues: { id: string; name: string; status: string } | null
+    }
+
     const leagueTeamsResponse = await supabase
       .from('league_teams')
       .select(`
@@ -62,14 +70,14 @@ export function Sidebar() {
           status
         )
       `)
-      .eq('teams.owner_id', userId) as any
+      .eq('teams.owner_id', userId) as unknown as { data: LeagueTeamJoin[] | null; error: unknown }
 
     if (leagueTeamsResponse?.data) {
       const userLeagues = leagueTeamsResponse.data
-        .filter((item: any) => item.leagues && (item.leagues.status === 'active' || item.leagues.status === 'upcoming'))
-        .map((item: any) => ({
-          id: item.leagues.id,
-          name: item.leagues.name,
+        .filter((item) => item.leagues && (item.leagues.status === 'active' || item.leagues.status === 'upcoming'))
+        .map((item) => ({
+          id: item.leagues!.id,
+          name: item.leagues!.name,
           team_id: item.team_id
         }))
       setLeagues(userLeagues)
@@ -81,7 +89,7 @@ export function Sidebar() {
     router.push('/')
   }
 
-  const handleProtectedClick = (e: React.MouseEvent, href: string) => {
+  const _handleProtectedClick = (e: React.MouseEvent, href: string) => {
     // Don't block navigation while auth is still loading
     if (authLoading) return
     if (!user) {

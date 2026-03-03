@@ -438,7 +438,7 @@ export default function DraftResults({
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {analytics.teamStats.map((team, index) => (
+                  {analytics.teamStats.map((team) => (
                     <div key={team.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
                       <span className="font-medium">{team.name}</span>
                       <div className="text-right text-sm">

@@ -39,7 +39,7 @@ export default function MobileWishlistSheet({
   isOpen,
   onToggle,
   onRemove,
-  onReorder,
+  onReorder: _onReorder,
   className
 }: MobileWishlistSheetProps) {
   const availableItems = wishlist.filter(item => item.isAvailable)

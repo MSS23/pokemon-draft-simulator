@@ -77,7 +77,7 @@ export const usePokemonSearch = () => {
 
   return useMutation({
     mutationFn: (query: string) => searchPokemon(query),
-    onSuccess: (data, query) => {
+    onSuccess: (data, _query) => {
       // Cache individual Pokemon
       data.forEach(pokemon => {
         queryClient.setQueryData(

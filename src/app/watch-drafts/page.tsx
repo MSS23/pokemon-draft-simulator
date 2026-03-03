@@ -57,7 +57,7 @@ export default function WatchDraftsPage() {
     try {
       setIsLoading(true);
       const data = await DraftService.getPublicDrafts({
-        status: statusFilter === "all" ? undefined : (statusFilter as any),
+        status: statusFilter === "all" ? undefined : statusFilter,
         limit: 50,
       });
       setDrafts(data);
@@ -379,7 +379,7 @@ export default function WatchDraftsPage() {
                   <div className="text-sm text-blue-900 dark:text-blue-100">
                     <p className="font-medium mb-1">Spectator Mode</p>
                     <p className="text-blue-700 dark:text-blue-300">
-                      Click any draft to watch it live. You'll see all picks,
+                      Click any draft to watch it live. You&apos;ll see all picks,
                       team rosters, and draft progress in real-time without
                       participating.
                     </p>
@@ -399,8 +399,8 @@ export default function WatchDraftsPage() {
                       </p>
                       <p className="text-green-700 dark:text-green-300">
                         As an authenticated user, you can join drafts with
-                        available team slots using the "Join" button. For full
-                        or active drafts, use the "Spectate" button to watch as
+                        available team slots using the &quot;Join&quot; button. For full
+                        or active drafts, use the &quot;Spectate&quot; button to watch as
                         a spectator.
                       </p>
                     </div>

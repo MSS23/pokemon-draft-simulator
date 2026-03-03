@@ -1,17 +1,88 @@
 import { supabase } from './supabase'
 import type {
   League,
-  LeagueTeam,
   Match,
   Standing,
   Team,
   TeamWithPokemonStatus,
   ExtendedLeagueSettings,
 } from '@/types'
+import type {
+  DraftRow,
+  LeagueRow,
+  LeagueTeamRow,
+  MatchRow,
+  StandingRow,
+  PickRow,
+  TeamRow,
+} from '@/types/supabase-helpers'
 import { MatchKOService } from './match-ko-service'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('LeagueService')
+
+/** Shape returned by a draft query with joined teams */
+type DraftWithTeams = DraftRow & { teams: TeamRow[] }
+
+/** Shape returned by a match query with joined league and teams */
+type MatchWithJoins = MatchRow & {
+  league: LeagueRow
+  home_team: TeamRow
+  away_team: TeamRow
+}
+
+/** Shape returned by a match query with joined teams (no league) */
+type MatchWithTeams = MatchRow & {
+  home_team: TeamRow
+  away_team: TeamRow
+}
+
+/** Shape returned by a standings query with joined team */
+type StandingWithTeam = StandingRow & { team: TeamRow }
+
+/** Shape returned by a league query with joined league_teams containing nested team */
+type LeagueWithTeams = LeagueRow & {
+  league_teams: Array<{ team: TeamRow }>
+}
+
+function mapMatchRow(m: MatchRow): Match {
+  return {
+    id: m.id,
+    leagueId: m.league_id,
+    weekNumber: m.week_number,
+    matchNumber: m.match_number,
+    homeTeamId: m.home_team_id,
+    awayTeamId: m.away_team_id,
+    scheduledDate: m.scheduled_date,
+    status: m.status,
+    homeScore: m.home_score,
+    awayScore: m.away_score,
+    winnerTeamId: m.winner_team_id,
+    battleFormat: m.battle_format,
+    notes: m.notes,
+    createdAt: m.created_at,
+    updatedAt: m.updated_at,
+    completedAt: m.completed_at,
+  }
+}
+
+function mapLeagueRow(row: LeagueRow): League {
+  return {
+    id: row.id,
+    draftId: row.draft_id,
+    name: row.name,
+    leagueType: row.league_type,
+    seasonNumber: row.season_number,
+    status: row.status,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    currentWeek: row.current_week,
+    totalWeeks: row.total_weeks,
+    settings: row.settings,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
 
 export class LeagueService {
   /**
@@ -32,17 +103,30 @@ export class LeagueService {
   ): Promise<{ leagues: League[]; matches: Match[] }> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    // Fetch draft and teams
-    const { data: draft } = await (supabase
-      .from('drafts') as any)
+    // Fetch draft and teams — join query returns nested data not typed by Supabase Relationships
+    const { data: rawDraft } = await supabase
+      .from('drafts')
       .select('*, teams(*)')
       .eq('id', draftId)
       .single()
 
-    if (!draft) throw new Error('Draft not found')
-    if ((draft as any).status !== 'completed') throw new Error('Draft must be completed to create league')
+    if (!rawDraft) throw new Error('Draft not found')
 
-    const teams = (draft as any).teams as Team[]
+    // Cast to access joined teams since Relationships config is empty
+    const draft = rawDraft as unknown as DraftWithTeams
+
+    if (draft.status !== 'completed') throw new Error('Draft must be completed to create league')
+
+    const teams: Team[] = draft.teams.map((t: TeamRow) => ({
+      id: t.id,
+      draftId: t.draft_id,
+      name: t.name,
+      ownerId: t.owner_id,
+      budgetRemaining: t.budget_remaining,
+      draftOrder: t.draft_order,
+      undosRemaining: t.undos_remaining,
+      picks: [],
+    }))
     if (teams.length < 2) throw new Error('Need at least 2 teams to create league')
 
     const leagues: League[] = []
@@ -120,8 +204,8 @@ export class LeagueService {
     if (!supabase) throw new Error('Supabase not configured')
 
     // Create league
-    const { data: league, error: leagueError } = await (supabase
-      .from('leagues') as any)
+    const { data: league, error: leagueError } = await supabase
+      .from('leagues')
       .insert({
         draft_id: draftId,
         name,
@@ -141,32 +225,18 @@ export class LeagueService {
 
     // Add teams to league
     const leagueTeams = teams.map((team, index) => ({
-      league_id: (league as any).id,
+      league_id: league.id,
       team_id: team.id,
       seed: team.draftOrder || index + 1
     }))
 
-    const { error: teamsError } = await (supabase
-      .from('league_teams') as any)
+    const { error: teamsError } = await supabase
+      .from('league_teams')
       .insert(leagueTeams)
 
     if (teamsError) throw new Error('Failed to add teams to league')
 
-    return {
-      id: (league as any).id,
-      draftId: (league as any).draft_id,
-      name: (league as any).name,
-      leagueType: (league as any).league_type,
-      seasonNumber: (league as any).season_number,
-      status: (league as any).status,
-      startDate: (league as any).start_date,
-      endDate: (league as any).end_date,
-      currentWeek: (league as any).current_week,
-      totalWeeks: (league as any).total_weeks,
-      settings: (league as any).settings,
-      createdAt: (league as any).created_at,
-      updatedAt: (league as any).updated_at
-    }
+    return mapLeagueRow(league)
   }
 
   /**
@@ -186,8 +256,8 @@ export class LeagueService {
     if (!supabase) throw new Error('Supabase not configured')
 
     const matches: Omit<Match, 'id' | 'createdAt' | 'updatedAt' | 'completedAt'>[] = []
-    const teamCount = teams.length
-    const maxMatchesPerWeek = config.maxMatchesPerWeek || 1
+    const _teamCount = teams.length
+    const _maxMatchesPerWeek = config.maxMatchesPerWeek || 1
 
     // Shuffle teams initially for randomization
     const shuffledTeams = [...teams].sort(() => Math.random() - 0.5)
@@ -295,8 +365,8 @@ export class LeagueService {
     }
 
     // Insert matches into database
-    const { data: insertedMatches, error } = await (supabase
-      .from('matches') as any)
+    const { data: insertedMatches, error } = await supabase
+      .from('matches')
       .insert(
         matches.map(m => ({
           league_id: m.leagueId,
@@ -317,24 +387,7 @@ export class LeagueService {
 
     if (error || !insertedMatches) throw new Error('Failed to create schedule')
 
-    return insertedMatches.map((m: any) => ({
-      id: m.id,
-      leagueId: m.league_id,
-      weekNumber: m.week_number,
-      matchNumber: m.match_number,
-      homeTeamId: m.home_team_id,
-      awayTeamId: m.away_team_id,
-      scheduledDate: m.scheduled_date,
-      status: m.status,
-      homeScore: m.home_score,
-      awayScore: m.away_score,
-      winnerTeamId: m.winner_team_id,
-      battleFormat: m.battle_format,
-      notes: m.notes,
-      createdAt: m.created_at,
-      updatedAt: m.updated_at,
-      completedAt: m.completed_at
-    }))
+    return insertedMatches.map((m: MatchRow) => mapMatchRow(m))
   }
 
   /**
@@ -344,15 +397,20 @@ export class LeagueService {
     if (!supabase) throw new Error('Supabase not configured')
 
     // Get all teams in this league
-    const { data: leagueTeams } = await (supabase
-      .from('league_teams') as any)
+    const { data: leagueTeams, error: fetchError } = await supabase
+      .from('league_teams')
       .select('team_id')
       .eq('league_id', leagueId)
 
-    if (!leagueTeams) return
+    if (fetchError) {
+      log.error('Error fetching league teams for standings:', fetchError)
+      throw new Error(`Failed to fetch league teams: ${fetchError.message}`)
+    }
+
+    if (!leagueTeams || leagueTeams.length === 0) return
 
     // Create initial standings records
-    const standings = leagueTeams.map((lt: any) => ({
+    const standings = leagueTeams.map((lt: Pick<LeagueTeamRow, 'team_id'>) => ({
       league_id: leagueId,
       team_id: lt.team_id,
       wins: 0,
@@ -362,7 +420,11 @@ export class LeagueService {
       points_against: 0
     }))
 
-    await (supabase.from('standings') as any).insert(standings)
+    const { error: insertError } = await supabase.from('standings').insert(standings)
+    if (insertError) {
+      log.error('Error initializing standings:', insertError)
+      throw new Error(`Failed to initialize standings: ${insertError.message}`)
+    }
   }
 
   /**
@@ -383,11 +445,11 @@ export class LeagueService {
       return { matches: [] }
     }
 
-    const teamIds = userTeams.map((t: any) => t.id)
+    const teamIds = userTeams.map((t: Pick<TeamRow, 'id' | 'draft_id'>) => t.id)
 
-    // Get all matches for these teams
-    const { data: matches } = await (supabase
-      .from('matches') as any)
+    // Get all matches for these teams — join query with nested relations
+    const { data: rawMatches } = await supabase
+      .from('matches')
       .select(`
         *,
         league:leagues(*),
@@ -397,43 +459,17 @@ export class LeagueService {
       .or(`home_team_id.in.(${teamIds.join(',')}),away_team_id.in.(${teamIds.join(',')})`)
       .order('scheduled_date', { ascending: true })
 
-    if (!matches) return { matches: [] }
+    if (!rawMatches) return { matches: [] }
+
+    // Cast to access joined relations since Supabase Relationships config is empty
+    const matches = rawMatches as unknown as MatchWithJoins[]
 
     return {
-      matches: matches.map((m: any) => ({
-        id: m.id,
-        leagueId: m.league_id,
-        weekNumber: m.week_number,
-        matchNumber: m.match_number,
-        homeTeamId: m.home_team_id,
-        awayTeamId: m.away_team_id,
-        scheduledDate: m.scheduled_date,
-        status: m.status,
-        homeScore: m.home_score,
-        awayScore: m.away_score,
-        winnerTeamId: m.winner_team_id,
-        battleFormat: m.battle_format,
-        notes: m.notes,
-        createdAt: m.created_at,
-        updatedAt: m.updated_at,
-        completedAt: m.completed_at,
-        league: {
-          id: m.league.id,
-          draftId: m.league.draft_id,
-          name: m.league.name,
-          leagueType: m.league.league_type,
-          seasonNumber: m.league.season_number,
-          status: m.league.status,
-          startDate: m.league.start_date,
-          endDate: m.league.end_date,
-          currentWeek: m.league.current_week,
-          totalWeeks: m.league.total_weeks,
-          settings: m.league.settings,
-          createdAt: m.league.created_at,
-          updatedAt: m.league.updated_at
-        },
-        homeTeam: m.home_team,
-        awayTeam: m.away_team
+      matches: matches.map((m: MatchWithJoins) => ({
+        ...mapMatchRow(m),
+        league: mapLeagueRow(m.league),
+        homeTeam: m.home_team as unknown as Team,
+        awayTeam: m.away_team as unknown as Team,
       }))
     }
   }
@@ -444,8 +480,8 @@ export class LeagueService {
   static async getStandings(leagueId: string): Promise<(Standing & { team: Team })[]> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data: standings } = await (supabase
-      .from('standings') as any)
+    const { data: rawStandings } = await supabase
+      .from('standings')
       .select(`
         *,
         team:teams(*)
@@ -453,9 +489,12 @@ export class LeagueService {
       .eq('league_id', leagueId)
       .order('rank', { ascending: true, nullsFirst: false })
 
-    if (!standings) return []
+    if (!rawStandings) return []
 
-    return standings.map((s: any) => ({
+    // Cast to access joined team since Supabase Relationships config is empty
+    const standings = rawStandings as unknown as StandingWithTeam[]
+
+    return standings.map((s: StandingWithTeam) => ({
       id: s.id,
       leagueId: s.league_id,
       teamId: s.team_id,
@@ -468,7 +507,7 @@ export class LeagueService {
       rank: s.rank,
       currentStreak: s.current_streak,
       updatedAt: s.updated_at,
-      team: s.team
+      team: s.team as unknown as Team
     }))
   }
 
@@ -486,8 +525,8 @@ export class LeagueService {
   ): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { error } = await (supabase
-      .from('matches') as any)
+    const { error } = await supabase
+      .from('matches')
       .update({
         home_score: result.homeScore,
         away_score: result.awayScore,
@@ -511,8 +550,8 @@ export class LeagueService {
   }) | null> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data: match } = await (supabase
-      .from('matches') as any)
+    const { data: rawMatch } = await supabase
+      .from('matches')
       .select(`
         *,
         league:leagues(*),
@@ -522,42 +561,16 @@ export class LeagueService {
       .eq('id', matchId)
       .single()
 
-    if (!match) return null
+    if (!rawMatch) return null
+
+    // Cast to access joined relations since Supabase Relationships config is empty
+    const match = rawMatch as unknown as MatchWithJoins
 
     return {
-      id: match.id,
-      leagueId: match.league_id,
-      weekNumber: match.week_number,
-      matchNumber: match.match_number,
-      homeTeamId: match.home_team_id,
-      awayTeamId: match.away_team_id,
-      scheduledDate: match.scheduled_date,
-      status: match.status,
-      homeScore: match.home_score,
-      awayScore: match.away_score,
-      winnerTeamId: match.winner_team_id,
-      battleFormat: match.battle_format,
-      notes: match.notes,
-      createdAt: match.created_at,
-      updatedAt: match.updated_at,
-      completedAt: match.completed_at,
-      league: {
-        id: match.league.id,
-        draftId: match.league.draft_id,
-        name: match.league.name,
-        leagueType: match.league.league_type,
-        seasonNumber: match.league.season_number,
-        status: match.league.status,
-        startDate: match.league.start_date,
-        endDate: match.league.end_date,
-        currentWeek: match.league.current_week,
-        totalWeeks: match.league.total_weeks,
-        settings: match.league.settings,
-        createdAt: match.league.created_at,
-        updatedAt: match.league.updated_at
-      },
-      homeTeam: match.home_team,
-      awayTeam: match.away_team
+      ...mapMatchRow(match),
+      league: mapLeagueRow(match.league),
+      homeTeam: match.home_team as unknown as Team,
+      awayTeam: match.away_team as unknown as Team,
     }
   }
 
@@ -567,8 +580,8 @@ export class LeagueService {
   static async getLeague(leagueId: string): Promise<(League & { teams: Team[] }) | null> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data: league } = await (supabase
-      .from('leagues') as any)
+    const { data: rawLeague } = await supabase
+      .from('leagues')
       .select(`
         *,
         league_teams(
@@ -578,23 +591,14 @@ export class LeagueService {
       .eq('id', leagueId)
       .single()
 
-    if (!league) return null
+    if (!rawLeague) return null
+
+    // Cast to access joined relations since Supabase Relationships config is empty
+    const league = rawLeague as unknown as LeagueWithTeams
 
     return {
-      id: league.id,
-      draftId: league.draft_id,
-      name: league.name,
-      leagueType: league.league_type,
-      seasonNumber: league.season_number,
-      status: league.status,
-      startDate: league.start_date,
-      endDate: league.end_date,
-      currentWeek: league.current_week,
-      totalWeeks: league.total_weeks,
-      settings: league.settings,
-      createdAt: league.created_at,
-      updatedAt: league.updated_at,
-      teams: league.league_teams.map((lt: any) => lt.team)
+      ...mapLeagueRow(league),
+      teams: league.league_teams.map((lt: { team: TeamRow }) => lt.team as unknown as Team)
     }
   }
 
@@ -642,8 +646,8 @@ export class LeagueService {
   ): Promise<(Match & { homeTeam: Team; awayTeam: Team })[]> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data: matches } = await (supabase
-      .from('matches') as any)
+    const { data: rawMatches } = await supabase
+      .from('matches')
       .select(`
         *,
         home_team:teams!matches_home_team_id_fkey(*),
@@ -653,27 +657,15 @@ export class LeagueService {
       .eq('week_number', weekNumber)
       .order('match_number', { ascending: true })
 
-    if (!matches) return []
+    if (!rawMatches) return []
 
-    return matches.map((m: any) => ({
-      id: m.id,
-      leagueId: m.league_id,
-      weekNumber: m.week_number,
-      matchNumber: m.match_number,
-      homeTeamId: m.home_team_id,
-      awayTeamId: m.away_team_id,
-      scheduledDate: m.scheduled_date,
-      status: m.status,
-      homeScore: m.home_score,
-      awayScore: m.away_score,
-      winnerTeamId: m.winner_team_id,
-      battleFormat: m.battle_format,
-      notes: m.notes,
-      createdAt: m.created_at,
-      updatedAt: m.updated_at,
-      completedAt: m.completed_at,
-      homeTeam: m.home_team,
-      awayTeam: m.away_team,
+    // Cast to access joined relations since Supabase Relationships config is empty
+    const matches = rawMatches as unknown as MatchWithTeams[]
+
+    return matches.map((m: MatchWithTeams) => ({
+      ...mapMatchRow(m),
+      homeTeam: m.home_team as unknown as Team,
+      awayTeam: m.away_team as unknown as Team,
     }))
   }
 
@@ -710,8 +702,8 @@ export class LeagueService {
   static async getLeagueSettings(leagueId: string): Promise<ExtendedLeagueSettings> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data: league } = await (supabase
-      .from('leagues') as any)
+    const { data: league } = await supabase
+      .from('leagues')
       .select('settings')
       .eq('id', leagueId)
       .single()
@@ -720,14 +712,17 @@ export class LeagueService {
       throw new Error('League not found')
     }
 
+    // Cast to ExtendedLeagueSettings since the JSON column stores extended fields
+    const s = league.settings as unknown as Partial<ExtendedLeagueSettings> | null
+
     return {
-      matchFormat: league.settings?.matchFormat || 'best_of_3',
-      pointsPerWin: league.settings?.pointsPerWin || 3,
-      pointsPerDraw: league.settings?.pointsPerDraw || 1,
-      enableNuzlocke: league.settings?.enableNuzlocke || false,
-      enableTrades: league.settings?.enableTrades || false,
-      tradeDeadlineWeek: league.settings?.tradeDeadlineWeek || null,
-      requireCommissionerApproval: league.settings?.requireCommissionerApproval || false,
+      matchFormat: s?.matchFormat || 'best_of_3',
+      pointsPerWin: s?.pointsPerWin || 3,
+      pointsPerDraw: s?.pointsPerDraw || 1,
+      enableNuzlocke: s?.enableNuzlocke || false,
+      enableTrades: s?.enableTrades || false,
+      tradeDeadlineWeek: s?.tradeDeadlineWeek ?? undefined,
+      requireCommissionerApproval: s?.requireCommissionerApproval || false,
     }
   }
 
@@ -750,8 +745,8 @@ export class LeagueService {
     }
 
     // Update in database
-    const { error } = await (supabase
-      .from('leagues') as any)
+    const { error } = await supabase
+      .from('leagues')
       .update({
         settings: updatedSettings,
         updated_at: new Date().toISOString(),
@@ -778,18 +773,16 @@ export class LeagueService {
 
     // For each team, get their picks and initialize status
     for (const team of league.teams) {
-      const picksResponse = await supabase
+      const { data: picks } = await supabase
         .from('picks')
         .select('*')
-        .eq('team_id', team.id) as any
-
-      const picks = picksResponse?.data
+        .eq('team_id', team.id)
 
       if (picks && picks.length > 0) {
         await MatchKOService.initializePokemonStatus(
           leagueId,
           team.id,
-          picks.map((p: any) => ({
+          picks.map((p: PickRow) => ({
             id: p.id,
             draftId: p.draft_id,
             teamId: p.team_id,
@@ -811,8 +804,8 @@ export class LeagueService {
   static async getLeagueByDraftId(draftId: string): Promise<League | null> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data: league } = await (supabase
-      .from('leagues') as any)
+    const { data: league } = await supabase
+      .from('leagues')
       .select('*')
       .eq('draft_id', draftId)
       .order('created_at', { ascending: false })
@@ -821,21 +814,7 @@ export class LeagueService {
 
     if (!league) return null
 
-    return {
-      id: league.id,
-      draftId: league.draft_id,
-      name: league.name,
-      leagueType: league.league_type,
-      seasonNumber: league.season_number,
-      status: league.status,
-      startDate: league.start_date,
-      endDate: league.end_date,
-      currentWeek: league.current_week,
-      totalWeeks: league.total_weeks,
-      settings: league.settings,
-      createdAt: league.created_at,
-      updatedAt: league.updated_at,
-    }
+    return mapLeagueRow(league)
   }
 
   /**
@@ -846,8 +825,8 @@ export class LeagueService {
     if (!supabase) throw new Error('Supabase not configured')
 
     // Get current league state
-    const { data: league } = await (supabase
-      .from('leagues') as any)
+    const { data: league } = await supabase
+      .from('leagues')
       .select('current_week, total_weeks, status')
       .eq('id', leagueId)
       .single()
@@ -879,8 +858,8 @@ export class LeagueService {
     // Check if season is complete
     if (nextWeek > league.total_weeks) {
       // Mark league as completed
-      await (supabase
-        .from('leagues') as any)
+      await supabase
+        .from('leagues')
         .update({
           status: 'completed',
           end_date: new Date().toISOString(),
@@ -889,8 +868,8 @@ export class LeagueService {
         .eq('id', leagueId)
     } else {
       // Advance to next week
-      await (supabase
-        .from('leagues') as any)
+      await supabase
+        .from('leagues')
         .update({
           current_week: nextWeek,
           updated_at: new Date().toISOString(),

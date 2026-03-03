@@ -18,8 +18,8 @@ interface AuctionNotificationsProps {
 }
 
 export default function AuctionNotifications({
-  draftId,
-  userTeamId,
+  draftId: _draftId,
+  userTeamId: _userTeamId,
   isVisible = true,
   onToggle,
   className
@@ -255,11 +255,11 @@ export default function AuctionNotifications({
                           {/* Additional data if available */}
                           {notification.data && (
                             <div className="mt-2 text-xs text-gray-500">
-                              {notification.data.pokemonName && (
-                                <span>Pokémon: {notification.data.pokemonName}</span>
+                              {'pokemonName' in notification.data && (
+                                <span>Pokémon: {String(notification.data.pokemonName)}</span>
                               )}
-                              {notification.data.bidAmount && (
-                                <span className="ml-2">Amount: ${notification.data.bidAmount}</span>
+                              {'bidAmount' in notification.data && (
+                                <span className="ml-2">Amount: ${String(notification.data.bidAmount)}</span>
                               )}
                             </div>
                           )}

@@ -1,7 +1,6 @@
 import { supabase, Database } from './supabase'
 import { DraftService, DraftState as ServiceDraftState } from './draft-service'
 import { DraftError, DraftErrorCode, DraftErrors } from './draft-errors'
-import { generateSnakeDraftOrder, getCurrentPick } from '@/utils/draft'
 import type { DraftSettings } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 

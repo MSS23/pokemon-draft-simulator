@@ -3,7 +3,19 @@
  * Provides deep insights into draft trends, meta analysis, and team performance
  */
 
-import type { Pokemon, Team, Draft } from '@/types'
+import type { Pokemon, PokemonType, Team, Draft } from '@/types'
+
+interface DraftPickData {
+  pokemon: Pokemon
+}
+
+interface DraftTeamData {
+  picks?: DraftPickData[]
+}
+
+interface DraftWithTeams extends Draft {
+  teams?: DraftTeamData[]
+}
 
 export interface MetaAnalysis {
   topPicks: {
@@ -99,7 +111,7 @@ export interface MatchupPrediction {
 /**
  * Analyze draft meta from historical data
  */
-export function analyzeMetaGame(drafts: Draft[]): MetaAnalysis {
+export function analyzeMetaGame(drafts: DraftWithTeams[]): MetaAnalysis {
   const pickCounts = new Map<string, number>()
   const pickPositions = new Map<string, number[]>()
   const costs = new Map<string, number>()
@@ -109,9 +121,8 @@ export function analyzeMetaGame(drafts: Draft[]): MetaAnalysis {
 
   // Aggregate data
   drafts.forEach(draft => {
-    const draftWithTeams = draft as any // Type assertion for compatibility
-    draftWithTeams.teams?.forEach((team: any) => {
-      team.picks?.forEach((pick: any, index: number) => {
+    draft.teams?.forEach((team) => {
+      team.picks?.forEach((pick, index: number) => {
         const name = pick.pokemon.name
 
         pickCounts.set(name, (pickCounts.get(name) || 0) + 1)
@@ -122,15 +133,16 @@ export function analyzeMetaGame(drafts: Draft[]): MetaAnalysis {
 
         costs.set(name, pick.pokemon.cost || 0)
 
-        pick.pokemon.types.forEach((type: any) => {
-          typeCounts.set(type, (typeCounts.get(type) || 0) + 1)
-          const tc = typeCosts.get(type) || []
+        pick.pokemon.types.forEach((type: PokemonType | string) => {
+          const typeName = typeof type === 'string' ? type : type.name
+          typeCounts.set(typeName, (typeCounts.get(typeName) || 0) + 1)
+          const tc = typeCosts.get(typeName) || []
           tc.push(pick.pokemon.cost || 0)
-          typeCosts.set(type, tc)
+          typeCosts.set(typeName, tc)
         })
 
         // Track common combinations (pairs)
-        team.picks?.forEach((otherPick: any) => {
+        team.picks?.forEach((otherPick) => {
           if (otherPick.pokemon.name !== name) {
             const combo = [name, otherPick.pokemon.name].sort().join('+')
             combos.set(combo, (combos.get(combo) || 0) + 1)
@@ -180,7 +192,7 @@ export function analyzeMetaGame(drafts: Draft[]): MetaAnalysis {
 
   // Calculate popular combos
   const popularCombos = Array.from(combos.entries())
-    .filter(([_, freq]) => freq >= 3)
+    .filter(([_combo, freq]) => freq >= 3)
     .map(([combo, frequency]) => ({
       pokemon: combo.split('+'),
       frequency,
@@ -296,13 +308,13 @@ function calculateSynergyRating(team: Pokemon[]): number {
 
   // Check for weather synergy
   const weatherSetters = team.filter(p =>
-    p.abilities?.some((a: any) =>
-      ['Drought', 'Drizzle', 'Sand Stream', 'Snow Warning'].includes(typeof a === 'string' ? a : a.name)
+    p.abilities?.some((a: string) =>
+      ['Drought', 'Drizzle', 'Sand Stream', 'Snow Warning'].includes(a)
     )
   )
   const weatherAbusers = team.filter(p =>
-    p.abilities?.some((a: any) =>
-      ['Swift Swim', 'Chlorophyll', 'Sand Rush', 'Slush Rush'].includes(typeof a === 'string' ? a : a.name)
+    p.abilities?.some((a: string) =>
+      ['Swift Swim', 'Chlorophyll', 'Sand Rush', 'Slush Rush'].includes(a)
     )
   )
 
@@ -350,9 +362,9 @@ function calculateVersatility(team: Pokemon[]): number {
   return (roles.size / 4) * 100
 }
 
-function calculatePredictability(team: Pokemon[], allPokemon: Pokemon[]): number {
+function calculatePredictability(team: Pokemon[], _allPokemon: Pokemon[]): number {
   // Lower is better
-  const pickRates = team.map(p => {
+  const pickRates = team.map(_p => {
     // Mock: in real implementation, would use actual pick rate data
     return 50 + Math.random() * 50
   })
@@ -362,7 +374,7 @@ function calculatePredictability(team: Pokemon[], allPokemon: Pokemon[]): number
 
 function generateInsights(
   ratings: Record<string, number>,
-  team: Pokemon[]
+  _team: Pokemon[]
 ): {
   strengths: string[]
   weaknesses: string[]
@@ -449,7 +461,7 @@ function calculateMatchupScore(attacker: Pokemon, defender: Pokemon): number {
 
   // Type advantage
   attacker.moves?.forEach(move => {
-    const defenderTypes = defender.types.map((t: any) => typeof t === 'string' ? t : t.name)
+    const defenderTypes = defender.types.map((t: PokemonType | string) => typeof t === 'string' ? t : t.name)
     const effectiveness = getTypeEffectiveness(move.type, defenderTypes)
     if (effectiveness >= 2) score += 15
     if (effectiveness <= 0.5) score -= 15

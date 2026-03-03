@@ -334,7 +334,7 @@ export function getSavedTemplates(): DraftTemplate[] {
     if (!saved) return []
 
     const parsed = JSON.parse(saved)
-    return parsed.map((t: any) => ({
+    return parsed.map((t: DraftTemplate & { createdAt: string | Date; updatedAt: string | Date }) => ({
       ...t,
       createdAt: new Date(t.createdAt),
       updatedAt: new Date(t.updatedAt),

@@ -6,7 +6,7 @@
  */
 
 import { supabase } from './supabase'
-import type { Pick } from '@/types'
+import type { WeeklySummaryRow, WeeklyHighlightRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('WeeklyHighlightsService')
@@ -16,18 +16,18 @@ export interface WeeklySummary {
   leagueId: string
   weekNumber: number
 
-  headline?: string
-  summaryText?: string
+  headline: string | null
+  summaryText: string | null
 
-  topPerformerTeamId?: string
-  topPerformerReason?: string
+  topPerformerTeamId: string | null
+  topPerformerReason: string | null
 
-  mostKosPokemonId?: string
-  mostKosPickId?: string
+  mostKosPokemonId: string | null
+  mostKosPickId: string | null
   mostKosCount: number
 
-  biggestUpsetMatchId?: string
-  biggestUpsetDescription?: string
+  biggestUpsetMatchId: string | null
+  biggestUpsetDescription: string | null
 
   totalMatches: number
   totalKos: number
@@ -49,12 +49,12 @@ export interface WeeklyHighlight {
 
   title: string
   description: string
-  icon?: string
+  icon: string | null
 
-  teamId?: string
-  matchId?: string
-  pickId?: string
-  tradeId?: string
+  teamId: string | null
+  matchId: string | null
+  pickId: string | null
+  tradeId: string | null
 
   displayOrder: number
   isPinned: boolean
@@ -74,7 +74,7 @@ export class WeeklyHighlightsService {
 
     try {
       // Call database function to generate summary
-      const { data, error } = await (supabase as any)
+      const { data: _data, error } = await supabase
         .rpc('generate_week_summary', {
           p_league_id: leagueId,
           p_week_number: weekNumber
@@ -99,7 +99,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('weekly_summaries')
         .select('*')
         .eq('league_id', leagueId)
@@ -146,7 +146,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('weekly_highlights')
         .select('*')
         .eq('league_id', leagueId)
@@ -156,11 +156,11 @@ export class WeeklyHighlightsService {
 
       if (error) throw error
 
-      return (data || []).map((h: any) => ({
+      return (data || []).map((h: WeeklyHighlightRow) => ({
         id: h.id,
         leagueId: h.league_id,
         weekNumber: h.week_number,
-        type: h.type,
+        type: h.type as WeeklyHighlight['type'],
         title: h.title,
         description: h.description,
         icon: h.icon,
@@ -202,7 +202,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('weekly_highlights')
         .insert({
           league_id: leagueId,
@@ -226,7 +226,7 @@ export class WeeklyHighlightsService {
         id: data.id,
         leagueId: data.league_id,
         weekNumber: data.week_number,
-        type: data.type,
+        type: data.type as WeeklyHighlight['type'],
         title: data.title,
         description: data.description,
         icon: data.icon,
@@ -257,7 +257,19 @@ export class WeeklyHighlightsService {
 
     try {
       // Get all completed matches for the week
-      const { data: matches } = await (supabase as any)
+      // Join queries use relationships not in generated types, so we cast
+      type MatchWithTeams = {
+        id: string
+        home_team_id: string
+        away_team_id: string
+        home_score: number | null
+        away_score: number | null
+        winner_team_id: string | null
+        home_team: { id: string; name: string }
+        away_team: { id: string; name: string }
+      }
+
+      const { data: rawMatches } = await supabase
         .from('matches')
         .select(`
           *,
@@ -268,7 +280,8 @@ export class WeeklyHighlightsService {
         .eq('week_number', weekNumber)
         .eq('status', 'completed')
 
-      if (!matches || matches.length === 0) return []
+      const matches = (rawMatches ?? []) as unknown as MatchWithTeams[]
+      if (matches.length === 0) return []
 
       for (const match of matches) {
         const homeScore = match.home_score || 0
@@ -323,7 +336,14 @@ export class WeeklyHighlightsService {
       }
 
       // Get Pokemon with most KOs this week
-      const { data: topKOs } = await (supabase as any)
+      // Join queries use relationships not in generated types, so we cast
+      type KOWithPick = {
+        pick_id: string
+        ko_count: number
+        picks: { pokemon_name: string; team_id: string; teams: { name: string } }
+      }
+
+      const { data: rawTopKOs } = await supabase
         .from('match_pokemon_kos')
         .select(`
           pick_id,
@@ -336,6 +356,8 @@ export class WeeklyHighlightsService {
         .order('ko_count', { ascending: false })
         .limit(1)
         .single()
+
+      const topKOs = rawTopKOs as unknown as KOWithPick | null
 
       if (topKOs) {
         const highlight = await this.createHighlight(leagueId, weekNumber, {
@@ -350,7 +372,7 @@ export class WeeklyHighlightsService {
       }
 
       // Check for deaths (Nuzlocke)
-      const { data: deaths } = await (supabase as any)
+      const { data: rawDeaths } = await supabase
         .from('match_pokemon_kos')
         .select(`
           pick_id,
@@ -361,7 +383,9 @@ export class WeeklyHighlightsService {
         .eq('matches.week_number', weekNumber)
         .eq('is_death', true)
 
-      if (deaths && deaths.length > 0) {
+      const deaths = (rawDeaths ?? []) as unknown as KOWithPick[]
+
+      if (deaths.length > 0) {
         for (const death of deaths) {
           const highlight = await this.createHighlight(leagueId, weekNumber, {
             type: 'tragic_death',
@@ -391,7 +415,7 @@ export class WeeklyHighlightsService {
     }
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('weekly_summaries')
         .select('*')
         .eq('league_id', leagueId)
@@ -399,7 +423,7 @@ export class WeeklyHighlightsService {
 
       if (error) throw error
 
-      return (data || []).map((d: any) => ({
+      return (data || []).map((d: WeeklySummaryRow) => ({
         id: d.id,
         leagueId: d.league_id,
         weekNumber: d.week_number,

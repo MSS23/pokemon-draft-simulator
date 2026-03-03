@@ -56,6 +56,7 @@ export default function TeamDetailPage() {
   const [picks, setPicks] = useState<Pick[]>([])
   const [stats, setStats] = useState<AdvancedTeamStats | null>(null)
   const [form, setForm] = useState<TeamFormIndicator | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [analysis, setAnalysis] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

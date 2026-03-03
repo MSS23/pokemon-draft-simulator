@@ -49,7 +49,7 @@ export interface UsePokemonDataManagerResult {
   // Metadata
   types: string[]
   abilities: string[]
-  stats: any
+  stats: Awaited<ReturnType<typeof PokemonDataManager.getStats>> | null
 }
 
 export function usePokemonDataManager(
@@ -193,13 +193,17 @@ export function usePokemonDataManager(
   }, [])
 
   // Computed values - depend on updateCounter to refresh when data changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const allPokemon = useMemo(() => PokemonDataManager.getAllPokemon(false), [updateCounter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const legalPokemon = useMemo(() => PokemonDataManager.getAllPokemon(true), [updateCounter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const types = useMemo(() => PokemonDataManager.getAllTypes(), [updateCounter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const abilities = useMemo(() => PokemonDataManager.getAllAbilities(), [updateCounter])
 
   // Get stats
-  const [stats, setStats] = useState<any>(null)
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof PokemonDataManager.getStats>> | null>(null)
 
   useEffect(() => {
     if (isInitialized) {

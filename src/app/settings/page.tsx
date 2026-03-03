@@ -51,14 +51,14 @@ export default function SettingsPage() {
   async function loadProfile(userId: string) {
     if (!supabase) return
 
-    const response = await supabase
+    const { data: profileData, error: profileError } = await supabase
       .from('user_profiles')
       .select('*')
       .eq('user_id', userId)
-      .single() as any
+      .single()
 
-    if (response?.data) {
-      setProfile(response.data)
+    if (profileData && !profileError) {
+      setProfile(profileData as unknown as UserProfile)
     } else {
       // Create default profile
       const defaultProfile: Partial<UserProfile> = {
@@ -82,8 +82,8 @@ export default function SettingsPage() {
 
     setSaving(true)
 
-    const updateResponse = await (supabase
-      .from('user_profiles') as any)
+    const updateResponse = await supabase
+      .from('user_profiles')
       .upsert({
         user_id: profile.user_id,
         username: profile.username,

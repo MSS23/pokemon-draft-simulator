@@ -151,8 +151,8 @@ export const useDraftActions = () => {
     if (!draft) throw new Error('Draft not found')
 
     // Insert the pick
-    const { error: pickError } = await (supabase
-      .from('picks') as unknown as { insert: (data: Record<string, unknown>) => Promise<{ error: unknown }> })
+    const { error: pickError } = await supabase
+      .from('picks')
       .insert({
         draft_id: draftId,
         team_id: teamId,
@@ -165,16 +165,16 @@ export const useDraftActions = () => {
 
     if (pickError) throw pickError
 
-    // Update team budget - RPC not in generated types
-    const { error: teamError } = await (supabase.rpc as unknown as (name: string, params: Record<string, unknown>) => Promise<{ error: unknown }>)('update_team_budget', {
+    // Update team budget
+    const { error: teamError } = await supabase.rpc('update_team_budget', {
       team_id: teamId,
       cost_to_subtract: cost,
     })
 
     if (teamError) throw teamError
 
-    // Advance the draft turn - RPC not in generated types
-    const { error: draftError } = await (supabase.rpc as unknown as (name: string, params: Record<string, unknown>) => Promise<{ error: unknown }>)('advance_draft_turn', {
+    // Advance the draft turn
+    const { error: draftError } = await supabase.rpc('advance_draft_turn', {
       draft_id: draftId,
     })
 
@@ -187,8 +187,7 @@ export const useDraftActions = () => {
     bidAmount: number
   ) => {
     if (!supabase) throw new Error('Supabase not available')
-    // RPC not in generated types
-    const { error } = await (supabase.rpc as unknown as (name: string, params: Record<string, unknown>) => Promise<{ error: unknown }>)('place_bid', {
+    const { error } = await supabase.rpc('place_bid', {
       auction_id: auctionId,
       bidder_team_id: teamId,
       bid_amount: bidAmount,
@@ -207,8 +206,8 @@ export const useDraftActions = () => {
     const auctionEnd = new Date(Date.now() + auctionDuration * 1000).toISOString()
 
     if (!supabase) throw new Error('Supabase not available')
-    const { error } = await (supabase
-      .from('auctions') as unknown as { insert: (data: Record<string, unknown>) => Promise<{ error: unknown }> })
+    const { error } = await supabase
+      .from('auctions')
       .insert({
         draft_id: draftId,
         pokemon_id: pokemonId,
@@ -228,8 +227,8 @@ export const useDraftActions = () => {
     userId?: string
   ) => {
     if (!supabase) throw new Error('Supabase not available')
-    const { error } = await (supabase
-      .from('participants') as unknown as { insert: (data: Record<string, unknown>) => Promise<{ error: unknown }> })
+    const { error } = await supabase
+      .from('participants')
       .insert({
         draft_id: draftId,
         user_id: userId || null,

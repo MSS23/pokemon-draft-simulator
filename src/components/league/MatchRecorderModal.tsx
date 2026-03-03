@@ -13,11 +13,9 @@
 import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LeagueService } from '@/lib/league-service'
@@ -25,7 +23,6 @@ import { MatchKOService } from '@/lib/match-ko-service'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('MatchRecorderModal')
-import { PokemonStatusBadge } from './PokemonStatusBadge'
 import { Loader2, Trophy, Skull, AlertTriangle, Plus, Minus } from 'lucide-react'
 import type { Match, Team, Pick, ExtendedLeagueSettings } from '@/types'
 

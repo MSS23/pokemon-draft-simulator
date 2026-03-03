@@ -12,6 +12,7 @@ const log = createLogger('UpdateQueue')
  * - Conflict resolution for concurrent updates
  */
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface QueuedUpdate<T = any> {
   id: string
   action: () => Promise<T>
@@ -40,6 +41,7 @@ export class UpdateQueue {
   /**
    * Add an optimistic update to the queue
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async addUpdate<T = any>(
     action: () => Promise<T>,
     rollback: () => void,

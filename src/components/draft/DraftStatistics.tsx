@@ -254,6 +254,7 @@ export default function DraftStatistics({ pokemon, className }: DraftStatisticsP
                         </Badge>
 
                         {pokemonData && (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
                             alt={p.name}

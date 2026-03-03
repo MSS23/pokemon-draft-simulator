@@ -1,6 +1,6 @@
 import { Pokemon, PokemonType, PokemonStats, Move } from '@/types'
 import { getTypeColor } from '@/utils/pokemon'
-import { PokemonFormat, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
+import { getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { createFormatRulesEngine } from '@/domain/rules'
 import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
@@ -115,7 +115,7 @@ interface PokeAPIMoveResponse {
 }
 
 // Official Pokédex ranges for Regulation H
-const REGULATION_H_POKEDEX_RANGES = {
+const _REGULATION_H_POKEDEX_RANGES = {
   paldea: [
     { start: 1, end: 375 },    // Paldea Pokédex #001-375
     { start: 388, end: 392 }   // Paldea Pokédex #388-392
@@ -469,7 +469,7 @@ export const fetchPokemonByType = async (typeName: string, formatId?: string): P
   const data = await response.json()
   const pokemonPromises = data.pokemon
     .slice(0, 100) // Limit to first 100 to avoid overwhelming
-    .map((p: any) => {
+    .map((p: { pokemon: { name: string; url: string } }) => {
       const id = p.pokemon.url.split('/').slice(-2, -1)[0]
       return fetchPokemon(id, formatId).catch(() => null)
     })
@@ -519,7 +519,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
   try {
     const startTime = performance.now()
     const manifest = await fetch('/data/format-manifest.json').then(res => res.json())
-    const formatEntry = manifest?.formats?.find((f: any) => f.id === formatId)
+    const formatEntry = manifest?.formats?.find((f: { id: string; hash: string }) => f.id === formatId)
 
     if (formatEntry) {
       // Load both the format pack and the Pokemon index in parallel
@@ -671,6 +671,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
 export const pokemonQueries = {
   all: () => ['pokemon'] as const,
   lists: () => [...pokemonQueries.all(), 'list'] as const,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   list: (filters: Record<string, any>) => [...pokemonQueries.lists(), filters] as const,
   listByFormat: (formatId: string) => [...pokemonQueries.lists(), 'format', formatId] as const,
   details: () => [...pokemonQueries.all(), 'detail'] as const,
@@ -713,7 +714,8 @@ export const fetchPokemonForCustomFormat = async (customFormatId: string): Promi
   try {
     // Fetch the custom format from database
     const { data: customFormat, error } = await (supabase
-      .from('custom_formats') as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .from('custom_formats' as any))
       .select('pokemon_pricing')
       .eq('id', customFormatId)
       .single()
@@ -723,7 +725,8 @@ export const fetchPokemonForCustomFormat = async (customFormatId: string): Promi
       throw new Error('Custom format not found')
     }
 
-    const pokemonPricing: Record<string, number> = customFormat.pokemon_pricing || {}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pokemonPricing: Record<string, number> = (customFormat as any).pokemon_pricing || {}
     const pokemonList: Pokemon[] = []
 
     // Helper to normalize Pokemon names for matching

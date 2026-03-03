@@ -153,6 +153,7 @@ export default function DraftReplay({
         <Card className="border-2 border-blue-500 bg-blue-50/50 dark:bg-blue-900/20">
           <CardContent className="pt-6">
             <div className="flex items-center gap-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${currentPokemon.id}.png`}
                 alt={currentPokemon.name}
@@ -313,6 +314,7 @@ export default function DraftReplay({
                         >
                           {pickPokemon && (
                             <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pickPokemon.id}.png`}
                                 alt={pickPokemon.name}

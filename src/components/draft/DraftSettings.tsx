@@ -23,9 +23,9 @@ interface DraftSettingsProps {
 export function DraftSettings({ draft, isHost, onUpdate }: DraftSettingsProps) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [settings, setSettings] = useState({
-    isPublic: (draft as any).is_public || false,
-    description: (draft as any).description || '',
-    tags: ((draft as any).tags || []).join(', ')
+    isPublic: draft.isPublic || false,
+    description: draft.description || '',
+    tags: (draft.tags || []).join(', ')
   })
 
   const handleTogglePublic = async () => {
@@ -43,8 +43,8 @@ export function DraftSettings({ draft, isHost, onUpdate }: DraftSettingsProps) {
     try {
       const newIsPublic = !settings.isPublic
 
-      const { error } = await (supabase
-        .from('drafts') as any)
+      const { error } = await supabase
+        .from('drafts')
         .update({
           is_public: newIsPublic,
           updated_at: new Date().toISOString()
@@ -87,8 +87,8 @@ export function DraftSettings({ draft, isHost, onUpdate }: DraftSettingsProps) {
         .map((t: string) => t.trim())
         .filter(Boolean)
 
-      const { error } = await (supabase
-        .from('drafts') as any)
+      const { error } = await supabase
+        .from('drafts')
         .update({
           description: settings.description || null,
           tags: tags.length > 0 ? tags : null,
@@ -249,7 +249,7 @@ export function DraftSettings({ draft, isHost, onUpdate }: DraftSettingsProps) {
           <div className="flex items-center gap-2">
             <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <span className="font-medium text-blue-900 dark:text-blue-100">
-              {(draft as any).spectator_count || 0} spectators
+              {draft.spectatorCount || 0} spectators
             </span>
           </div>
           {settings.isPublic && (

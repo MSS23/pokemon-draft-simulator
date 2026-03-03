@@ -1,20 +1,18 @@
 import { supabase } from './supabase'
-import type { Database } from './supabase'
-import { generateSnakeDraftOrder, getCurrentPick } from '@/utils/draft'
+import { generateSnakeDraftOrder } from '@/utils/draft'
 import { getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { createFormatRulesEngine as createNewFormatRulesEngine } from '@/domain/rules'
-import { Pokemon, Team as AppTeam } from '@/types'
+import { Team as AppTeam } from '@/types'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { generateRoomCode } from '@/lib/room-utils'
 import { fetchPokemon } from '@/lib/pokemon-api'
 import type {
-  DraftRow, DraftInsert, DraftUpdate,
-  TeamRow, TeamInsert, TeamUpdate,
-  ParticipantRow, ParticipantInsert, ParticipantUpdate,
-  PickRow, PickInsert,
-  AuctionRow, AuctionInsert, AuctionUpdate,
+  DraftRow, DraftInsert,
+  TeamRow, TeamInsert,
+  ParticipantRow, ParticipantInsert,
+  PickRow,
+  AuctionRow,
   CustomFormatInsert,
-  UserProfileInsert,
   DraftSettings as DraftSettingsJson,
 } from '@/types/supabase-helpers'
 import bcrypt from 'bcryptjs'
@@ -37,7 +35,7 @@ type DraftWithRelations = DraftRow & {
 }
 
 /** Type for draft query results with only participants */
-type DraftWithParticipants = DraftRow & {
+type _DraftWithParticipants = DraftRow & {
   participants: ParticipantRow[]
 }
 
@@ -48,7 +46,7 @@ type DraftWithTeamsAndParticipants = DraftRow & {
 }
 
 /** Type for the make_draft_pick RPC response */
-interface MakeDraftPickResponse {
+interface _MakeDraftPickResponse {
   success: boolean
   error?: string
   pickId?: string
@@ -318,7 +316,7 @@ export class DraftService {
       is_host: true,
       last_seen: new Date().toISOString()
     }
-    const { data: participant, error: participantError } = await supabase
+    const { data: _participant, error: participantError } = await supabase
       .from('participants')
       .insert(hostParticipantInsert)
       .select()
@@ -1041,7 +1039,8 @@ export class DraftService {
       .maybeSingle()
 
     if (error) {
-      log.error('Database error:', error)
+      log.error('Error looking up participant:', error)
+      throw new Error(`Failed to look up participant: ${error.message}`)
     }
 
     if (!participant) {
@@ -1319,7 +1318,7 @@ export class DraftService {
     // 2. Delete bid history (may not exist)
     try {
       await (supabase.from('bid_history')).delete().eq('draft_id', internalId)
-    } catch (error) {
+    } catch (_error) {
       log.debug('No bid_history table or no records to delete')
     }
 
@@ -1329,14 +1328,14 @@ export class DraftService {
     // 4. Delete wishlists (may not exist)
     try {
       await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)('wishlists').delete().eq('draft_id', internalId)
-    } catch (error) {
+    } catch (_error) {
       log.debug('No wishlists table or no records to delete')
     }
 
     // 5. Delete wishlist_items (actual table name)
     try {
       await supabase.from('wishlist_items').delete().eq('draft_id', internalId)
-    } catch (error) {
+    } catch (_error) {
       log.debug('No wishlist_items to delete')
     }
 
@@ -1349,7 +1348,7 @@ export class DraftService {
     // 8. Delete draft results if any (may not exist)
     try {
       await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)('draft_results').delete().eq('draft_id', internalId)
-    } catch (error) {
+    } catch (_error) {
       log.debug('No draft_results table or no records to delete')
     }
 
@@ -2055,6 +2054,7 @@ export class DraftService {
       .single()
 
     if (error) {
+      log.error('Error fetching current auction:', error)
       return null
     }
 
@@ -2097,7 +2097,7 @@ export class DraftService {
     }
 
     // Implement turn-based nomination logic for auction drafts
-    const { draft, teams, picks } = draftState
+    const { draft: _draft, teams, picks } = draftState
 
     // Calculate whose turn it is to nominate
     const totalPicks = picks.length

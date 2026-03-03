@@ -200,6 +200,7 @@ export function analyzeTeamTypeCoverage(
   teamPokemon: Array<{ types: Array<{ name: string }> }>
 ): TypeCoverage[] {
   const allTypes = Object.keys(TYPE_CHART) as PokemonTypeName[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const coverage: Record<PokemonTypeName, number> = {} as any
 
   // Initialize

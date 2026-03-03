@@ -18,8 +18,8 @@ export interface DeduplicatorOptions {
 
 export class RequestDeduplicator {
   private static instance: RequestDeduplicator
-  private pendingRequests = new Map<string, Promise<any>>()
-  private cache = new Map<string, { data: any; timestamp: number }>()
+  private pendingRequests = new Map<string, Promise<unknown>>()
+  private cache = new Map<string, { data: unknown; timestamp: number }>()
   private defaultCacheTime = 5000 // 5 seconds
 
   static getInstance(): RequestDeduplicator {
@@ -54,7 +54,7 @@ export class RequestDeduplicator {
       const age = Date.now() - cached.timestamp
       if (age < cacheTime) {
         log.info(`Cache hit for ${key} (age: ${age}ms)`)
-        return cached.data
+        return cached.data as T
       } else {
         // Cache expired, remove it
         this.cache.delete(key)
@@ -65,7 +65,7 @@ export class RequestDeduplicator {
     const pending = this.pendingRequests.get(key)
     if (pending) {
       log.info(`Request already in progress for ${key}, reusing promise`)
-      return pending
+      return pending as Promise<T>
     }
 
     // Execute new request

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Pokemon, WishlistItem } from '@/types'
+import { WishlistItem } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,8 +19,6 @@ import {
   ChevronUp,
   Zap
 } from 'lucide-react'
-import { useDraftStore } from '@/stores/draftStore'
-import { selectUserWishlist, selectIsInWishlist } from '@/stores/selectors'
 import { useDragAndDrop } from '@/hooks/useDragAndDrop'
 import { useWishlistSync } from '@/hooks/useWishlistSync'
 import { useBudgetValidation } from '@/hooks/useBudgetValidation'
@@ -39,7 +37,7 @@ interface WishlistManagerProps {
 export default function WishlistManager({
   draftId,
   participantId,
-  userTeam,
+  userTeam: _userTeam,
   currentBudget = 100,
   usedBudget = 0,
   className,
@@ -89,7 +87,7 @@ export default function WishlistManager({
     handleDragLeave,
     handleDragOver,
     handleDrop,
-    isDragging
+    isDragging: _isDragging
   } = useDragAndDrop<WishlistItem>({
     items: userWishlist,
     onReorder: (reorderedItems) => {

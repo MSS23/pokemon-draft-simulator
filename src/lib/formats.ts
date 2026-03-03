@@ -567,6 +567,7 @@ export const DEFAULT_FORMAT = 'vgc-reg-h'
  */
 export function mergeWithShowdownData(
   localFormats: PokemonFormat[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   showdownData: Record<string, any>
 ): PokemonFormat[] {
   return localFormats.map(format => {

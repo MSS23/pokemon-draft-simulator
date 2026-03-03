@@ -262,7 +262,7 @@ export default function CreateDraftPage() {
           createLeague: formData.createLeague,
           splitIntoConferences: formData.splitIntoConferences,
           leagueWeeks: parseInt(formData.leagueWeeks),
-        } as any,
+        },
         isPublic: formData.isPublic,
         description: formData.description || null,
         tags: formData.tags
@@ -418,6 +418,7 @@ export default function CreateDraftPage() {
                         onChange={(e) =>
                           handleInputChange("userName", e.target.value)
                         }
+                        aria-required="true"
                       />
                     </div>
                     <div className="space-y-2">
@@ -431,6 +432,7 @@ export default function CreateDraftPage() {
                         onChange={(e) =>
                           handleInputChange("teamName", e.target.value)
                         }
+                        aria-required="true"
                       />
                     </div>
                   </div>
@@ -668,7 +670,7 @@ export default function CreateDraftPage() {
                               : "Export Pokemon List (CSV)"}
                           </Button>
                           <p className="text-xs text-muted-foreground mt-2">
-                            Download this format's Pokemon list with draft
+                            Download this format&apos;s Pokemon list with draft
                             points. Edit it to create your own custom format!
                           </p>
                         </div>

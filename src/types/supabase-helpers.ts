@@ -84,8 +84,38 @@ export type MatchGameRow = Row<'match_games'>
 export type MatchGameInsert = Insert<'match_games'>
 export type MatchGameUpdate = Update<'match_games'>
 
+export type TradeRow = Row<'trades'>
+export type TradeInsert = Insert<'trades'>
+export type TradeUpdate = Update<'trades'>
+
+export type TradeApprovalRow = Row<'trade_approvals'>
+export type TradeApprovalInsert = Insert<'trade_approvals'>
+export type TradeApprovalUpdate = Update<'trade_approvals'>
+
+export type MatchPokemonKORow = Row<'match_pokemon_kos'>
+export type MatchPokemonKOInsert = Insert<'match_pokemon_kos'>
+export type MatchPokemonKOUpdate = Update<'match_pokemon_kos'>
+
+export type TeamPokemonStatusRow = Row<'team_pokemon_status'>
+export type TeamPokemonStatusInsert = Insert<'team_pokemon_status'>
+export type TeamPokemonStatusUpdate = Update<'team_pokemon_status'>
+
+export type WeeklySummaryRow = Row<'weekly_summaries'>
+export type WeeklySummaryInsert = Insert<'weekly_summaries'>
+export type WeeklySummaryUpdate = Update<'weekly_summaries'>
+
+export type WeeklyHighlightRow = Row<'weekly_highlights'>
+export type WeeklyHighlightInsert = Insert<'weekly_highlights'>
+export type WeeklyHighlightUpdate = Update<'weekly_highlights'>
+
+export type DraftResultRow = Row<'draft_results'>
+export type DraftResultInsert = Insert<'draft_results'>
+export type DraftResultUpdate = Update<'draft_results'>
+
 // View types
 export type ActivePublicDraftRow = Views['active_public_drafts']['Row']
+export type TradeHistoryViewRow = Views['trade_history']['Row']
+export type DraftHistoryViewRow = Views['draft_history']['Row']
 
 // Query result type helper
 export type QueryResult<T> = {
@@ -105,6 +135,8 @@ export interface DraftSettings {
   pickTimeLimitSeconds?: number
   /** Maximum Pokemon per team */
   maxPokemonPerTeam?: number
+  /** Pokemon per team (alias for maxPokemonPerTeam) */
+  pokemonPerTeam?: number
   /** Format ID (e.g., 'vgc-reg-h') */
   formatId?: string
   /** Auction duration in seconds */

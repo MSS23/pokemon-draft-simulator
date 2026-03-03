@@ -12,6 +12,7 @@ export function HydrationErrorFilter() {
     const originalError = console.error
     const originalWarn = console.warn
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     console.error = (...args: any[]) => {
       const message = args[0]?.toString() || ''
       
@@ -34,6 +35,7 @@ export function HydrationErrorFilter() {
       originalError.apply(console, args)
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     console.warn = (...args: any[]) => {
       const message = args[0]?.toString() || ''
       

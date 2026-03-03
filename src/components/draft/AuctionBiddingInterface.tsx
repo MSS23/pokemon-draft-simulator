@@ -52,7 +52,7 @@ export default function AuctionBiddingInterface({
   timeRemaining,
   isUserTurn,
   onPlaceBid,
-  onNominatePokemon,
+  onNominatePokemon: _onNominatePokemon,
   draftId,
   className
 }: AuctionBiddingInterfaceProps) {

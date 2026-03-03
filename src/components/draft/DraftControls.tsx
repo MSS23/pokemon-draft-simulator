@@ -72,7 +72,7 @@ const DraftControls = memo(function DraftControls({
   draftStatus,
   currentTurn,
   totalTeams,
-  currentTeam,
+  currentTeam: _currentTeam,
   teams,
   isHost,
   isStarting = false,
@@ -86,9 +86,9 @@ const DraftControls = memo(function DraftControls({
   onDeleteDraft,
   onAdvanceTurn,
   onSetTimer,
-  onEnableProxyPicking,
-  onDisableProxyPicking,
-  isProxyPickingEnabled = false,
+  onEnableProxyPicking: _onEnableProxyPicking,
+  onDisableProxyPicking: _onDisableProxyPicking,
+  isProxyPickingEnabled: _isProxyPickingEnabled = false,
   isShuffling = false,
   onUndoLastPick,
   onRequestNotificationPermission,
@@ -322,7 +322,7 @@ const DraftControls = memo(function DraftControls({
                     <SkipForward className="h-4 w-4 mr-1" />
                     Skip Turn
                   </Button>
-                  <span className="text-xs text-gray-500">Skip current player's turn</span>
+                  <span className="text-xs text-gray-500">Skip current player&apos;s turn</span>
                 </div>
               </div>
             )}
@@ -360,7 +360,7 @@ const DraftControls = memo(function DraftControls({
                     <Bell className="h-4 w-4 mr-1" />
                     Enable Notifications
                   </Button>
-                  <span className="text-xs text-gray-500">Get notified when it's your turn</span>
+                  <span className="text-xs text-gray-500">Get notified when it&apos;s your turn</span>
                 </div>
               </div>
             )}

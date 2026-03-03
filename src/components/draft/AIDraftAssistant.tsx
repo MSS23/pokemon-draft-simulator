@@ -65,6 +65,7 @@ export function AIDraftAssistant({
       setIsAnalyzing(false)
       isAnalyzingRef.current = false
     }, 500)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     availablePokemon.length,
     currentTeam.length,
@@ -85,10 +86,10 @@ export function AIDraftAssistant({
         clearTimeout(analysisTimeoutRef.current)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // Note: analyzeNow is intentionally omitted to prevent infinite re-render loop
     // The callback is recreated when its dependencies change (via useCallback deps),
     // which triggers re-analysis through availablePokemon.length changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availablePokemon.length, isYourTurn])
 
   if (!isExpanded) {
@@ -230,6 +231,7 @@ function RecommendationCard({
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={pokemon.sprite}
               alt={pokemon.name}

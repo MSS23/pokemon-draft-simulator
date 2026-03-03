@@ -205,6 +205,7 @@ export function isSyncStale(): boolean {
 /**
  * Convert Showdown format to our format structure
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function convertShowdownFormat(showdownFormat: ShowdownFormat, formatId: string): Partial<any> {
   // Map common Showdown format IDs to our format IDs
   const formatMapping: Record<string, string> = {

@@ -9,8 +9,8 @@
  */
 
 import { LeagueStatsService } from './league-stats-service'
-import type { AdvancedTeamStats, HeadToHeadRecord, TeamFormIndicator } from './league-stats-service'
-import type { Pick, Team } from '@/types'
+import type { AdvancedTeamStats } from './league-stats-service'
+import type { Pick } from '@/types'
 
 interface TypeEffectiveness {
   [key: string]: {
@@ -21,7 +21,7 @@ interface TypeEffectiveness {
 }
 
 // Simplified type chart (major weaknesses/resistances)
-const TYPE_CHART: TypeEffectiveness = {
+const _TYPE_CHART: TypeEffectiveness = {
   normal: { weakTo: ['fighting'], resistsTo: [], immuneTo: ['ghost'] },
   fire: { weakTo: ['water', 'ground', 'rock'], resistsTo: ['fire', 'grass', 'ice', 'bug', 'steel', 'fairy'], immuneTo: [] },
   water: { weakTo: ['electric', 'grass'], resistsTo: ['fire', 'water', 'ice', 'steel'], immuneTo: [] },
@@ -142,8 +142,8 @@ export class AIAnalysisService {
     }
 
     // Analyze type coverage (simplified - would need actual Pokemon type data)
-    const typeCount: { [key: string]: number } = {}
-    const allTypes = new Set<string>()
+    const _typeCount: { [key: string]: number } = {}
+    const _allTypes = new Set<string>()
 
     // This is simplified - in production you'd fetch actual Pokemon types from PokeAPI
     // For now, we'll make educated guesses or use placeholder data
@@ -234,8 +234,8 @@ export class AIAnalysisService {
   static async predictMatchup(
     homeTeamId: string,
     awayTeamId: string,
-    homePicks: Pick[],
-    awayPicks: Pick[]
+    _homePicks: Pick[],
+    _awayPicks: Pick[]
   ): Promise<MatchupPrediction> {
     // Fetch team stats and form
     const [homeStats, awayStats, homeForm, awayForm, h2h] = await Promise.all([
@@ -434,7 +434,7 @@ export class AIAnalysisService {
   /**
    * Generate power rankings for all teams in a league
    */
-  static async generatePowerRankings(leagueId: string): Promise<Array<{
+  static async generatePowerRankings(_leagueId: string): Promise<Array<{
     rank: number
     previousRank: number
     teamId: string

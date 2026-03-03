@@ -406,7 +406,7 @@ function calculateAchievementProgress(
  */
 export function getLeaderboard(
   players: PlayerStats[],
-  period: 'global' | 'weekly' | 'monthly' = 'global',
+  _period: 'global' | 'weekly' | 'monthly' = 'global',
   limit: number = 100
 ): LeaderboardEntry[] {
   const sorted = players

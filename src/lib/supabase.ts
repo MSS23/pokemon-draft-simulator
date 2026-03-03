@@ -150,6 +150,7 @@ export type Database = {
           owner_id: string | null
           budget_remaining: number
           draft_order: number
+          undos_remaining: number
         }
         Insert: {
           id?: string
@@ -159,6 +160,7 @@ export type Database = {
           owner_id?: string | null
           budget_remaining?: number
           draft_order: number
+          undos_remaining?: number
         }
         Update: {
           id?: string
@@ -168,6 +170,7 @@ export type Database = {
           owner_id?: string | null
           budget_remaining?: number
           draft_order?: number
+          undos_remaining?: number
         }
         Relationships: []
       }
@@ -216,6 +219,7 @@ export type Database = {
           display_name: string
           team_id: string | null
           is_host: boolean
+          is_admin: boolean
           last_seen: string
         }
         Insert: {
@@ -226,6 +230,7 @@ export type Database = {
           display_name: string
           team_id?: string | null
           is_host?: boolean
+          is_admin?: boolean
           last_seen?: string
         }
         Update: {
@@ -236,6 +241,7 @@ export type Database = {
           display_name?: string
           team_id?: string | null
           is_host?: boolean
+          is_admin?: boolean
           last_seen?: string
         }
         Relationships: []
@@ -732,6 +738,339 @@ export type Database = {
         }
         Relationships: []
       }
+      trades: {
+        Row: {
+          id: string
+          league_id: string
+          week_number: number
+          team_a_id: string
+          team_b_id: string
+          team_a_gives: string[]
+          team_b_gives: string[]
+          status: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
+          proposed_by: string
+          proposed_at: string
+          responded_at: string | null
+          completed_at: string | null
+          notes: string | null
+          commissioner_approved: boolean | null
+          commissioner_id: string | null
+          commissioner_notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          week_number: number
+          team_a_id: string
+          team_b_id: string
+          team_a_gives: string[]
+          team_b_gives: string[]
+          status?: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
+          proposed_by: string
+          proposed_at?: string
+          responded_at?: string | null
+          completed_at?: string | null
+          notes?: string | null
+          commissioner_approved?: boolean | null
+          commissioner_id?: string | null
+          commissioner_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          week_number?: number
+          team_a_id?: string
+          team_b_id?: string
+          team_a_gives?: string[]
+          team_b_gives?: string[]
+          status?: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
+          proposed_by?: string
+          proposed_at?: string
+          responded_at?: string | null
+          completed_at?: string | null
+          notes?: string | null
+          commissioner_approved?: boolean | null
+          commissioner_id?: string | null
+          commissioner_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      trade_approvals: {
+        Row: {
+          id: string
+          trade_id: string
+          approver_user_id: string
+          approver_role: 'commissioner' | 'admin' | 'owner'
+          approved: boolean
+          comments: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          trade_id: string
+          approver_user_id: string
+          approver_role?: 'commissioner' | 'admin' | 'owner'
+          approved: boolean
+          comments?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          trade_id?: string
+          approver_user_id?: string
+          approver_role?: 'commissioner' | 'admin' | 'owner'
+          approved?: boolean
+          comments?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      match_pokemon_kos: {
+        Row: {
+          id: string
+          match_id: string
+          game_number: number
+          pick_id: string
+          pokemon_id: string
+          ko_count: number
+          is_death: boolean
+          ko_details: Record<string, unknown> | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          match_id: string
+          game_number: number
+          pick_id: string
+          pokemon_id: string
+          ko_count?: number
+          is_death?: boolean
+          ko_details?: Record<string, unknown> | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          match_id?: string
+          game_number?: number
+          pick_id?: string
+          pokemon_id?: string
+          ko_count?: number
+          is_death?: boolean
+          ko_details?: Record<string, unknown> | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      team_pokemon_status: {
+        Row: {
+          id: string
+          pick_id: string
+          team_id: string
+          league_id: string
+          status: 'alive' | 'fainted' | 'dead'
+          total_kos: number
+          matches_played: number
+          matches_won: number
+          death_match_id: string | null
+          death_date: string | null
+          death_details: Record<string, unknown> | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          pick_id: string
+          team_id: string
+          league_id: string
+          status?: 'alive' | 'fainted' | 'dead'
+          total_kos?: number
+          matches_played?: number
+          matches_won?: number
+          death_match_id?: string | null
+          death_date?: string | null
+          death_details?: Record<string, unknown> | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          pick_id?: string
+          team_id?: string
+          league_id?: string
+          status?: 'alive' | 'fainted' | 'dead'
+          total_kos?: number
+          matches_played?: number
+          matches_won?: number
+          death_match_id?: string | null
+          death_date?: string | null
+          death_details?: Record<string, unknown> | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      weekly_summaries: {
+        Row: {
+          id: string
+          league_id: string
+          week_number: number
+          headline: string | null
+          summary_text: string | null
+          top_performer_team_id: string | null
+          top_performer_reason: string | null
+          most_kos_pokemon_id: string | null
+          most_kos_pick_id: string | null
+          most_kos_count: number
+          biggest_upset_match_id: string | null
+          biggest_upset_description: string | null
+          total_matches: number
+          total_kos: number
+          total_deaths: number
+          total_trades: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          week_number: number
+          headline?: string | null
+          summary_text?: string | null
+          top_performer_team_id?: string | null
+          top_performer_reason?: string | null
+          most_kos_pokemon_id?: string | null
+          most_kos_pick_id?: string | null
+          most_kos_count?: number
+          biggest_upset_match_id?: string | null
+          biggest_upset_description?: string | null
+          total_matches?: number
+          total_kos?: number
+          total_deaths?: number
+          total_trades?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          week_number?: number
+          headline?: string | null
+          summary_text?: string | null
+          top_performer_team_id?: string | null
+          top_performer_reason?: string | null
+          most_kos_pokemon_id?: string | null
+          most_kos_pick_id?: string | null
+          most_kos_count?: number
+          biggest_upset_match_id?: string | null
+          biggest_upset_description?: string | null
+          total_matches?: number
+          total_kos?: number
+          total_deaths?: number
+          total_trades?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      weekly_highlights: {
+        Row: {
+          id: string
+          league_id: string
+          week_number: number
+          type: string
+          title: string
+          description: string
+          icon: string | null
+          team_id: string | null
+          match_id: string | null
+          pick_id: string | null
+          trade_id: string | null
+          display_order: number
+          is_pinned: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          week_number: number
+          type: string
+          title: string
+          description: string
+          icon?: string | null
+          team_id?: string | null
+          match_id?: string | null
+          pick_id?: string | null
+          trade_id?: string | null
+          display_order?: number
+          is_pinned?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          week_number?: number
+          type?: string
+          title?: string
+          description?: string
+          icon?: string | null
+          team_id?: string | null
+          match_id?: string | null
+          pick_id?: string | null
+          trade_id?: string | null
+          display_order?: number
+          is_pinned?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      draft_results: {
+        Row: {
+          id: string
+          draft_id: string
+          total_picks: number
+          total_teams: number
+          duration_seconds: number | null
+          winner_team_id: string | null
+          stats: Record<string, unknown> | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          draft_id: string
+          total_picks?: number
+          total_teams?: number
+          duration_seconds?: number | null
+          winner_team_id?: string | null
+          stats?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          draft_id?: string
+          total_picks?: number
+          total_teams?: number
+          duration_seconds?: number | null
+          winner_team_id?: string | null
+          stats?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       active_public_drafts: {
@@ -753,6 +1092,49 @@ export type Database = {
         }
         Relationships: []
       }
+      trade_history: {
+        Row: {
+          id: string
+          league_id: string
+          week_number: number
+          team_a_id: string
+          team_b_id: string
+          team_a_gives: string[]
+          team_b_gives: string[]
+          status: string
+          proposed_by: string
+          proposed_at: string
+          responded_at: string | null
+          completed_at: string | null
+          notes: string | null
+          commissioner_approved: boolean | null
+          commissioner_id: string | null
+          commissioner_notes: string | null
+          created_at: string
+          updated_at: string
+          team_a_name: string
+          team_b_name: string
+          proposed_by_name: string
+          league_name: string
+        }
+        Relationships: []
+      }
+      draft_history: {
+        Row: {
+          id: string
+          name: string
+          host_id: string
+          format: string
+          ruleset: string
+          status: string
+          room_code: string | null
+          completed_at: string | null
+          created_at: string
+          total_teams: number
+          total_picks: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       update_team_budget: {
@@ -765,6 +1147,38 @@ export type Database = {
       }
       place_bid: {
         Args: { auction_id: string; bidder_team_id: string; bid_amount: number }
+        Returns: undefined
+      }
+      promote_to_admin: {
+        Args: { p_draft_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      demote_from_admin: {
+        Args: { p_draft_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      execute_trade: {
+        Args: { trade_uuid: string }
+        Returns: undefined
+      }
+      increment_pokemon_match_stats: {
+        Args: { p_pick_id: string; p_won: boolean }
+        Returns: undefined
+      }
+      undo_last_pick: {
+        Args: { p_draft_id: string; p_team_id: string }
+        Returns: Record<string, unknown>
+      }
+      get_draft_history: {
+        Args: { p_draft_id: string }
+        Returns: Record<string, unknown>[]
+      }
+      record_draft_action: {
+        Args: { p_draft_id: string; p_action_type: string; p_action_data: Record<string, unknown> }
+        Returns: undefined
+      }
+      generate_week_summary: {
+        Args: { p_league_id: string; p_week_number: number }
         Returns: undefined
       }
     }

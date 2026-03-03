@@ -171,6 +171,7 @@ export class BatchRequester<T> {
 /**
  * Pokemon-specific batch requester
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 class PokemonBatchRequester extends BatchRequester<any> {
   constructor() {
     super(async (ids: string[]) => {
@@ -180,9 +181,11 @@ class PokemonBatchRequester extends BatchRequester<any> {
           const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${id}`)
           if (!response.ok) throw new Error(`HTTP ${response.status}`)
           const data = await response.json()
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return [id, data] as [string, any]
         } catch (error) {
           log.error(`Failed to fetch Pokemon ${id}:`, error)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return [id, null] as [string, any]
         }
       })
@@ -215,6 +218,7 @@ export function getPokemonBatcher(): PokemonBatchRequester {
 /**
  * Batch request Pokemon data
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function batchRequestPokemon(id: string): Promise<any> {
   const batcher = getPokemonBatcher()
   return batcher.request(id)

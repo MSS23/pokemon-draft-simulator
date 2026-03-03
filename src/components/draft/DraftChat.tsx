@@ -44,8 +44,8 @@ const EMOJI_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '⚡', '🔥'
 export default function DraftChat({
   messages,
   currentUserId,
-  currentUserName,
-  draftId,
+  currentUserName: _currentUserName,
+  draftId: _draftId,
   isMinimized = false,
   onSendMessage,
   onAddReaction,

@@ -56,7 +56,7 @@ export default function DraftHistory() {
     loadHistory()
   }, [loadHistory])
 
-  const formatDate = (dateString: string) => {
+  const _formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
     const diffTime = Math.abs(now.getTime() - date.getTime())
@@ -73,7 +73,7 @@ export default function DraftHistory() {
     }
   }
 
-  const formatDuration = (minutes?: number) => {
+  const _formatDuration = (minutes?: number) => {
     if (!minutes) return 'N/A'
     if (minutes < 60) return `${minutes}m`
     const hours = Math.floor(minutes / 60)

@@ -75,7 +75,7 @@ class ErrorHandler {
   private categorizeError(error: unknown, context?: ErrorContext): AppError {
     // Handle Supabase/PostgreSQL errors
     if (this.isSupabaseError(error)) {
-      return this.handleSupabaseError(error as any, context)
+      return this.handleSupabaseError(error as Record<string, unknown>, context)
     }
 
     // Handle Fetch/Network errors
@@ -149,9 +149,9 @@ class ErrorHandler {
   /**
    * Handle Supabase-specific errors
    */
-  private handleSupabaseError(error: any, context?: ErrorContext): AppError {
-    const code = error.code || error.status || error.statusCode || 'UNKNOWN'
-    const message = error.message || error.error_description || String(error)
+  private handleSupabaseError(error: Record<string, unknown>, _context?: ErrorContext): AppError {
+    const code = String(error.code ?? error.status ?? error.statusCode ?? 'UNKNOWN')
+    const message = String(error.message ?? error.error_description ?? error)
 
     // Common Supabase error codes
     switch (code) {

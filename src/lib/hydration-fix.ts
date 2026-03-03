@@ -69,6 +69,7 @@ export function suppressExtensionHydrationWarnings() {
 
   // Override console.error temporarily to filter out extension-related hydration warnings
   const originalError = console.error
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   console.error = (...args: any[]) => {
     const message = args[0]?.toString() || ''
     

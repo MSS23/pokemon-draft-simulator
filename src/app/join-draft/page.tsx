@@ -28,6 +28,7 @@ function JoinDraftForm() {
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [isJoining, setIsJoining] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [draftInfo, setDraftInfo] = useState<any>(null);
   const [error, setError] = useState("");
   const [userDisplayName, setUserDisplayName] = useState("");
@@ -68,7 +69,7 @@ function JoinDraftForm() {
       }
 
       const hostParticipant = draftState.participants.find((p) => p.is_host);
-      const hasPassword = !!(draftState.draft as any).password;
+      const hasPassword = !!draftState.draft.password;
 
       setRequiresPassword(hasPassword);
       setDraftInfo({
@@ -284,6 +285,8 @@ function JoinDraftForm() {
                       }
                       className="bg-white dark:bg-slate-800 font-mono text-lg text-center"
                       maxLength={6}
+                      aria-label="Room code"
+                      aria-required="true"
                     />
                     <Button
                       onClick={lookupDraft}
@@ -401,6 +404,7 @@ function JoinDraftForm() {
                               handleInputChange("teamName", e.target.value)
                             }
                             className="bg-white dark:bg-slate-800"
+                            aria-required="true"
                           />
                         )}
                       </div>
@@ -424,6 +428,7 @@ function JoinDraftForm() {
                             handleInputChange("password", e.target.value)
                           }
                           className="bg-white dark:bg-slate-800 border-red-300 dark:border-red-700"
+                          aria-required="true"
                         />
                         <p className="text-xs text-red-600 dark:text-red-400">
                           This is a private draft and requires a password to

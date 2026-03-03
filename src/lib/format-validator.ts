@@ -147,7 +147,7 @@ export class FormatValidator {
     }
 
     // Check if restricted (legal but limited)
-    const isRestricted = format.restrictedMons?.includes(pokemonId) || false
+    const _isRestricted = format.restrictedMons?.includes(pokemonId) || false
 
     // Calculate cost
     const cost = this.calculateCost(pokemon, format)

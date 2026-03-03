@@ -35,6 +35,7 @@ export interface CacheStats {
 }
 
 class PokemonCache {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private cache: Map<string, CacheEntry<any>> = new Map()
   private config: CacheConfig
   private stats: CacheStats = {
@@ -47,6 +48,7 @@ class PokemonCache {
   }
   private gcTimer: NodeJS.Timeout | null = null
   private refreshQueue: Set<string> = new Set()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private refreshing: Map<string, Promise<any>> = new Map()
 
   constructor(config: Partial<CacheConfig> = {}) {

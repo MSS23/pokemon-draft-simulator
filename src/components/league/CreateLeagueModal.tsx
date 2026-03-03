@@ -119,6 +119,7 @@ export function CreateLeagueModal({
               value={leagueName}
               onChange={(e) => setLeagueName(e.target.value)}
               placeholder="My Pokemon League Season 1"
+              aria-required="true"
             />
           </div>
 
@@ -151,7 +152,7 @@ export function CreateLeagueModal({
               <Swords className="h-4 w-4" />
               Match Format
             </Label>
-            <Select value={matchFormat} onValueChange={(v) => setMatchFormat(v as any)}>
+            <Select value={matchFormat} onValueChange={(v) => setMatchFormat(v as 'best_of_1' | 'best_of_3' | 'best_of_5')}>
               <SelectTrigger id="match-format">
                 <SelectValue />
               </SelectTrigger>

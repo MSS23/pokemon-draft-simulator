@@ -31,7 +31,7 @@ export interface DraftNotification {
   type: NotificationType
   title: string
   message: string
-  data?: any
+  data?: Record<string, unknown>
   timestamp: string
   urgent: boolean
   sound?: boolean
@@ -198,6 +198,7 @@ class NotificationService {
 
     try {
       // Create audio context for notification sounds
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
 
       if (urgent) {

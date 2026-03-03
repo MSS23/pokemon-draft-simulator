@@ -53,6 +53,7 @@ const calculateColumnCount = (width: number, cardSize: 'sm' | 'md' | 'lg'): numb
 }
 
 // Debounce utility for resize events
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function debounce<T extends (...args: any[]) => void>(
   func: T,
   wait: number

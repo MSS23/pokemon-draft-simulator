@@ -45,7 +45,7 @@ export default function DraftManagementPanel() {
 
       if (error) throw error
       setDrafts(data as unknown as Draft[] || [])
-    } catch (err) {
+    } catch (_err) {
       notify.error('Error', 'Failed to load drafts')
     } finally {
       setLoading(false)
@@ -79,7 +79,7 @@ export default function DraftManagementPanel() {
 
       notify.success('Draft Deleted', `Draft ${roomCode} has been removed`)
       setDrafts(prev => prev.filter(d => d.id !== draftId))
-    } catch (err) {
+    } catch (_err) {
       notify.error('Delete Failed', 'Failed to delete draft')
     } finally {
       setDeleting(null)
@@ -110,7 +110,7 @@ export default function DraftManagementPanel() {
 
       notify.success('All Drafts Deleted', `${count} drafts have been removed`)
       setDrafts([])
-    } catch (err) {
+    } catch (_err) {
       notify.error('Delete Failed', 'Failed to delete all drafts')
     } finally {
       setLoading(false)

@@ -133,12 +133,12 @@ export function batchStoreUpdates(updates: (() => void)[]): void {
 /**
  * Create a derived selector that depends on multiple stores
  */
-export function createCombinedSelector<T1, T2, R>(
+export function createCombinedSelector<T1, T2, V1, V2, R>(
   store1: UseBoundStore<StoreApi<T1>>,
-  selector1: (state: T1) => any,
+  selector1: (state: T1) => V1,
   store2: UseBoundStore<StoreApi<T2>>,
-  selector2: (state: T2) => any,
-  combiner: (value1: any, value2: any) => R
+  selector2: (state: T2) => V2,
+  combiner: (value1: V1, value2: V2) => R
 ): () => R {
   return () => {
     const value1 = store1(selector1)

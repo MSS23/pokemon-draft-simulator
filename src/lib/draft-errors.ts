@@ -77,7 +77,18 @@ export interface DraftErrorContext {
   expectedTurn?: number
   budgetRequired?: number
   budgetAvailable?: number
-  [key: string]: any
+  currentTeamId?: string
+  currentTeamName?: string
+  currentStatus?: string
+  teamName?: string
+  pokemonName?: string
+  maxPicks?: number
+  currentBid?: number
+  bidAmount?: number
+  reason?: string
+  action?: string
+  originalError?: string
+  [key: string]: unknown
 }
 
 /**
@@ -316,14 +327,14 @@ export const DraftErrors = {
 /**
  * Type guard to check if an error is a DraftError
  */
-export function isDraftError(error: any): error is DraftError {
+export function isDraftError(error: unknown): error is DraftError {
   return error instanceof DraftError
 }
 
 /**
  * Convert any error to DraftError
  */
-export function toDraftError(error: any): DraftError {
+export function toDraftError(error: unknown): DraftError {
   if (isDraftError(error)) {
     return error
   }

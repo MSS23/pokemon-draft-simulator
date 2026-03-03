@@ -58,10 +58,20 @@ export interface Draft {
   ruleset: string
   budgetPerTeam: number
   maxTeams: number
-  status: 'setup' | 'active' | 'completed' | 'paused'
+  status: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
   currentTurn: number | null
   currentRound: number
   settings: DraftSettings
+  roomCode: string | null
+  isPublic: boolean
+  spectatorCount: number
+  description: string | null
+  tags: string[] | null
+  password: string | null
+  customFormatId: string | null
+  turnStartedAt: string | null
+  deletedAt: string | null
+  deletedBy: string | null
   createdAt: string
   updatedAt: string
 }
@@ -69,6 +79,9 @@ export interface Draft {
 export interface DraftSettings {
   timePerPick?: number
   timePerBid?: number
+  timeLimit?: number
+  pokemonPerTeam?: number
+  formatId?: string
   allowUndos?: boolean
   requireFullRoster?: boolean
   maxPokemonPerTeam?: number
@@ -76,6 +89,7 @@ export interface DraftSettings {
   createLeague?: boolean
   splitIntoConferences?: boolean
   leagueWeeks?: number
+  [key: string]: unknown
 }
 
 export interface Team {
@@ -85,6 +99,7 @@ export interface Team {
   ownerId: string | null
   budgetRemaining: number
   draftOrder: number
+  undosRemaining: number
   picks: Pick[]
 }
 
@@ -283,13 +298,13 @@ export interface MatchPokemonKO {
   pickId: string
   koCount: number // Times this Pokemon fainted in this game
   isDeath: boolean // Permanent death (Nuzlocke)
-  koDetails?: {
+  koDetails: {
     opponentPokemon?: string
     moveUsed?: string
     turnNumber?: number
     damage?: number
     [key: string]: unknown
-  }
+  } | null
   createdAt: string
   updatedAt: string
 }
@@ -303,15 +318,15 @@ export interface TeamPokemonStatus {
   totalKos: number
   matchesPlayed: number
   matchesWon: number
-  deathMatchId?: string | null
-  deathDate?: string | null
-  deathDetails?: {
+  deathMatchId: string | null
+  deathDate: string | null
+  deathDetails: {
     opponentTeam?: string
     opponentPokemon?: string
     moveUsed?: string
     [key: string]: unknown
-  }
-  notes?: string | null
+  } | null
+  notes: string | null
   createdAt: string
   updatedAt: string
 }

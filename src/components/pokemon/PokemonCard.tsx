@@ -50,7 +50,7 @@ const PokemonCard = ({
   isInWishlist = false,
   isUnaffordable = false,
   showCost = true,
-  showStats = true,
+  showStats: _showStats = true,
   showWishlistButton = true,
   size = 'md',
   className,
@@ -124,7 +124,6 @@ const PokemonCard = ({
       role="article"
       tabIndex={!isDisabled && !isDrafted ? 0 : -1}
       aria-label={cardAriaLabel}
-      aria-disabled={isDisabled || isDrafted}
       onKeyDown={handleKeyDown}
       className={cn(
         sizeClasses[size],

@@ -84,7 +84,7 @@ export default function AuctionNomination({
           ) : currentNominatingTeam ? (
             <Badge variant="outline" className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {currentNominatingTeam.name}'s Turn
+              {currentNominatingTeam.name}&apos;s Turn
             </Badge>
           ) : (
             <Badge variant="outline">

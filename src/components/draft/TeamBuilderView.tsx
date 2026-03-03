@@ -236,6 +236,7 @@ export default function TeamBuilderView({
                         : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
                     )}
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png`}
                       alt={pokemon.name}

@@ -221,6 +221,7 @@ export function sanitizeUrl(url: string | null | undefined): string | null {
 /**
  * Validate JSONB object size (prevent DoS via large objects)
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function isValidJsonbSize(obj: any, maxSizeKB: number = 100): boolean {
   try {
     const jsonString = JSON.stringify(obj)
@@ -234,6 +235,7 @@ export function isValidJsonbSize(obj: any, maxSizeKB: number = 100): boolean {
 /**
  * Sanitize JSONB object
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function sanitizeJsonb<T = any>(obj: any, maxSizeKB: number = 100): T | null {
   if (!obj || typeof obj !== 'object') return null
 
@@ -253,7 +255,9 @@ export function sanitizeJsonb<T = any>(obj: any, maxSizeKB: number = 100): T | n
  * Sanitize array with element validation
  */
 export function sanitizeArray<T>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   arr: any[] | null | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   elementValidator: (item: any) => T | null,
   maxLength: number = 1000
 ): T[] {
@@ -335,6 +339,7 @@ export interface CreateDraftInput {
   host_id: string
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function validateCreateDraftInput(input: any): CreateDraftInput | null {
   if (!input || typeof input !== 'object') return null
 
@@ -372,6 +377,7 @@ export interface CreatePickInput {
   round: number
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function validateCreatePickInput(input: any): CreatePickInput | null {
   if (!input || typeof input !== 'object') return null
 
@@ -407,6 +413,7 @@ export interface CreateBidInput {
   bid_amount: number
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function validateCreateBidInput(input: any): CreateBidInput | null {
   if (!input || typeof input !== 'object') return null
 

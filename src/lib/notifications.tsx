@@ -118,7 +118,7 @@ export const notify = {
         audio.play().catch(() => {
           // Silently fail if audio can't play
         })
-      } catch (e) {
+      } catch (_e) {
         // Ignore audio errors
       }
     }

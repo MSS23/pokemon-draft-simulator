@@ -8,7 +8,7 @@
  * - Opponent team analysis
  */
 
-import type { Pokemon, Team, Draft, Format } from '@/types'
+import type { Pokemon, Team, Format } from '@/types'
 
 export interface PickRecommendation {
   pokemon: Pokemon
@@ -101,7 +101,7 @@ export function classifyRole(pokemon: Pokemon): string[] {
 function calculateTypeCoverage(
   pokemon: Pokemon,
   currentTeam: Pokemon[],
-  availablePokemon: Pokemon[]
+  _availablePokemon: Pokemon[]
 ): number {
   let score = 0
   const teamTypes = new Set(currentTeam.flatMap(p => p.types))
@@ -156,7 +156,7 @@ function calculateTeamWeaknesses(team: Pokemon[]): string[] {
   })
 
   return Object.entries(weaknessCount)
-    .filter(([_, count]) => count >= 2)
+    .filter(([_type, count]) => count >= 2)
     .map(([type]) => type)
 }
 
@@ -289,8 +289,8 @@ function calculateSynergy(pokemon: Pokemon, currentTeam: Pokemon[]): number {
  * Calculate counter-pick score
  */
 function calculateCounterPicks(
-  pokemon: Pokemon,
-  opponentTeams: Team[]
+  _pokemon: Pokemon,
+  _opponentTeams: Team[]
 ): number {
   // TODO: Implement counter picks calculation by looking up opponent Pokemon
   // Currently returning default score as Pick objects don't include full Pokemon data
@@ -306,7 +306,7 @@ export function generateRecommendations(
   opponentTeams: Team[],
   remainingBudget: number,
   remainingPicks: number,
-  format: Format
+  _format: Format
 ): PickRecommendation[] {
   const recommendations: PickRecommendation[] = []
 
@@ -362,9 +362,9 @@ export function generateRecommendations(
  * Generate human-readable reasoning
  */
 function generateReasoning(
-  pokemon: Pokemon,
+  _pokemon: Pokemon,
   factors: PickRecommendation['reasoning']['factors'],
-  currentTeam: Pokemon[]
+  _currentTeam: Pokemon[]
 ): string {
   const reasons: string[] = []
 
@@ -398,7 +398,7 @@ function generateReasoning(
 function generateTags(
   pokemon: Pokemon,
   factors: PickRecommendation['reasoning']['factors'],
-  currentTeam: Pokemon[]
+  _currentTeam: Pokemon[]
 ): string[] {
   const tags: string[] = []
   const roles = classifyRole(pokemon)
@@ -449,7 +449,7 @@ export function generateAssistantAnalysis(
   )
 
   // Analyze team needs
-  const teamWeaknesses = calculateTeamWeaknesses(currentTeam)
+  const _teamWeaknesses = calculateTeamWeaknesses(currentTeam)
   const teamRoles = new Set(currentTeam.flatMap(p => classifyRole(p)))
 
   const allRoles = ['Speed Sweeper', 'Physical Attacker', 'Special Attacker', 'Tank', 'Wall', 'Mixed Attacker']
@@ -517,7 +517,7 @@ function calculateStatGaps(team: Pokemon[]): { stat: string; priority: 'high' | 
  * Identify needed types
  */
 function identifyNeededTypes(team: Pokemon[], category: 'offense' | 'defense'): string[] {
-  const existingTypes = new Set(team.flatMap(p => p.types))
+  const _existingTypes = new Set(team.flatMap(p => p.types))
   const allTypes = Object.keys(TYPE_EFFECTIVENESS)
 
   if (category === 'offense') {
@@ -541,7 +541,7 @@ function identifyNeededTypes(team: Pokemon[], category: 'offense' | 'defense'): 
 /**
  * Analyze opponents
  */
-function analyzeOpponents(opponentTeams: Team[]): AssistantAnalysis['opponentAnalysis'] {
+function analyzeOpponents(_opponentTeams: Team[]): AssistantAnalysis['opponentAnalysis'] {
   const weaknessCount: Record<string, number> = {}
   const threatPokemon: { name: string; threat: number }[] = []
 
@@ -565,7 +565,7 @@ function analyzeOpponents(opponentTeams: Team[]): AssistantAnalysis['opponentAna
   const suggectedCounters = Array.from(new Set(
     commonWeaknesses.flatMap(weakness =>
       Object.entries(TYPE_EFFECTIVENESS)
-        .filter(([_, data]) => data.strong.includes(weakness))
+        .filter(([_type, data]) => data.strong.includes(weakness))
         .map(([type]) => type)
     )
   )).slice(0, 5)

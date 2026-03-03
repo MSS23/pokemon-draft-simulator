@@ -1,7 +1,7 @@
 'use client'
 
 import { supabase } from './supabase'
-import { BidHistory, Auction } from '@/types'
+import type { BidHistoryRow, AuctionRow } from '@/types/supabase-helpers'
 import { notificationService } from './notification-service'
 import { createLogger } from '@/lib/logger'
 
@@ -60,15 +60,15 @@ class AuctionService {
         throw new Error(`Draft is not active (status: ${draftState.draft.status})`)
       }
 
-      if ((draftState.draft as any).deleted_at) {
+      if (draftState.draft.deleted_at) {
         throw new Error('Draft has been deleted')
       }
 
       const draftUuid = draftState.draft.id
 
       // First, record the bid in history
-      const { error: historyError } = await (supabase
-        .from('bid_history') as any)
+      const { error: historyError } = await supabase
+        .from('bid_history')
         .insert({
           auction_id: auctionId,
           draft_id: draftUuid,  // Use UUID instead of room_code
@@ -83,8 +83,8 @@ class AuctionService {
       }
 
       // Then update the auction with the new bid
-      const { error: auctionError } = await (supabase
-        .from('auctions') as any)
+      const { error: auctionError } = await supabase
+        .from('auctions')
         .update({
           current_bid: bidAmount,
           current_bidder: teamId,
@@ -135,7 +135,7 @@ class AuctionService {
         return this.bidHistoryCache.get(auctionId) || []
       }
 
-      const bidHistory = (data as any[])?.map(bid => ({
+      const bidHistory = (data || []).map((bid: BidHistoryRow) => ({
         id: bid.id,
         auctionId: bid.auction_id,
         teamId: bid.team_id,
@@ -174,25 +174,29 @@ class AuctionService {
           filter: `auction_id=eq.${auctionId}`,
         },
         async (payload) => {
-          const newBid = payload.new as any
-          const bidEntry: BidHistoryEntry = {
-            id: newBid.id,
-            auctionId: newBid.auction_id,
-            teamId: newBid.team_id,
-            teamName: newBid.team_name,
-            bidAmount: newBid.bid_amount,
-            timestamp: newBid.created_at,
+          try {
+            const newBid = payload.new as BidHistoryRow
+            const bidEntry: BidHistoryEntry = {
+              id: newBid.id,
+              auctionId: newBid.auction_id,
+              teamId: newBid.team_id,
+              teamName: newBid.team_name,
+              bidAmount: newBid.bid_amount,
+              timestamp: newBid.created_at,
+            }
+
+            // Update cache
+            this.addBidToCache(auctionId, bidEntry)
+
+            // Get updated history and notify
+            const updatedHistory = await this.getBidHistory(auctionId)
+            onUpdate(updatedHistory)
+
+            // Trigger bid notification
+            this.notifyBidPlaced(bidEntry.teamName, bidEntry.bidAmount, bidEntry.teamId)
+          } catch (error) {
+            log.error('Error in bid history subscription callback:', error)
           }
-
-          // Update cache
-          this.addBidToCache(auctionId, bidEntry)
-
-          // Get updated history and notify
-          const updatedHistory = await this.getBidHistory(auctionId)
-          onUpdate(updatedHistory)
-
-          // Trigger bid notification
-          this.notifyBidPlaced(bidEntry.teamName, bidEntry.bidAmount, bidEntry.teamId)
         }
       )
       .subscribe()
@@ -224,7 +228,7 @@ class AuctionService {
           filter: `draft_id=eq.${draftId}`,
         },
         (payload) => {
-          const auction = payload.new as any
+          const auction = payload.new as AuctionRow
           this.notifyAuctionStarted(auction.pokemon_name, auction.nominated_by, userTeamId)
         }
       )
@@ -237,16 +241,18 @@ class AuctionService {
           filter: `draft_id=eq.${draftId}`,
         },
         (payload) => {
-          const auction = payload.new as any
+          const auction = payload.new as AuctionRow
           
           // Check if auction completed
           if (auction.status === 'completed') {
-            this.notifyAuctionCompleted(
-              auction.pokemon_name,
-              auction.current_bidder,
-              auction.current_bid,
-              userTeamId
-            )
+            if (auction.current_bidder) {
+              this.notifyAuctionCompleted(
+                auction.pokemon_name,
+                auction.current_bidder,
+                auction.current_bid,
+                userTeamId
+              )
+            }
           }
         }
       )
@@ -294,10 +300,10 @@ class AuctionService {
 
       const totalBids = bidStats?.length || 0
       const averageBidsPerAuction = auctionCount ? totalBids / auctionCount : 0
-      const highestBid = (bidStats as any[])?.reduce((max, bid) => Math.max(max, bid.bid_amount), 0) || 0
+      const highestBid = (bidStats || [])?.reduce((max, bid) => Math.max(max, bid.bid_amount), 0) || 0
 
       // Find most active team
-      const teamBidCounts = (bidStats as any[])?.reduce((acc, bid) => {
+      const teamBidCounts = (bidStats || [])?.reduce((acc, bid) => {
         acc[bid.team_name] = (acc[bid.team_name] || 0) + 1
         return acc
       }, {} as Record<string, number>) || {}
@@ -342,13 +348,13 @@ class AuctionService {
     this.bidHistoryCache.set(auctionId, existing)
   }
 
-  private notifyBidPlaced(teamName: string, bidAmount: number, teamId: string) {
+  private notifyBidPlaced(teamName: string, bidAmount: number, _teamId: string) {
     // Note: We don't know the current user's team ID in this context,
     // so notifications will be handled at the component level
     log.info(`Bid placed: ${teamName} bid $${bidAmount}`)
   }
 
-  private notifyAuctionStarted(pokemonName: string, nominatedBy: string, userTeamId: string | null) {
+  private notifyAuctionStarted(pokemonName: string, nominatedBy: string, _userTeamId: string | null) {
     notificationService.notifyAuctionStarted(pokemonName, nominatedBy)
   }
 

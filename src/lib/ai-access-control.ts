@@ -57,20 +57,18 @@ export class AIAccessControl {
         throw new Error('Supabase not available')
       }
 
-      const leagueResponse = await supabase
+      const { data: league, error: leagueError } = await supabase
         .from('leagues')
         .select('draft_id')
         .eq('id', context.leagueId)
-        .maybeSingle() as any
+        .maybeSingle()
 
-      if (leagueResponse.error || !leagueResponse.data) {
+      if (leagueError || !league) {
         return {
           allowed: false,
           reason: 'League not found'
         }
       }
-
-      const league = leagueResponse.data as { draft_id: string }
 
       // Check if user is a participant (owns a team in this league's draft)
       const isParticipant = await this.isLeagueParticipant(userId, league.draft_id)
@@ -115,20 +113,18 @@ export class AIAccessControl {
       }
 
       // Check if draft is public
-      const draftResponse = await supabase
+      const { data: draft, error: draftError } = await supabase
         .from('drafts')
         .select('is_public, status')
         .eq('id', context.draftId)
-        .single() as any
+        .single()
 
-      if (draftResponse.error || !draftResponse.data) {
+      if (draftError || !draft) {
         return {
           allowed: false,
           reason: 'Draft not found'
         }
       }
-
-      const draft = draftResponse.data as { is_public: boolean; status: string }
 
       // Draft must be completed to have analysis
       if (draft.status !== 'completed') {
@@ -213,13 +209,14 @@ export class AIAccessControl {
     }
 
     try {
-      const teamResponse = await supabase
+      const { data, error } = await supabase
         .from('teams')
         .select('owner_id')
         .eq('id', teamId)
-        .single() as any
+        .single()
 
-      return teamResponse?.data?.owner_id === userId
+      if (error || !data) return false
+      return data.owner_id === userId
     } catch (error) {
       log.error('Error checking team ownership:', error)
       return false
@@ -235,13 +232,14 @@ export class AIAccessControl {
     }
 
     try {
-      const teamsResponse = await supabase
+      const { data, error } = await supabase
         .from('teams')
         .select('id')
         .eq('draft_id', draftId)
-        .eq('owner_id', userId) as any
+        .eq('owner_id', userId)
 
-      return teamsResponse?.data?.map((t: any) => t.id) || []
+      if (error || !data) return []
+      return data.map(t => t.id)
     } catch (error) {
       log.error('Error getting user teams:', error)
       return []
@@ -257,13 +255,14 @@ export class AIAccessControl {
     }
 
     try {
-      const draftResponse = await supabase
+      const { data, error } = await supabase
         .from('drafts')
         .select('is_public')
         .eq('id', draftId)
-        .single() as any
+        .single()
 
-      return draftResponse?.data?.is_public === true
+      if (error || !data) return false
+      return data.is_public === true
     } catch (error) {
       log.error('Error checking draft visibility:', error)
       return false
@@ -289,13 +288,13 @@ export class AIAccessControl {
       const effectiveUserId = userId || session.userId
 
       // Get league's draft
-      const leagueResponse = await supabase
+      const { data: league, error: leagueError } = await supabase
         .from('leagues')
         .select('draft_id')
         .eq('id', leagueId)
-        .maybeSingle() as any
+        .maybeSingle()
 
-      if (!leagueResponse?.data || !effectiveUserId) {
+      if (leagueError || !league || !effectiveUserId) {
         return {
           isParticipant: false,
           isDraftPublic: false,
@@ -305,7 +304,6 @@ export class AIAccessControl {
         }
       }
 
-      const league = leagueResponse.data as { draft_id: string }
       const draftId = league.draft_id
 
       // Run all checks in parallel

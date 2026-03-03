@@ -32,7 +32,7 @@ export default function ExportDraft({ exportData, className }: ExportDraftProps)
       } else {
         notify.error('Copy Failed', 'Could not copy to clipboard')
       }
-    } catch (error) {
+    } catch (_error) {
       notify.error('Copy Failed', 'Could not copy to clipboard')
     } finally {
       setIsCopying(false)

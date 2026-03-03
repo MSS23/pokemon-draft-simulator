@@ -3,7 +3,6 @@ import { useState, useRef } from 'react'
 export interface DragDropItem {
   id: string
   priority: number
-  [key: string]: any
 }
 
 interface UseDragAndDropOptions<T extends DragDropItem> {
@@ -19,7 +18,7 @@ export function useDragAndDrop<T extends DragDropItem>({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const dragCounter = useRef(0)
 
-  const handleDragStart = (e: React.DragEvent, item: T, index: number) => {
+  const handleDragStart = (e: React.DragEvent, item: T, _index: number) => {
     setDraggedItem(item)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/html', item.id)

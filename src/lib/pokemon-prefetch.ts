@@ -116,7 +116,7 @@ export class PokemonPrefetch {
   private static async fetchBatch(
     pokemonIds: string[],
     progress: PrefetchProgress,
-    onProgress?: PrefetchProgressCallback
+    _onProgress?: PrefetchProgressCallback
   ): Promise<void> {
     const promises = pokemonIds.map(id => this.fetchPokemon(id))
     const results = await Promise.allSettled(promises)

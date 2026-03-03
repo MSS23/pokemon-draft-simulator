@@ -12,9 +12,6 @@
  */
 
 import { supabase } from './supabase'
-import { AIAnalysisService } from './ai-analysis-service'
-import { LeagueStatsService } from './league-stats-service'
-import type { Pick, Team } from '@/types'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('AiDraftAnalysisService')
@@ -95,55 +92,49 @@ export class AIDraftAnalysisService {
 
     try {
       // Get draft info
-      const draftResponse = await supabase
+      const { data: draft, error: draftError } = await supabase
         .from('drafts')
-        .select('*, format:formats(*)')
+        .select('*')
         .eq('id', draftId)
-        .single() as any
+        .single()
 
-      if (draftResponse.error || !draftResponse.data) {
+      if (draftError || !draft) {
         throw new Error('Draft not found')
       }
-
-      const draft = draftResponse.data
 
       if (draft.status !== 'completed') {
         throw new Error('Draft must be completed for analysis')
       }
 
       // Get all teams and their picks
-      const teamsResponse = await supabase
+      const { data: teams, error: teamsError } = await supabase
         .from('teams')
         .select('*')
         .eq('draft_id', draftId)
-        .order('draft_order', { ascending: true }) as any
+        .order('draft_order', { ascending: true })
 
-      if (teamsResponse.error || !teamsResponse.data || teamsResponse.data.length === 0) {
+      if (teamsError || !teams || teams.length === 0) {
         throw new Error('No teams found in draft')
       }
 
-      const teams = teamsResponse.data
-
       // Get all picks
-      const picksResponse = await supabase
+      const { data: picks, error: picksError } = await supabase
         .from('picks')
         .select('*')
         .eq('draft_id', draftId)
-        .order('pick_order', { ascending: true }) as any
+        .order('pick_order', { ascending: true })
 
-      if (picksResponse.error || !picksResponse.data || picksResponse.data.length === 0) {
+      if (picksError || !picks || picks.length === 0) {
         throw new Error('No picks found in draft')
       }
 
-      const picks = picksResponse.data
-
       // Analyze each team
       const teamAnalyses = await Promise.all(
-        teams.map(async (team: any) => {
-          const teamPicks = picks.filter((p: any) => p.team_id === team.id)
+        teams.map(async (team) => {
+          const teamPicks = picks.filter(p => p.team_id === team.id)
 
           // Calculate power score based on picks
-          const totalCost = teamPicks.reduce((sum: number, p: any) => sum + p.cost, 0)
+          const totalCost = teamPicks.reduce((sum, p) => sum + p.cost, 0)
           const avgCost = totalCost / teamPicks.length
           const budgetUsed = (draft.budget_per_team || 100) - team.budget_remaining
           const budgetEfficiency = budgetUsed / (draft.budget_per_team || 100)
@@ -245,7 +236,7 @@ export class AIDraftAnalysisService {
       let valuePicksCount = 0
       let overpaymentsCount = 0
 
-      picks.forEach((pick: any) => {
+      picks.forEach((pick) => {
         // Simplified: Compare to average cost for similar picks
         const expectedCost = avgPowerScore / 10  // Rough estimate
         if (pick.cost < expectedCost * 0.8) valuePicksCount++
@@ -254,15 +245,15 @@ export class AIDraftAnalysisService {
 
       // Find best value pick
       const valuePicks = picks
-        .map((pick: any) => ({
+        .map((pick) => ({
           ...pick,
           value: avgPowerScore / 10 - pick.cost
         }))
-        .sort((a: any, b: any) => b.value - a.value)
+        .sort((a, b) => b.value - a.value)
 
       if (valuePicks.length > 0 && valuePicks[0].value > 2) {
         const bestPick = valuePicks[0]
-        const team = teams.find((t: any) => t.id === bestPick.team_id)
+        const team = teams.find(t => t.id === bestPick.team_id)
         insights.push({
           type: 'biggest_steal',
           title: `${bestPick.pokemon_name} - Steal of the Draft`,
@@ -310,26 +301,24 @@ export class AIDraftAnalysisService {
 
       if (!teams) return []
 
-      const picksResponse = await supabase
+      const { data: picks } = await supabase
         .from('picks')
         .select('*')
-        .eq('draft_id', draftId) as any
+        .eq('draft_id', draftId)
 
-      if (!picksResponse?.data) return []
+      if (!picks) return []
 
-      const picks = picksResponse.data
-
-      const draftResponse = await supabase
+      const { data: draftData } = await supabase
         .from('drafts')
         .select('budget_per_team')
         .eq('id', draftId)
-        .single() as any
+        .single()
 
-      const budgetPerTeam = draftResponse?.data?.budget_per_team || 100
+      const budgetPerTeam = draftData?.budget_per_team || 100
 
-      const comparisons = teams.map((team: any, index: number) => {
-        const teamPicks = picks.filter((p: any) => p.team_id === team.id)
-        const totalCost = teamPicks.reduce((sum: number, p: any) => sum + p.cost, 0)
+      const comparisons = teams.map((team) => {
+        const teamPicks = picks.filter(p => p.team_id === team.id)
+        const totalCost = teamPicks.reduce((sum, p) => sum + p.cost, 0)
         const avgCost = teamPicks.length > 0 ? totalCost / teamPicks.length : 0
         const budgetUsed = budgetPerTeam - team.budget_remaining
         const budgetEfficiency = (budgetUsed / budgetPerTeam) * 100
@@ -372,23 +361,22 @@ export class AIDraftAnalysisService {
     }
 
     try {
-      const picksResponse = await supabase
+      // Use join query - result shape isn't auto-typed by Supabase
+      const { data: picks } = await supabase
         .from('picks')
         .select(`
           *,
           team:teams!inner(id, name)
         `)
         .eq('draft_id', draftId)
-        .order('pick_order', { ascending: true }) as any
+        .order('pick_order', { ascending: true })
 
-      if (!picksResponse?.data) return []
-
-      const picks = picksResponse.data
+      if (!picks) return []
 
       // Calculate average cost as baseline
-      const avgCost = picks.reduce((sum: number, p: any) => sum + p.cost, 0) / picks.length
+      const avgCost = picks.reduce((sum, p) => sum + p.cost, 0) / picks.length
 
-      const analyses = picks.map((pick: any) => {
+      const analyses = picks.map((pick) => {
         const expectedCost = avgCost  // Simplified - would use more complex calculation
         const valueRating = ((expectedCost - pick.cost) / expectedCost) * 100
 
@@ -398,11 +386,14 @@ export class AIDraftAnalysisService {
         else if (valueRating < -30) value = 'overpay'
         else if (valueRating < -10) value = 'reach'
 
+        // Access joined team data
+        const team = pick as unknown as { team: { id: string; name: string } }
+
         return {
           pickId: pick.id,
           pickOrder: pick.pick_order,
           teamId: pick.team_id,
-          teamName: pick.team.name,
+          teamName: team.team.name,
           pokemonName: pick.pokemon_name,
           cost: pick.cost,
           expectedCost,
@@ -437,14 +428,14 @@ export class AIDraftAnalysisService {
         supabase.from('drafts').select('status').eq('id', draftId).single(),
         supabase.from('teams').select('id, name').eq('draft_id', draftId),
         supabase.from('picks').select('cost').eq('draft_id', draftId)
-      ]) as any[]
+      ])
 
       const draft = draftResponse?.data
       const teams = teamsResponse?.data
       const picks = picksResponse?.data
 
       const avgPickCost = picks && picks.length > 0
-        ? picks.reduce((sum: number, p: any) => sum + p.cost, 0) / picks.length
+        ? picks.reduce((sum, p) => sum + p.cost, 0) / picks.length
         : 0
 
       // Get top team from comparison

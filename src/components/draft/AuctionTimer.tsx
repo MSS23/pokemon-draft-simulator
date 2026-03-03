@@ -90,7 +90,7 @@ export default function AuctionTimer({
     return 'text-green-600'
   }
 
-  const getProgressColor = () => {
+  const _getProgressColor = () => {
     if (timeRemaining <= 5) return 'bg-red-500'
     if (timeRemaining <= 15) return 'bg-orange-500'
     if (timeRemaining <= 30) return 'bg-yellow-500'

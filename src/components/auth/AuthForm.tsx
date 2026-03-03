@@ -64,7 +64,7 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
 
           if (data.user) {
             // Create user profile in database
-            const { error: profileError } = await (supabase as any)
+            const { error: profileError } = await supabase
               .from('user_profiles')
               .insert({
                 user_id: data.user.id,
@@ -151,6 +151,7 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="pl-10"
                     disabled={isPending}
+                    autoComplete="name"
                   />
                 </div>
               </div>
@@ -169,6 +170,10 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
                   className="pl-10"
                   required
                   disabled={isPending}
+                  autoComplete="email"
+                  aria-required="true"
+                  aria-invalid={error ? 'true' : undefined}
+                  aria-describedby={error ? 'auth-error' : undefined}
                 />
               </div>
             </div>
@@ -187,6 +192,10 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
                   required
                   minLength={6}
                   disabled={isPending}
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  aria-required="true"
+                  aria-invalid={error ? 'true' : undefined}
+                  aria-describedby={isRegister ? 'password-hint' : undefined}
                 />
                 <Button
                   type="button"
@@ -195,29 +204,31 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
                   className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={isPending}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    <EyeOff className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
+                    <Eye className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   )}
                 </Button>
               </div>
               {isRegister && (
-                <p className="text-xs text-muted-foreground">
+                <p id="password-hint" className="text-xs text-muted-foreground">
                   Password must be at least 6 characters long
                 </p>
               )}
             </div>
 
             {error && (
-              <Alert variant="destructive">
+              <Alert variant="destructive" role="alert" id="auth-error">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
             {success && (
-              <Alert>
+              <Alert role="status">
                 <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}

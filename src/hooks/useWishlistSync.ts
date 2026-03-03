@@ -87,7 +87,7 @@ export function useWishlistSync({
           return
         }
 
-        const wishlistItems: WishlistItem[] = (data as any[])?.map(item => ({
+        const wishlistItems: WishlistItem[] = (data ?? []).map(item => ({
           id: item.id,
           draftId: item.draft_id,
           participantId: item.participant_id,
@@ -98,7 +98,7 @@ export function useWishlistSync({
           cost: item.cost,
           createdAt: item.created_at,
           updatedAt: item.updated_at
-        })) || []
+        }))
 
         setWishlistItems(wishlistItems)
         lastSyncRef.current = Date.now()
@@ -136,7 +136,7 @@ export function useWishlistSync({
             table: 'wishlist_items',
             filter: `draft_id=eq.${draftUuid}`
           },
-          async (payload) => {
+          async (_payload) => {
             // Debounce rapid changes
             const now = Date.now()
             if (now - lastSyncRef.current < 100) return
@@ -156,7 +156,7 @@ export function useWishlistSync({
                 return
               }
 
-              const updatedItems: WishlistItem[] = (data as any[])?.map(item => ({
+              const updatedItems: WishlistItem[] = (data ?? []).map(item => ({
                 id: item.id,
                 draftId: item.draft_id,
                 participantId: item.participant_id,
@@ -167,7 +167,7 @@ export function useWishlistSync({
                 cost: item.cost,
                 createdAt: item.created_at,
                 updatedAt: item.updated_at
-              })) || []
+              }))
 
               setWishlistItems(updatedItems)
             } catch (error) {
@@ -220,7 +220,7 @@ export function useWishlistSync({
   }, [draftId, enabled, setWishlistItems])
 
   // Helper functions for common operations
-  const addToWishlist = async (pokemon: any) => {
+  const addToWishlist = async (pokemon: import('@/types').Pokemon) => {
     if (!participantId) return null
 
     try {
