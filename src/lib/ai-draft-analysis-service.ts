@@ -15,6 +15,9 @@ import { supabase } from './supabase'
 import { AIAnalysisService } from './ai-analysis-service'
 import { LeagueStatsService } from './league-stats-service'
 import type { Pick, Team } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AiDraftAnalysisService')
 
 export interface DraftAnalysis {
   draftId: string
@@ -286,7 +289,7 @@ export class AIDraftAnalysisService {
         typeDistribution: {}  // Would need Pokemon type data from PokeAPI
       }
     } catch (error) {
-      console.error('Error analyzing draft:', error)
+      log.error('Error analyzing draft:', error)
       throw error
     }
   }
@@ -355,7 +358,7 @@ export class AIDraftAnalysisService {
 
       return ranked
     } catch (error) {
-      console.error('Error comparing teams:', error)
+      log.error('Error comparing teams:', error)
       throw error
     }
   }
@@ -410,7 +413,7 @@ export class AIDraftAnalysisService {
 
       return analyses
     } catch (error) {
-      console.error('Error analyzing pick efficiency:', error)
+      log.error('Error analyzing pick efficiency:', error)
       throw error
     }
   }
@@ -456,7 +459,7 @@ export class AIDraftAnalysisService {
         draftComplete: draft?.status === 'completed'
       }
     } catch (error) {
-      console.error('Error getting draft summary:', error)
+      log.error('Error getting draft summary:', error)
       throw error
     }
   }

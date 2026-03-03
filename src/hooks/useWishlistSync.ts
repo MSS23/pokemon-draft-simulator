@@ -5,6 +5,9 @@ import { WishlistService } from '@/lib/wishlist-service'
 import { supabase } from '@/lib/supabase'
 import { WishlistItem } from '@/types'
 import { RealtimeChannel } from '@supabase/supabase-js'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UseWishlistSync')
 
 interface UseWishlistSyncOptions {
   draftId: string
@@ -35,7 +38,7 @@ export function useWishlistSync({
       .single()
 
     if (error) {
-      console.error('Error loading draft UUID:', error)
+      log.error('Error loading draft UUID:', error)
       return null
     }
 
@@ -64,12 +67,12 @@ export function useWishlistSync({
           .single()
 
         if (draftError) {
-          console.error('Error loading draft:', draftError)
+          log.error('Error loading draft:', draftError)
           return
         }
 
         if (!draftData) {
-          console.error('Draft not found')
+          log.error('Draft not found')
           return
         }
 
@@ -80,7 +83,7 @@ export function useWishlistSync({
           .order('participant_id, priority')
 
         if (error) {
-          console.error('Error loading initial wishlist:', error)
+          log.error('Error loading initial wishlist:', error)
           return
         }
 
@@ -100,7 +103,7 @@ export function useWishlistSync({
         setWishlistItems(wishlistItems)
         lastSyncRef.current = Date.now()
       } catch (error) {
-        console.error('Error loading initial wishlist:', error)
+        log.error('Error loading initial wishlist:', error)
       }
     }
 
@@ -149,7 +152,7 @@ export function useWishlistSync({
                 .order('participant_id, priority')
 
               if (error) {
-                console.error('Error syncing wishlist:', error)
+                log.error('Error syncing wishlist:', error)
                 return
               }
 
@@ -168,7 +171,7 @@ export function useWishlistSync({
 
               setWishlistItems(updatedItems)
             } catch (error) {
-              console.error('Error handling wishlist change:', error)
+              log.error('Error handling wishlist change:', error)
             }
           }
         )
@@ -188,15 +191,15 @@ export function useWishlistSync({
                 await WishlistService.markPokemonDrafted(draftId, pick.pokemon_id)
               }
             } catch (error) {
-              console.error('Error handling pick:', error)
+              log.error('Error handling pick:', error)
             }
           }
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log(`Subscribed to wishlist changes for draft ${draftId}`)
+            log.info(`Subscribed to wishlist changes for draft ${draftId}`)
           } else if (status === 'CHANNEL_ERROR') {
-            console.error(`Wishlist subscription error for draft ${draftId}`)
+            log.error(`Wishlist subscription error for draft ${draftId}`)
             // Retry subscription after delay
             setTimeout(setupSubscription, 2000)
           }
@@ -228,7 +231,7 @@ export function useWishlistSync({
       )
       return result
     } catch (error) {
-      console.error('Error adding to wishlist:', error)
+      log.error('Error adding to wishlist:', error)
       return null
     }
   }
@@ -244,7 +247,7 @@ export function useWishlistSync({
       )
       return result
     } catch (error) {
-      console.error('Error removing from wishlist:', error)
+      log.error('Error removing from wishlist:', error)
       return false
     }
   }
@@ -260,7 +263,7 @@ export function useWishlistSync({
       )
       return result
     } catch (error) {
-      console.error('Error reordering wishlist:', error)
+      log.error('Error reordering wishlist:', error)
       return false
     }
   }
@@ -275,7 +278,7 @@ export function useWishlistSync({
       )
       return result
     } catch (error) {
-      console.error('Error getting next auto-pick Pokemon:', error)
+      log.error('Error getting next auto-pick Pokemon:', error)
       return null
     }
   }

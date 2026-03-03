@@ -9,6 +9,8 @@
  * - https://play.pokemonshowdown.com/data/formats.js
  * - https://github.com/smogon/pokemon-showdown
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('ShowdownSync')
 
 const SHOWDOWN_DATA_URL = 'https://play.pokemonshowdown.com/data'
 
@@ -67,7 +69,7 @@ export async function fetchShowdownFormats(): Promise<ShowdownFormatData> {
       source: SHOWDOWN_DATA_URL
     }
   } catch (error) {
-    console.error('Error fetching Showdown formats:', error)
+    log.error('Error fetching Showdown formats:', error)
     throw error
   }
 }
@@ -121,7 +123,7 @@ function parseShowdownFormatsJS(jsContent: string): Record<string, ShowdownForma
 
     return vgcFormats
   } catch (error) {
-    console.error('Error parsing Showdown formats:', error)
+    log.error('Error parsing Showdown formats:', error)
     return {}
   }
 }
@@ -173,7 +175,7 @@ export function getCachedShowdownData(): ShowdownFormatData | null {
 
     return JSON.parse(cached)
   } catch (error) {
-    console.error('Error reading cached Showdown data:', error)
+    log.error('Error reading cached Showdown data:', error)
     return null
   }
 }

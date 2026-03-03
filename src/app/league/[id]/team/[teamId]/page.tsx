@@ -42,6 +42,9 @@ import type {
   TeamFormIndicator
 } from '@/lib/league-stats-service'
 import type { Pick, Team } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('LeagueTeamPage')
 
 export default function TeamDetailPage() {
   const params = useParams()
@@ -100,7 +103,7 @@ export default function TeamDetailPage() {
       setCanAnalyzeTeams(accessInfo.canAnalyzeTeams)
       setAccessChecked(true)
     } catch (err) {
-      console.error('Error loading team data:', err)
+      log.error('Error loading team data:', err)
       setError(err instanceof Error ? err.message : 'Failed to load team')
     } finally {
       setIsLoading(false)
@@ -138,7 +141,7 @@ export default function TeamDetailPage() {
       const analysisData = await response.json()
       setAnalysis(analysisData)
     } catch (err) {
-      console.error('Error analyzing team:', err)
+      log.error('Error analyzing team:', err)
       toast.error(err instanceof Error ? err.message : 'Failed to analyze team')
     } finally {
       setIsAnalyzing(false)

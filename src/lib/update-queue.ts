@@ -1,4 +1,6 @@
 'use client'
+import { createLogger } from '@/lib/logger'
+const log = createLogger('UpdateQueue')
 
 /**
  * Update Queue with Optimistic Updates
@@ -69,7 +71,7 @@ export class UpdateQueue {
       this.queue.splice(insertIndex, 0, update)
     }
 
-    console.log(`[UpdateQueue] Added update ${update.id} (priority: ${update.priority}, queue size: ${this.queue.length})`)
+    log.info(`Added update ${update.id} (priority: ${update.priority}, queue size: ${this.queue.length})`)
 
     // Start processing if not already running
     if (!this.processing) {
@@ -86,13 +88,13 @@ export class UpdateQueue {
     }
 
     this.processing = true
-    console.log(`[UpdateQueue] Processing ${this.queue.length} updates...`)
+    log.info(`Processing ${this.queue.length} updates...`)
 
     while (this.queue.length > 0) {
       const update = this.queue.shift()!
 
       try {
-        console.log(`[UpdateQueue] Executing update ${update.id}`)
+        log.info(`Executing update ${update.id}`)
         const result = await update.action()
 
         // Success - call success callback if provided
@@ -100,17 +102,17 @@ export class UpdateQueue {
           update.onSuccess(result)
         }
 
-        console.log(`[UpdateQueue] Update ${update.id} completed successfully`)
+        log.info(`Update ${update.id} completed successfully`)
 
       } catch (error) {
-        console.error(`[UpdateQueue] Update ${update.id} failed:`, error)
+        log.error(`Update ${update.id} failed:`, error)
 
         const errorObj = error instanceof Error ? error : new Error(String(error))
 
         // Retry logic
         if (update.retryCount < this.maxRetries) {
           update.retryCount++
-          console.log(`[UpdateQueue] Retrying update ${update.id} (attempt ${update.retryCount}/${this.maxRetries})`)
+          log.info(`Retrying update ${update.id} (attempt ${update.retryCount}/${this.maxRetries})`)
 
           // Re-add to queue with exponential backoff
           const delay = Math.min(1000 * Math.pow(2, update.retryCount), 10000)
@@ -123,12 +125,12 @@ export class UpdateQueue {
 
         } else {
           // Max retries exceeded - rollback and call error callback
-          console.error(`[UpdateQueue] Max retries exceeded for update ${update.id}, rolling back`)
+          log.error(`Max retries exceeded for update ${update.id}, rolling back`)
 
           try {
             update.rollback()
           } catch (rollbackError) {
-            console.error(`[UpdateQueue] Rollback failed for update ${update.id}:`, rollbackError)
+            log.error(`Rollback failed for update ${update.id}:`, rollbackError)
           }
 
           if (update.onError) {
@@ -144,7 +146,7 @@ export class UpdateQueue {
     }
 
     this.processing = false
-    console.log('[UpdateQueue] Queue processing complete')
+    log.info('Queue processing complete')
   }
 
   /**
@@ -176,7 +178,7 @@ export class UpdateQueue {
    * Clear all pending updates (useful for cleanup)
    */
   clear(): void {
-    console.log(`[UpdateQueue] Clearing ${this.queue.length} pending updates`)
+    log.info(`Clearing ${this.queue.length} pending updates`)
     this.queue = []
     this.processing = false
   }

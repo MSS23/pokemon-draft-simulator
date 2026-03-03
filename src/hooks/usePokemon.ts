@@ -9,6 +9,9 @@ import {
   pokemonQueries
 } from '@/lib/pokemon-api'
 import { Pokemon } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UsePokemon')
 
 export const usePokemon = (id: string) => {
   return useQuery({
@@ -135,7 +138,7 @@ export const usePokemonByIds = (ids: string[]) => {
         const results = await Promise.all(promises)
         return results.filter(pokemon => pokemon !== null)
       } catch (error) {
-        console.warn('Error fetching Pokemon by IDs:', error)
+        log.warn('Error fetching Pokemon by IDs:', error)
         return []
       }
     },

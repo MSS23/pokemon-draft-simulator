@@ -7,6 +7,8 @@
  * - Progressive image loading
  * - Image format selection
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('ImageOptimization')
 
 /**
  * Generate a blur data URL for a Pokemon sprite
@@ -178,7 +180,7 @@ export class ProgressiveImageLoader {
       await this.loadImage(lowQualityUrl)
       onLowQualityLoaded?.()
     } catch (error) {
-      console.warn('Failed to load low-quality image:', error)
+      log.warn('Failed to load low-quality image:', error)
     }
 
     // Load high-quality
@@ -187,7 +189,7 @@ export class ProgressiveImageLoader {
       this.loaded.add(highQualityUrl)
       onHighQualityLoaded?.()
     } catch (error) {
-      console.warn('Failed to load high-quality image:', error)
+      log.warn('Failed to load high-quality image:', error)
       throw error
     }
   }

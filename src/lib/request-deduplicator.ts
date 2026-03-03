@@ -1,4 +1,6 @@
 'use client'
+import { createLogger } from '@/lib/logger'
+const log = createLogger('RequestDeduplicator')
 
 /**
  * Request Deduplicator
@@ -51,7 +53,7 @@ export class RequestDeduplicator {
     if (cached) {
       const age = Date.now() - cached.timestamp
       if (age < cacheTime) {
-        console.log(`[Deduplicator] Cache hit for ${key} (age: ${age}ms)`)
+        log.info(`Cache hit for ${key} (age: ${age}ms)`)
         return cached.data
       } else {
         // Cache expired, remove it
@@ -62,12 +64,12 @@ export class RequestDeduplicator {
     // Check if request is already in progress
     const pending = this.pendingRequests.get(key)
     if (pending) {
-      console.log(`[Deduplicator] Request already in progress for ${key}, reusing promise`)
+      log.info(`Request already in progress for ${key}, reusing promise`)
       return pending
     }
 
     // Execute new request
-    console.log(`[Deduplicator] Executing new request for ${key}`)
+    log.info(`Executing new request for ${key}`)
 
     const promise = fn()
       .then(result => {
@@ -100,7 +102,7 @@ export class RequestDeduplicator {
     if (typeof keyOrPattern === 'string') {
       this.cache.delete(keyOrPattern)
       this.pendingRequests.delete(keyOrPattern)
-      console.log(`[Deduplicator] Invalidated cache for ${keyOrPattern}`)
+      log.info(`Invalidated cache for ${keyOrPattern}`)
     } else {
       // Pattern invalidation
       const pattern = keyOrPattern
@@ -114,7 +116,7 @@ export class RequestDeduplicator {
         }
       }
 
-      console.log(`[Deduplicator] Invalidated ${count} cache entries matching pattern ${pattern}`)
+      log.info(`Invalidated ${count} cache entries matching pattern ${pattern}`)
     }
   }
 
@@ -122,7 +124,7 @@ export class RequestDeduplicator {
    * Clear all cached data and pending requests
    */
   clear(): void {
-    console.log(`[Deduplicator] Clearing ${this.cache.size} cached entries and ${this.pendingRequests.size} pending requests`)
+    log.info(`Clearing ${this.cache.size} cached entries and ${this.pendingRequests.size} pending requests`)
     this.cache.clear()
     this.pendingRequests.clear()
   }
@@ -143,7 +145,7 @@ export class RequestDeduplicator {
     }
 
     if (cleaned > 0) {
-      console.log(`[Deduplicator] Cleaned ${cleaned} expired cache entries`)
+      log.info(`Cleaned ${cleaned} expired cache entries`)
     }
   }
 

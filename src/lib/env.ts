@@ -6,6 +6,9 @@
  */
 
 import { z } from 'zod'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('Env')
 
 // Zod schema for required Supabase env vars
 const supabaseEnvSchema = z.object({
@@ -95,7 +98,7 @@ export function validateEnv(): { isValid: boolean; missing: string[] } {
 
   // Development: warn but don't throw
   if (env.app.isDevelopment) {
-    console.warn(`[env] Missing environment variables: ${missing.join(', ')}`)
+    log.warn(`Missing environment variables: ${missing.join(', ')}`)
   }
 
   return { isValid: false, missing }

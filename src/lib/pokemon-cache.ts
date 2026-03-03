@@ -1,6 +1,9 @@
 'use client'
 
 import { Pokemon } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('PokemonCache')
 
 export interface CacheEntry<T> {
   data: T
@@ -97,11 +100,11 @@ class PokemonCache {
         this.updateStats()
         return data
       } catch (error) {
-        console.error(`Failed to fetch data for key ${key}:`, error)
+        log.error(`Failed to fetch data for key ${key}:`, error)
 
         // Return stale data if available as fallback
         if (entry) {
-          console.warn(`Returning stale data for key ${key}`)
+          log.warn(`Returning stale data for key ${key}`)
           return entry.data as T
         }
       }
@@ -196,7 +199,7 @@ class PokemonCache {
         const data = await fetchFn()
         this.set(key, data)
       } catch (error) {
-        console.error(`Failed to preload data for key ${key}:`, error)
+        log.error(`Failed to preload data for key ${key}:`, error)
       }
     }
   }
@@ -233,9 +236,9 @@ class PokemonCache {
         const data = await refreshPromise
         this.set(key, data)
 
-        console.debug(`Background refresh completed for key ${key}`)
+        log.debug(`Background refresh completed for key ${key}`)
       } catch (error) {
-        console.warn(`Background refresh failed for key ${key}:`, error)
+        log.warn(`Background refresh failed for key ${key}:`, error)
       } finally {
         this.refreshing.delete(key)
       }
@@ -284,7 +287,7 @@ class PokemonCache {
     this.stats.size -= freedSpace
     this.stats.entries = this.cache.size
 
-    console.debug(`Evicted ${evictedCount} entries, freed ${freedSpace} bytes`)
+    log.debug(`Evicted ${evictedCount} entries, freed ${freedSpace} bytes`)
   }
 
   // Garbage collection
@@ -314,7 +317,7 @@ class PokemonCache {
     if (removedCount > 0) {
       this.stats.size -= freedSpace
       this.stats.entries = this.cache.size
-      console.debug(`GC: Removed ${removedCount} expired entries, freed ${freedSpace} bytes`)
+      log.debug(`GC: Removed ${removedCount} expired entries, freed ${freedSpace} bytes`)
     }
   }
 
@@ -336,7 +339,7 @@ class PokemonCache {
 
       localStorage.setItem('pokemon-cache', JSON.stringify(cacheData))
     } catch (error) {
-      console.warn('Failed to persist cache to storage:', error)
+      log.warn('Failed to persist cache to storage:', error)
     }
   }
 
@@ -360,10 +363,10 @@ class PokemonCache {
         }
 
         this.stats.entries = this.cache.size
-        console.debug(`Loaded ${this.cache.size} entries from storage`)
+        log.debug(`Loaded ${this.cache.size} entries from storage`)
       }
     } catch (error) {
-      console.warn('Failed to load cache from storage:', error)
+      log.warn('Failed to load cache from storage:', error)
       this.clearStorage()
     }
   }
@@ -374,7 +377,7 @@ class PokemonCache {
     try {
       localStorage.removeItem('pokemon-cache')
     } catch (error) {
-      console.warn('Failed to clear storage:', error)
+      log.warn('Failed to clear storage:', error)
     }
   }
 

@@ -6,6 +6,9 @@
  */
 
 import type { CompiledFormat, PokemonIndex } from '@/../data/formats/format-schema'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('FormatLoader')
 
 interface FormatManifest {
   pokemonIndexHash: string
@@ -40,7 +43,7 @@ class FormatLoaderService {
       this.manifestCache = await response.json()
       return this.manifestCache!
     } catch (error) {
-      console.error('Error loading format manifest:', error)
+      log.error('Error loading format manifest:', error)
       throw new Error('Format data not available. Run `npm run build:formats` first.')
     }
   }
@@ -64,7 +67,7 @@ class FormatLoaderService {
       this.pokemonIndexCache = await response.json()
       return this.pokemonIndexCache!
     } catch (error) {
-      console.error('Error loading Pokemon index:', error)
+      log.error('Error loading Pokemon index:', error)
       throw new Error('Pokemon index not available. Run `npm run build:formats` first.')
     }
   }
@@ -98,7 +101,7 @@ class FormatLoaderService {
       this.formatCache.set(formatId, compiled)
       return compiled
     } catch (error) {
-      console.error(`Error loading format '${formatId}':`, error)
+      log.error(`Error loading format '${formatId}':`, error)
       throw new Error(`Format '${formatId}' not available. Run \`npm run build:formats\` first.`)
     }
   }

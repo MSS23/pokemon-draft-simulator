@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Eye, EyeOff, Tag, Save, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
 
 const log = createLogger('DraftSettings')
 import type { Draft } from '@/types'
@@ -21,7 +21,6 @@ interface DraftSettingsProps {
 }
 
 export function DraftSettings({ draft, isHost, onUpdate }: DraftSettingsProps) {
-  const notify = useNotify()
   const [isUpdating, setIsUpdating] = useState(false)
   const [settings, setSettings] = useState({
     isPublic: (draft as any).is_public || false,

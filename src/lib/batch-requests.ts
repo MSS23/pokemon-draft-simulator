@@ -11,6 +11,10 @@
  * - Error handling per request
  */
 
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('BatchRequests')
+
 interface BatchRequest<T> {
   id: string
   resolve: (value: T) => void
@@ -178,7 +182,7 @@ class PokemonBatchRequester extends BatchRequester<any> {
           const data = await response.json()
           return [id, data] as [string, any]
         } catch (error) {
-          console.error(`Failed to fetch Pokemon ${id}:`, error)
+          log.error(`Failed to fetch Pokemon ${id}:`, error)
           return [id, null] as [string, any]
         }
       })
@@ -286,7 +290,7 @@ class ImagePreloader {
       }
       img.onerror = () => {
         this.loading.delete(url)
-        console.warn(`Failed to preload image: ${url}`)
+        log.warn(`Failed to preload image: ${url}`)
       }
       img.src = url
     })

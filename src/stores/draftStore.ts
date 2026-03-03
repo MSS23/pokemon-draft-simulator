@@ -11,6 +11,9 @@ import {
   PokemonTier,
   WishlistItem
 } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftStore')
 
 // ============================================
 // NORMALIZED STATE STRUCTURE
@@ -272,7 +275,7 @@ function validateTeamExists(
   actionName: string
 ): boolean {
   if (!teamsById[teamId]) {
-    console.error(`[${actionName}] Team not found: ${teamId}`)
+    log.error(`[${actionName}] Team not found: ${teamId}`)
     return false
   }
   return true
@@ -288,7 +291,7 @@ function validateBudget(
   if (!team) return false
 
   if (team.budgetRemaining < cost) {
-    console.error(
+    log.error(
       `[${actionName}] Insufficient budget. Required: ${cost}, Available: ${team.budgetRemaining}`
     )
     return false
@@ -616,7 +619,7 @@ export const useDraftStore = create<DraftStore>()(
           if (team && typeof team.budgetRemaining === 'number' && typeof pick.cost === 'number') {
             team.budgetRemaining -= pick.cost
           } else if (team) {
-            console.error(`[addPick] Invalid budget or cost values for team ${teamId}:`, {
+            log.error(`Invalid budget or cost values for team ${teamId}:`, {
               budgetRemaining: team.budgetRemaining,
               cost: pick.cost
             })
@@ -685,7 +688,7 @@ export const useDraftStore = create<DraftStore>()(
 
           // Validate budget doesn't go negative
           if (updates.budgetRemaining !== undefined && updates.budgetRemaining < 0) {
-            console.error('[updateTeam] Budget cannot be negative:', updates.budgetRemaining)
+            log.error('Budget cannot be negative:', updates.budgetRemaining)
             state.teamsById[teamId].budgetRemaining = 0
           }
         })
@@ -701,7 +704,7 @@ export const useDraftStore = create<DraftStore>()(
           const newBudget = team.budgetRemaining + budgetChange
 
           if (newBudget < 0) {
-            console.error('[updateTeamBudget] Budget cannot go negative:', newBudget)
+            log.error('Budget cannot go negative:', newBudget)
             return
           }
 

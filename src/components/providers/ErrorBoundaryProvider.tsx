@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect } from 'react'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('ErrorBoundaryProvider')
 
 export function ErrorBoundaryProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Handle unhandled promise rejections
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled promise rejection:', event.reason)
+      log.error('Unhandled promise rejection:', event.reason)
       
       // Prevent the default browser behavior of logging to console
       event.preventDefault()
@@ -18,15 +21,15 @@ export function ErrorBoundaryProvider({ children }: { children: React.ReactNode 
       
       // Log meaningful errors
       if (event.reason instanceof Error) {
-        console.error('Promise rejection error:', event.reason.message, event.reason.stack)
+        log.error('Promise rejection error:', event.reason.message, event.reason.stack)
       } else if (typeof event.reason === 'string') {
-        console.error('Promise rejection reason:', event.reason)
+        log.error('Promise rejection reason:', event.reason)
       }
     }
 
     // Handle uncaught errors
     const handleError = (event: ErrorEvent) => {
-      console.error('Uncaught error:', event.error)
+      log.error('Uncaught error:', event.error)
       
       // If it's just an Event object, ignore it
       if (event.error && typeof event.error === 'object' && event.error.toString() === '[object Event]') {

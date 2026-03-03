@@ -4,6 +4,8 @@
  * Tracks and reports Web Vitals and custom performance metrics
  * Helps identify performance bottlenecks and regressions
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('PerformanceMonitor')
 
 interface PerformanceMetrics {
   // Core Web Vitals
@@ -110,7 +112,7 @@ class PerformanceMonitor {
         }
       }
     } catch (error) {
-      console.warn('Performance observers not supported:', error)
+      log.warn('Performance observers not supported:', error)
     }
   }
 
@@ -254,38 +256,38 @@ class PerformanceMonitor {
 
     if (this.metrics.lcp) {
       const rating = this.rateLCP(this.metrics.lcp)
-      console.log(`${getColor(rating)} LCP (Largest Contentful Paint): ${(this.metrics.lcp / 1000).toFixed(2)}s`)
+      log.info(`${getColor(rating)} LCP (Largest Contentful Paint): ${(this.metrics.lcp / 1000).toFixed(2)}s`)
     }
 
     if (this.metrics.fid) {
       const rating = this.rateFID(this.metrics.fid)
-      console.log(`${getColor(rating)} FID (First Input Delay): ${this.metrics.fid.toFixed(2)}ms`)
+      log.info(`${getColor(rating)} FID (First Input Delay): ${this.metrics.fid.toFixed(2)}ms`)
     }
 
     if (this.metrics.cls !== undefined) {
       const rating = this.rateCLS(this.metrics.cls)
-      console.log(`${getColor(rating)} CLS (Cumulative Layout Shift): ${this.metrics.cls.toFixed(3)}`)
+      log.info(`${getColor(rating)} CLS (Cumulative Layout Shift): ${this.metrics.cls.toFixed(3)}`)
     }
 
     if (this.metrics.fcp) {
       const rating = this.rateFCP(this.metrics.fcp)
-      console.log(`${getColor(rating)} FCP (First Contentful Paint): ${(this.metrics.fcp / 1000).toFixed(2)}s`)
+      log.info(`${getColor(rating)} FCP (First Contentful Paint): ${(this.metrics.fcp / 1000).toFixed(2)}s`)
     }
 
     if (this.metrics.ttfb) {
       const rating = this.rateTTFB(this.metrics.ttfb)
-      console.log(`${getColor(rating)} TTFB (Time to First Byte): ${this.metrics.ttfb.toFixed(2)}ms`)
+      log.info(`${getColor(rating)} TTFB (Time to First Byte): ${this.metrics.ttfb.toFixed(2)}ms`)
     }
 
     console.groupEnd()
 
     console.group('⏱️ Navigation Timing')
-    if (this.metrics.dns) console.log(`DNS Lookup: ${this.metrics.dns.toFixed(2)}ms`)
-    if (this.metrics.tcp) console.log(`TCP Connection: ${this.metrics.tcp.toFixed(2)}ms`)
-    if (this.metrics.request) console.log(`Request Time: ${this.metrics.request.toFixed(2)}ms`)
-    if (this.metrics.response) console.log(`Response Time: ${this.metrics.response.toFixed(2)}ms`)
-    if (this.metrics.domInteractive) console.log(`DOM Interactive: ${(this.metrics.domInteractive / 1000).toFixed(2)}s`)
-    if (this.metrics.domComplete) console.log(`DOM Complete: ${(this.metrics.domComplete / 1000).toFixed(2)}s`)
+    if (this.metrics.dns) log.info(`DNS Lookup: ${this.metrics.dns.toFixed(2)}ms`)
+    if (this.metrics.tcp) log.info(`TCP Connection: ${this.metrics.tcp.toFixed(2)}ms`)
+    if (this.metrics.request) log.info(`Request Time: ${this.metrics.request.toFixed(2)}ms`)
+    if (this.metrics.response) log.info(`Response Time: ${this.metrics.response.toFixed(2)}ms`)
+    if (this.metrics.domInteractive) log.info(`DOM Interactive: ${(this.metrics.domInteractive / 1000).toFixed(2)}s`)
+    if (this.metrics.domComplete) log.info(`DOM Complete: ${(this.metrics.domComplete / 1000).toFixed(2)}s`)
     console.groupEnd()
   }
 
@@ -386,7 +388,7 @@ export function measurePerformance(markName: string): void {
   try {
     performance.mark(markName)
   } catch (error) {
-    console.warn('Failed to mark performance:', error)
+    log.warn('Failed to mark performance:', error)
   }
 }
 
@@ -401,7 +403,7 @@ export function measureDuration(startMark: string, endMark: string, measureName:
     const measure = performance.getEntriesByName(measureName)[0]
     return measure?.duration || null
   } catch (error) {
-    console.warn('Failed to measure duration:', error)
+    log.warn('Failed to measure duration:', error)
     return null
   }
 }

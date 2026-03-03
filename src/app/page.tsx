@@ -249,7 +249,7 @@ export default function Home() {
 
         {/* Hero */}
         <div className="text-center space-y-3">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight bg-gradient-to-r from-primary via-blue-500 to-cyan-500 bg-clip-text text-transparent">
             Pokemon Draft League
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -260,7 +260,7 @@ export default function Home() {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
           <Card
-            className="group cursor-pointer hover:border-primary/50 transition-colors"
+            className="group cursor-pointer hover:border-primary/50 hover:shadow-lg hover:-translate-y-0.5 transition-all"
             onClick={() => {
               if (!user) {
                 setAuthRedirectTo('/create-draft')
@@ -280,7 +280,7 @@ export default function Home() {
           </Card>
 
           <Card
-            className="group cursor-pointer hover:border-primary/50 transition-colors"
+            className="group cursor-pointer hover:border-primary/50 hover:shadow-lg hover:-translate-y-0.5 transition-all"
             onClick={() => router.push('/join-draft')}
           >
             <CardContent className="p-5 text-center space-y-2">
@@ -293,7 +293,7 @@ export default function Home() {
           </Card>
 
           <Card
-            className="group cursor-pointer hover:border-primary/50 transition-colors"
+            className="group cursor-pointer hover:border-primary/50 hover:shadow-lg hover:-translate-y-0.5 transition-all"
             onClick={() => router.push('/watch-drafts')}
           >
             <CardContent className="p-5 text-center space-y-2">
@@ -385,18 +385,24 @@ export default function Home() {
 
         {/* Features */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-5 rounded-lg border bg-card space-y-2">
-            <Zap className="h-5 w-5 text-primary" />
+          <div className="p-5 rounded-lg border bg-card space-y-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Zap className="h-4.5 w-4.5 text-primary" />
+            </div>
             <h3 className="font-semibold text-sm">Real-Time Drafting</h3>
             <p className="text-xs text-muted-foreground">Instant sync across all participants with WebSocket technology.</p>
           </div>
-          <div className="p-5 rounded-lg border bg-card space-y-2">
-            <Trophy className="h-5 w-5 text-primary" />
+          <div className="p-5 rounded-lg border bg-card space-y-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Trophy className="h-4.5 w-4.5 text-primary" />
+            </div>
             <h3 className="font-semibold text-sm">Official Formats</h3>
             <p className="text-xs text-muted-foreground">VGC, Smogon, and custom formats with automatic cost calculation.</p>
           </div>
-          <div className="p-5 rounded-lg border bg-card space-y-2">
-            <Users className="h-5 w-5 text-primary" />
+          <div className="p-5 rounded-lg border bg-card space-y-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Users className="h-4.5 w-4.5 text-primary" />
+            </div>
             <h3 className="font-semibold text-sm">Multiplayer Ready</h3>
             <p className="text-xs text-muted-foreground">2-8 teams with spectator mode and live activity feed.</p>
           </div>
@@ -404,9 +410,9 @@ export default function Home() {
 
         {/* Pokemon Browser */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold">Browse Pokemon</h2>
-            <div className="flex items-center gap-2 sm:ml-auto">
+            <div className="flex items-center gap-2 ml-auto">
               <Select value={selectedFormatId} onValueChange={setSelectedFormatId}>
                 <SelectTrigger className="w-[200px] h-9 text-sm">
                   <SelectValue placeholder="Select format" />

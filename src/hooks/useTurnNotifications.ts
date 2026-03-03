@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UseTurnNotifications')
 
 interface TurnNotificationOptions {
   isUserTurn: boolean
@@ -25,7 +28,6 @@ export function useTurnNotifications({
   isConnected = true,
   currentTurn
 }: TurnNotificationOptions) {
-  const notify = useNotify()
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission>('default')
   const hasShownWarning = useRef(false)
   const hasShownTurnNotification = useRef(false)
@@ -129,8 +131,7 @@ export function useTurnNotifications({
     draftStatus,
     warningThreshold,
     enableBrowserNotifications,
-    browserNotificationPermission,
-    notify
+    browserNotificationPermission
   ])
 
   // Handle auto-skip when time expires with grace period for disconnected users
@@ -141,7 +142,7 @@ export function useTurnNotifications({
     // This prevents the race condition where the draft starts and immediately skips before anyone can act
     const isDraftStart = currentTurn === 1
     if (isDraftStart) {
-      console.log('[AutoSkip] Turn 1 - auto-skip disabled to prevent race condition')
+      log.info('Turn 1 - auto-skip disabled to prevent race condition')
       return
     }
 
@@ -175,7 +176,7 @@ export function useTurnNotifications({
         )
       }
     }
-  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip, isConnected, notify, currentTurn])
+  }, [isUserTurn, pickTimeRemaining, draftStatus, onAutoSkip, isConnected, currentTurn])
 
   return {
     browserNotificationPermission,

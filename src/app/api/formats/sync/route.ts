@@ -6,6 +6,9 @@
 
 import { NextResponse } from 'next/server'
 import { syncShowdownData } from '@/services/showdown-sync'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('FormatsSyncRoute')
 
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
@@ -32,7 +35,7 @@ export async function POST() {
       }, { status: 500 })
     }
   } catch (error) {
-    console.error('Error in format sync endpoint:', error)
+    log.error('Error in format sync endpoint:', error)
     return NextResponse.json({
       success: false,
       message: 'Internal server error',

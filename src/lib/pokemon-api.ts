@@ -3,6 +3,9 @@ import { getTypeColor } from '@/utils/pokemon'
 import { PokemonFormat, getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { createFormatRulesEngine } from '@/domain/rules'
 import { supabase } from '@/lib/supabase'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('PokemonApi')
 
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2'
 
@@ -315,7 +318,7 @@ const processMoveData = async (pokemonMoves: PokeAPIResponse['moves']): Promise<
       await new Promise(resolve => setTimeout(resolve, 50))
 
     } catch (error) {
-      console.warn(`Failed to fetch details for move ${moveName}:`, error)
+      log.warn(`Failed to fetch details for move ${moveName}:`, error)
     }
   }
 
@@ -402,7 +405,7 @@ export const fetchPokemon = async (identifier: string | number, formatId?: strin
     pokemon.isLegal = validation.isLegal
     pokemon.cost = validation.cost
   } catch (error) {
-    console.warn(`Failed to validate Pokemon ${pokemon.id} with NEW rules engine:`, error)
+    log.warn(`Failed to validate Pokemon ${pokemon.id} with NEW rules engine:`, error)
     // Fallback: mark as illegal
     pokemon.isLegal = false
     pokemon.cost = 0
@@ -435,7 +438,7 @@ export const fetchPokemonList = async (limit: number = 400, formatId?: string): 
 
       pokemonList.push(...validPokemon)
     } catch (error) {
-      console.warn(`Failed to fetch batch ${batch + 1}:`, error)
+      log.warn(`Failed to fetch batch ${batch + 1}:`, error)
       // Continue with next batch instead of failing completely
     }
   }
@@ -500,7 +503,7 @@ export const isInRegionalDex = (pokemonId: string | number, regions: string[]): 
     // For now, allow all Pokemon for non-Paldea formats
     return true
   } catch (error) {
-    console.warn('Error checking regional dex for Pokemon:', pokemonId, error)
+    log.warn('Error checking regional dex for Pokemon:', pokemonId, error)
     return false
   }
 }
@@ -527,7 +530,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
 
       // Validate format pack structure (should have legalPokemon array and costs object)
       if (formatPack && Array.isArray(formatPack.legalPokemon) && formatPack.legalPokemon.length > 0 && formatPack.costs && pokemonIndex) {
-        console.log(`✨ Loaded format pack with ${formatPack.legalPokemon.length} legal Pokemon for ${formatId} from pre-built files`)
+        log.info(`✨ Loaded format pack with ${formatPack.legalPokemon.length} legal Pokemon for ${formatId} from pre-built files`)
 
         // Convert legal Pokemon names to full Pokemon objects using the index
         const pokemonList: Pokemon[] = []
@@ -536,7 +539,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
         for (const pokemonName of legalPokemonSlice) {
           const pokemonData = pokemonIndex[pokemonName]
           if (!pokemonData) {
-            console.warn(`Pokemon ${pokemonName} not found in index`)
+            log.warn(`Pokemon ${pokemonName} not found in index`)
             continue
           }
 
@@ -574,14 +577,14 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
         const loadTime = Math.round(endTime - startTime)
         // Sanity check: if loadTime is unreasonably large (>60 seconds), just report as fast
         const displayTime = loadTime > 60000 ? '<100' : loadTime.toString()
-        console.log(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${displayTime}ms`)
+        log.info(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${displayTime}ms`)
         return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
       } else {
-        console.warn('Format pack has invalid structure (missing legalPokemon or costs), falling back to API fetching')
+        log.warn('Format pack has invalid structure (missing legalPokemon or costs), falling back to API fetching')
       }
     }
   } catch (error) {
-    console.warn('Could not load pre-built format pack, falling back to API fetching:', error)
+    log.warn('Could not load pre-built format pack, falling back to API fetching:', error)
   }
 
   // Fallback: Fetch from PokeAPI (slower)
@@ -648,7 +651,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
           break
         }
       } catch (error) {
-        console.warn(`Failed to fetch batch ${batch + 1} for range ${range.start}-${range.end}:`, error)
+        log.warn(`Failed to fetch batch ${batch + 1} for range ${range.start}-${range.end}:`, error)
       }
     }
 
@@ -696,7 +699,7 @@ export const validatePokemonInFormat = (pokemon: Pokemon, formatId: string): { i
       reason: validation.reason
     }
   } catch (error) {
-    console.error(`Error validating Pokemon ${pokemon.id} in format ${formatId}:`, error)
+    log.error(`Error validating Pokemon ${pokemon.id} in format ${formatId}:`, error)
     return { isLegal: false, cost: 0, reason: 'Validation error' }
   }
 }
@@ -716,7 +719,7 @@ export const fetchPokemonForCustomFormat = async (customFormatId: string): Promi
       .single()
 
     if (error || !customFormat) {
-      console.error('Error fetching custom format:', error)
+      log.error('Error fetching custom format:', error)
       throw new Error('Custom format not found')
     }
 
@@ -743,14 +746,14 @@ export const fetchPokemonForCustomFormat = async (customFormatId: string): Promi
           pokemonList.push(pokemon)
         }
       } catch (error) {
-        console.warn(`Failed to fetch Pokemon "${pokemonName}" for custom format:`, error)
+        log.warn(`Failed to fetch Pokemon "${pokemonName}" for custom format:`, error)
         // Continue with other Pokemon
       }
     }
 
     return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
   } catch (error) {
-    console.error('Error fetching Pokemon for custom format:', error)
+    log.error('Error fetching Pokemon for custom format:', error)
     throw error
   }
 }

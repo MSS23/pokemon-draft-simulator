@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Trash2, Search, AlertTriangle, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 interface Draft {
@@ -22,7 +22,6 @@ interface Draft {
 }
 
 export default function DraftManagementPanel() {
-  const notify = useNotify()
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -51,7 +50,7 @@ export default function DraftManagementPanel() {
     } finally {
       setLoading(false)
     }
-  }, [notify])
+  }, [])
 
   useEffect(() => {
     loadDrafts()

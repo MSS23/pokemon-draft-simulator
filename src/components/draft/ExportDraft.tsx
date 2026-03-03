@@ -11,7 +11,7 @@ import {
   copyDraftSummaryToClipboard,
   type ExportDraftData
 } from '@/lib/draft-export'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
 
 interface ExportDraftProps {
   exportData: ExportDraftData
@@ -21,8 +21,6 @@ interface ExportDraftProps {
 export default function ExportDraft({ exportData, className }: ExportDraftProps) {
   const [isCopying, setIsCopying] = useState(false)
   const [copied, setCopied] = useState(false)
-  const notify = useNotify()
-
   const handleCopyToClipboard = async () => {
     setIsCopying(true)
     try {

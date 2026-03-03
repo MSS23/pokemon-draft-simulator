@@ -7,6 +7,9 @@
 
 import Fuse from 'fuse.js'
 import type { CachedPokemon } from './pokemon-cache-db'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('PokemonSearchIndex')
 
 export interface SearchFilters {
   types?: string[]
@@ -97,7 +100,7 @@ export class PokemonSearchIndex {
     }
 
     const duration = performance.now() - startTime
-    console.log(`[PokemonSearchIndex] Built index for ${pokemon.length} Pokemon in ${duration.toFixed(2)}ms`)
+    log.info(`Built index for ${pokemon.length} Pokemon in ${duration.toFixed(2)}ms`)
   }
 
   /**
@@ -105,7 +108,7 @@ export class PokemonSearchIndex {
    */
   static search(query: string, limit: number = 50): SearchResult[] {
     if (!this.fuse) {
-      console.warn('[PokemonSearchIndex] Index not built')
+      log.warn('Index not built')
       return []
     }
 
@@ -128,7 +131,7 @@ export class PokemonSearchIndex {
     }))
 
     const duration = performance.now() - startTime
-    console.log(`[PokemonSearchIndex] Search "${query}" returned ${searchResults.length} results in ${duration.toFixed(2)}ms`)
+    log.info(`Search "${query}" returned ${searchResults.length} results in ${duration.toFixed(2)}ms`)
 
     return searchResults
   }
@@ -205,7 +208,7 @@ export class PokemonSearchIndex {
     }
 
     const duration = performance.now() - startTime
-    console.log(`[PokemonSearchIndex] Filtered ${pokemon.length} to ${filtered.length} Pokemon in ${duration.toFixed(2)}ms`)
+    log.info(`Filtered ${pokemon.length} to ${filtered.length} Pokemon in ${duration.toFixed(2)}ms`)
 
     return filtered
   }

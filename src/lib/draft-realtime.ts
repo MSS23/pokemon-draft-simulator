@@ -12,6 +12,9 @@
 
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { supabase } from './supabase'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftRealtime')
 
 // ============================================
 // Types
@@ -78,7 +81,7 @@ export class DraftRealtimeManager {
    */
   async subscribe(): Promise<void> {
     if (this.abortController.signal.aborted) {
-      console.log('[DraftRealtime] Subscription aborted before start')
+      log.info('Subscription aborted before start')
       return
     }
 
@@ -162,7 +165,7 @@ export class DraftRealtimeManager {
       this.channel.subscribe(async (status) => {
         if (this.abortController.signal.aborted) return
 
-        console.log('[DraftRealtime] Channel status:', status)
+        log.info('Channel status:', status)
 
         if (status === 'SUBSCRIBED') {
           this.isSubscribed = true
@@ -176,7 +179,7 @@ export class DraftRealtimeManager {
               user_id: this.userId
             })
           } catch (err) {
-            console.warn('[DraftRealtime] Failed to track presence:', err)
+            log.warn('Failed to track presence:', err)
           }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           this.isSubscribed = false
@@ -188,7 +191,7 @@ export class DraftRealtimeManager {
         }
       })
     } catch (error) {
-      console.error('[DraftRealtime] Subscription error:', error)
+      log.error('Subscription error:', error)
       this.callbacks.onError?.(error instanceof Error ? error : new Error(String(error)))
       this.scheduleReconnect()
     }
@@ -213,7 +216,7 @@ export class DraftRealtimeManager {
     const now = Date.now()
     const lastSeen = this.lastEventIds.get(eventId)
     if (lastSeen && now - lastSeen < this.eventDedupeWindow) {
-      console.log('[DraftRealtime] Duplicate event ignored:', eventId)
+      log.info('Duplicate event ignored:', eventId)
       return
     }
 
@@ -239,7 +242,7 @@ export class DraftRealtimeManager {
       timestamp: now
     }
 
-    console.log('[DraftRealtime] Event:', table, payload.eventType, recordId)
+    log.info('Event:', table, payload.eventType, recordId)
     this.callbacks.onDraftEvent(event)
   }
 
@@ -308,7 +311,7 @@ export class DraftRealtimeManager {
   private handleBroadcast(event: string, payload: unknown): void {
     if (this.abortController.signal.aborted) return
 
-    console.log('[DraftRealtime] Broadcast:', event, payload)
+    log.info('Broadcast:', event, payload)
 
     // Handle draft deletion specially
     if (event === 'draft_deleted') {
@@ -326,12 +329,12 @@ export class DraftRealtimeManager {
    */
   private scheduleReconnect(): void {
     if (this.abortController.signal.aborted) {
-      console.log('[DraftRealtime] Reconnection cancelled - aborted')
+      log.info('Reconnection cancelled - aborted')
       return
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[DraftRealtime] Max reconnection attempts reached')
+      log.error('Max reconnection attempts reached')
       this.callbacks.onConnectionChange({
         status: 'failed',
         error: 'Max reconnection attempts reached'
@@ -345,7 +348,7 @@ export class DraftRealtimeManager {
     )
     this.reconnectAttempts++
 
-    console.log(`[DraftRealtime] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
+    log.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)
     this.callbacks.onConnectionChange({
       status: 'reconnecting',
       attempt: this.reconnectAttempts
@@ -362,7 +365,7 @@ export class DraftRealtimeManager {
    * Perform reconnection
    */
   private async reconnect(): Promise<void> {
-    console.log('[DraftRealtime] Reconnecting...')
+    log.info('Reconnecting...')
 
     // Clean up existing channel
     if (this.channel) {
@@ -370,7 +373,7 @@ export class DraftRealtimeManager {
         await this.channel.unsubscribe()
         supabase.removeChannel(this.channel)
       } catch (err) {
-        console.warn('[DraftRealtime] Error during reconnect cleanup:', err)
+        log.warn('Error during reconnect cleanup:', err)
       }
       this.channel = null
     }
@@ -397,7 +400,7 @@ export class DraftRealtimeManager {
    * Clean up all subscriptions
    */
   async cleanup(): Promise<void> {
-    console.log('[DraftRealtime] Cleaning up...')
+    log.info('Cleaning up...')
 
     // Signal abort to stop all pending operations
     this.abortController.abort()
@@ -408,7 +411,7 @@ export class DraftRealtimeManager {
         await this.channel.unsubscribe()
         supabase.removeChannel(this.channel)
       } catch (err) {
-        console.warn('[DraftRealtime] Error during cleanup:', err)
+        log.warn('Error during cleanup:', err)
       }
       this.channel = null
     }

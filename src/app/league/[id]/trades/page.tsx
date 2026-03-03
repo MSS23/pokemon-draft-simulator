@@ -24,6 +24,9 @@ import { TradeProposalModal } from '@/components/league/TradeProposalModal'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { ArrowLeft, Repeat, Check, X, Clock, CheckCircle } from 'lucide-react'
 import type { TradeWithDetails, League, Team, Pick } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('LeagueTradesPage')
 
 export default function LeagueTradesPage() {
   const params = useParams()
@@ -90,7 +93,7 @@ export default function LeagueTradesPage() {
         setTeamPicks(picks)
       }
     } catch (err) {
-      console.error('Error loading trades:', err)
+      log.error('Error loading trades:', err)
       setError(err instanceof Error ? err.message : 'Failed to load trades')
     } finally {
       setIsLoading(false)
@@ -107,7 +110,7 @@ export default function LeagueTradesPage() {
       await TradeService.executeTrade(tradeId)
       await loadTradesData()
     } catch (err) {
-      console.error('Failed to accept trade:', err)
+      log.error('Failed to accept trade:', err)
       alert(err instanceof Error ? err.message : 'Failed to accept trade')
     }
   }
@@ -117,7 +120,7 @@ export default function LeagueTradesPage() {
       await TradeService.rejectTrade(tradeId, teamId)
       await loadTradesData()
     } catch (err) {
-      console.error('Failed to reject trade:', err)
+      log.error('Failed to reject trade:', err)
       alert(err instanceof Error ? err.message : 'Failed to reject trade')
     }
   }

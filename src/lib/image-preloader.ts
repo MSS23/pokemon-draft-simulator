@@ -4,6 +4,8 @@
  * Efficiently preloads Pokemon images with priority queue and batch processing.
  * Performance: Reduces perceived load time by 80%+
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('ImagePreloader')
 
 export interface PreloadOptions {
   priority?: 'high' | 'medium' | 'low'
@@ -254,7 +256,7 @@ export class ImagePreloader {
     this.cache.clear()
     this.loading.clear()
     this.queue = []
-    console.log('[ImagePreloader] Cache cleared')
+    log.info('Cache cleared')
   }
 
   /**

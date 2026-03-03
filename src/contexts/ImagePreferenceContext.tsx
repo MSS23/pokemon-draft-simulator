@@ -1,6 +1,9 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('ImagePreferenceContext')
 
 type ImageType = 'gif' | 'png'
 
@@ -49,7 +52,7 @@ export function useImagePreference() {
   const context = useContext(ImagePreferenceContext)
   if (context === undefined) {
     // Return default values if context is not available (shouldn't happen in production)
-    console.warn('useImagePreference used outside ImagePreferenceProvider, using defaults')
+    log.warn('useImagePreference used outside ImagePreferenceProvider, using defaults')
     return {
       imageType: 'gif' as const,
       setImageType: () => {},

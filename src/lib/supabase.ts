@@ -1,5 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { DraftSettings, LeagueSettings, SpectatorEventMetadata } from '@/types/supabase-helpers'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('Supabase')
 
 // Augment Window interface for Supabase instance tracking
 declare global {
@@ -17,7 +20,7 @@ const supabaseAnonKey = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').
 
 // Debug logging for production troubleshooting
 if (typeof window !== 'undefined') {
-  console.log('[Supabase Config]', {
+  log.info('', {
     hasUrl: !!supabaseUrl,
     hasKey: !!supabaseAnonKey,
     urlPrefix: supabaseUrl?.substring(0, 30),

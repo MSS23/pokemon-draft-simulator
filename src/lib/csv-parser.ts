@@ -7,6 +7,8 @@
  * Charizard,25
  * Mewtwo,30
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('CsvParser')
 
 export interface PokemonPricing {
   [pokemonNameOrId: string]: number
@@ -147,7 +149,7 @@ export function parseCustomPricingCSV(csvContent: string): ParsedCSVResult {
 
     // Warn about errors but still return data if we have some
     if (errors.length > 0) {
-      console.warn('CSV parsing completed with warnings:', errors)
+      log.warn('CSV parsing completed with warnings:', errors)
     }
 
     return {

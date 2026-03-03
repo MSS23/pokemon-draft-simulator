@@ -6,6 +6,9 @@
  */
 
 import type { CachedPokemon } from './pokemon-cache-db'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('FormatValidator')
 
 export interface FormatRules {
   id: string
@@ -324,6 +327,6 @@ export class FormatValidator {
     })
 
     const duration = performance.now() - startTime
-    console.log(`[FormatValidator] Preloaded ${pokemonList.length} Pokemon for ${format.name} in ${duration.toFixed(2)}ms`)
+    log.info(`Preloaded ${pokemonList.length} Pokemon for ${format.name} in ${duration.toFixed(2)}ms`)
   }
 }

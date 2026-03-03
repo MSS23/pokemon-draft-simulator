@@ -22,9 +22,12 @@ import {
   UserPlus,
 } from "lucide-react";
 import { DraftService } from "@/lib/draft-service";
-import { useNotify } from "@/components/providers/NotificationProvider";
+import { notify } from "@/lib/notifications";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('WatchDraftsPage')
 
 interface PublicDraft {
   roomCode: string;
@@ -41,7 +44,6 @@ interface PublicDraft {
 
 export default function WatchDraftsPage() {
   const router = useRouter();
-  const notify = useNotify();
   const { user } = useAuth();
   const [drafts, setDrafts] = useState<PublicDraft[]>([]);
   const [filteredDrafts, setFilteredDrafts] = useState<PublicDraft[]>([]);
@@ -61,7 +63,7 @@ export default function WatchDraftsPage() {
       setDrafts(data);
       setFilteredDrafts(data);
     } catch (error) {
-      console.error("Error loading public drafts:", error);
+      log.error("Error loading public drafts:", error);
       notify.error("Failed to Load", "Could not load public drafts");
     } finally {
       setIsLoading(false);

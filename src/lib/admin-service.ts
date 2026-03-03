@@ -1,4 +1,7 @@
 import { supabase } from './supabase'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AdminService')
 
 export interface PromoteToAdminParams {
   draftId: string
@@ -34,13 +37,13 @@ export class AdminService {
       })
 
       if (error) {
-        console.error('Error promoting to admin:', error)
+        log.error('Error promoting to admin:', error)
         return { success: false, error: error.message }
       }
 
       return { success: true }
     } catch (error) {
-      console.error('Error promoting to admin:', error)
+      log.error('Error promoting to admin:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -70,13 +73,13 @@ export class AdminService {
       })
 
       if (error) {
-        console.error('Error demoting from admin:', error)
+        log.error('Error demoting from admin:', error)
         return { success: false, error: error.message }
       }
 
       return { success: true }
     } catch (error) {
-      console.error('Error demoting from admin:', error)
+      log.error('Error demoting from admin:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
@@ -106,7 +109,7 @@ export class AdminService {
 
       return (data as any).is_host || (data as any).is_admin
     } catch (error) {
-      console.error('Error checking admin status:', error)
+      log.error('Error checking admin status:', error)
       return false
     }
   }
@@ -127,7 +130,7 @@ export class AdminService {
         .or('is_host.eq.true,is_admin.eq.true')
 
       if (error) {
-        console.error('Error fetching admins:', error)
+        log.error('Error fetching admins:', error)
         return { host: null, admins: [] }
       }
 
@@ -136,7 +139,7 @@ export class AdminService {
 
       return { host, admins }
     } catch (error) {
-      console.error('Error fetching admins:', error)
+      log.error('Error fetching admins:', error)
       return { host: null, admins: [] }
     }
   }

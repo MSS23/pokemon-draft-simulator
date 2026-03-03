@@ -9,6 +9,9 @@
 
 import { supabase } from './supabase'
 import { UserSessionService } from './user-session'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AiAccessControl')
 
 export interface AIAccessContext {
   userId?: string
@@ -85,7 +88,7 @@ export class AIAccessControl {
         userRole: 'spectator'
       }
     } catch (error) {
-      console.error('Error checking team analysis access:', error)
+      log.error('Error checking team analysis access:', error)
       return {
         allowed: false,
         reason: 'Error verifying permissions'
@@ -170,7 +173,7 @@ export class AIAccessControl {
         userRole: 'spectator'
       }
     } catch (error) {
-      console.error('Error checking draft analysis access:', error)
+      log.error('Error checking draft analysis access:', error)
       return {
         allowed: false,
         reason: 'Error verifying permissions'
@@ -196,7 +199,7 @@ export class AIAccessControl {
 
       return (teams && teams.length > 0) || false
     } catch (error) {
-      console.error('Error checking league participation:', error)
+      log.error('Error checking league participation:', error)
       return false
     }
   }
@@ -218,7 +221,7 @@ export class AIAccessControl {
 
       return teamResponse?.data?.owner_id === userId
     } catch (error) {
-      console.error('Error checking team ownership:', error)
+      log.error('Error checking team ownership:', error)
       return false
     }
   }
@@ -240,7 +243,7 @@ export class AIAccessControl {
 
       return teamsResponse?.data?.map((t: any) => t.id) || []
     } catch (error) {
-      console.error('Error getting user teams:', error)
+      log.error('Error getting user teams:', error)
       return []
     }
   }
@@ -262,7 +265,7 @@ export class AIAccessControl {
 
       return draftResponse?.data?.is_public === true
     } catch (error) {
-      console.error('Error checking draft visibility:', error)
+      log.error('Error checking draft visibility:', error)
       return false
     }
   }
@@ -320,7 +323,7 @@ export class AIAccessControl {
         canViewDraftAnalysis: isDraftPublic || isParticipant
       }
     } catch (error) {
-      console.error('Error getting league access info:', error)
+      log.error('Error getting league access info:', error)
       return {
         isParticipant: false,
         isDraftPublic: false,

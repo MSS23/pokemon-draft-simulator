@@ -3,22 +3,35 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import type { Database } from '@/lib/supabase'
+import type { DraftSettings } from '@/types/supabase-helpers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Clock, Zap, TrendingUp } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Clock, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 
+type DraftRow = Database['public']['Tables']['drafts']['Row']
+
+interface TeamWithDraft {
+  id: string
+  name: string
+  owner_id: string | null
+  budget_remaining: number
+  draft_order: number
+  drafts: DraftRow
+}
+
 interface DraftSummary {
   draft_id: string
   draft_name: string
-  status: 'setup' | 'active' | 'completed' | 'paused'
-  format: 'snake' | 'auction'
+  status: DraftRow['status']
+  format: DraftRow['format']
   ruleset: string
   room_code: string
   host_id: string
@@ -30,18 +43,50 @@ interface DraftSummary {
   spectator_count: number
   user_team_id: string
   user_team_name: string
-  user_id: string
+  is_host: boolean
   budget_remaining: number
   draft_order: number
-  is_host: boolean
   picks_made: number
-  total_picks: number
-  max_possible_picks: number
   progress_percent: number
-  active_participant_count: number
-  total_participant_count: number
-  league_id: string | null
-  league_status: string | null
+}
+
+function buildDraftSummaries(
+  teams: TeamWithDraft[],
+  pickCounts: Record<string, number>,
+  userId: string
+): DraftSummary[] {
+  return teams.map((team) => {
+    const draft = team.drafts
+    const settings = (draft.settings ?? {}) as DraftSettings
+    const pokemonPerTeam = settings.maxPokemonPerTeam ?? 6
+    const picksMade = pickCounts[team.id] ?? 0
+    const progress = pokemonPerTeam > 0
+      ? Math.min(100, Math.round((picksMade / pokemonPerTeam) * 100))
+      : 0
+
+    return {
+      draft_id: draft.id,
+      draft_name: draft.name,
+      status: draft.status,
+      format: draft.format,
+      ruleset: draft.ruleset,
+      room_code: draft.room_code ?? '',
+      host_id: draft.host_id,
+      created_at: draft.created_at,
+      updated_at: draft.updated_at,
+      max_teams: draft.max_teams,
+      pokemon_per_team: pokemonPerTeam,
+      current_turn: draft.current_turn,
+      spectator_count: draft.spectator_count,
+      user_team_id: team.id,
+      user_team_name: team.name,
+      is_host: draft.host_id === userId,
+      budget_remaining: team.budget_remaining,
+      draft_order: team.draft_order,
+      picks_made: picksMade,
+      progress_percent: progress,
+    }
+  })
 }
 
 export default function DashboardPage() {
@@ -68,20 +113,46 @@ export default function DashboardPage() {
           return
         }
 
-        const { data: draftSummaries, error } = await (supabase as any)
-          .from('user_draft_summary')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
+        // Fetch teams with their draft data
+        const { data: userTeams, error: teamsError } = await supabase
+          .from('teams')
+          .select(`
+            id, name, owner_id, budget_remaining, draft_order,
+            drafts!inner(id, name, status, format, ruleset, room_code, host_id,
+              created_at, updated_at, max_teams, current_turn, spectator_count, settings, deleted_at)
+          `)
+          .eq('owner_id', user.id)
+          .is('drafts.deleted_at', null)
 
-        if (error) {
-          setFetchError(`Failed to load your drafts: ${error.message}`)
+        if (teamsError) {
+          setFetchError(`Failed to load your drafts: ${teamsError.message}`)
           setDrafts([])
           setLoading(false)
           return
         }
+
+        const teams = (userTeams ?? []) as unknown as TeamWithDraft[]
+
+        // Batch-query pick counts for all user teams
+        const teamIds = teams.map(t => t.id)
+        let pickCounts: Record<string, number> = {}
+
+        if (teamIds.length > 0) {
+          const { data: picks, error: picksError } = await supabase
+            .from('picks')
+            .select('team_id')
+            .in('team_id', teamIds)
+
+          if (!picksError && picks) {
+            pickCounts = picks.reduce<Record<string, number>>((acc, pick) => {
+              acc[pick.team_id] = (acc[pick.team_id] ?? 0) + 1
+              return acc
+            }, {})
+          }
+        }
+
         setFetchError(null)
-        setDrafts(draftSummaries || [])
+        setDrafts(buildDraftSummaries(teams, pickCounts, user.id))
       } catch {
         setFetchError('An unexpected error occurred. Please try again.')
         setDrafts([])
@@ -174,7 +245,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <p className="text-xs text-muted-foreground">Picks</p>
             <p className="text-sm font-semibold">{draft.picks_made}/{draft.pokemon_per_team}</p>
@@ -184,21 +255,10 @@ export default function DashboardPage() {
             <p className="text-sm font-semibold">{draft.budget_remaining}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Teams</p>
-            <p className="text-sm font-semibold">{draft.total_participant_count}/{draft.max_teams}</p>
-          </div>
-          <div>
             <p className="text-xs text-muted-foreground">Format</p>
             <p className="text-sm font-semibold capitalize">{draft.format}</p>
           </div>
         </div>
-
-        {draft.league_id && (
-          <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-md text-xs">
-            <Trophy className="h-3.5 w-3.5 text-primary" />
-            <span className="text-primary font-medium">League &middot; {draft.league_status}</span>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
@@ -253,10 +313,10 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-muted-foreground">Leagues</p>
+                <p className="text-xs text-muted-foreground">Win Rate</p>
                 <Users className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold">{drafts.filter(d => d.league_id).length}</p>
+              <p className="text-2xl font-bold">{drafts.length > 0 ? `${Math.round((completedDrafts.length / drafts.length) * 100)}%` : '-'}</p>
             </CardContent>
           </Card>
         </div>

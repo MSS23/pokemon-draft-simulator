@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftHistoryPage')
 
 interface CompletedDraft {
   id: string
@@ -73,7 +76,7 @@ export default function DraftHistoryPage() {
           .order('draft(updated_at)', { ascending: false })
 
         if (error) {
-          console.error('Error loading completed drafts:', error)
+          log.error('Error loading completed drafts:', error)
           setIsLoading(false)
           return
         }
@@ -114,7 +117,7 @@ export default function DraftHistoryPage() {
 
         setCompletedDrafts(draftsWithDetails)
       } catch (error) {
-        console.error('Error loading draft history:', error)
+        log.error('Error loading draft history:', error)
       } finally {
         setIsLoading(false)
       }

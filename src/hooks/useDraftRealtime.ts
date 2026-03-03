@@ -14,6 +14,9 @@ import {
   PresenceState
 } from '@/lib/draft-realtime'
 import { DraftService } from '@/lib/draft-service'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UseDraftRealtime')
 
 // Simple debounce implementation
 function debounce<T extends (...args: unknown[]) => void>(
@@ -221,7 +224,7 @@ export function useDraftRealtime(
 
     // Start subscription
     manager.subscribe().catch((err) => {
-      console.error('[useDraftRealtime] Subscription error:', err)
+      log.error('Subscription error:', err)
       handleError(err instanceof Error ? err : new Error(String(err)))
     })
 
@@ -318,7 +321,7 @@ export function useDraftStateWithRealtime(
       setDraftState(state)
       setLoadError(null)
     } catch (err) {
-      console.error('[useDraftStateWithRealtime] Error fetching state:', err)
+      log.error('Error fetching state:', err)
       setLoadError(err instanceof Error ? err : new Error(String(err)))
     } finally {
       setIsLoading(false)

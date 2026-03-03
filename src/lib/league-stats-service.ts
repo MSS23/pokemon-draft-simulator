@@ -10,6 +10,9 @@
  */
 
 import { supabase } from './supabase'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('LeagueStatsService')
 
 export interface PokemonDetailedStats {
   pickId: string
@@ -285,7 +288,7 @@ export class LeagueStatsService {
         history: matchHistory
       }
     } catch (error) {
-      console.error('Error fetching Pokemon detailed stats:', error)
+      log.error('Error fetching Pokemon detailed stats:', error)
       throw error
     }
   }
@@ -410,7 +413,7 @@ export class LeagueStatsService {
         } : undefined
       }
     } catch (error) {
-      console.error('Error fetching head-to-head record:', error)
+      log.error('Error fetching head-to-head record:', error)
       throw error
     }
   }
@@ -534,7 +537,7 @@ export class LeagueStatsService {
         last5PointsAgainst: pointsAgainst
       }
     } catch (error) {
-      console.error('Error fetching team form:', error)
+      log.error('Error fetching team form:', error)
       throw error
     }
   }
@@ -656,7 +659,7 @@ export class LeagueStatsService {
         healthyRosterPercentage: (activePokemon / totalPokemon) * 100
       }
     } catch (error) {
-      console.error('Error fetching advanced team stats:', error)
+      log.error('Error fetching advanced team stats:', error)
       throw error
     }
   }
@@ -685,7 +688,7 @@ export class LeagueStatsService {
 
       return forms.filter((f): f is TeamFormIndicator => f !== null)
     } catch (error) {
-      console.error('Error fetching all team forms:', error)
+      log.error('Error fetching all team forms:', error)
       throw error
     }
   }

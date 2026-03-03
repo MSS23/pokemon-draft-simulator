@@ -1,6 +1,9 @@
 'use client'
 
 import { toast } from 'sonner'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('NotificationService')
 
 export type NotificationType =
   | 'turn_reminder'
@@ -92,7 +95,7 @@ class NotificationService {
 
   async requestPermission(): Promise<boolean> {
     if (!this.permission.supported) {
-      console.warn('Push notifications not supported')
+      log.warn('Push notifications not supported')
       return false
     }
 
@@ -113,7 +116,7 @@ class NotificationService {
 
       return this.permission.granted
     } catch (error) {
-      console.error('Error requesting notification permission:', error)
+      log.error('Error requesting notification permission:', error)
       return false
     }
   }
@@ -168,7 +171,7 @@ class NotificationService {
       }
 
     } catch (error) {
-      console.error('Error showing native notification:', error)
+      log.error('Error showing native notification:', error)
     }
   }
 
@@ -206,7 +209,7 @@ class NotificationService {
         this.playTone(audioContext, 600, 150)
       }
     } catch (error) {
-      console.warn('Could not play notification sound:', error)
+      log.warn('Could not play notification sound:', error)
     }
   }
 
@@ -233,7 +236,7 @@ class NotificationService {
     try {
       navigator.vibrate(pattern)
     } catch (error) {
-      console.warn('Vibration not supported:', error)
+      log.warn('Vibration not supported:', error)
     }
   }
 

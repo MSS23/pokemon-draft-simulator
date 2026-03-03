@@ -9,6 +9,9 @@ import type {
   ExtendedLeagueSettings,
 } from '@/types'
 import { MatchKOService } from './match-ko-service'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('LeagueService')
 
 export class LeagueService {
   /**
@@ -867,7 +870,7 @@ export class LeagueService {
       await WeeklyHighlightsService.generateWeeklySummary(leagueId, league.current_week)
       await WeeklyHighlightsService.autoGenerateHighlights(leagueId, league.current_week)
     } catch (error) {
-      console.error('Error generating weekly highlights:', error)
+      log.error('Error generating weekly highlights:', error)
       // Continue even if highlights fail
     }
 

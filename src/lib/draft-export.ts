@@ -1,5 +1,8 @@
 import { Draft, Team, Pick, Participant, Pokemon } from '@/types'
 import { calculateTeamStats, rateTeam } from './team-analytics'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftExport')
 
 export interface ExportDraftData {
   draft: Draft
@@ -217,7 +220,7 @@ export async function copyDraftSummaryToClipboard(data: ExportDraftData): Promis
     await navigator.clipboard.writeText(summary)
     return true
   } catch (error) {
-    console.error('Failed to copy to clipboard:', error)
+    log.error('Failed to copy to clipboard:', error)
     return false
   }
 }

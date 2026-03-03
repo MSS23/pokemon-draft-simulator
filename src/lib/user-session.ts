@@ -3,6 +3,9 @@
 // Now integrated with Supabase authentication
 
 import { supabase } from './supabase'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UserSession')
 
 export interface UserSession {
   userId: string
@@ -85,13 +88,13 @@ export class UserSessionService {
           try {
             localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
           } catch (error) {
-            console.warn('Failed to save authenticated session to localStorage:', error)
+            log.warn('Failed to save authenticated session to localStorage:', error)
           }
 
           return session
         }
       } catch (error) {
-        console.warn('Failed to get authenticated user:', error)
+        log.warn('Failed to get authenticated user:', error)
       }
     }
 
@@ -111,7 +114,7 @@ export class UserSessionService {
         return session
       }
     } catch (error) {
-      console.warn('Failed to load user session from localStorage:', error)
+      log.warn('Failed to load user session from localStorage:', error)
     }
 
     // No authenticated user and no stored session - create new guest session
@@ -127,7 +130,7 @@ export class UserSessionService {
     try {
       localStorage.setItem(USER_SESSION_KEY, JSON.stringify(guestSession))
     } catch (error) {
-      console.warn('Failed to save guest session to localStorage:', error)
+      log.warn('Failed to save guest session to localStorage:', error)
     }
 
     return guestSession
@@ -154,7 +157,7 @@ export class UserSessionService {
         localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
       }
     } catch (error) {
-      console.warn('Failed to update user session activity:', error)
+      log.warn('Failed to update user session activity:', error)
     }
   }
 
@@ -170,7 +173,7 @@ export class UserSessionService {
         return JSON.parse(stored) as UserSession
       }
     } catch (error) {
-      console.warn('Failed to get current user session:', error)
+      log.warn('Failed to get current user session:', error)
     }
 
     return null
@@ -185,7 +188,7 @@ export class UserSessionService {
     try {
       localStorage.removeItem(USER_SESSION_KEY)
     } catch (error) {
-      console.warn('Failed to clear user session:', error)
+      log.warn('Failed to clear user session:', error)
     }
   }
 
@@ -216,7 +219,7 @@ export class UserSessionService {
 
       localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(limited))
     } catch (error) {
-      console.warn('Failed to record draft participation:', error)
+      log.warn('Failed to record draft participation:', error)
     }
   }
 
@@ -243,7 +246,7 @@ export class UserSessionService {
         localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(participations))
       }
     } catch (error) {
-      console.warn('Failed to update draft participation:', error)
+      log.warn('Failed to update draft participation:', error)
     }
   }
 
@@ -260,7 +263,7 @@ export class UserSessionService {
         return participations.sort((a, b) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime())
       }
     } catch (error) {
-      console.warn('Failed to get draft participations:', error)
+      log.warn('Failed to get draft participations:', error)
     }
 
     return []
@@ -296,10 +299,10 @@ export class UserSessionService {
 
       if (nonAbandoned.length !== participations.length) {
         localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(nonAbandoned))
-        console.log(`Cleaned up ${participations.length - nonAbandoned.length} abandoned draft(s)`)
+        log.info(`Cleaned up ${participations.length - nonAbandoned.length} abandoned draft(s)`)
       }
     } catch (error) {
-      console.warn('Failed to cleanup abandoned drafts:', error)
+      log.warn('Failed to cleanup abandoned drafts:', error)
     }
   }
 
@@ -352,7 +355,7 @@ export class UserSessionService {
 
       localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(filtered))
     } catch (error) {
-      console.warn('Failed to remove draft participation:', error)
+      log.warn('Failed to remove draft participation:', error)
     }
   }
 
@@ -375,7 +378,7 @@ export class UserSessionService {
         localStorage.setItem(DRAFT_PARTICIPATION_KEY, JSON.stringify(recent))
       }
     } catch (error) {
-      console.warn('Failed to cleanup old participations:', error)
+      log.warn('Failed to cleanup old participations:', error)
     }
   }
 }

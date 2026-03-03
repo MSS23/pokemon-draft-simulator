@@ -5,6 +5,9 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { pokemonCacheManager, type CacheStats } from '@/lib/pokemon-cache'
 import { fetchPokemon, fetchPokemonList, pokemonQueries } from '@/lib/pokemon-api'
 import { Pokemon } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UseEnhancedPokemonCache')
 
 interface CacheHealthMetrics {
   hitRate: number
@@ -123,7 +126,7 @@ export function useEnhancedPokemonCache() {
       return []
     } catch (error) {
       metricsRef.current.errors++
-      console.error('Failed to fetch Pokemon list:', error)
+      log.error('Failed to fetch Pokemon list:', error)
       return []
     }
   }, [queryClient])
@@ -151,9 +154,9 @@ export function useEnhancedPokemonCache() {
       )
 
       await Promise.allSettled(preloadPromises)
-      console.debug(`Predictively loaded ${priorityPokemon.length} Pokemon`)
+      log.debug(`Predictively loaded ${priorityPokemon.length} Pokemon`)
     } catch (error) {
-      console.warn('Predictive loading failed:', error)
+      log.warn('Predictive loading failed:', error)
     }
   }, [fetchListWithCache])
 
@@ -168,7 +171,7 @@ export function useEnhancedPokemonCache() {
         metricsRef.current.backgroundRefreshes++
       }
     } catch (error) {
-      console.warn('Background refresh failed:', error)
+      log.warn('Background refresh failed:', error)
       metricsRef.current.errors++
     }
   }, [queryClient])
@@ -200,9 +203,9 @@ export function useEnhancedPokemonCache() {
       const relatedPromises = relatedPokemon.map(p => pokemonCacheManager.cachePokemon(p))
       await Promise.allSettled(relatedPromises)
       
-      console.debug(`Warmed cache with ${relatedPokemon.length} related Pokemon`)
+      log.debug(`Warmed cache with ${relatedPokemon.length} related Pokemon`)
     } catch (error) {
-      console.warn('Cache warming failed:', error)
+      log.warn('Cache warming failed:', error)
     }
   }, [fetchWithCache, fetchListWithCache])
 
@@ -213,7 +216,7 @@ export function useEnhancedPokemonCache() {
       
       // If cache is getting full, trigger cleanup
       if (stats.memoryUsage > 80 * 1024 * 1024) { // 80MB threshold
-        console.debug('Cache optimization triggered - high memory usage')
+        log.debug('Cache optimization triggered - high memory usage')
         // The cache's built-in LRU and GC will handle cleanup
       }
       
@@ -223,7 +226,7 @@ export function useEnhancedPokemonCache() {
         entriesBefore: stats.entries
       }
     } catch (error) {
-      console.warn('Cache optimization failed:', error)
+      log.warn('Cache optimization failed:', error)
       return { performed: false }
     }
   }, [])

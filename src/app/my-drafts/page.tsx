@@ -14,6 +14,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import type { Match, League, Team, Draft } from '@/types'
 import { format, isFuture, isToday } from 'date-fns'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('MyDraftsPage')
 
 interface MatchWithDetails extends Match {
   league: League
@@ -111,7 +114,7 @@ export default function MyDraftsPage() {
           }
         }
       } catch (error) {
-        console.error('Failed to load data:', error)
+        log.error('Failed to load data:', error)
       } finally {
         setIsLoading(false)
       }

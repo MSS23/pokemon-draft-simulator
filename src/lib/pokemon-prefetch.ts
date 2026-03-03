@@ -7,6 +7,9 @@
 
 import { PokemonCacheDB, type CachedPokemon } from './pokemon-cache-db'
 import { ImagePreloader } from './image-preloader'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('PokemonPrefetch')
 
 export interface PrefetchProgress {
   total: number
@@ -33,9 +36,9 @@ export class PokemonPrefetch {
       // Note: Web Workers require proper webpack/next.js configuration
       // For now, we'll use a simpler approach without workers
       this.isInitialized = true
-      console.log('[PokemonPrefetch] Initialized (non-worker mode)')
+      log.info('Initialized (non-worker mode)')
     } catch (error) {
-      console.error('[PokemonPrefetch] Initialization failed:', error)
+      log.error('Initialization failed:', error)
       throw error
     }
   }
@@ -52,7 +55,7 @@ export class PokemonPrefetch {
       await this.initialize()
     }
 
-    console.log(`[PokemonPrefetch] Starting prefetch for format ${formatId} (${pokemonIds.length} Pokemon)`)
+    log.info(`Starting prefetch for format ${formatId} (${pokemonIds.length} Pokemon)`)
 
     const startTime = performance.now()
     const progress: PrefetchProgress = {
@@ -71,7 +74,7 @@ export class PokemonPrefetch {
       const cachedMap = await PokemonCacheDB.getPokemonBatch(pokemonIds)
       const uncachedIds = pokemonIds.filter(id => !cachedMap.has(id))
 
-      console.log(`[PokemonPrefetch] ${cachedMap.size} cached, ${uncachedIds.length} need fetching`)
+      log.info(`${cachedMap.size} cached, ${uncachedIds.length} need fetching`)
 
       // Update progress for cached Pokemon
       progress.completed = cachedMap.size
@@ -95,8 +98,8 @@ export class PokemonPrefetch {
       }
 
       const duration = performance.now() - startTime
-      console.log(`[PokemonPrefetch] Completed prefetch for ${formatId} in ${duration.toFixed(2)}ms`)
-      console.log(`[PokemonPrefetch] Success: ${progress.completed}, Failed: ${progress.failed}`)
+      log.info(`Completed prefetch for ${formatId} in ${duration.toFixed(2)}ms`)
+      log.info(`Success: ${progress.completed}, Failed: ${progress.failed}`)
 
       // Prefetch images for cached Pokemon
       await this.prefetchImages(pokemonIds)
@@ -123,7 +126,7 @@ export class PokemonPrefetch {
         progress.completed++
       } else {
         progress.failed++
-        console.error(`[PokemonPrefetch] Failed to fetch ${pokemonIds[index]}:`, result.reason)
+        log.error(`Failed to fetch ${pokemonIds[index]}:`, result.reason)
       }
 
       progress.percentage = (progress.completed / progress.total) * 100
@@ -168,7 +171,7 @@ export class PokemonPrefetch {
       // Cache the Pokemon
       await PokemonCacheDB.cachePokemon(pokemon)
     } catch (error) {
-      console.error(`[PokemonPrefetch] Error fetching Pokemon ${pokemonId}:`, error)
+      log.error(`Error fetching Pokemon ${pokemonId}:`, error)
       throw error
     }
   }
@@ -177,7 +180,7 @@ export class PokemonPrefetch {
    * Prefetch images for Pokemon
    */
   private static async prefetchImages(pokemonIds: string[]): Promise<void> {
-    console.log(`[PokemonPrefetch] Prefetching images for ${pokemonIds.length} Pokemon`)
+    log.info(`Prefetching images for ${pokemonIds.length} Pokemon`)
 
     try {
       await ImagePreloader.preloadPokemonImages(pokemonIds, {
@@ -186,7 +189,7 @@ export class PokemonPrefetch {
         fallbackToSprite: true,
       })
     } catch (error) {
-      console.error('[PokemonPrefetch] Image prefetch failed:', error)
+      log.error('Image prefetch failed:', error)
     }
   }
 
@@ -198,7 +201,7 @@ export class PokemonPrefetch {
       try {
         callback(progress)
       } catch (error) {
-        console.error('[PokemonPrefetch] Progress callback error:', error)
+        log.error('Progress callback error:', error)
       }
     })
   }
@@ -280,7 +283,7 @@ export class PokemonPrefetch {
   static cancelAll(): void {
     this.prefetchQueue.clear()
     this.progressCallbacks.clear()
-    console.log('[PokemonPrefetch] Cancelled all operations')
+    log.info('Cancelled all operations')
   }
 
   /**
@@ -311,6 +314,6 @@ export class PokemonPrefetch {
     this.progressCallbacks.clear()
     this.isInitialized = false
 
-    console.log('[PokemonPrefetch] Shutdown complete')
+    log.info('Shutdown complete')
   }
 }

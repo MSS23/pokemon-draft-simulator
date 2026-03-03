@@ -27,6 +27,9 @@ import {
 } from 'lucide-react'
 import type { AdvancedTeamStats, TeamFormIndicator } from '@/lib/league-stats-service'
 import type { Team } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('LeagueRankingsPage')
 
 interface PowerRanking {
   rank: number
@@ -131,7 +134,7 @@ export default function PowerRankingsPage() {
 
       setRankings(finalRankings)
     } catch (err) {
-      console.error('Error loading rankings:', err)
+      log.error('Error loading rankings:', err)
       setError(err instanceof Error ? err.message : 'Failed to load rankings')
     } finally {
       setIsLoading(false)

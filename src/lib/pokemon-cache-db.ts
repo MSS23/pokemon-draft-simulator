@@ -9,6 +9,9 @@
  */
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('PokemonCacheDb')
 
 export interface CachedPokemon {
   id: string
@@ -110,9 +113,9 @@ export class PokemonCacheDB {
           version: '1.0.0',
         }, 'init')
 
-        console.log('[PokemonCacheDB] Initialized successfully')
+        log.info('Initialized successfully')
       } catch (error) {
-        console.error('[PokemonCacheDB] Initialization failed:', error)
+        log.error('Initialization failed:', error)
         throw error
       }
     })()
@@ -132,7 +135,7 @@ export class PokemonCacheDB {
       }
       await db.put('pokemon', cached)
     } catch (error) {
-      console.error(`[PokemonCacheDB] Failed to cache Pokemon ${pokemon.id}:`, error)
+      log.error(`Failed to cache Pokemon ${pokemon.id}:`, error)
     }
   }
 
@@ -153,9 +156,9 @@ export class PokemonCacheDB {
       )
 
       await tx.done
-      console.log(`[PokemonCacheDB] Cached ${pokemonList.length} Pokemon`)
+      log.info(`Cached ${pokemonList.length} Pokemon`)
     } catch (error) {
-      console.error('[PokemonCacheDB] Batch cache failed:', error)
+      log.error('Batch cache failed:', error)
     }
   }
 
@@ -171,13 +174,13 @@ export class PokemonCacheDB {
 
       // Check if cache is stale
       if (Date.now() - cached.cachedAt > CACHE_DURATION_MS) {
-        console.log(`[PokemonCacheDB] Cache stale for Pokemon ${id}`)
+        log.info(`Cache stale for Pokemon ${id}`)
         return null
       }
 
       return cached
     } catch (error) {
-      console.error(`[PokemonCacheDB] Failed to get Pokemon ${id}:`, error)
+      log.error(`Failed to get Pokemon ${id}:`, error)
       return null
     }
   }
@@ -206,7 +209,7 @@ export class PokemonCacheDB {
       await tx.done
       return results
     } catch (error) {
-      console.error('[PokemonCacheDB] Batch read failed:', error)
+      log.error('Batch read failed:', error)
       return new Map()
     }
   }
@@ -222,7 +225,7 @@ export class PokemonCacheDB {
       const now = Date.now()
       return all.filter(p => (now - p.cachedAt) <= CACHE_DURATION_MS)
     } catch (error) {
-      console.error('[PokemonCacheDB] Failed to get all Pokemon:', error)
+      log.error('Failed to get all Pokemon:', error)
       return []
     }
   }
@@ -253,7 +256,7 @@ export class PokemonCacheDB {
 
       return results
     } catch (error) {
-      console.error('[PokemonCacheDB] Search failed:', error)
+      log.error('Search failed:', error)
       return []
     }
   }
@@ -277,9 +280,9 @@ export class PokemonCacheDB {
         cachedAt: Date.now(),
       }
       await db.put('formats', cached)
-      console.log(`[PokemonCacheDB] Cached format ${formatId}`)
+      log.info(`Cached format ${formatId}`)
     } catch (error) {
-      console.error(`[PokemonCacheDB] Failed to cache format ${formatId}:`, error)
+      log.error(`Failed to cache format ${formatId}:`, error)
     }
   }
 
@@ -295,13 +298,13 @@ export class PokemonCacheDB {
 
       // Format cache is valid for 7 days
       if (Date.now() - cached.cachedAt > CACHE_DURATION_MS) {
-        console.log(`[PokemonCacheDB] Format cache stale for ${formatId}`)
+        log.info(`Format cache stale for ${formatId}`)
         return null
       }
 
       return cached
     } catch (error) {
-      console.error(`[PokemonCacheDB] Failed to get format ${formatId}:`, error)
+      log.error(`Failed to get format ${formatId}:`, error)
       return null
     }
   }
@@ -331,9 +334,9 @@ export class PokemonCacheDB {
       }
 
       await tx.done
-      console.log(`[PokemonCacheDB] Cleared ${deletedCount} stale entries`)
+      log.info(`Cleared ${deletedCount} stale entries`)
     } catch (error) {
-      console.error('[PokemonCacheDB] Failed to clear stale cache:', error)
+      log.error('Failed to clear stale cache:', error)
     }
   }
 
@@ -366,7 +369,7 @@ export class PokemonCacheDB {
         oldestEntry,
       }
     } catch (error) {
-      console.error('[PokemonCacheDB] Failed to get stats:', error)
+      log.error('Failed to get stats:', error)
       return {
         pokemonCount: 0,
         formatCount: 0,
@@ -384,9 +387,9 @@ export class PokemonCacheDB {
       const db = await this.getDB()
       await db.clear('pokemon')
       await db.clear('formats')
-      console.log('[PokemonCacheDB] Cleared all cache data')
+      log.info('Cleared all cache data')
     } catch (error) {
-      console.error('[PokemonCacheDB] Failed to clear cache:', error)
+      log.error('Failed to clear cache:', error)
     }
   }
 }

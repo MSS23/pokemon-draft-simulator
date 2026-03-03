@@ -7,6 +7,9 @@
 
 import { supabase } from './supabase'
 import type { Pick } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('WeeklyHighlightsService')
 
 export interface WeeklySummary {
   id: string
@@ -82,7 +85,7 @@ export class WeeklyHighlightsService {
       // Fetch the generated summary
       return await this.getWeeklySummary(leagueId, weekNumber)
     } catch (error) {
-      console.error('Error generating weekly summary:', error)
+      log.error('Error generating weekly summary:', error)
       throw error
     }
   }
@@ -129,7 +132,7 @@ export class WeeklyHighlightsService {
         updatedAt: data.updated_at
       }
     } catch (error) {
-      console.error('Error fetching weekly summary:', error)
+      log.error('Error fetching weekly summary:', error)
       throw error
     }
   }
@@ -171,7 +174,7 @@ export class WeeklyHighlightsService {
         updatedAt: h.updated_at
       }))
     } catch (error) {
-      console.error('Error fetching weekly highlights:', error)
+      log.error('Error fetching weekly highlights:', error)
       throw error
     }
   }
@@ -237,7 +240,7 @@ export class WeeklyHighlightsService {
         updatedAt: data.updated_at
       }
     } catch (error) {
-      console.error('Error creating highlight:', error)
+      log.error('Error creating highlight:', error)
       throw error
     }
   }
@@ -374,7 +377,7 @@ export class WeeklyHighlightsService {
 
       return highlights
     } catch (error) {
-      console.error('Error auto-generating highlights:', error)
+      log.error('Error auto-generating highlights:', error)
       return highlights
     }
   }
@@ -417,7 +420,7 @@ export class WeeklyHighlightsService {
         updatedAt: d.updated_at
       }))
     } catch (error) {
-      console.error('Error fetching league summaries:', error)
+      log.error('Error fetching league summaries:', error)
       throw error
     }
   }

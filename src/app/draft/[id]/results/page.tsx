@@ -11,9 +11,12 @@ import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-servi
 import { LeagueService } from '@/lib/league-service'
 import DraftResults from '@/components/draft/DraftResults'
 import { CreateLeagueModal } from '@/components/league/CreateLeagueModal'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import Link from 'next/link'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftResultsPage')
 
 export default function DraftResultsPage() {
   const params = useParams()
@@ -26,8 +29,6 @@ export default function DraftResultsPage() {
   const [existingLeagueId, setExistingLeagueId] = useState<string | null>(null)
   const [isLeagueModalOpen, setIsLeagueModalOpen] = useState(false)
   const [isCheckingLeague, setIsCheckingLeague] = useState(false)
-
-  const notify = useNotify()
 
   useEffect(() => {
     const loadDraftState = async () => {
@@ -57,12 +58,12 @@ export default function DraftResultsPage() {
             setExistingLeagueId(league.id)
           }
         } catch (err) {
-          console.error('Error checking for existing league:', err)
+          log.error('Error checking for existing league:', err)
         } finally {
           setIsCheckingLeague(false)
         }
       } catch (err) {
-        console.error('Error loading draft state:', err)
+        log.error('Error loading draft state:', err)
         setError('Failed to load draft results')
       } finally {
         setIsLoading(false)

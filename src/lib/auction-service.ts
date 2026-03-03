@@ -3,6 +3,9 @@
 import { supabase } from './supabase'
 import { BidHistory, Auction } from '@/types'
 import { notificationService } from './notification-service'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AuctionService')
 
 export interface PlaceBidParams {
   auctionId: string
@@ -75,7 +78,7 @@ class AuctionService {
         })
 
       if (historyError) {
-        console.error('Error recording bid history:', historyError)
+        log.error('Error recording bid history:', historyError)
         throw new Error('Failed to record bid history')
       }
 
@@ -89,7 +92,7 @@ class AuctionService {
         .eq('id', auctionId)
 
       if (auctionError) {
-        console.error('Error updating auction:', auctionError)
+        log.error('Error updating auction:', auctionError)
         throw new Error('Failed to update auction')
       }
 
@@ -107,7 +110,7 @@ class AuctionService {
       this.notifyBidPlaced(teamName, bidAmount, teamId)
 
     } catch (error) {
-      console.error('Error placing bid:', error)
+      log.error('Error placing bid:', error)
       throw error
     }
   }
@@ -128,7 +131,7 @@ class AuctionService {
         .order('created_at', { ascending: true })
 
       if (error) {
-        console.error('Error fetching bid history:', error)
+        log.error('Error fetching bid history:', error)
         return this.bidHistoryCache.get(auctionId) || []
       }
 
@@ -146,7 +149,7 @@ class AuctionService {
 
       return bidHistory
     } catch (error) {
-      console.error('Error getting bid history:', error)
+      log.error('Error getting bid history:', error)
       return this.bidHistoryCache.get(auctionId) || []
     }
   }
@@ -156,7 +159,7 @@ class AuctionService {
    */
   subscribeToBidHistory(auctionId: string, onUpdate: (bidHistory: BidHistoryEntry[]) => void) {
     if (!supabase) {
-      console.warn('Supabase not available, using cache only')
+      log.warn('Supabase not available, using cache only')
       return () => {}
     }
 
@@ -206,7 +209,7 @@ class AuctionService {
    */
   subscribeToAuctionUpdates(draftId: string, userTeamId: string | null) {
     if (!supabase) {
-      console.warn('Supabase not available, notifications disabled')
+      log.warn('Supabase not available, notifications disabled')
       return () => {}
     }
 
@@ -310,7 +313,7 @@ class AuctionService {
         mostActiveTeam,
       }
     } catch (error) {
-      console.error('Error getting auction stats:', error)
+      log.error('Error getting auction stats:', error)
       return {
         totalAuctions: 0,
         totalBids: 0,
@@ -342,7 +345,7 @@ class AuctionService {
   private notifyBidPlaced(teamName: string, bidAmount: number, teamId: string) {
     // Note: We don't know the current user's team ID in this context,
     // so notifications will be handled at the component level
-    console.log(`Bid placed: ${teamName} bid $${bidAmount}`)
+    log.info(`Bid placed: ${teamName} bid $${bidAmount}`)
   }
 
   private notifyAuctionStarted(pokemonName: string, nominatedBy: string, userTeamId: string | null) {

@@ -4,6 +4,8 @@
  * Centralized error handling and recovery logic for the application.
  * Provides consistent error messages and recovery strategies.
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('ErrorHandler')
 
 export enum ErrorSeverity {
   INFO = 'info',
@@ -298,7 +300,7 @@ class ErrorHandler {
           })
         })
         .catch((sentryError) => {
-          console.error('Failed to send error to Sentry:', sentryError)
+          log.error('Failed to send error to Sentry:', sentryError)
         })
     }
   }

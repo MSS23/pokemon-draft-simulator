@@ -3,6 +3,8 @@
  * Manages which drafts a user has verified access to
  * Prevents unauthorized access to private/password-protected drafts
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('DraftAccess')
 
 const STORAGE_KEY = 'verified_draft_access'
 
@@ -38,7 +40,7 @@ export function getVerifiedDrafts(): DraftAccess[] {
 
     return validDrafts
   } catch (error) {
-    console.error('Error reading draft access:', error)
+    log.error('Error reading draft access:', error)
     return []
   }
 }
@@ -76,7 +78,7 @@ export function grantDraftAccess(roomCode: string, isHost: boolean = false): voi
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
   } catch (error) {
-    console.error('Error granting draft access:', error)
+    log.error('Error granting draft access:', error)
   }
 }
 
@@ -94,7 +96,7 @@ export function revokeDraftAccess(roomCode: string): void {
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
   } catch (error) {
-    console.error('Error revoking draft access:', error)
+    log.error('Error revoking draft access:', error)
   }
 }
 
@@ -107,6 +109,6 @@ export function clearAllDraftAccess(): void {
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch (error) {
-    console.error('Error clearing draft access:', error)
+    log.error('Error clearing draft access:', error)
   }
 }

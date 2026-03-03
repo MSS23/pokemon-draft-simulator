@@ -3,6 +3,8 @@
  *
  * Handles sound effects and audio feedback for draft events
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('SoundService')
 
 export type SoundEffect =
   | 'pick'
@@ -54,7 +56,7 @@ export class SoundService {
         this.volume = parseFloat(volume)
       }
     } catch (error) {
-      console.warn('Failed to load sound settings:', error)
+      log.warn('Failed to load sound settings:', error)
     }
   }
 
@@ -66,7 +68,7 @@ export class SoundService {
       localStorage.setItem('soundEnabled', String(this.enabled))
       localStorage.setItem('soundVolume', String(this.volume))
     } catch (error) {
-      console.warn('Failed to save sound settings:', error)
+      log.warn('Failed to save sound settings:', error)
     }
   }
 
@@ -150,7 +152,7 @@ export class SoundService {
           this.playNotificationSound(oscillator, gainNode)
       }
     } catch (error) {
-      console.warn('Failed to play sound:', error)
+      log.warn('Failed to play sound:', error)
     }
   }
 

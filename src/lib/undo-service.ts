@@ -1,4 +1,7 @@
 import { supabase } from './supabase'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UndoService')
 
 export interface UndoPickParams {
   draftId: string
@@ -36,7 +39,7 @@ export class UndoService {
       })
 
       if (error) {
-        console.error('Error undoing pick:', error)
+        log.error('Error undoing pick:', error)
         return {
           success: false,
           message: error.message || 'Failed to undo pick'
@@ -51,7 +54,7 @@ export class UndoService {
         pickId: result?.pick_id
       }
     } catch (error) {
-      console.error('Error undoing pick:', error)
+      log.error('Error undoing pick:', error)
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Unknown error'
@@ -73,13 +76,13 @@ export class UndoService {
       })
 
       if (error) {
-        console.error('Error fetching draft history:', error)
+        log.error('Error fetching draft history:', error)
         return []
       }
 
       return data || []
     } catch (error) {
-      console.error('Error fetching draft history:', error)
+      log.error('Error fetching draft history:', error)
       return []
     }
   }
@@ -118,13 +121,13 @@ export class UndoService {
       })
 
       if (error) {
-        console.error('Error recording draft action:', error)
+        log.error('Error recording draft action:', error)
         return null
       }
 
       return data
     } catch (error) {
-      console.error('Error recording draft action:', error)
+      log.error('Error recording draft action:', error)
       return null
     }
   }
@@ -150,7 +153,7 @@ export class UndoService {
 
       return (data as { undos_remaining: number }).undos_remaining || 0
     } catch (error) {
-      console.error('Error getting undos remaining:', error)
+      log.error('Error getting undos remaining:', error)
       return 0
     }
   }

@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Shield, ShieldCheck, ShieldOff, Crown, Users } from 'lucide-react'
 import { AdminService } from '@/lib/admin-service'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
 import type { Participant } from '@/types'
 
 interface AdminManagementProps {
@@ -25,7 +25,6 @@ export default function AdminManagement({
   isAdmin
 }: AdminManagementProps) {
   const [isProcessing, setIsProcessing] = useState<string | null>(null)
-  const notify = useNotify()
 
   // Only hosts and admins can see this component
   if (!isHost && !isAdmin) {

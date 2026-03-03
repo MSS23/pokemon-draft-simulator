@@ -2,6 +2,8 @@
  * Input Validation and Sanitization Utilities
  * Protects against XSS, SQL injection, and other malicious input
  */
+import { createLogger } from '@/lib/logger'
+const log = createLogger('Validation')
 
 // ============================================================================
 // STRING SANITIZATION
@@ -236,7 +238,7 @@ export function sanitizeJsonb<T = any>(obj: any, maxSizeKB: number = 100): T | n
   if (!obj || typeof obj !== 'object') return null
 
   if (!isValidJsonbSize(obj, maxSizeKB)) {
-    console.warn('JSONB object exceeds size limit')
+    log.warn('JSONB object exceeds size limit')
     return null
   }
 

@@ -32,7 +32,7 @@ import {
   Trash2,
   Shuffle
 } from 'lucide-react'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
 
 interface DraftControlsProps {
   draftStatus: 'waiting' | 'drafting' | 'completed' | 'paused'
@@ -105,8 +105,6 @@ const DraftControls = memo(function DraftControls({
   } | null>(null)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const notify = useNotify()
-
   const handlePauseDraft = () => {
     onPauseDraft()
     notify.warning('Draft Paused', 'The draft has been paused by the host')

@@ -36,7 +36,7 @@ import {
   Download,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useNotify } from "@/components/providers/NotificationProvider";
+import { notify } from "@/lib/notifications";
 import {
   POKEMON_FORMATS,
   getFormatById,
@@ -53,12 +53,14 @@ import {
 } from "@/lib/format-export";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { useAuth } from "@/contexts/AuthContext";
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('CreateDraftPage')
 
 export default function CreateDraftPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
-  const notify = useNotify();
   const [formData, setFormData] = useState({
     userName: "",
     teamName: "",
@@ -151,7 +153,7 @@ export default function CreateDraftPage() {
         `${selectedFormat.shortName} format exported successfully!`,
       );
     } catch (error) {
-      console.error("Export error:", error);
+      log.error("Export error:", error);
       notify.error(
         "Export Failed",
         error instanceof Error ? error.message : "Failed to export format",
@@ -291,7 +293,7 @@ export default function CreateDraftPage() {
         `/draft/${roomCode.toLowerCase()}?userName=${encodeURIComponent(formData.userName)}&teamName=${encodeURIComponent(formData.teamName)}&isHost=true`,
       );
     } catch (error) {
-      console.error("Failed to create draft:", error);
+      log.error("Failed to create draft:", error);
       notify.error(
         "Failed to Create Draft",
         error instanceof Error

@@ -18,6 +18,9 @@ import type {
   DraftSettings as DraftSettingsJson,
 } from '@/types/supabase-helpers'
 import bcrypt from 'bcryptjs'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftService')
 
 type Draft = DraftRow
 type Team = TeamRow
@@ -187,7 +190,7 @@ export class DraftService {
         turnStartedAt: null
       }
     } catch (error) {
-      console.error('Error fetching server time:', error)
+      log.error('Error fetching server time:', error)
       return {
         serverTime: Date.now(),
         pickEndsAt: null,
@@ -199,7 +202,7 @@ export class DraftService {
 
   static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, password, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
     if (!supabase) {
-      console.error('Supabase configuration error:', {
+      log.error('Supabase configuration error:', {
         url: process.env.NEXT_PUBLIC_SUPABASE_URL,
         hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       })
@@ -239,7 +242,7 @@ export class DraftService {
         .single()
 
       if (formatError) {
-        console.error('Error creating custom format:', formatError)
+        log.error('Error creating custom format:', formatError)
         throw new Error(`Failed to create custom format: ${formatError.message}`)
       }
 
@@ -283,7 +286,7 @@ export class DraftService {
       .single()
 
     if (draftError) {
-      console.error('Error creating draft:', draftError)
+      log.error('Error creating draft:', draftError)
       throw new Error(`Failed to create draft: ${draftError.message || JSON.stringify(draftError)}`)
     }
 
@@ -302,7 +305,7 @@ export class DraftService {
       .single()
 
     if (teamError) {
-      console.error('Error creating team:', teamError)
+      log.error('Error creating team:', teamError)
       throw new Error(`Failed to create team: ${teamError.message || JSON.stringify(teamError)}`)
     }
 
@@ -322,7 +325,7 @@ export class DraftService {
       .single()
 
     if (participantError) {
-      console.error('Error creating participant:', participantError)
+      log.error('Error creating participant:', participantError)
       throw new Error(`Failed to create participant: ${participantError.message || JSON.stringify(participantError)}`)
     }
 
@@ -372,7 +375,7 @@ export class DraftService {
         })
 
       if (createError) {
-        console.error('Failed to auto-create user profile:', createError)
+        log.error('Failed to auto-create user profile:', createError)
       }
     } else {
       displayName = userProfile.display_name || 'User'
@@ -397,7 +400,7 @@ export class DraftService {
 
     if (existingParticipant) {
       // User is already part of this draft - update their last_seen and return their existing team
-      console.log('User already participant, updating last_seen and returning existing team')
+      log.info('User already participant, updating last_seen and returning existing team')
 
       await (supabase
         .from('participants'))
@@ -448,7 +451,7 @@ export class DraftService {
 
     // If draft is full or already started, join as spectator instead
     if (existingTeams.length >= (draft as unknown as DraftWithTeamsAndParticipants).max_teams || (draft as unknown as DraftWithTeamsAndParticipants).status !== 'setup') {
-      console.log('Draft is full or started, joining as spectator instead')
+      log.info('Draft is full or started, joining as spectator instead')
       const result = await this.joinAsSpectator({ roomCode, userId })
       return {
         draftId: result.draftId,
@@ -479,7 +482,7 @@ export class DraftService {
       .single()
 
     if (teamError) {
-      console.error('Error creating team:', teamError)
+      log.error('Error creating team:', teamError)
       throw new Error('Failed to join draft')
     }
 
@@ -496,7 +499,7 @@ export class DraftService {
       })
 
     if (participantError) {
-      console.error('Error creating participant:', participantError)
+      log.error('Error creating participant:', participantError)
       throw new Error('Failed to create participant')
     }
 
@@ -543,7 +546,7 @@ export class DraftService {
         })
 
       if (createError) {
-        console.error('Failed to auto-create user profile:', createError)
+        log.error('Failed to auto-create user profile:', createError)
       }
     } else {
       displayName = userProfile.display_name || 'User'
@@ -566,7 +569,7 @@ export class DraftService {
     const existingParticipant = existingParticipants.find((p: ParticipantRow) => p.user_id === userId)
 
     if (existingParticipant) {
-      console.log('User already spectator, updating last_seen')
+      log.info('User already spectator, updating last_seen')
 
       // Update their last_seen
       await (supabase
@@ -604,7 +607,7 @@ export class DraftService {
       })
 
     if (participantError) {
-      console.error('Error creating spectator:', participantError)
+      log.error('Error creating spectator:', participantError)
       throw new Error('Failed to join as spectator')
     }
 
@@ -642,12 +645,12 @@ export class DraftService {
         .maybeSingle()
 
       if (error) {
-        console.error('Error fetching draft state:', error)
+        log.error('Error fetching draft state:', error)
         return null
       }
 
       if (!data) {
-        console.warn(`Draft not found for ${isUuid ? 'ID' : 'room code'}: ${roomCodeOrDraftId}`)
+        log.warn(`Draft not found for ${isUuid ? 'ID' : 'room code'}: ${roomCodeOrDraftId}`)
         return null
       }
 
@@ -659,7 +662,7 @@ export class DraftService {
         auctions: ((data as unknown as DraftWithRelations)).auctions || []
       }
     } catch (err) {
-      console.error('Unexpected error in getDraftState:', err)
+      log.error('Unexpected error in getDraftState:', err)
       return null
     }
   }
@@ -696,7 +699,7 @@ export class DraftService {
 
     // Update each team with new randomized draft order
     const updatePromises = teams.map((team, index) => {
-      console.log(`[Shuffle] Updating team ${team.name} to draft_order ${randomizedOrder[index]}`)
+      log.info(`Updating team ${team.name} to draft_order ${randomizedOrder[index]}`)
       return supabase
         .from('teams')
         .update({ draft_order: randomizedOrder[index] })
@@ -704,7 +707,7 @@ export class DraftService {
     })
 
     const results = await Promise.all(updatePromises)
-    console.log('[Shuffle] Team updates completed:', results.map(r => ({ error: r.error, count: r.count })))
+    log.info('Team updates completed:', results.map(r => ({ error: r.error, count: r.count })))
 
     // Update draft settings to mark as manually shuffled
     const updatedSettings = {
@@ -720,7 +723,7 @@ export class DraftService {
       })
       .eq('id', draftUuid)
 
-    console.log('[Shuffle] Draft update:', { error: draftUpdateError, draftId: draftUuid })
+    log.info('Draft update:', { error: draftUpdateError, draftId: draftUuid })
   }
 
   /**
@@ -802,7 +805,7 @@ export class DraftService {
 
     // If draft is already active, return success (idempotency)
     if (draftState.draft.status === 'active') {
-      console.log('[startDraft] Draft already active, returning success (idempotent)')
+      log.info('Draft already active, returning success (idempotent)')
       return
     }
 
@@ -812,7 +815,7 @@ export class DraftService {
     const needsShuffle = !draftOrderShuffled
 
     if (needsShuffle) {
-      console.log('[startDraft] Auto-shuffling draft order (not manually shuffled)')
+      log.info('Auto-shuffling draft order (not manually shuffled)')
 
       // Generate randomized order
       const randomizedOrder = teams.map((_: TeamRow, index: number) => index + 1)
@@ -834,11 +837,11 @@ export class DraftService {
       // Check for errors in shuffle updates
       const shuffleErrors = results.filter(r => r.error)
       if (shuffleErrors.length > 0) {
-        console.error('[startDraft] Error shuffling teams:', shuffleErrors)
+        log.error('Error shuffling teams:', shuffleErrors)
         throw new Error('Failed to shuffle team draft order')
       }
 
-      console.log('[startDraft] Team draft order shuffled successfully')
+      log.info('Team draft order shuffled successfully')
     }
 
     // Prepare updated settings (mark as shuffled if we just shuffled)
@@ -864,7 +867,7 @@ export class DraftService {
       .eq('status', 'setup') // Only update if still in setup (prevent race conditions)
 
     if (error) {
-      console.error('[startDraft] Error updating draft status:', error)
+      log.error('Error updating draft status:', error)
 
       // Check if it's an RLS policy error
       if (error.code === '42501' || error.message?.includes('policy')) {
@@ -874,7 +877,7 @@ export class DraftService {
       throw new Error(`Failed to start draft: ${error.message || 'Unknown error'}`)
     }
 
-    console.log('[startDraft] Draft started successfully:', { draftId: draftUuid, roomCode: roomCodeOrDraftId })
+    log.info('Draft started successfully:', { draftId: draftUuid, roomCode: roomCodeOrDraftId })
   }
 
   /**
@@ -925,7 +928,7 @@ export class DraftService {
     })
 
     if (error) {
-      console.error('[makePick] Database RPC error:', error)
+      log.error('Database RPC error:', error)
       throw new Error(error.message || 'Failed to make pick')
     }
 
@@ -937,7 +940,7 @@ export class DraftService {
     if (!data.success) {
       // The atomic function returned an error (validation failed)
       const errorMessage = data.error || 'Failed to make pick'
-      console.error('[makePick] Atomic function error:', errorMessage, data)
+      log.error('Atomic function error:', errorMessage, data)
 
       // Provide user-friendly error messages
       if (errorMessage.includes('Not your turn')) {
@@ -959,7 +962,7 @@ export class DraftService {
       throw new Error(errorMessage)
     }
 
-    console.log('[makePick] Success:', {
+    log.info('Success:', {
       pickId: data.pickId,
       newBudget: data.newBudget,
       nextTurn: data.nextTurn,
@@ -971,7 +974,7 @@ export class DraftService {
       try {
         await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
       } catch (leagueError) {
-        console.error('Error creating league:', leagueError)
+        log.error('Error creating league:', leagueError)
         // Don't fail the pick if league creation fails
       }
     }
@@ -1024,7 +1027,7 @@ export class DraftService {
     if (!draftState) return null
 
     // Debug logging to help troubleshoot participant lookup issues
-    console.log('[getUserTeam] Looking up participant:', {
+    log.info('Looking up participant:', {
       draftId,
       userId,
       draftUuid: draftState.draft.id
@@ -1038,11 +1041,11 @@ export class DraftService {
       .maybeSingle()
 
     if (error) {
-      console.error('[getUserTeam] Database error:', error)
+      log.error('Database error:', error)
     }
 
     if (!participant) {
-      console.warn('[getUserTeam] No participant found for user. All participants in draft:',
+      log.warn('No participant found for user. All participants in draft:',
         draftState.participants.map(p => ({
           userId: p.user_id,
           teamId: p.team_id,
@@ -1113,7 +1116,7 @@ export class DraftService {
       .eq('id', draftState.draft.id)
 
     if (error) {
-      console.error('Error pausing draft:', error)
+      log.error('Error pausing draft:', error)
       throw new Error('Failed to pause draft')
     }
   }
@@ -1140,7 +1143,7 @@ export class DraftService {
       .eq('id', draftState.draft.id)
 
     if (error) {
-      console.error('Error unpausing draft:', error)
+      log.error('Error unpausing draft:', error)
       throw new Error('Failed to unpause draft')
     }
   }
@@ -1162,7 +1165,7 @@ export class DraftService {
       .eq('id', draftState.draft.id)
 
     if (error) {
-      console.error('Error ending draft:', error)
+      log.error('Error ending draft:', error)
       throw new Error('Failed to end draft')
     }
   }
@@ -1183,7 +1186,7 @@ export class DraftService {
       .eq('draft_id', draftState.draft.id)
 
     if (picksError) {
-      console.error('Error deleting picks:', picksError)
+      log.error('Error deleting picks:', picksError)
       throw new Error('Failed to delete picks')
     }
 
@@ -1194,7 +1197,7 @@ export class DraftService {
       .eq('draft_id', draftState.draft.id)
 
     if (auctionsError) {
-      console.error('Error deleting auctions:', auctionsError)
+      log.error('Error deleting auctions:', auctionsError)
       // Don't throw - auctions might not exist
     }
 
@@ -1205,7 +1208,7 @@ export class DraftService {
       .eq('draft_id', draftState.draft.id)
 
     if (bidsError) {
-      console.error('Error deleting bids:', bidsError)
+      log.error('Error deleting bids:', bidsError)
       // Don't throw - bids might not exist
     }
 
@@ -1218,7 +1221,7 @@ export class DraftService {
       .eq('draft_id', draftState.draft.id)
 
     if (teamsError) {
-      console.error('Error resetting teams:', teamsError)
+      log.error('Error resetting teams:', teamsError)
       throw new Error('Failed to reset teams')
     }
 
@@ -1234,7 +1237,7 @@ export class DraftService {
       .eq('id', draftState.draft.id)
 
     if (draftError) {
-      console.error('Error resetting draft:', draftError)
+      log.error('Error resetting draft:', draftError)
       throw new Error('Failed to reset draft')
     }
   }
@@ -1271,7 +1274,7 @@ export class DraftService {
       // Unsubscribe the channel
       await channel.unsubscribe()
     } catch (error) {
-      console.warn('Failed to broadcast deletion event:', error)
+      log.warn('Failed to broadcast deletion event:', error)
       // Continue with deletion even if broadcast fails
     }
 
@@ -1286,11 +1289,11 @@ export class DraftService {
       .eq('id', internalId)
 
     if (draftError) {
-      console.error('Error soft-deleting draft:', draftError)
+      log.error('Error soft-deleting draft:', draftError)
       throw new Error('Failed to delete draft')
     }
 
-    console.log(`[DraftService] Draft ${draftId} soft-deleted by user ${userId}`)
+    log.info(`Draft ${draftId} soft-deleted by user ${userId}`)
   }
 
   /**
@@ -1317,7 +1320,7 @@ export class DraftService {
     try {
       await (supabase.from('bid_history')).delete().eq('draft_id', internalId)
     } catch (error) {
-      console.debug('No bid_history table or no records to delete')
+      log.debug('No bid_history table or no records to delete')
     }
 
     // 3. Delete auctions
@@ -1327,14 +1330,14 @@ export class DraftService {
     try {
       await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)('wishlists').delete().eq('draft_id', internalId)
     } catch (error) {
-      console.debug('No wishlists table or no records to delete')
+      log.debug('No wishlists table or no records to delete')
     }
 
     // 5. Delete wishlist_items (actual table name)
     try {
       await supabase.from('wishlist_items').delete().eq('draft_id', internalId)
     } catch (error) {
-      console.debug('No wishlist_items to delete')
+      log.debug('No wishlist_items to delete')
     }
 
     // 6. Delete participants
@@ -1347,7 +1350,7 @@ export class DraftService {
     try {
       await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)('draft_results').delete().eq('draft_id', internalId)
     } catch (error) {
-      console.debug('No draft_results table or no records to delete')
+      log.debug('No draft_results table or no records to delete')
     }
 
     // 9. Finally, delete the draft itself
@@ -1357,11 +1360,11 @@ export class DraftService {
       .eq('id', internalId)
 
     if (draftError) {
-      console.error('Error hard-deleting draft:', draftError)
+      log.error('Error hard-deleting draft:', draftError)
       throw new Error('Failed to delete draft')
     }
 
-    console.log(`[DraftService] Draft ${draftId} hard-deleted (permanent)`)
+    log.info(`Draft ${draftId} hard-deleted (permanent)`)
   }
 
   static async updateTimerSetting(draftId: string, timerSeconds: number): Promise<void> {
@@ -1394,7 +1397,7 @@ export class DraftService {
       .eq('id', internalId)
 
     if (error) {
-      console.error('Error updating timer setting:', error)
+      log.error('Error updating timer setting:', error)
       throw new Error('Failed to update timer setting')
     }
   }
@@ -1451,13 +1454,13 @@ export class DraftService {
       .select()
 
     if (error) {
-      console.error('[advanceTurn] Error advancing turn:', error)
+      log.error('Error advancing turn:', error)
       throw new Error('Failed to advance turn')
     }
 
     if (!updateResult || updateResult.length === 0) {
       // Optimistic lock failed - turn was already advanced by another process
-      console.warn('[advanceTurn] Optimistic lock failed - turn was already advanced')
+      log.warn('Optimistic lock failed - turn was already advanced')
       throw new Error('Turn was already advanced by another process')
     }
   }
@@ -1520,7 +1523,7 @@ export class DraftService {
         validatedCost: validation.cost
       }
     } catch (error) {
-      console.error('Error validating Pokemon in format:', error)
+      log.error('Error validating Pokemon in format:', error)
       return {
         isValid: false,
         reason: 'Failed to validate Pokemon against format rules',
@@ -1545,7 +1548,7 @@ export class DraftService {
       .single()
 
     if (error || !draft) {
-      console.error('Error fetching draft format:', error)
+      log.error('Error fetching draft format:', error)
       return null
     }
 
@@ -1597,7 +1600,7 @@ export class DraftService {
 
       return { success: true, url }
     } catch (error) {
-      console.error('Error resuming draft:', error)
+      log.error('Error resuming draft:', error)
       return { success: false, error: 'Failed to resume draft' }
     }
   }
@@ -1645,7 +1648,7 @@ export class DraftService {
       .eq('draft_id', draftState.draft.id)
 
     if (error) {
-      console.error('Error adjusting team budget:', error)
+      log.error('Error adjusting team budget:', error)
       throw new Error('Failed to adjust team budget')
     }
   }
@@ -1697,7 +1700,7 @@ export class DraftService {
       .eq('id', internalId)
 
     if (error) {
-      console.error('Error setting auction timer duration:', error)
+      log.error('Error setting auction timer duration:', error)
       throw new Error('Failed to set auction timer duration')
     }
   }
@@ -1717,7 +1720,7 @@ export class DraftService {
 
       // Only create leagues from snake drafts
       if (draftState?.draft?.format !== 'snake') {
-        console.log('League auto-creation skipped: Only snake drafts supported')
+        log.info('League auto-creation skipped: Only snake drafts supported')
         return
       }
 
@@ -1733,9 +1736,9 @@ export class DraftService {
         maxMatchesPerWeek: 1  // Limit each team to 1 match per week
       })
 
-      console.log('League created successfully for draft:', draftId)
+      log.info('League created successfully for draft:', draftId)
     } catch (error) {
-      console.error('Failed to create league:', error)
+      log.error('Failed to create league:', error)
       throw error
     }
   }
@@ -1798,7 +1801,7 @@ export class DraftService {
       })
 
     if (error) {
-      console.error('Error creating auction:', error)
+      log.error('Error creating auction:', error)
       throw new Error('Failed to nominate Pokemon')
     }
   }
@@ -1877,7 +1880,7 @@ export class DraftService {
       .eq('id', auctionId)
 
     if (updateError) {
-      console.error('Error placing bid:', updateError)
+      log.error('Error placing bid:', updateError)
       throw new Error('Failed to place bid')
     }
   }
@@ -1930,7 +1933,7 @@ export class DraftService {
         })
 
       if (pickError) {
-        console.error('Error creating pick from auction:', pickError)
+        log.error('Error creating pick from auction:', pickError)
         throw new Error('Failed to create pick from auction')
       }
 
@@ -1942,7 +1945,7 @@ export class DraftService {
         .single()
 
       if (teamFetchError || !team) {
-        console.error('Error fetching team budget after auction:', teamFetchError)
+        log.error('Error fetching team budget after auction:', teamFetchError)
         throw new Error('Failed to fetch team budget after auction')
       }
 
@@ -1958,13 +1961,13 @@ export class DraftService {
         .select()
 
       if (teamError || !budgetUpdateResult || budgetUpdateResult.length === 0) {
-        console.error('Error updating team budget after auction (possible race condition):', teamError)
+        log.error('Error updating team budget after auction (possible race condition):', teamError)
         throw new Error('Failed to update team budget after auction. Budget may have been modified.')
       }
 
       // Verify budget didn't go negative
       if (budgetUpdateResult[0].budget_remaining < 0) {
-        console.error(`[completeAuction] Budget went negative for team ${auction.current_bidder}`)
+        log.error(`Budget went negative for team ${auction.current_bidder}`)
         // Rollback budget
         await supabase
           .from('teams')
@@ -1984,7 +1987,7 @@ export class DraftService {
       .eq('id', auctionId)
 
     if (updateError) {
-      console.error('Error completing auction:', updateError)
+      log.error('Error completing auction:', updateError)
       throw new Error('Failed to complete auction')
     }
 
@@ -2030,7 +2033,7 @@ export class DraftService {
       .eq('id', auctionId)
 
     if (error) {
-      console.error('Error extending auction time:', error)
+      log.error('Error extending auction time:', error)
       throw new Error('Failed to extend auction time')
     }
   }
@@ -2151,7 +2154,7 @@ export class DraftService {
         .eq('id', internalId)
 
       if (error) {
-        console.error('Error completing auction draft:', error)
+        log.error('Error completing auction draft:', error)
       }
 
       // Create league if enabled
@@ -2159,7 +2162,7 @@ export class DraftService {
         try {
           await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
         } catch (leagueError) {
-          console.error('Error creating league for auction draft:', leagueError)
+          log.error('Error creating league for auction draft:', leagueError)
           // Don't fail the auction completion if league creation fails
         }
       }
@@ -2179,7 +2182,7 @@ export class DraftService {
       .eq('id', internalId)
 
     if (turnError) {
-      console.error('Error updating auction draft turn:', turnError)
+      log.error('Error updating auction draft turn:', turnError)
     }
   }
 
@@ -2218,7 +2221,7 @@ export class DraftService {
       .eq('id', lastPick.id)
 
     if (deleteError) {
-      console.error('Error deleting pick:', deleteError)
+      log.error('Error deleting pick:', deleteError)
       throw new Error('Failed to undo pick')
     }
 
@@ -2230,7 +2233,7 @@ export class DraftService {
       .single()
 
     if (teamFetchError || !teamBudgetData) {
-      console.error('Error fetching team budget for undo:', teamFetchError)
+      log.error('Error fetching team budget for undo:', teamFetchError)
     } else {
       const newBudget = teamBudgetData.budget_remaining + lastPick.cost
       const { error: budgetError } = await supabase
@@ -2239,7 +2242,7 @@ export class DraftService {
         .eq('id', lastPick.team_id)
 
       if (budgetError) {
-        console.error('Error restoring budget:', budgetError)
+        log.error('Error restoring budget:', budgetError)
       }
     }
 
@@ -2310,7 +2313,7 @@ export class DraftService {
       .range(offset, offset + limit - 1)
 
     if (error) {
-      console.error('Error fetching draft history:', error)
+      log.error('Error fetching draft history:', error)
       throw new Error('Failed to fetch draft history')
     }
 
@@ -2336,7 +2339,7 @@ export class DraftService {
       .single()
 
     if (error) {
-      console.error('Error fetching draft results:', error)
+      log.error('Error fetching draft results:', error)
       return null
     }
 
@@ -2393,7 +2396,7 @@ export class DraftService {
       .eq('id', draftResultId)
 
     if (error) {
-      console.error('Error deleting draft results:', error)
+      log.error('Error deleting draft results:', error)
       throw new Error('Failed to delete draft results')
     }
   }
@@ -2409,12 +2412,12 @@ export class DraftService {
       // Get current draft state
       const draftState = await this.getDraftState(draftId)
       if (!draftState) {
-        console.warn(`Auto-skip aborted: Draft ${draftId} not found or has ended`)
+        log.warn(`Auto-skip aborted: Draft ${draftId} not found or has ended`)
         return // Don't throw, just return silently
       }
 
       if (draftState.draft.status !== 'active') {
-        console.warn(`Auto-skip aborted: Draft ${draftId} is not active (status: ${draftState.draft.status})`)
+        log.warn(`Auto-skip aborted: Draft ${draftId} is not active (status: ${draftState.draft.status})`)
         return // Don't throw for non-active drafts
       }
 
@@ -2422,9 +2425,9 @@ export class DraftService {
       // This effectively skips the current team's turn
       await this.advanceTurn(draftId)
 
-      console.log(`Auto-skipped turn ${draftState.draft.current_turn} for draft ${draftId}`)
+      log.info(`Auto-skipped turn ${draftState.draft.current_turn} for draft ${draftId}`)
     } catch (error) {
-      console.error(`Auto-skip failed for draft ${draftId}:`, error)
+      log.error(`Auto-skip failed for draft ${draftId}:`, error)
       // Re-throw only if it's not a "not found" error
       if (error instanceof Error && !error.message.includes('not found')) {
         throw error
@@ -2469,7 +2472,7 @@ export class DraftService {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error fetching public drafts:', error)
+      log.error('Error fetching public drafts:', error)
       throw new Error('Failed to fetch public drafts')
     }
 

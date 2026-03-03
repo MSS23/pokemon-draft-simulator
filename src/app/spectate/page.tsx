@@ -16,6 +16,9 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Search, Users, Clock, Eye, Play, Trophy, Hash } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('SpectatePage')
 
 interface PublicDraft {
   id: string;
@@ -87,12 +90,12 @@ export default function SpectatePage() {
         .limit(20);
 
       if (error) {
-        console.error("Error loading public drafts:", error);
+        log.error("Error loading public drafts:", error);
       } else {
         setDrafts((data || []) as unknown as PublicDraft[]);
       }
     } catch (error) {
-      console.error("Failed to load public drafts:", error);
+      log.error("Failed to load public drafts:", error);
     } finally {
       setLoading(false);
     }
@@ -110,7 +113,7 @@ export default function SpectatePage() {
       router.push(`/spectate/${roomCode.toLowerCase()}`);
     } else {
       // Fallback: fetch the draft to get its room_code
-      console.warn(
+      log.warn(
         "room_code not available in view, fetching from drafts table",
       );
       if (supabase) {
@@ -128,7 +131,7 @@ export default function SpectatePage() {
               error: any;
             }) => {
               if (error || !data?.room_code) {
-                console.error("Failed to fetch room_code:", error);
+                log.error("Failed to fetch room_code:", error);
               } else {
                 router.push(`/spectate/${data.room_code.toLowerCase()}`);
               }

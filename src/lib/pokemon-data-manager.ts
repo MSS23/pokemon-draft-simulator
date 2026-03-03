@@ -16,6 +16,9 @@ import { PokemonSearchIndex, type SearchFilters, type SearchResult } from './pok
 import { FormatValidator, type FormatRules, type ValidationResult } from './format-validator'
 import { ImagePreloader } from './image-preloader'
 import { PokemonPrefetch, type PrefetchProgress } from './pokemon-prefetch'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('PokemonDataManager')
 
 export interface PokemonDataManagerOptions {
   enableCache?: boolean
@@ -48,11 +51,11 @@ export class PokemonDataManager {
    */
   static async initialize(options: PokemonDataManagerOptions = {}): Promise<void> {
     if (this.isInitialized) {
-      console.log('[PokemonDataManager] Already initialized')
+      log.info('Already initialized')
       return
     }
 
-    console.log('[PokemonDataManager] Initializing...')
+    log.info('Initializing...')
     const startTime = performance.now()
 
     try {
@@ -68,7 +71,7 @@ export class PokemonDataManager {
 
       // Load cached Pokemon
       this.allPokemon = await PokemonCacheDB.getAllPokemon()
-      console.log(`[PokemonDataManager] Loaded ${this.allPokemon.length} cached Pokemon`)
+      log.info(`Loaded ${this.allPokemon.length} cached Pokemon`)
 
       // Build search index if we have Pokemon
       if (this.allPokemon.length > 0) {
@@ -78,13 +81,13 @@ export class PokemonDataManager {
       this.isInitialized = true
 
       const duration = performance.now() - startTime
-      console.log(`[PokemonDataManager] Initialized in ${duration.toFixed(2)}ms`)
+      log.info(`Initialized in ${duration.toFixed(2)}ms`)
 
       // Log cache stats
       const cacheStats = await PokemonCacheDB.getStats()
-      console.log('[PokemonDataManager] Cache stats:', cacheStats)
+      log.info('Cache stats:', cacheStats)
     } catch (error) {
-      console.error('[PokemonDataManager] Initialization failed:', error)
+      log.error('Initialization failed:', error)
       throw error
     }
   }
@@ -102,7 +105,7 @@ export class PokemonDataManager {
       await this.initialize()
     }
 
-    console.log(`[PokemonDataManager] Loading format ${options.formatId}`)
+    log.info(`Loading format ${options.formatId}`)
     const startTime = performance.now()
 
     try {
@@ -116,7 +119,7 @@ export class PokemonDataManager {
 
       if (cachedFormat) {
         // Use cached format data
-        console.log(`[PokemonDataManager] Using cached format ${options.formatId}`)
+        log.info(`Using cached format ${options.formatId}`)
         pokemonIds = cachedFormat.legalPokemon
         pokemonCosts = cachedFormat.pokemonCosts
       } else {
@@ -125,7 +128,7 @@ export class PokemonDataManager {
         pokemonIds = allowedIds.map(id => String(id))
         pokemonCosts = {}
 
-        console.log(`[PokemonDataManager] Format ${options.formatId} has ${pokemonIds.length} potential Pokemon`)
+        log.info(`Format ${options.formatId} has ${pokemonIds.length} potential Pokemon`)
       }
 
       // Prefetch Pokemon data
@@ -198,8 +201,8 @@ export class PokemonDataManager {
 
       const duration = performance.now() - startTime
 
-      console.log(`[PokemonDataManager] Format ${options.formatId} loaded in ${duration.toFixed(2)}ms`)
-      console.log(`[PokemonDataManager] Legal: ${legalCount}, Illegal: ${illegalCount}`)
+      log.info(`Format ${options.formatId} loaded in ${duration.toFixed(2)}ms`)
+      log.info(`Legal: ${legalCount}, Illegal: ${illegalCount}`)
 
       return {
         total: this.pokemonCache.size,
@@ -208,7 +211,7 @@ export class PokemonDataManager {
         duration,
       }
     } catch (error) {
-      console.error(`[PokemonDataManager] Failed to load format ${options.formatId}:`, error)
+      log.error(`Failed to load format ${options.formatId}:`, error)
       throw error
     }
   }
@@ -386,7 +389,7 @@ export class PokemonDataManager {
     this.allPokemon = []
     this.currentFormat = null
 
-    console.log('[PokemonDataManager] All caches cleared')
+    log.info('All caches cleared')
   }
 
   /**
@@ -419,6 +422,6 @@ export class PokemonDataManager {
     this.currentFormat = null
     this.isInitialized = false
 
-    console.log('[PokemonDataManager] Shutdown complete')
+    log.info('Shutdown complete')
   }
 }

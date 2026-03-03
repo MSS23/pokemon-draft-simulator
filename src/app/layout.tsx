@@ -4,7 +4,6 @@ import Script from "next/script";
 import "./globals.css";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { NotificationProvider } from "@/components/providers/NotificationProvider";
 import { HydrationFixProvider } from "@/components/providers/HydrationFixProvider";
 import { ErrorBoundaryProvider } from "@/components/providers/ErrorBoundaryProvider";
 import { ImagePreferenceProvider } from "@/contexts/ImagePreferenceContext";
@@ -91,13 +90,11 @@ export default function RootLayout({
               >
                 <ImagePreferenceProvider>
                   <AuthProvider>
-                    <NotificationProvider>
-                      <Toaster position="top-right" richColors />
-                      <QueryProvider>
-                        <Header />
-                        {children}
-                      </QueryProvider>
-                    </NotificationProvider>
+                    <Toaster position="top-right" richColors />
+                    <QueryProvider>
+                      <Header />
+                      {children}
+                    </QueryProvider>
                   </AuthProvider>
                 </ImagePreferenceProvider>
               </ThemeProvider>

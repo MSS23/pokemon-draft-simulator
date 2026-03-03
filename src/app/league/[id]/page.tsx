@@ -23,6 +23,9 @@ import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { ArrowLeft, Trophy, Calendar, TrendingUp, Skull, Swords, Users, Repeat, Loader2 } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('LeaguePage')
 
 export default function LeaguePage() {
   const params = useParams()
@@ -78,7 +81,7 @@ export default function LeaguePage() {
       const canAdvanceWeek = await LeagueService.canAdvanceWeek(leagueId, leagueData.currentWeek || 1)
       setCanAdvance(canAdvanceWeek)
     } catch (err) {
-      console.error('Error loading league data:', err)
+      log.error('Error loading league data:', err)
       setError(err instanceof Error ? err.message : 'Failed to load league')
     } finally {
       setIsLoading(false)
@@ -95,7 +98,7 @@ export default function LeaguePage() {
       await LeagueService.advanceToNextWeek(leagueId)
       await loadLeagueData()
     } catch (err) {
-      console.error('Error advancing week:', err)
+      log.error('Error advancing week:', err)
       alert(err instanceof Error ? err.message : 'Failed to advance to next week')
     } finally {
       setIsAdvancing(false)

@@ -13,6 +13,9 @@ import {
 } from '@/lib/pokemon-data-manager'
 import type { SearchFilters, SearchResult } from '@/lib/pokemon-search-index'
 import type { PrefetchProgress } from '@/lib/pokemon-prefetch'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UsePokemonDataManager')
 
 export interface UsePokemonDataManagerResult {
   // Data
@@ -84,7 +87,7 @@ export function usePokemonDataManager(
           setPokemon(PokemonDataManager.getAllPokemon(true))
         }
       } catch (error) {
-        console.error('[usePokemonDataManager] Initialization failed:', error)
+        log.error('Initialization failed:', error)
       }
     }
 
@@ -114,7 +117,7 @@ export function usePokemonDataManager(
       setPokemon(PokemonDataManager.getAllPokemon(true))
       setUpdateCounter(c => c + 1)
     } catch (error) {
-      console.error('[usePokemonDataManager] Load format failed:', error)
+      log.error('Load format failed:', error)
       throw error
     } finally {
       setIsLoading(false)
@@ -131,7 +134,7 @@ export function usePokemonDataManager(
       setPokemon(PokemonDataManager.getAllPokemon(true))
       setUpdateCounter(c => c + 1)
     } catch (error) {
-      console.error('[usePokemonDataManager] Refresh format failed:', error)
+      log.error('Refresh format failed:', error)
       throw error
     } finally {
       setIsLoading(false)
@@ -147,7 +150,7 @@ export function usePokemonDataManager(
       setPokemon([])
       setUpdateCounter(c => c + 1)
     } catch (error) {
-      console.error('[usePokemonDataManager] Clear caches failed:', error)
+      log.error('Clear caches failed:', error)
       throw error
     } finally {
       setIsLoading(false)

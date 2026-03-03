@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { WishlistItem, Pokemon } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('WishlistService')
 
 export class WishlistService {
   /**
@@ -42,7 +45,7 @@ export class WishlistService {
     pokemon: Pokemon
   ): Promise<WishlistItem | null> {
     if (!supabase) {
-      console.warn('Supabase not configured')
+      log.warn('Supabase not configured')
       return null
     }
 
@@ -80,7 +83,7 @@ export class WishlistService {
         .single()
 
       if (error) {
-        console.error('Error adding to wishlist:', error)
+        log.error('Error adding to wishlist:', error)
         return null
       }
 
@@ -97,7 +100,7 @@ export class WishlistService {
         updatedAt: (data as any).updated_at
       }
     } catch (error) {
-      console.error('Error adding to wishlist:', error)
+      log.error('Error adding to wishlist:', error)
       return null
     }
   }
@@ -111,7 +114,7 @@ export class WishlistService {
     pokemonId: string
   ): Promise<boolean> {
     if (!supabase) {
-      console.warn('Supabase not configured')
+      log.warn('Supabase not configured')
       return false
     }
 
@@ -127,7 +130,7 @@ export class WishlistService {
         .eq('pokemon_id', pokemonId)
 
       if (error) {
-        console.error('Error removing from wishlist:', error)
+        log.error('Error removing from wishlist:', error)
         return false
       }
 
@@ -136,7 +139,7 @@ export class WishlistService {
 
       return true
     } catch (error) {
-      console.error('Error removing from wishlist:', error)
+      log.error('Error removing from wishlist:', error)
       return false
     }
   }
@@ -150,7 +153,7 @@ export class WishlistService {
     reorderedItems: WishlistItem[]
   ): Promise<boolean> {
     if (!supabase) {
-      console.warn('Supabase not configured')
+      log.warn('Supabase not configured')
       return false
     }
 
@@ -167,13 +170,13 @@ export class WishlistService {
         .upsert(updates as any, { onConflict: 'id' })
 
       if (error) {
-        console.error('Error updating wishlist order:', error)
+        log.error('Error updating wishlist order:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error updating wishlist order:', error)
+      log.error('Error updating wishlist order:', error)
       return false
     }
   }
@@ -186,7 +189,7 @@ export class WishlistService {
     participantId: string
   ): Promise<WishlistItem[]> {
     if (!supabase) {
-      console.warn('Supabase not configured')
+      log.warn('Supabase not configured')
       return []
     }
 
@@ -202,7 +205,7 @@ export class WishlistService {
         .order('priority', { ascending: true })
 
       if (error) {
-        console.error('Error getting wishlist:', error)
+        log.error('Error getting wishlist:', error)
         return []
       }
 
@@ -219,7 +222,7 @@ export class WishlistService {
         updatedAt: (item as any).updated_at
       }))
     } catch (error) {
-      console.error('Error getting wishlist:', error)
+      log.error('Error getting wishlist:', error)
       return []
     }
   }
@@ -232,7 +235,7 @@ export class WishlistService {
     pokemonId: string
   ): Promise<boolean> {
     if (!supabase) {
-      console.warn('Supabase not configured')
+      log.warn('Supabase not configured')
       return false
     }
 
@@ -252,13 +255,13 @@ export class WishlistService {
         .eq('pokemon_id', pokemonId)
 
       if (error) {
-        console.error('Error marking Pokemon as drafted:', error)
+        log.error('Error marking Pokemon as drafted:', error)
         return false
       }
 
       return true
     } catch (error) {
-      console.error('Error marking Pokemon as drafted:', error)
+      log.error('Error marking Pokemon as drafted:', error)
       return false
     }
   }
@@ -271,7 +274,7 @@ export class WishlistService {
     participantId: string
   ): Promise<WishlistItem | null> {
     if (!supabase) {
-      console.warn('Supabase not configured')
+      log.warn('Supabase not configured')
       return null
     }
 
@@ -290,7 +293,7 @@ export class WishlistService {
         .single()
 
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error getting next auto-pick Pokemon:', error)
+        log.error('Error getting next auto-pick Pokemon:', error)
         return null
       }
 
@@ -309,7 +312,7 @@ export class WishlistService {
         updatedAt: (data as any).updated_at
       }
     } catch (error) {
-      console.error('Error getting next auto-pick Pokemon:', error)
+      log.error('Error getting next auto-pick Pokemon:', error)
       return null
     }
   }
@@ -322,7 +325,7 @@ export class WishlistService {
     callback: (items: WishlistItem[]) => void
   ) {
     if (!supabase) {
-      console.warn('Supabase not configured')
+      log.warn('Supabase not configured')
       return null
     }
 
@@ -361,7 +364,7 @@ export class WishlistService {
         .order('participant_id, priority')
 
       if (error) {
-        console.error('Error getting all wishlist items:', error)
+        log.error('Error getting all wishlist items:', error)
         return []
       }
 
@@ -378,7 +381,7 @@ export class WishlistService {
         updatedAt: item.updated_at
       }))
     } catch (error) {
-      console.error('Error getting all wishlist items:', error)
+      log.error('Error getting all wishlist items:', error)
       return []
     }
   }
@@ -416,7 +419,7 @@ export class WishlistService {
         .from('wishlist_items')
         .upsert(updates, { onConflict: 'id' })
     } catch (error) {
-      console.error('Error reordering wishlist:', error)
+      log.error('Error reordering wishlist:', error)
     }
   }
 }

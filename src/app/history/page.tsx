@@ -12,6 +12,9 @@ import { Search, Trophy, Calendar, TrendingUp, Zap } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('HistoryPage')
 
 interface LeagueHistory {
   // League metadata
@@ -82,13 +85,13 @@ export default function HistoryPage() {
 
   async function loadUserHistory(userId: string) {
     if (!supabase) {
-      console.error('[History] Supabase not available')
+      log.error('Supabase not available')
       setLoading(false)
       return
     }
 
     try {
-      console.log('[History] Fetching league history for user:', userId)
+      log.info('Fetching league history for user:', userId)
 
       // Query the user_league_history view
       const { data: leagueData, error } = await (supabase as any)
@@ -98,16 +101,16 @@ export default function HistoryPage() {
         .order('end_date', { ascending: false, nullsFirst: false })
 
       if (error) {
-        console.error('[History] Error fetching league history:', error)
+        log.error('Error fetching league history:', error)
         setLeagues([])
         setLoading(false)
         return
       }
 
-      console.log('[History] Fetched league history:', leagueData)
+      log.info('Fetched league history:', leagueData)
 
       if (!leagueData || leagueData.length === 0) {
-        console.log('[History] No league history found for user')
+        log.info('No league history found for user')
         setLeagues([])
         setLoading(false)
         return
@@ -123,7 +126,7 @@ export default function HistoryPage() {
         .in('team_id', teamIds) as any
 
       if (picksError) {
-        console.error('[History] Error fetching picks:', picksError)
+        log.error('Error fetching picks:', picksError)
       } else if (picksData) {
         // Group picks by team_id
         const picksByTeam: Record<string, PokemonPick[]> = {}
@@ -134,10 +137,10 @@ export default function HistoryPage() {
           picksByTeam[pick.team_id].push(pick)
         })
         setPokemonPicks(picksByTeam)
-        console.log('[History] Fetched Pokemon picks:', picksByTeam)
+        log.info('Fetched Pokemon picks:', picksByTeam)
       }
     } catch (err) {
-      console.error('[History] Unexpected error:', err)
+      log.error('Unexpected error:', err)
       setLeagues([])
     } finally {
       setLoading(false)

@@ -17,6 +17,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('EnhancedErrorBoundary')
 
 interface ErrorInfo {
   componentStack: string
@@ -78,7 +81,7 @@ export class EnhancedErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error Boundary caught an error:', error, errorInfo)
+    log.error('Error Boundary caught an error:', error, errorInfo)
 
     this.setState({ errorInfo })
 
@@ -198,10 +201,10 @@ Timestamp: ${new Date().toISOString()}
         timestamp: new Date().toISOString()
       }
 
-      console.log('Error report generated:', report)
+      log.info('Error report generated:', report)
       // Example: await fetch('/api/errors', { method: 'POST', body: JSON.stringify(report) })
     } catch (reportError) {
-      console.error('Failed to report error:', reportError)
+      log.error('Failed to report error:', reportError)
     }
   }
 
@@ -402,7 +405,7 @@ export function withErrorBoundary<P extends object>(
 // Hook for error reporting from functional components
 export function useErrorHandler() {
   return (error: Error, errorInfo?: Partial<ErrorInfo>) => {
-    console.error('Manual error report:', error, errorInfo)
+    log.error('Manual error report:', error, errorInfo)
 
     // In a real app, report to error tracking service
     const report = {
@@ -415,6 +418,6 @@ export function useErrorHandler() {
       timestamp: new Date().toISOString()
     }
 
-    console.log('Manual error report generated:', report)
+    log.info('Manual error report generated:', report)
   }
 }

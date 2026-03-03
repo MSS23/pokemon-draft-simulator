@@ -12,6 +12,9 @@ import { UserSessionService } from '@/lib/user-session'
 import type { Match, League, Team, Standing, Pick } from '@/types'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('MatchPage')
 
 interface MatchDetails extends Match {
   league: League
@@ -65,7 +68,7 @@ export default function MatchDetailPage() {
         const standingsData = await LeagueService.getStandings(matchData.leagueId)
         setStandings(standingsData)
       } catch (error) {
-        console.error('Failed to load match data:', error)
+        log.error('Failed to load match data:', error)
       } finally {
         setIsLoading(false)
       }

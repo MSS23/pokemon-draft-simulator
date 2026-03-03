@@ -3,6 +3,9 @@ import { DraftService, DraftState as ServiceDraftState } from './draft-service'
 import { DraftError, DraftErrorCode, DraftErrors } from './draft-errors'
 import { generateSnakeDraftOrder, getCurrentPick } from '@/utils/draft'
 import type { DraftSettings } from '@/types/supabase-helpers'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AutoSkipService')
 
 type TeamRow = Database['public']['Tables']['teams']['Row']
 type PickRow = Database['public']['Tables']['picks']['Row']
@@ -63,7 +66,7 @@ export class AutoSkipService {
       )
     }
 
-    console.log(`[AutoSkip] Timer expired for team ${team.name} in draft ${draftId}`)
+    log.info(`Timer expired for team ${team.name} in draft ${draftId}`)
 
     // Try to get wishlist items for this team
     try {
@@ -75,7 +78,7 @@ export class AutoSkipService {
       )
 
       if (autoPickResult.success) {
-        console.log(`[AutoSkip] Auto-picked ${autoPickResult.pokemonName} from wishlist`)
+        log.info(`Auto-picked ${autoPickResult.pokemonName} from wishlist`)
 
         // Advance turn (this happens automatically in makePick, but we log it)
         return {
@@ -87,11 +90,11 @@ export class AutoSkipService {
         }
       }
     } catch (error) {
-      console.error('[AutoSkip] Failed to auto-pick from wishlist:', error)
+      log.error('Failed to auto-pick from wishlist:', error)
     }
 
     // No valid wishlist picks - skip turn
-    console.log(`[AutoSkip] No valid wishlist picks for ${team.name}, skipping turn`)
+    log.info(`No valid wishlist picks for ${team.name}, skipping turn`)
 
     // Advance turn without making a pick
     await DraftService.advanceTurn(draftId)
@@ -134,7 +137,7 @@ export class AutoSkipService {
       .order('priority', { ascending: true })
 
     if (wishlistError || !wishlistItems || wishlistItems.length === 0) {
-      console.log('[AutoSkip] No wishlist items available')
+      log.info('No wishlist items available')
       return { success: false }
     }
 
@@ -150,7 +153,7 @@ export class AutoSkipService {
 
       // Check budget
       if (team.budget_remaining < item.cost) {
-        console.log(`[AutoSkip] Cannot afford ${item.pokemon_name} (${item.cost} > ${team.budget_remaining})`)
+        log.info(`Cannot afford ${item.pokemon_name} (${item.cost} > ${team.budget_remaining})`)
         continue
       }
 
@@ -158,7 +161,7 @@ export class AutoSkipService {
       const maxPokemonPerTeam = draftState.draft.settings?.maxPokemonPerTeam || 10
       const currentPickCount = draftState.picks.filter((p: PickRow) => p.team_id === teamId).length
       if (currentPickCount >= maxPokemonPerTeam) {
-        console.log(`[AutoSkip] Team has reached pick limit (${maxPokemonPerTeam})`)
+        log.info(`Team has reached pick limit (${maxPokemonPerTeam})`)
         return { success: false }
       }
 
@@ -172,7 +175,7 @@ export class AutoSkipService {
           .single()
 
         if (!ownerData?.owner_id) {
-          console.error('[AutoSkip] No owner found for team')
+          log.error('No owner found for team')
           continue
         }
 
@@ -191,7 +194,7 @@ export class AutoSkipService {
           cost: item.cost
         }
       } catch (error) {
-        console.error(`[AutoSkip] Failed to pick ${item.pokemon_name}:`, error)
+        log.error(`Failed to pick ${item.pokemon_name}:`, error)
         continue
       }
     }
@@ -209,7 +212,7 @@ export class AutoSkipService {
   ): Promise<void> {
     try {
       // You could add a skip_events table for this, but for now we'll just log it
-      console.log(`[AutoSkip] Logged skip event for ${teamName} in draft ${draftId}`)
+      log.info(`Logged skip event for ${teamName} in draft ${draftId}`)
 
       // Optionally, you could insert into spectator_events table
       if (supabase) {
@@ -228,7 +231,7 @@ export class AutoSkipService {
           })
       }
     } catch (error) {
-      console.error('[AutoSkip] Failed to log skip event:', error)
+      log.error('Failed to log skip event:', error)
     }
   }
 
@@ -285,7 +288,7 @@ export class AutoSkipService {
         const result = await this.handleTimeExpired(draftId, teamId)
         callback(result)
       } catch (error) {
-        console.error('[AutoSkip] Scheduled auto-skip failed:', error)
+        log.error('Scheduled auto-skip failed:', error)
       }
     }, delaySeconds * 1000)
 

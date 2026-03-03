@@ -44,6 +44,22 @@ const POKEMON_TYPES = [
   'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'
 ]
 
+const SORT_OPTIONS: { value: string; label: string; sort: SortOption; direction: SortDirection }[] = [
+  { value: 'name-asc', label: 'Name (A-Z)', sort: 'name', direction: 'asc' },
+  { value: 'name-desc', label: 'Name (Z-A)', sort: 'name', direction: 'desc' },
+  { value: 'cost-desc', label: 'Cost (High-Low)', sort: 'cost', direction: 'desc' },
+  { value: 'cost-asc', label: 'Cost (Low-High)', sort: 'cost', direction: 'asc' },
+  { value: 'total-desc', label: 'BST (High-Low)', sort: 'total', direction: 'desc' },
+  { value: 'total-asc', label: 'BST (Low-High)', sort: 'total', direction: 'asc' },
+  { value: 'hp-desc', label: 'HP (High-Low)', sort: 'hp', direction: 'desc' },
+  { value: 'attack-desc', label: 'Attack (High-Low)', sort: 'attack', direction: 'desc' },
+  { value: 'defense-desc', label: 'Defense (High-Low)', sort: 'defense', direction: 'desc' },
+  { value: 'specialAttack-desc', label: 'Sp. Atk (High-Low)', sort: 'specialAttack', direction: 'desc' },
+  { value: 'specialDefense-desc', label: 'Sp. Def (High-Low)', sort: 'specialDefense', direction: 'desc' },
+  { value: 'speed-desc', label: 'Speed (Fast-Slow)', sort: 'speed', direction: 'desc' },
+  { value: 'speed-asc', label: 'Speed (Slow-Fast)', sort: 'speed', direction: 'asc' },
+]
+
 export default function PokemonGrid({
   pokemon,
   onViewDetails,
@@ -73,10 +89,14 @@ export default function PokemonGrid({
   const [speedRange, setSpeedRange] = useState<[number, number]>([0, 255])
   const [bstRange, setBstRange] = useState<[number, number]>([0, 800])
 
-  // Sorting presets
-  const applySortPreset = (sort: SortOption, direction: SortDirection) => {
-    setSortBy(sort)
-    setSortDirection(direction)
+  const sortValue = `${sortBy}-${sortDirection}`
+
+  const handleSortChange = (value: string) => {
+    const option = SORT_OPTIONS.find(o => o.value === value)
+    if (option) {
+      setSortBy(option.sort)
+      setSortDirection(option.direction)
+    }
   }
 
   // Clear all filters and sorting
@@ -104,16 +124,6 @@ export default function PokemonGrid({
     defenseRange[0] > 0 || defenseRange[1] < 255 ||
     speedRange[0] > 0 || speedRange[1] < 255 ||
     bstRange[0] > 0 || bstRange[1] < 800
-
-  /**
-   * OPTIMIZED FILTER & SORT - Performance enhancements:
-   * 1. Pre-normalize search query once
-   * 2. Early return for no-filter case
-   * 3. Extract sort comparator to prevent recreation
-   * 4. Use early returns in filter function
-   *
-   * Expected improvement: 40-60% faster filtering with 1000+ Pokemon
-   */
 
   // Pre-normalize search query (runs once per query change)
   const normalizedSearchQuery = useMemo(() => {
@@ -187,7 +197,6 @@ export default function PokemonGrid({
   }, [sortBy, sortDirection])
 
   const filteredAndSortedPokemon = useMemo(() => {
-    // Early return for no filters (common case)
     const hasFilters = normalizedSearchQuery ||
       typeFilter !== 'all' ||
       costFilter !== 'all' ||
@@ -199,7 +208,6 @@ export default function PokemonGrid({
 
     let result = pokemon
 
-    // Apply filters only if needed
     if (hasFilters) {
       result = pokemon.filter(p => {
         // Search filter (most selective - check first)
@@ -242,7 +250,7 @@ export default function PokemonGrid({
           }
         }
 
-        // Stat range filters (use early returns for performance)
+        // Stat range filters
         if (p.stats.hp < hpRange[0] || p.stats.hp > hpRange[1]) return false
         if (p.stats.attack < attackRange[0] || p.stats.attack > attackRange[1]) return false
         if (p.stats.defense < defenseRange[0] || p.stats.defense > defenseRange[1]) return false
@@ -253,7 +261,6 @@ export default function PokemonGrid({
       })
     }
 
-    // Sort (use extracted comparator)
     return result.slice().sort(sortComparator)
   }, [pokemon, normalizedSearchQuery, typeFilter, costFilter, sortComparator, hpRange, attackRange, defenseRange, speedRange, bstRange])
 
@@ -270,22 +277,17 @@ export default function PokemonGrid({
   if (isLoading) {
     return (
       <div className={cn('space-y-4', className)}>
-        {/* Loading filters */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative flex-1">
-              <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+              <div className="h-12 bg-muted rounded animate-pulse" />
             </div>
-            <div className="h-12 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            <div className="h-12 w-32 bg-muted rounded animate-pulse" />
           </div>
         </div>
-
-        {/* Loading results info */}
-        <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
+        <div className="p-4 bg-card rounded-lg border">
+          <div className="h-4 bg-muted rounded w-48 animate-pulse" />
         </div>
-
-        {/* Loading grid */}
         <PokemonGridSkeleton count={12} cardSize={cardSize} />
       </div>
     )
@@ -295,235 +297,63 @@ export default function PokemonGrid({
     <div className={cn('space-y-4 md:space-y-5 lg:space-y-6', className)}>
       {/* Filters */}
       {showFilters && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Search by name, type, ability, or move (e.g., 'Pikachu', 'Fire', 'Levitate', 'Trick Room', 'Earthquake')..."
+                placeholder="Search by name, type, ability, or move..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-12 text-base"
               />
             </div>
             <div className="flex gap-2">
+              <Select value={sortValue} onValueChange={handleSortChange}>
+                <SelectTrigger className="h-12 w-[180px]">
+                  <SelectValue placeholder="Sort by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 variant="outline"
                 size="lg"
                 onClick={() => setShowFiltersPanel(!showFiltersPanel)}
-                className="h-12 px-6 text-base whitespace-nowrap"
+                className="h-12 px-4"
               >
                 <Filter className="h-4 w-4 mr-2" />
-                {showFiltersPanel ? 'Hide Filters' : 'Show Filters'}
+                Filters
                 {(typeFilter !== 'all' || costFilter !== 'all') && (
                   <Badge variant="secondary" className="ml-2 text-xs">
                     {[typeFilter !== 'all', costFilter !== 'all'].filter(Boolean).length}
                   </Badge>
                 )}
               </Button>
-            </div>
-          </div>
-
-          {/* Sorting Presets */}
-          <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-lg p-4 border border-slate-200 dark:border-slate-600 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Quick Sort</h3>
               {hasActiveFilters && (
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="lg"
                   onClick={clearAllFilters}
-                  className="text-xs h-7 px-3 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  className="h-12 px-3 text-muted-foreground"
                 >
-                  Clear All
+                  Clear
                 </Button>
               )}
-            </div>
-
-            {/* General Sorting */}
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">General</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={sortBy === 'name' && sortDirection === 'asc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('name', 'asc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'name' && sortDirection === 'asc' && "ring-2 ring-blue-500 dark:ring-blue-400"
-                    )}
-                  >
-                    <span className="mr-1.5">🔤</span>
-                    A-Z
-                  </Button>
-                  <Button
-                    variant={sortBy === 'cost' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('cost', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'cost' && sortDirection === 'desc' && "ring-2 ring-blue-500 dark:ring-blue-400"
-                    )}
-                  >
-                    <span className="mr-1.5">💰</span>
-                    Highest Cost
-                  </Button>
-                  <Button
-                    variant={sortBy === 'cost' && sortDirection === 'asc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('cost', 'asc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'cost' && sortDirection === 'asc' && "ring-2 ring-blue-500 dark:ring-blue-400"
-                    )}
-                  >
-                    <span className="mr-1.5">💸</span>
-                    Lowest Cost
-                  </Button>
-                  <Button
-                    variant={sortBy === 'total' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('total', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'total' && sortDirection === 'desc' && "ring-2 ring-blue-500 dark:ring-blue-400"
-                    )}
-                  >
-                    <span className="mr-1.5">⭐</span>
-                    Highest BST
-                  </Button>
-                </div>
-              </div>
-
-              {/* Stat-based Sorting */}
-              <div>
-                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Sort by Highest Stat</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={sortBy === 'hp' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('hp', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'hp' && sortDirection === 'desc' && "ring-2 ring-red-500 dark:ring-red-400"
-                    )}
-                  >
-                    <span className="mr-1.5">❤️</span>
-                    HP
-                  </Button>
-                  <Button
-                    variant={sortBy === 'attack' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('attack', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'attack' && sortDirection === 'desc' && "ring-2 ring-orange-500 dark:ring-orange-400"
-                    )}
-                  >
-                    <span className="mr-1.5">⚔️</span>
-                    Attack
-                  </Button>
-                  <Button
-                    variant={sortBy === 'defense' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('defense', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'defense' && sortDirection === 'desc' && "ring-2 ring-yellow-500 dark:ring-yellow-400"
-                    )}
-                  >
-                    <span className="mr-1.5">🛡️</span>
-                    Defense
-                  </Button>
-                  <Button
-                    variant={sortBy === 'specialAttack' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('specialAttack', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'specialAttack' && sortDirection === 'desc' && "ring-2 ring-blue-500 dark:ring-blue-400"
-                    )}
-                  >
-                    <span className="mr-1.5">✨</span>
-                    Sp. Atk
-                  </Button>
-                  <Button
-                    variant={sortBy === 'specialDefense' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('specialDefense', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'specialDefense' && sortDirection === 'desc' && "ring-2 ring-green-500 dark:ring-green-400"
-                    )}
-                  >
-                    <span className="mr-1.5">💚</span>
-                    Sp. Def
-                  </Button>
-                  <Button
-                    variant={sortBy === 'speed' && sortDirection === 'desc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('speed', 'desc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'speed' && sortDirection === 'desc' && "ring-2 ring-pink-500 dark:ring-pink-400"
-                    )}
-                  >
-                    <span className="mr-1.5">⚡</span>
-                    Speed
-                  </Button>
-                </div>
-              </div>
-
-              {/* Speed Variants */}
-              <div>
-                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Speed Variants</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant={sortBy === 'speed' && sortDirection === 'asc' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => applySortPreset('speed', 'asc')}
-                    className={cn(
-                      "text-xs h-9 px-4 font-medium transition-all",
-                      "bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700",
-                      "border-slate-300 dark:border-slate-600",
-                      sortBy === 'speed' && sortDirection === 'asc' && "ring-2 ring-blue-500 dark:ring-blue-400"
-                    )}
-                  >
-                    <span className="mr-1.5">🐌</span>
-                    Slowest
-                  </Button>
-                </div>
-              </div>
             </div>
           </div>
 
           {showFiltersPanel && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 sm:p-6 bg-gradient-to-r from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 sm:p-6 bg-card rounded-lg border">
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Type</label>
+                <label className="block text-sm font-medium text-foreground">Type</label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm">
+                  <SelectTrigger>
                     <SelectValue placeholder="All types" />
                   </SelectTrigger>
                   <SelectContent>
@@ -538,50 +368,30 @@ export default function PokemonGrid({
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Cost</label>
+                <label className="block text-sm font-medium text-foreground">Cost</label>
                 <Select value={costFilter} onValueChange={setCostFilter}>
-                  <SelectTrigger className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm">
+                  <SelectTrigger>
                     <SelectValue placeholder="All costs" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All costs</SelectItem>
-                    <SelectItem value="0-5">⚪ 0-5 points</SelectItem>
-                    <SelectItem value="6-10">🟢 6-10 points</SelectItem>
-                    <SelectItem value="11-15">🔵 11-15 points</SelectItem>
-                    <SelectItem value="16-20">🟣 16-20 points</SelectItem>
-                    <SelectItem value="21-25">🟠 21-25 points</SelectItem>
-                    <SelectItem value="26">🟡 26+ points</SelectItem>
+                    <SelectItem value="0-5">0-5 pts</SelectItem>
+                    <SelectItem value="6-10">6-10 pts</SelectItem>
+                    <SelectItem value="11-15">11-15 pts</SelectItem>
+                    <SelectItem value="16-20">16-20 pts</SelectItem>
+                    <SelectItem value="21-25">21-25 pts</SelectItem>
+                    <SelectItem value="26">26+ pts</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Sort by</label>
-                <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-                  <SelectTrigger className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="cost">Cost</SelectItem>
-                    <SelectItem value="total">Stat Total</SelectItem>
-                    <SelectItem value="hp">HP</SelectItem>
-                    <SelectItem value="attack">Attack</SelectItem>
-                    <SelectItem value="defense">Defense</SelectItem>
-                    <SelectItem value="specialAttack">Special Attack</SelectItem>
-                    <SelectItem value="specialDefense">Special Defense</SelectItem>
-                    <SelectItem value="speed">Speed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Direction</label>
+                <label className="block text-sm font-medium text-foreground">Direction</label>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                  className="w-full bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                  className="w-full"
                 >
                   {sortDirection === 'asc' ? (
                     <>
@@ -598,13 +408,11 @@ export default function PokemonGrid({
               </div>
 
               {/* Stat Range Filters */}
-              <div className="lg:col-span-4 space-y-4 border-t pt-4 mt-4">
-                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Filter by Stats</h4>
-
+              <div className="sm:col-span-2 lg:col-span-3 space-y-4 border-t pt-4">
+                <h4 className="font-medium text-sm text-foreground">Filter by Stats</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* HP Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm text-muted-foreground">
                       HP: {hpRange[0]} - {hpRange[1]}
                     </label>
                     <Slider
@@ -616,10 +424,8 @@ export default function PokemonGrid({
                       className="cursor-pointer"
                     />
                   </div>
-
-                  {/* Attack Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm text-muted-foreground">
                       Attack: {attackRange[0]} - {attackRange[1]}
                     </label>
                     <Slider
@@ -631,10 +437,8 @@ export default function PokemonGrid({
                       className="cursor-pointer"
                     />
                   </div>
-
-                  {/* Defense Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm text-muted-foreground">
                       Defense: {defenseRange[0]} - {defenseRange[1]}
                     </label>
                     <Slider
@@ -646,10 +450,8 @@ export default function PokemonGrid({
                       className="cursor-pointer"
                     />
                   </div>
-
-                  {/* Speed Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm text-muted-foreground">
                       Speed: {speedRange[0]} - {speedRange[1]}
                     </label>
                     <Slider
@@ -661,10 +463,8 @@ export default function PokemonGrid({
                       className="cursor-pointer"
                     />
                   </div>
-
-                  {/* BST Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label className="text-sm text-muted-foreground">
                       Base Stat Total: {bstRange[0]} - {bstRange[1]}
                     </label>
                     <Slider
@@ -684,14 +484,14 @@ export default function PokemonGrid({
       )}
 
       {/* Results info */}
-      <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+      <div className="p-4 bg-card rounded-lg border">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">
-              Showing <span className="font-bold text-blue-600 dark:text-blue-400">{availablePokemon.length}</span> of <span className="font-bold">{pokemon.length}</span> Pokémon
+            <div className="text-sm font-medium text-foreground">
+              Showing <span className="font-bold text-primary">{availablePokemon.length}</span> of <span className="font-bold">{pokemon.length}</span> Pokemon
               {searchQuery && (
-                <span className="ml-2 text-slate-600 dark:text-slate-400">
-                  matching "{searchQuery}"
+                <span className="ml-2 text-muted-foreground">
+                  matching &ldquo;{searchQuery}&rdquo;
                 </span>
               )}
             </div>
@@ -700,23 +500,23 @@ export default function PokemonGrid({
           {(draftedPokemonIds.length > 0 || typeFilter !== 'all' || costFilter !== 'all' || searchQuery) && (
             <div className="flex flex-wrap items-center gap-2">
               {searchQuery && (
-                <Badge variant="outline" className="text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600">
+                <Badge variant="outline">
                   <Search className="h-3 w-3 mr-1" />
                   Search: {searchQuery}
                 </Badge>
               )}
               {draftedPokemonIds.length > 0 && (
-                <Badge variant="outline" className="text-red-600 dark:text-red-400 border-red-300 dark:border-red-600">
+                <Badge variant="outline" className="text-destructive border-destructive/30">
                   {draftedPokemonIds.length} drafted
                 </Badge>
               )}
               {typeFilter !== 'all' && (
-                <Badge variant="outline" className="text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-600 capitalize">
+                <Badge variant="outline" className="capitalize">
                   Type: {typeFilter}
                 </Badge>
               )}
               {costFilter !== 'all' && (
-                <Badge variant="outline" className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600">
+                <Badge variant="outline">
                   Cost: {costFilter}
                 </Badge>
               )}
@@ -729,7 +529,7 @@ export default function PokemonGrid({
                     setTypeFilter('all')
                     setCostFilter('all')
                   }}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-xs h-6 px-2"
+                  className="text-muted-foreground text-xs h-6 px-2"
                 >
                   Clear filters
                 </Button>
@@ -778,8 +578,8 @@ export default function PokemonGrid({
       )}
 
       {availablePokemon.length === 0 && (
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          No Pokémon found matching your filters
+        <div className="text-center py-8 text-muted-foreground">
+          No Pokemon found matching your filters
         </div>
       )}
     </div>

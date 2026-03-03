@@ -20,7 +20,7 @@ import { Copy, Share2, History } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
 import { useAuth } from '@/contexts/AuthContext'
-import { useNotify } from '@/components/providers/NotificationProvider'
+import { notify } from '@/lib/notifications'
 import { DraftRoomLoading, TeamStatusSkeleton } from '@/components/ui/loading-states'
 import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 import { useTurnNotifications } from '@/hooks/useTurnNotifications'
@@ -51,6 +51,9 @@ import TeamRoster from '@/components/team/TeamRoster'
 import DraftProgress from '@/components/team/DraftProgress'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftPage')
 
 // Heavy components - lazy load with loading states
 const DraftConfirmationModal = dynamic(() => import('@/components/draft/DraftConfirmationModal'), {
@@ -277,8 +280,6 @@ export default function DraftRoomPage() {
     customFormatId,
     true
   )
-  const notify = useNotify()
-
   // Demo mode detection - we are always in non-demo mode when connected to the database
   const isDemoMode = false
 
@@ -452,7 +453,7 @@ export default function DraftRoomPage() {
           })
         }
       } catch (error) {
-        console.error('[DraftRealtime] Error refreshing state:', error)
+        log.error('Error refreshing state:', error)
       }
     },
     onStatusChange: (newStatus) => {
@@ -532,7 +533,7 @@ export default function DraftRoomPage() {
         setIsConnected(true)
       } catch (err) {
         if (!mounted || abortController.signal.aborted) return
-        console.error('Error loading draft state:', err)
+        log.error('Error loading draft state:', err)
         setError('Failed to load draft room')
       } finally {
         if (mounted) {
@@ -563,7 +564,7 @@ export default function DraftRoomPage() {
         const offset = serverTimeData.serverTime - Date.now() + latency
         setServerTimeOffset(offset)
       } catch (error) {
-        console.error('Failed to sync server time:', error)
+        log.error('Failed to sync server time:', error)
       }
     }
 
@@ -640,7 +641,7 @@ export default function DraftRoomPage() {
   const hasNotifiedDraftStart = useRef(false)
   useEffect(() => {
     if (lastStatusRef.current === 'waiting' && draftState?.status === 'drafting') {
-      console.log('[Draft Start] Transition detected: waiting → drafting')
+      log.info('Transition detected: waiting → drafting')
       setIsDraftStarting(true)
 
       // Show success notification only once using idempotency guard
@@ -654,7 +655,7 @@ export default function DraftRoomPage() {
 
       // Give 3 seconds for all updates to settle during draft start (increased from 2s)
       const timeoutId = setTimeout(() => {
-        console.log('[Draft Start] Cooldown period ended')
+        log.info('Cooldown period ended')
         setIsDraftStarting(false)
         // Reset notification guard for potential future transitions
         hasNotifiedDraftStart.current = false
@@ -662,7 +663,7 @@ export default function DraftRoomPage() {
       return () => clearTimeout(timeoutId)
     }
     lastStatusRef.current = draftState?.status || null
-  }, [draftState?.status, notify])
+  }, [draftState?.status])
 
   // Notification logic - watches draftState changes and shows pick/turn notifications
   // This replaces the old DraftService.subscribeToDraft notification logic
@@ -723,7 +724,7 @@ export default function DraftRoomPage() {
     }
 
     prevDraftStateRef.current = draftState
-  }, [draftState, pokemon, isAuctionDraft, notify])
+  }, [draftState, pokemon, isAuctionDraft])
 
   // Load current auction for auction drafts
   useEffect(() => {
@@ -744,7 +745,7 @@ export default function DraftRoomPage() {
           setAuctionTimeRemaining(0)
         }
       } catch (error) {
-        console.error('Error loading current auction:', error)
+        log.error('Error loading current auction:', error)
       }
     }
 
@@ -852,7 +853,7 @@ export default function DraftRoomPage() {
       )
       currentNotify.success('Added to Wishlist', `${pokemon.name} added to your wishlist`, { duration: 2000 })
     } catch (error) {
-      console.error('Error adding to wishlist:', error)
+      log.error('Error adding to wishlist:', error)
       currentNotify.error('Failed to Add', 'Could not add Pokémon to wishlist')
     }
   }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef])
@@ -876,7 +877,7 @@ export default function DraftRoomPage() {
       )
       currentNotify.success('Removed from Wishlist', `${pokemon.name} removed from your wishlist`, { duration: 2000 })
     } catch (error) {
-      console.error('Error removing from wishlist:', error)
+      log.error('Error removing from wishlist:', error)
       currentNotify.error('Failed to Remove', 'Could not remove Pokémon from wishlist')
     }
   }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef])
@@ -1001,7 +1002,7 @@ export default function DraftRoomPage() {
     // Check if user can draft (their turn)
     const canDraft = isUserTurn && draftState?.status === 'drafting'
     if (!canDraft) {
-      console.log('[Draft] Cannot draft:', { isUserTurn, isHost, status: draftState?.status })
+      log.info('Cannot draft:', { isUserTurn, isHost, status: draftState?.status })
       // Show user-friendly error message
       if (draftState?.status !== 'drafting') {
         notify.warning('Draft Not Active', 'The draft is not currently active')
@@ -1019,7 +1020,7 @@ export default function DraftRoomPage() {
         return
       }
     } catch (error) {
-      console.error('[Draft] Error validating draft status:', error)
+      log.error('Error validating draft status:', error)
       notify.error('Connection Error', 'Could not validate draft status. Please try again.')
       return
     }
@@ -1037,7 +1038,7 @@ export default function DraftRoomPage() {
       // Validate cost data
       const pickCost = pokemon.cost || 1
       if (!pokemon.cost) {
-        console.warn(`[Draft] Pokemon "${pokemon.name}" (id: ${pokemon.id}) has no cost data. Using minimum cost of 1.`)
+        log.warn(`Pokemon "${pokemon.name}" (id: ${pokemon.id}) has no cost data. Using minimum cost of 1.`)
       }
 
       await DraftService.makePick(
@@ -1060,7 +1061,7 @@ export default function DraftRoomPage() {
       setSelectedPokemon(null)
       setIsDetailsOpen(false)
     } catch (err) {
-      console.error('Error making pick:', err)
+      log.error('Error making pick:', err)
 
       // Provide specific error messages based on error type
       const errorMessage = err instanceof Error ? err.message : 'Failed to make pick'
@@ -1079,7 +1080,7 @@ export default function DraftRoomPage() {
           setDraftState(transformDraftState(freshState, userId))
         }
       } catch (refreshErr) {
-        console.warn('[Draft] Failed to refresh state after pick error:', refreshErr)
+        log.warn('Failed to refresh state after pick error:', refreshErr)
       }
 
       if (errorMessage.includes('not part of this draft') || errorMessage.includes('not found')) {
@@ -1104,18 +1105,18 @@ export default function DraftRoomPage() {
         notify.error('Draft Failed', errorMessage, { duration: 5000 })
       }
     }
-  }, [isUserTurn, isHost, draftState?.status, currentTeam, userTeam, userId, roomCode, notify, shouldShowNotification, transformDraftState])
+  }, [isUserTurn, isHost, draftState?.status, currentTeam, userTeam, userId, roomCode, shouldShowNotification, transformDraftState])
 
   const copyRoomCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode)
     notify.success('Room Code Copied!', `${roomCode} copied to clipboard`)
-  }, [roomCode, notify])
+  }, [roomCode])
 
   const shareRoom = useCallback(() => {
     const shareUrl = `${window.location.origin}/join-draft?code=${roomCode}`
     navigator.clipboard.writeText(shareUrl)
     notify.success('Share Link Copied!', 'Invite link copied to clipboard')
-  }, [roomCode, notify])
+  }, [roomCode])
 
   const startDraft = useCallback(async () => {
     if (!draftState || !draftState.teams || draftState.teams.length < 2) {
@@ -1125,7 +1126,7 @@ export default function DraftRoomPage() {
 
     // Prevent multiple simultaneous start attempts
     if (isStarting) {
-      console.log('[startDraft] Already starting, ignoring duplicate call')
+      log.info('Already starting, ignoring duplicate call')
       return
     }
 
@@ -1133,7 +1134,7 @@ export default function DraftRoomPage() {
     try {
       await DraftService.startDraft(roomCode.toLowerCase())
       // Don't show success immediately - wait for subscription to confirm status change
-      console.log('[startDraft] Start request sent, waiting for subscription confirmation...')
+      log.info('Start request sent, waiting for subscription confirmation...')
 
       // Reset isStarting after a delay to allow status transition to complete
       // The transition useEffect will handle the final state stabilization
@@ -1141,42 +1142,42 @@ export default function DraftRoomPage() {
         setIsStarting(false)
       }, 1000)
     } catch (err) {
-      console.error('Error starting draft:', err)
+      log.error('Error starting draft:', err)
       notify.error(
         'Failed to Start Draft',
         err instanceof Error ? err.message : 'Failed to start draft. Please try again.'
       )
       setIsStarting(false) // Re-enable button immediately on error
     }
-  }, [draftState, roomCode, notify, isStarting])
+  }, [draftState, roomCode, isStarting])
 
   // Draft Control Functions
   const handlePauseDraft = useCallback(async () => {
     try {
       await DraftService.pauseDraft(roomCode.toLowerCase())
     } catch (err) {
-      console.error('Error pausing draft:', err)
+      log.error('Error pausing draft:', err)
       notify.error('Failed to Pause', err instanceof Error ? err.message : 'Failed to pause draft')
     }
-  }, [roomCode, notify])
+  }, [roomCode])
 
   const handleResumeDraft = useCallback(async () => {
     try {
       await DraftService.resumeDraft(roomCode.toLowerCase())
     } catch (err) {
-      console.error('Error resuming draft:', err)
+      log.error('Error resuming draft:', err)
       notify.error('Failed to Resume', err instanceof Error ? err.message : 'Failed to resume draft')
     }
-  }, [roomCode, notify])
+  }, [roomCode])
 
   const handleEndDraft = useCallback(async () => {
     try {
       await DraftService.endDraft(roomCode.toLowerCase())
     } catch (err) {
-      console.error('Error ending draft:', err)
+      log.error('Error ending draft:', err)
       notify.error('Failed to End Draft', err instanceof Error ? err.message : 'Failed to end draft')
     }
-  }, [roomCode, notify])
+  }, [roomCode])
 
   const handleResetDraft = useCallback(async () => {
     try {
@@ -1185,10 +1186,10 @@ export default function DraftRoomPage() {
       // Refresh the page to show the reset state
       router.refresh()
     } catch (err) {
-      console.error('Error resetting draft:', err)
+      log.error('Error resetting draft:', err)
       notify.error('Failed to Reset Draft', err instanceof Error ? err.message : 'Failed to reset draft')
     }
-  }, [roomCode, notify])
+  }, [roomCode])
 
   const handleDeleteDraft = useCallback(async () => {
     try {
@@ -1205,10 +1206,10 @@ export default function DraftRoomPage() {
         router.push('/my-drafts')
       }, 1500)
     } catch (err) {
-      console.error('Error deleting draft:', err)
+      log.error('Error deleting draft:', err)
       notify.error('Failed to Delete Draft', err instanceof Error ? err.message : 'Failed to delete draft')
     }
-  }, [roomCode, userId, notify, router])
+  }, [roomCode, userId, router])
 
   const handleShuffleDraftOrder = useCallback(async () => {
     if (isShuffling) return // Prevent double-clicks
@@ -1225,21 +1226,21 @@ export default function DraftRoomPage() {
 
       notify.success('Draft Order Shuffled!', 'Team draft order has been randomized. Check the Draft Order section.')
     } catch (err) {
-      console.error('Error shuffling draft order:', err)
+      log.error('Error shuffling draft order:', err)
       notify.error('Failed to Shuffle', err instanceof Error ? err.message : 'Failed to shuffle draft order')
     } finally {
       setIsShuffling(false)
     }
-  }, [roomCode, notify, userId, transformDraftState, isShuffling])
+  }, [roomCode, userId, transformDraftState, isShuffling])
 
   const handleAdvanceTurn = useCallback(async () => {
     try {
       await DraftService.advanceTurn(roomCode.toLowerCase())
     } catch (err) {
-      console.error('Error advancing turn:', err)
+      log.error('Error advancing turn:', err)
       notify.error('Failed to Advance Turn', err instanceof Error ? err.message : 'Failed to advance turn')
     }
-  }, [roomCode, notify])
+  }, [roomCode])
 
   const handleSetTimer = useCallback(async (seconds: number) => {
     try {
@@ -1253,10 +1254,10 @@ export default function DraftRoomPage() {
         notify.success('Timer Updated', `Turn timer set to ${seconds} seconds`)
       }
     } catch (err) {
-      console.error('Error updating timer:', err)
+      log.error('Error updating timer:', err)
       notify.error('Failed to Update Timer', err instanceof Error ? err.message : 'Failed to update timer')
     }
-  }, [roomCode, notify, draftState?.status])
+  }, [roomCode, draftState?.status])
 
   // Proxy picking handlers removed - feature not implemented
 
@@ -1280,14 +1281,14 @@ export default function DraftRoomPage() {
 
       setSelectedPokemon(null)
     } catch (err) {
-      console.error('Error nominating Pokemon:', err)
+      log.error('Error nominating Pokemon:', err)
       notify.error(
         'Nomination Failed',
         err instanceof Error ? err.message : 'Failed to nominate Pokemon',
         { duration: 5000 }
       )
     }
-  }, [roomCode, userId, notify])
+  }, [roomCode, userId])
 
   const handlePlaceBid = useCallback(async (amount: number) => {
     if (!currentAuction) return
@@ -1306,10 +1307,10 @@ export default function DraftRoomPage() {
         { duration: 2000 }
       )
     } catch (err) {
-      console.error('Error placing bid:', err)
+      log.error('Error placing bid:', err)
       notify.error('Bid Failed', err instanceof Error ? err.message : 'Failed to place bid')
     }
-  }, [currentAuction, roomCode, userId, notify])
+  }, [currentAuction, roomCode, userId])
 
   const handleUndoLastPick = useCallback(async () => {
     if (!roomCode || !draftState) return
@@ -1318,14 +1319,14 @@ export default function DraftRoomPage() {
       await DraftService.undoLastPick(roomCode.toLowerCase(), userId)
       notify.success('Pick Undone', 'The last pick has been removed', { duration: 3000 })
     } catch (err) {
-      console.error('Error undoing pick:', err)
+      log.error('Error undoing pick:', err)
       notify.error(
         'Undo Failed',
         err instanceof Error ? err.message : 'Failed to undo pick',
         { duration: 5000 }
       )
     }
-  }, [roomCode, draftState, userId, notify])
+  }, [roomCode, draftState, userId])
 
   const handleRequestNotificationPermission = useCallback(() => {
     requestBrowserNotificationPermission()
@@ -1342,9 +1343,9 @@ export default function DraftRoomPage() {
         { duration: 3000 }
       )
     } catch (err) {
-      console.error('Error resolving auction:', err)
+      log.error('Error resolving auction:', err)
     }
-  }, [currentAuction, roomCode, notify])
+  }, [currentAuction, roomCode])
 
   const handleExtendAuctionTime = useCallback(async (seconds: number) => {
     if (!currentAuction) return
@@ -1361,9 +1362,9 @@ export default function DraftRoomPage() {
         { duration: 2000 }
       )
     } catch (err) {
-      console.error('Error extending auction:', err)
+      log.error('Error extending auction:', err)
     }
-  }, [currentAuction, roomCode, notify])
+  }, [currentAuction, roomCode])
 
 
   // Removed userName/teamName check - authenticated users are automatically joined
