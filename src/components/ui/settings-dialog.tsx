@@ -7,7 +7,10 @@ import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
 import { Button } from '@/components/ui/button'
 import { soundService } from '@/lib/sound-service'
+import { createLogger } from '@/lib/logger'
 import { Volume2, VolumeX, Bell, BellOff, Vibrate, Sparkles } from 'lucide-react'
+
+const log = createLogger('SettingsDialog')
 
 interface SettingsDialogProps {
   isOpen: boolean
@@ -32,7 +35,7 @@ export default function SettingsDialog({ isOpen, onClose }: SettingsDialogProps)
       if (animations !== null) setAnimationsEnabled(animations === 'true')
       if (haptic !== null) setHapticEnabled(haptic === 'true')
     } catch (error) {
-      console.warn('Failed to load settings:', error)
+      log.warn('Failed to load settings:', error)
     }
   }, [])
 

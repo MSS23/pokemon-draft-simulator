@@ -7,6 +7,9 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pokemon } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AuctionNomination')
 import { Gavel, Clock, DollarSign, Zap, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PokemonCard from '@/components/pokemon/PokemonCard'
@@ -53,7 +56,7 @@ export default function AuctionNomination({
       await onNominate(selectedPokemon, bid, duration)
       setStartingBid('')
     } catch (error) {
-      console.error('Error nominating Pokemon:', error)
+      log.error('Error nominating Pokemon:', error)
     } finally {
       setIsNominating(false)
     }

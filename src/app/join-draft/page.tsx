@@ -19,6 +19,9 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("JoinDraft");
 
 function JoinDraftForm() {
   const router = useRouter();
@@ -83,7 +86,7 @@ function JoinDraftForm() {
         hasPassword,
       });
     } catch (error) {
-      console.error("Failed to lookup draft:", error);
+      log.error("Failed to lookup draft:", error);
       setError("Draft room not found. Please check the room code.");
     } finally {
       setIsJoining(false);
@@ -159,7 +162,7 @@ function JoinDraftForm() {
         }
       }
     } catch (error) {
-      console.error("Failed to join draft:", error);
+      log.error("Failed to join draft:", error);
       setError(
         error instanceof Error
           ? error.message
@@ -184,7 +187,7 @@ function JoinDraftForm() {
       try {
         if (!supabase) throw new Error("Supabase not configured");
 
-        console.log("[Join Draft] Loading profile for user:", user.id);
+        log.debug("Loading profile for user:", user.id);
 
         const { data: profile, error: profileError } = await supabase
           .from("user_profiles")
@@ -193,26 +196,24 @@ function JoinDraftForm() {
           .maybeSingle();
 
         if (profileError) {
-          console.error("[Join Draft] Profile query error:", profileError);
+          log.error("Profile query error:", profileError);
           throw profileError;
         }
 
         if (!profile) {
-          console.warn(
-            "[Join Draft] No profile found, using email as display name",
-          );
+          log.warn("No profile found, using email as display name");
           // If no profile exists, use email username as display name
           const displayName = user.email?.split("@")[0] || "User";
           setUserDisplayName(displayName);
         } else {
-          console.log("[Join Draft] Profile loaded:", profile);
+          log.debug("Profile loaded:", profile);
           const profileData = profile as { display_name: string };
           setUserDisplayName(
             profileData.display_name || user.email?.split("@")[0] || "User",
           );
         }
       } catch (error) {
-        console.error("[Join Draft] Error loading profile:", error);
+        log.error("Error loading profile:", error);
         // Don't block the user - use email as fallback
         const fallbackName = user.email?.split("@")[0] || "User";
         setUserDisplayName(fallbackName);

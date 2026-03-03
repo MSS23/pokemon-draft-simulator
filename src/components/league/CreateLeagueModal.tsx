@@ -21,7 +21,10 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LeagueService } from '@/lib/league-service'
+import { createLogger } from '@/lib/logger'
 import { Loader2, Trophy, Users, Calendar, Swords, Repeat, Shield, Skull } from 'lucide-react'
+
+const log = createLogger('CreateLeagueModal')
 
 interface CreateLeagueModalProps {
   isOpen: boolean
@@ -84,7 +87,7 @@ export function CreateLeagueModal({
       onSuccess(leagueId)
       onClose()
     } catch (err) {
-      console.error('Failed to create league:', err)
+      log.error('Failed to create league:', err)
       setError(err instanceof Error ? err.message : 'Failed to create league')
     } finally {
       setIsCreating(false)

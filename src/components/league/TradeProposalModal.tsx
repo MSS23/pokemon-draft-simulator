@@ -20,6 +20,9 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { TradeService } from '@/lib/trade-service'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('TradeProposalModal')
 import { PokemonStatusBadge } from './PokemonStatusBadge'
 import { Loader2, ArrowLeftRight, AlertTriangle, Plus, X } from 'lucide-react'
 import type { Pick, TeamPokemonStatus } from '@/types'
@@ -94,7 +97,7 @@ export function TradeProposalModal({
       onSuccess()
       onClose()
     } catch (err) {
-      console.error('Failed to propose trade:', err)
+      log.error('Failed to propose trade:', err)
       setError(err instanceof Error ? err.message : 'Failed to propose trade')
     } finally {
       setIsSubmitting(false)

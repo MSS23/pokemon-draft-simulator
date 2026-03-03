@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Trash2, Search, AlertTriangle, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useNotify } from '@/components/providers/NotificationProvider'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 interface Draft {
   id: string
@@ -27,6 +28,12 @@ export default function DraftManagementPanel() {
   const [searchTerm, setSearchTerm] = useState('')
   const [deleting, setDeleting] = useState<string | null>(null)
 
+  // Dialog state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; roomCode: string } | null>(null)
+  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false)
+  const [deleteAllFinalConfirmOpen, setDeleteAllFinalConfirmOpen] = useState(false)
+  const [deleteAllInput, setDeleteAllInput] = useState('')
+
   const loadDrafts = useCallback(async () => {
     if (!supabase) return
 
@@ -39,8 +46,7 @@ export default function DraftManagementPanel() {
 
       if (error) throw error
       setDrafts(data as unknown as Draft[] || [])
-    } catch (error) {
-      console.error('Error loading drafts:', error)
+    } catch (err) {
       notify.error('Error', 'Failed to load drafts')
     } finally {
       setLoading(false)
@@ -51,16 +57,12 @@ export default function DraftManagementPanel() {
     loadDrafts()
   }, [loadDrafts])
 
-  async function deleteDraft(draftId: string, roomCode: string) {
+  async function executeDeleteDraft(draftId: string, roomCode: string) {
     if (!supabase) return
-    if (!confirm(`Are you sure you want to delete draft ${roomCode}? This action cannot be undone.`)) {
-      return
-    }
 
     setDeleting(draftId)
 
     try {
-      // Delete related data first
       await supabase.from('picks').delete().eq('draft_id', draftId)
       await supabase.from('teams').delete().eq('draft_id', draftId)
       await supabase.from('participants').delete().eq('draft_id', draftId)
@@ -69,7 +71,6 @@ export default function DraftManagementPanel() {
       await supabase.from('auctions').delete().eq('draft_id', draftId)
       await supabase.from('bid_history').delete().eq('draft_id', draftId)
 
-      // Delete the draft itself
       const { error } = await supabase
         .from('drafts')
         .delete()
@@ -79,28 +80,20 @@ export default function DraftManagementPanel() {
 
       notify.success('Draft Deleted', `Draft ${roomCode} has been removed`)
       setDrafts(prev => prev.filter(d => d.id !== draftId))
-    } catch (error) {
-      console.error('Error deleting draft:', error)
+    } catch (err) {
       notify.error('Delete Failed', 'Failed to delete draft')
     } finally {
       setDeleting(null)
     }
   }
 
-  async function deleteAllDrafts() {
+  async function executeDeleteAllDrafts() {
     if (!supabase) return
-    if (!confirm(`⚠️ WARNING: Delete ALL ${drafts.length} drafts? This cannot be undone!`)) {
-      return
-    }
-    if (!confirm('Type "DELETE ALL" to confirm:') || prompt('Type "DELETE ALL" to confirm:') !== 'DELETE ALL') {
-      notify.info('Cancelled', 'Delete all operation cancelled')
-      return
-    }
 
     setLoading(true)
+    const count = drafts.length
 
     try {
-      // Delete all related data
       await supabase.from('picks').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('teams').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('participants').delete().neq('id', '00000000-0000-0000-0000-000000000000')
@@ -109,7 +102,6 @@ export default function DraftManagementPanel() {
       await supabase.from('auctions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       await supabase.from('bid_history').delete().neq('id', '00000000-0000-0000-0000-000000000000')
 
-      // Delete all drafts
       const { error } = await supabase
         .from('drafts')
         .delete()
@@ -117,10 +109,9 @@ export default function DraftManagementPanel() {
 
       if (error) throw error
 
-      notify.success('All Drafts Deleted', `${drafts.length} drafts have been removed`)
+      notify.success('All Drafts Deleted', `${count} drafts have been removed`)
       setDrafts([])
-    } catch (error) {
-      console.error('Error deleting all drafts:', error)
+    } catch (err) {
       notify.error('Delete Failed', 'Failed to delete all drafts')
     } finally {
       setLoading(false)
@@ -163,7 +154,7 @@ export default function DraftManagementPanel() {
             </Button>
             <Button
               variant="destructive"
-              onClick={deleteAllDrafts}
+              onClick={() => setDeleteAllConfirmOpen(true)}
               disabled={loading || drafts.length === 0}
               className="gap-2"
             >
@@ -217,13 +208,13 @@ export default function DraftManagementPanel() {
                       {draft.name}
                     </p>
                     <p className="text-xs text-slate-500">
-                      Created: {new Date(draft.created_at).toLocaleString()} • {draft.max_teams} teams
+                      Created: {new Date(draft.created_at).toLocaleString()} &bull; {draft.max_teams} teams
                     </p>
                   </div>
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => deleteDraft(draft.id, draft.room_code)}
+                    onClick={() => setDeleteTarget({ id: draft.id, roomCode: draft.room_code })}
                     disabled={deleting === draft.id}
                     className="gap-2"
                   >
@@ -234,6 +225,85 @@ export default function DraftManagementPanel() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Single draft delete confirmation */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
+        title="Delete Draft"
+        description={`Are you sure you want to delete draft ${deleteTarget?.roomCode}? This action cannot be undone.`}
+        confirmLabel="Delete Draft"
+        variant="destructive"
+        onConfirm={() => {
+          if (deleteTarget) {
+            executeDeleteDraft(deleteTarget.id, deleteTarget.roomCode)
+            setDeleteTarget(null)
+          }
+        }}
+      />
+
+      {/* Delete all - first confirmation */}
+      <ConfirmDialog
+        open={deleteAllConfirmOpen}
+        onOpenChange={setDeleteAllConfirmOpen}
+        title="Delete All Drafts"
+        description={`This will permanently delete ALL ${drafts.length} drafts and their associated data. This cannot be undone.`}
+        confirmLabel="Continue"
+        variant="destructive"
+        onConfirm={() => {
+          setDeleteAllConfirmOpen(false)
+          setDeleteAllInput('')
+          setDeleteAllFinalConfirmOpen(true)
+        }}
+      />
+
+      {/* Delete all - final confirmation with typed input */}
+      {deleteAllFinalConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Final Confirmation
+              </CardTitle>
+              <CardDescription>
+                Type <strong>DELETE ALL</strong> to confirm deletion of all {drafts.length} drafts.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input
+                placeholder="Type DELETE ALL"
+                value={deleteAllInput}
+                onChange={(e) => setDeleteAllInput(e.target.value)}
+                autoFocus
+              />
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDeleteAllFinalConfirmOpen(false)
+                    setDeleteAllInput('')
+                    notify.info('Cancelled', 'Delete all operation cancelled')
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleteAllInput !== 'DELETE ALL'}
+                  onClick={() => {
+                    setDeleteAllFinalConfirmOpen(false)
+                    setDeleteAllInput('')
+                    executeDeleteAllDrafts()
+                  }}
+                >
+                  Delete All Drafts
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

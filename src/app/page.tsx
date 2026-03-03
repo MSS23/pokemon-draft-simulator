@@ -19,6 +19,38 @@ import { AuthModal } from '@/components/auth/AuthModal'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('Home')
+
+interface TeamWithDraft {
+  id: string
+  name: string
+  owner_id: string | null
+  draft_id: string
+  draft: {
+    id: string
+    room_code: string
+    status: string
+    created_at: string
+    deleted_at: string | null
+    host_id: string
+  }
+}
+
+function mapTeamsToDrafts(teams: TeamWithDraft[], userId: string, email?: string): DraftParticipation[] {
+  return teams.map((team) => ({
+    draftId: team.draft.room_code || team.draft.id,
+    userId,
+    teamId: team.id,
+    teamName: team.name,
+    displayName: email?.split('@')[0] || 'User',
+    isHost: team.draft.host_id === userId,
+    status: team.draft.status as DraftParticipation['status'],
+    lastActivity: team.draft.created_at,
+    joinedAt: team.draft.created_at,
+  }))
+}
 
 const PokemonGrid = dynamic(() => import('@/components/pokemon/PokemonGrid'), {
   loading: () => <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"></div></div>,
@@ -103,7 +135,7 @@ export default function Home() {
         toast.error(result.error || 'Failed to resume draft')
       }
     } catch (error) {
-      console.error('Error resuming draft:', error)
+      log.error('Error resuming draft:', error)
       toast.error('Failed to resume draft')
     }
   }
@@ -130,7 +162,7 @@ export default function Home() {
       UserSessionService.removeDraftParticipation(draftId)
       toast.success('Draft deleted.')
     } catch (error) {
-      console.error('Error deleting draft:', error)
+      log.error('Error deleting draft:', error)
 
       if (user?.id && supabase) {
         try {
@@ -144,21 +176,10 @@ export default function Home() {
             .is('draft.deleted_at', null)
 
           if (userTeams) {
-            const dbDrafts: DraftParticipation[] = userTeams.map((team: any) => ({
-              draftId: team.draft.room_code || team.draft.id,
-              userId: user.id,
-              teamId: team.id,
-              teamName: team.name,
-              displayName: user.email?.split('@')[0] || 'User',
-              isHost: team.draft.host_id === user.id,
-              status: team.draft.status,
-              lastActivity: team.draft.created_at,
-              joinedAt: team.draft.created_at
-            }))
-            setMyDrafts(dbDrafts)
+            setMyDrafts(mapTeamsToDrafts(userTeams as unknown as TeamWithDraft[], user.id, user.email ?? undefined))
           }
         } catch (reloadError) {
-          console.error('Error reloading drafts:', reloadError)
+          log.error('Error reloading drafts:', reloadError)
           setMyDrafts(UserSessionService.getVisibleDraftParticipations())
         }
       } else {
@@ -185,27 +206,13 @@ export default function Home() {
             .is('draft.deleted_at', null)
 
           if (error) {
-            console.error('Error loading drafts from database:', error)
+            log.error('Error loading drafts from database:', error)
             setMyDrafts(localDrafts)
             return
           }
 
-          const validDraftIds = new Set<string>()
-          const dbDrafts: DraftParticipation[] = (userTeams || []).map((team: any) => {
-            const draftId = team.draft.room_code || team.draft.id
-            validDraftIds.add(draftId)
-            return {
-              draftId,
-              userId: user.id,
-              teamId: team.id,
-              teamName: team.name,
-              displayName: user.email?.split('@')[0] || 'User',
-              isHost: team.draft.host_id === user.id,
-              status: team.draft.status,
-              lastActivity: team.draft.created_at,
-              joinedAt: team.draft.created_at
-            }
-          })
+          const dbDrafts = mapTeamsToDrafts((userTeams || []) as unknown as TeamWithDraft[], user.id, user.email ?? undefined)
+          const validDraftIds = new Set(dbDrafts.map(d => d.draftId))
 
           localDrafts.forEach(draft => {
             if (!validDraftIds.has(draft.draftId)) {
@@ -214,7 +221,7 @@ export default function Home() {
           })
           setMyDrafts(dbDrafts)
         } catch (error) {
-          console.error('Error validating drafts:', error)
+          log.error('Error validating drafts:', error)
           setMyDrafts(localDrafts)
         }
       } else {

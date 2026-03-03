@@ -18,7 +18,6 @@ import { Search, Filter, SortAsc, SortDesc } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
-// import PokemonComparison from './PokemonComparison' // TODO: Re-enable when component is implemented
 
 interface PokemonGridProps {
   pokemon: Pokemon[]
@@ -282,7 +281,7 @@ export default function PokemonGrid({
         </div>
 
         {/* Loading results info */}
-        <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
           <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse" />
         </div>
 
@@ -308,12 +307,6 @@ export default function PokemonGrid({
               />
             </div>
             <div className="flex gap-2">
-              {/* TODO: Re-enable Pokemon comparison feature
-              <PokemonComparison
-                availablePokemon={availablePokemon}
-                maxCompare={4}
-              />
-              */}
               <Button
                 variant="outline"
                 size="lg"
@@ -526,11 +519,11 @@ export default function PokemonGrid({
           </div>
 
           {showFiltersPanel && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 sm:p-6 bg-gradient-to-r from-blue-50 via-purple-50 to-cyan-50 rounded-xl border border-gray-200 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 sm:p-6 bg-gradient-to-r from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Type</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Type</label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="bg-white border-gray-300 shadow-sm">
+                  <SelectTrigger className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm">
                     <SelectValue placeholder="All types" />
                   </SelectTrigger>
                   <SelectContent>
@@ -545,9 +538,9 @@ export default function PokemonGrid({
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Cost</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Cost</label>
                 <Select value={costFilter} onValueChange={setCostFilter}>
-                  <SelectTrigger className="bg-white border-gray-300 shadow-sm">
+                  <SelectTrigger className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm">
                     <SelectValue placeholder="All costs" />
                   </SelectTrigger>
                   <SelectContent>
@@ -563,9 +556,9 @@ export default function PokemonGrid({
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Sort by</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Sort by</label>
                 <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-                  <SelectTrigger className="bg-white border-gray-300 shadow-sm">
+                  <SelectTrigger className="bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -583,12 +576,12 @@ export default function PokemonGrid({
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Direction</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Direction</label>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                  className="w-full bg-white border-gray-300 shadow-sm hover:bg-gray-50 transition-colors"
+                  className="w-full bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                 >
                   {sortDirection === 'asc' ? (
                     <>
@@ -606,12 +599,12 @@ export default function PokemonGrid({
 
               {/* Stat Range Filters */}
               <div className="lg:col-span-4 space-y-4 border-t pt-4 mt-4">
-                <h4 className="font-semibold text-gray-700 mb-3">Filter by Stats</h4>
+                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Filter by Stats</h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* HP Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       HP: {hpRange[0]} - {hpRange[1]}
                     </label>
                     <Slider
@@ -626,7 +619,7 @@ export default function PokemonGrid({
 
                   {/* Attack Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Attack: {attackRange[0]} - {attackRange[1]}
                     </label>
                     <Slider
@@ -641,7 +634,7 @@ export default function PokemonGrid({
 
                   {/* Defense Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Defense: {defenseRange[0]} - {defenseRange[1]}
                     </label>
                     <Slider
@@ -656,7 +649,7 @@ export default function PokemonGrid({
 
                   {/* Speed Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Speed: {speedRange[0]} - {speedRange[1]}
                     </label>
                     <Slider
@@ -671,7 +664,7 @@ export default function PokemonGrid({
 
                   {/* BST Filter */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Base Stat Total: {bstRange[0]} - {bstRange[1]}
                     </label>
                     <Slider
@@ -694,7 +687,7 @@ export default function PokemonGrid({
       <div className="p-4 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 dark:text-gray-300">
               Showing <span className="font-bold text-blue-600 dark:text-blue-400">{availablePokemon.length}</span> of <span className="font-bold">{pokemon.length}</span> Pokémon
               {searchQuery && (
                 <span className="ml-2 text-slate-600 dark:text-slate-400">
@@ -785,7 +778,7 @@ export default function PokemonGrid({
       )}
 
       {availablePokemon.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           No Pokémon found matching your filters
         </div>
       )}

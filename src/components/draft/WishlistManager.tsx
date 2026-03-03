@@ -29,7 +29,7 @@ import BudgetWarnings from './BudgetWarnings'
 interface WishlistManagerProps {
   draftId: string
   participantId: string
-  userTeam?: any
+  userTeam?: { id: string; name: string; picks: string[]; budget_remaining?: number } | null
   currentBudget?: number
   usedBudget?: number
   className?: string
@@ -75,9 +75,8 @@ export default function WishlistManager({
     await removeFromWishlist(pokemonId)
   }
 
-  const handleToggleAvailability = (itemId: string, isAvailable: boolean) => {
-    // This is handled automatically by real-time sync when Pokemon are drafted
-    console.log('Availability toggle not implemented - handled by real-time sync')
+  const handleToggleAvailability = (_itemId: string, _isAvailable: boolean) => {
+    // Handled automatically by real-time sync when Pokemon are drafted
   }
 
   // Drag and drop functionality

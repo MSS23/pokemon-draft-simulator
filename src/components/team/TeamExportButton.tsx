@@ -13,7 +13,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Download, FileJson, FileText, FileSpreadsheet, File, Clipboard, Check } from 'lucide-react'
 import { ExportService, TeamExport } from '@/lib/export-service'
+import { createLogger } from '@/lib/logger'
 import { toast } from 'sonner'
+
+const log = createLogger('TeamExportButton')
 
 interface TeamExportButtonProps {
   teamName: string
@@ -73,7 +76,7 @@ export default function TeamExportButton({
           break
       }
     } catch (error) {
-      console.error('Export error:', error)
+      log.error('Export error:', error)
       toast.error('Failed to export team')
     }
   }
@@ -85,7 +88,7 @@ export default function TeamExportButton({
       toast.success('Team copied to clipboard')
       setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      console.error('Copy error:', error)
+      log.error('Copy error:', error)
       toast.error('Failed to copy to clipboard')
     }
   }

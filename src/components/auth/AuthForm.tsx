@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { supabase } from '@/lib/supabase'
+import { createLogger } from '@/lib/logger'
 import { Eye, EyeOff, Mail, Lock, User, Loader2 } from 'lucide-react'
+
+const log = createLogger('AuthForm')
 
 interface AuthFormProps {
   mode: 'login' | 'register'
@@ -69,7 +72,7 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
               })
 
             if (profileError) {
-              console.error('Failed to create user profile:', profileError)
+              log.error('Failed to create user profile:', profileError)
               // Don't throw - profile creation is not critical for signup
             }
 
@@ -99,7 +102,7 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
         }
       } catch (err) {
         const error = err as Error
-        console.error('Auth error:', error)
+        log.error('Auth error:', error)
 
         // Parse common Supabase error messages to user-friendly ones
         let errorMessage = error.message || 'An unexpected error occurred'

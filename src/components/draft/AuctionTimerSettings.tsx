@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Clock, Check } from 'lucide-react'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AuctionTimerSettings')
 
 interface AuctionTimerSettingsProps {
   isOpen: boolean
@@ -44,7 +47,7 @@ export default function AuctionTimerSettings({
         onClose()
       }, 1500)
     } catch (error) {
-      console.error('Error setting auction duration:', error)
+      log.error('Error setting auction duration:', error)
     } finally {
       setIsSaving(false)
     }

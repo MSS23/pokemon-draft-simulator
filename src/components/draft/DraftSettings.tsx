@@ -8,7 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Eye, EyeOff, Tag, Save, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { createLogger } from '@/lib/logger'
 import { useNotify } from '@/components/providers/NotificationProvider'
+
+const log = createLogger('DraftSettings')
 import type { Draft } from '@/types'
 
 interface DraftSettingsProps {
@@ -60,7 +63,7 @@ export function DraftSettings({ draft, isHost, onUpdate }: DraftSettingsProps) {
       )
       onUpdate?.()
     } catch (error) {
-      console.error('Error toggling public status:', error)
+      log.error('Error toggling public status:', error)
       notify.error('Update Failed', 'Failed to update spectator settings')
     } finally {
       setIsUpdating(false)
@@ -99,7 +102,7 @@ export function DraftSettings({ draft, isHost, onUpdate }: DraftSettingsProps) {
       notify.success('Settings Saved', 'Draft details updated successfully')
       onUpdate?.()
     } catch (error) {
-      console.error('Error saving metadata:', error)
+      log.error('Error saving metadata:', error)
       notify.error('Save Failed', 'Failed to update draft details')
     } finally {
       setIsUpdating(false)

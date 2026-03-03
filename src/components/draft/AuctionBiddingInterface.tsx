@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Pokemon } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('AuctionBiddingInterface')
 import { Clock, DollarSign, Gavel, Trophy, AlertCircle, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PokemonCard from '@/components/pokemon/PokemonCard'
@@ -148,7 +151,7 @@ export default function AuctionBiddingInterface({
       // Auto-increment for next potential bid
       setBidAmount((amount + 1).toString())
     } catch (error) {
-      console.error('Error placing bid:', error)
+      log.error('Error placing bid:', error)
       // Could add error notification here
     } finally {
       setIsPlacingBid(false)

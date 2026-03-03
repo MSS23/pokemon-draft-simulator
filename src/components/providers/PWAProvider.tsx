@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { toast } from 'sonner'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('PWA')
 
 export default function PWAProvider({ children }: { children: React.ReactNode }) {
   const [showInstallPrompt, setShowInstallPrompt] = useState(false)
@@ -39,7 +42,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
           scope: '/'
         })
 
-        console.log('[PWA] Service Worker registered:', registration.scope)
+        log.debug('Service Worker registered:', registration.scope)
 
         // Check for updates
         registration.addEventListener('updatefound', () => {
@@ -48,7 +51,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
 
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[PWA] New service worker available')
+              log.debug('New service worker available')
               setIsUpdateAvailable(true)
               setWaitingWorker(newWorker)
               showUpdateNotification()
@@ -64,7 +67,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
         }
 
       } catch (error) {
-        console.error('[PWA] Service Worker registration failed:', error)
+        log.error('Service Worker registration failed:', error)
       }
     }
   }, [showUpdateNotification])
@@ -75,7 +78,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
     deferredPrompt.prompt()
     const { outcome } = await deferredPrompt.userChoice
 
-    console.log('[PWA] Install prompt outcome:', outcome)
+    log.debug('Install prompt outcome:', outcome)
 
     setDeferredPrompt(null)
     setShowInstallPrompt(false)
@@ -99,7 +102,7 @@ export default function PWAProvider({ children }: { children: React.ReactNode })
 
     // Listen for app installed
     window.addEventListener('appinstalled', () => {
-      console.log('[PWA] App installed successfully')
+      log.info('App installed successfully')
       setDeferredPrompt(null)
       setShowInstallPrompt(false)
       toast.success('App installed! You can now use it offline.')

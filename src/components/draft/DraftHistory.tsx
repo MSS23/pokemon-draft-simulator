@@ -5,6 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DraftService } from '@/lib/draft-service'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftHistory')
 import { Calendar, Users, Trophy, Clock, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -42,7 +45,7 @@ export default function DraftHistory() {
       setHistory(data as unknown as DraftHistoryItem[])
       setHasMore(data.length === itemsPerPage)
     } catch (error) {
-      console.error('Failed to load draft history:', error)
+      log.error('Failed to load draft history:', error)
       toast.error('Failed to load draft history')
     } finally {
       setIsLoading(false)

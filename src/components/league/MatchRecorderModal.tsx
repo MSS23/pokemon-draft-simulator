@@ -22,6 +22,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LeagueService } from '@/lib/league-service'
 import { MatchKOService } from '@/lib/match-ko-service'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('MatchRecorderModal')
 import { PokemonStatusBadge } from './PokemonStatusBadge'
 import { Loader2, Trophy, Skull, AlertTriangle, Plus, Minus } from 'lucide-react'
 import type { Match, Team, Pick, ExtendedLeagueSettings } from '@/types'
@@ -202,7 +205,7 @@ export function MatchRecorderModal({
       onSuccess()
       onClose()
     } catch (err) {
-      console.error('Failed to record match:', err)
+      log.error('Failed to record match:', err)
       setError(err instanceof Error ? err.message : 'Failed to record match')
     } finally {
       setIsSubmitting(false)

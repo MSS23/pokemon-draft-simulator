@@ -14,7 +14,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { DollarSign, AlertTriangle, Check } from 'lucide-react'
+import { createLogger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
+
+const log = createLogger('BudgetAdjustmentModal')
 
 interface Team {
   id: string
@@ -69,7 +72,7 @@ export default function BudgetAdjustmentModal({
       await onAdjustBudget(teamId, budget)
       setSavedTeams(prev => new Set(prev).add(teamId))
     } catch (error) {
-      console.error('Error adjusting budget:', error)
+      log.error('Error adjusting budget:', error)
     } finally {
       setIsSaving(false)
     }
