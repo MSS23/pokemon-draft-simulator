@@ -136,6 +136,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
         }
+        Relationships: []
       }
       teams: {
         Row: {
@@ -165,6 +166,7 @@ export type Database = {
           budget_remaining?: number
           draft_order?: number
         }
+        Relationships: []
       }
       picks: {
         Row: {
@@ -200,6 +202,7 @@ export type Database = {
           pick_order?: number
           round?: number
         }
+        Relationships: []
       }
       participants: {
         Row: {
@@ -232,6 +235,7 @@ export type Database = {
           is_host?: boolean
           last_seen?: string
         }
+        Relationships: []
       }
       pokemon_tiers: {
         Row: {
@@ -261,6 +265,7 @@ export type Database = {
           cost?: number
           is_legal?: boolean
         }
+        Relationships: []
       }
       auctions: {
         Row: {
@@ -299,6 +304,7 @@ export type Database = {
           auction_end?: string
           status?: 'active' | 'completed' | 'cancelled'
         }
+        Relationships: []
       }
       bid_history: {
         Row: {
@@ -328,6 +334,7 @@ export type Database = {
           team_name?: string
           bid_amount?: number
         }
+        Relationships: []
       }
       wishlist_items: {
         Row: {
@@ -366,6 +373,7 @@ export type Database = {
           is_available?: boolean
           cost?: number
         }
+        Relationships: []
       }
       spectator_events: {
         Row: {
@@ -392,6 +400,7 @@ export type Database = {
           metadata?: SpectatorEventMetadata
           created_at?: string
         }
+        Relationships: []
       }
       custom_formats: {
         Row: {
@@ -448,6 +457,7 @@ export type Database = {
           last_used_at?: string | null
           deleted_at?: string | null
         }
+        Relationships: []
       }
       user_profiles: {
         Row: {
@@ -464,9 +474,9 @@ export type Database = {
           is_verified: boolean
           total_drafts_created: number
           total_drafts_participated: number
-          favorite_pokemon: any
-          stats: any
-          preferences: any
+          favorite_pokemon: string | null
+          stats: Record<string, unknown> | null
+          preferences: Record<string, unknown> | null
         }
         Insert: {
           user_id: string
@@ -482,9 +492,9 @@ export type Database = {
           is_verified?: boolean
           total_drafts_created?: number
           total_drafts_participated?: number
-          favorite_pokemon?: any
-          stats?: any
-          preferences?: any
+          favorite_pokemon?: string | null
+          stats?: Record<string, unknown> | null
+          preferences?: Record<string, unknown> | null
         }
         Update: {
           user_id?: string
@@ -500,10 +510,11 @@ export type Database = {
           is_verified?: boolean
           total_drafts_created?: number
           total_drafts_participated?: number
-          favorite_pokemon?: any
-          stats?: any
-          preferences?: any
+          favorite_pokemon?: string | null
+          stats?: Record<string, unknown> | null
+          preferences?: Record<string, unknown> | null
         }
+        Relationships: []
       }
       leagues: {
         Row: {
@@ -551,6 +562,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       league_teams: {
         Row: {
@@ -574,6 +586,7 @@ export type Database = {
           seed?: number | null
           created_at?: string
         }
+        Relationships: []
       }
       matches: {
         Row: {
@@ -630,6 +643,7 @@ export type Database = {
           updated_at?: string
           completed_at?: string | null
         }
+        Relationships: []
       }
       standings: {
         Row: {
@@ -674,6 +688,7 @@ export type Database = {
           current_streak?: string | null
           updated_at?: string
         }
+        Relationships: []
       }
       match_games: {
         Row: {
@@ -712,6 +727,7 @@ export type Database = {
           created_at?: string
           completed_at?: string | null
         }
+        Relationships: []
       }
     }
     Views: {
@@ -732,8 +748,24 @@ export type Database = {
           total_picks: number
           last_activity: string
         }
+        Relationships: []
       }
     }
+    Functions: {
+      update_team_budget: {
+        Args: { team_id: string; cost_to_subtract: number }
+        Returns: undefined
+      }
+      advance_draft_turn: {
+        Args: { draft_id: string }
+        Returns: undefined
+      }
+      place_bid: {
+        Args: { auction_id: string; bidder_team_id: string; bid_amount: number }
+        Returns: undefined
+      }
+    }
+    Enums: Record<string, never>
   }
 }
 
