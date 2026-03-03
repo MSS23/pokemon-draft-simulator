@@ -12,11 +12,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { User, LogOut, Eye } from 'lucide-react'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { LogOut, Settings, LayoutDashboard } from 'lucide-react'
 
 export function Header() {
   const router = useRouter()
@@ -24,77 +24,72 @@ export function Header() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  // Prevent hydration mismatch - only render user-dependent UI after client mount
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center">
-          <div className="mr-4 flex items-center gap-6">
-            <Link href="/" className="flex items-center space-x-2 group">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <span className="text-white font-bold text-lg">P</span>
-              </div>
-              <span className="font-bold text-xl hidden sm:inline">Pokémon Draft League</span>
-              <span className="font-bold text-xl sm:hidden">PDL</span>
-            </Link>
-            <nav className="hidden md:flex items-center gap-2">
-              <Link href="/watch-drafts">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Eye className="h-4 w-4" />
-                  Watch Drafts
-                </Button>
-              </Link>
-            </nav>
-          </div>
-          <div className="flex flex-1 items-center justify-end space-x-2">
+        <div className="container flex h-14 items-center">
+          <Link href="/" className="flex items-center gap-2 mr-auto group">
+            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center group-hover:opacity-90 transition-opacity">
+              <span className="text-primary-foreground font-bold text-sm">P</span>
+            </div>
+            <span className="font-semibold text-base hidden sm:inline">Poke Draft</span>
+          </Link>
+
+          <div className="flex items-center gap-1.5">
             <ImageTypeToggle />
             <ThemeToggle />
 
             <div suppressHydrationWarning>
               {!mounted || loading ? (
-                // Placeholder during loading to prevent hydration mismatch
-                <>
-                  <Button variant="ghost" size="sm" disabled>
-                    Sign In
-                  </Button>
-                  <Button size="sm" disabled>
-                    Sign Up
-                  </Button>
-                </>
+                <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
               ) : user ? (
-              // User is signed in
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <User className="h-4 w-4 mr-2" />
-                    {user.email}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={async () => {
-                      await signOut()
-                      router.push('/')
-                    }}
-                    suppressHydrationWarning
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              // User is not signed in
-              <Button variant="ghost" size="sm" onClick={() => setAuthModalOpen(true)}>
-                Sign In
-              </Button>
-            )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                          {displayName[0]?.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <div className="px-2 py-1.5">
+                      <p className="text-sm font-medium">{displayName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push('/dashboard')}>
+                      <LayoutDashboard className="h-4 w-4 mr-2" />
+                      Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/settings')}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        await signOut()
+                        router.push('/')
+                      }}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setAuthModalOpen(true)}>
+                  Sign In
+                </Button>
+              )}
             </div>
           </div>
         </div>

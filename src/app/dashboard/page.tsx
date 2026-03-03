@@ -8,14 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Clock, Zap, Calendar, TrendingUp } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Clock, Zap, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 
 interface DraftSummary {
-  // Draft metadata
   draft_id: string
   draft_name: string
   status: 'setup' | 'active' | 'completed' | 'paused'
@@ -29,24 +28,18 @@ interface DraftSummary {
   pokemon_per_team: number
   current_turn: number | null
   spectator_count: number
-
-  // User's team
   user_team_id: string
   user_team_name: string
   user_id: string
   budget_remaining: number
   draft_order: number
   is_host: boolean
-
-  // Statistics
   picks_made: number
   total_picks: number
   max_possible_picks: number
   progress_percent: number
   active_participant_count: number
   total_participant_count: number
-
-  // League association
   league_id: string | null
   league_status: string | null
 }
@@ -62,30 +55,19 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const loadDashboardData = async () => {
-      // Wait for auth to finish loading
-      if (authLoading) {
-        console.log('[Dashboard] Auth still loading, skipping data fetch')
-        return
-      }
-
-      // Skip data fetch if not authenticated
+      if (authLoading) return
       if (!user) {
-        console.log('[Dashboard] No user authenticated')
         setLoading(false)
         return
       }
 
       try {
-        console.log('[Dashboard] Loading drafts for user:', user.id)
-
         if (!supabase) {
-          console.error('[Dashboard] Supabase not available')
           setDrafts([])
           setLoading(false)
           return
         }
 
-        // Query the user_draft_summary view for efficient data retrieval
         const { data: draftSummaries, error } = await (supabase as any)
           .from('user_draft_summary')
           .select('*')
@@ -93,19 +75,15 @@ export default function DashboardPage() {
           .order('updated_at', { ascending: false })
 
         if (error) {
-          console.error('[Dashboard] Error fetching drafts:', error)
           setFetchError(`Failed to load your drafts: ${error.message}`)
           setDrafts([])
           setLoading(false)
           return
         }
         setFetchError(null)
-
-        console.log('[Dashboard] Fetched draft summaries:', draftSummaries)
         setDrafts(draftSummaries || [])
-      } catch (err) {
-        console.error('[Dashboard] Unexpected error:', err)
-        setFetchError('An unexpected error occurred while loading your drafts. Please try again.')
+      } catch {
+        setFetchError('An unexpected error occurred. Please try again.')
         setDrafts([])
       } finally {
         setLoading(false)
@@ -118,391 +96,237 @@ export default function DashboardPage() {
   if (authLoading || loading) {
     return (
       <SidebarLayout>
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </SidebarLayout>
     )
   }
 
-  // Show login prompt if not authenticated
   if (!user) {
     return (
       <SidebarLayout>
-        <div className="min-h-screen p-8">
-          <Card className="max-w-md mx-auto">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="h-5 w-5" />
-                Dashboard Access Required
-              </CardTitle>
+        <div className="min-h-[60vh] flex items-center justify-center p-8">
+          <Card className="max-w-sm w-full">
+            <CardHeader className="text-center">
+              <CardTitle className="text-lg">Sign in to continue</CardTitle>
               <CardDescription>
-                Sign in to view your drafts and league activity
+                View your drafts and league activity
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Your dashboard shows your active drafts, league participation, and recent activity.
-                Please log in to access these features.
-              </p>
-              <Button
-                className="w-full"
-                onClick={() => setAuthModalOpen(true)}
-              >
+            <CardContent>
+              <Button className="w-full" onClick={() => setAuthModalOpen(true)}>
                 Sign In
               </Button>
             </CardContent>
           </Card>
+          <AuthModal
+            isOpen={authModalOpen}
+            onClose={() => setAuthModalOpen(false)}
+            redirectTo="/dashboard"
+          />
         </div>
-        <AuthModal
-          isOpen={authModalOpen}
-          onClose={() => setAuthModalOpen(false)}
-          redirectTo="/dashboard"
-        />
       </SidebarLayout>
     )
   }
 
   const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User'
-
-  // Filter drafts by status
   const activeDrafts = drafts.filter(d => d.status === 'active' || d.status === 'setup')
   const completedDrafts = drafts.filter(d => d.status === 'completed')
 
-  // Calculate statistics
-  const totalDrafts = drafts.length
-  const totalActive = activeDrafts.length
-  const totalCompleted = completedDrafts.length
-  const draftsWithLeagues = drafts.filter(d => d.league_id).length
-
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { label: string; className: string }> = {
-      setup: { label: 'Setup', className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
-      active: { label: 'Active', className: 'bg-green-500/10 text-green-500 border-green-500/20' },
-      completed: { label: 'Completed', className: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
-      paused: { label: 'Paused', className: 'bg-gray-500/10 text-gray-500 border-gray-500/20' }
+    const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+      setup: { label: 'Setup', variant: 'outline' },
+      active: { label: 'Active', variant: 'default' },
+      completed: { label: 'Completed', variant: 'secondary' },
+      paused: { label: 'Paused', variant: 'outline' }
     }
-    const variant = variants[status] || variants.setup
-    return <Badge variant="outline" className={variant.className}>{variant.label}</Badge>
+    const c = config[status] || config.setup
+    return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>
   }
 
-  const DraftCard = ({ draft }: { draft: DraftSummary }) => {
-    const progressColor = draft.progress_percent >= 100 ? 'bg-green-500' : 'bg-blue-500'
-
-    return (
-      <Card
-        className="hover:shadow-lg transition-shadow cursor-pointer"
-        onClick={() => router.push(`/draft/${draft.room_code.toLowerCase()}`)}
-      >
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <CardTitle className="text-xl">{draft.draft_name}</CardTitle>
-                {draft.is_host && (
-                  <Badge variant="secondary" className="text-xs">
-                    Host
-                  </Badge>
-                )}
-              </div>
-              <CardDescription className="flex items-center gap-2">
-                <span className="font-mono text-sm">{draft.room_code}</span>
-                <span>•</span>
-                <span>{draft.user_team_name}</span>
-              </CardDescription>
+  const DraftCard = ({ draft }: { draft: DraftSummary }) => (
+    <Card
+      className="hover:border-primary/30 transition-colors cursor-pointer"
+      onClick={() => router.push(`/draft/${draft.room_code.toLowerCase()}`)}
+    >
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-sm truncate">{draft.draft_name}</p>
+              {draft.is_host && <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">Host</Badge>}
             </div>
-            {getStatusBadge(draft.status)}
+            <p className="text-xs text-muted-foreground mt-0.5">
+              <span className="font-mono">{draft.room_code}</span> &middot; {draft.user_team_name}
+            </p>
           </div>
-        </CardHeader>
+          {getStatusBadge(draft.status)}
+        </div>
 
-        <CardContent className="space-y-4">
-          {/* Progress Bar */}
-          {draft.status !== 'setup' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Draft Progress</span>
-                <span className="font-medium">{draft.progress_percent}%</span>
-              </div>
-              <Progress value={draft.progress_percent} className={progressColor} />
-              <div className="text-xs text-muted-foreground">
-                {draft.total_picks} / {draft.max_possible_picks} picks made
-              </div>
+        {draft.status !== 'setup' && (
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Progress</span>
+              <span className="font-medium text-foreground">{draft.progress_percent}%</span>
             </div>
-          )}
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Your Picks */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Trophy className="h-3 w-3" />
-                <span>Your Picks</span>
-              </div>
-              <div className="text-lg font-semibold">
-                {draft.picks_made}/{draft.pokemon_per_team}
-              </div>
-            </div>
-
-            {/* Budget */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <TrendingUp className="h-3 w-3" />
-                <span>Budget</span>
-              </div>
-              <div className="text-lg font-semibold">
-                {draft.budget_remaining}
-              </div>
-            </div>
-
-            {/* Participants */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Users className="h-3 w-3" />
-                <span>Teams</span>
-              </div>
-              <div className="text-lg font-semibold">
-                {draft.total_participant_count}/{draft.max_teams}
-              </div>
-            </div>
-
-            {/* Format */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Zap className="h-3 w-3" />
-                <span>Format</span>
-              </div>
-              <div className="text-sm font-semibold capitalize">
-                {draft.format}
-              </div>
-            </div>
+            <Progress value={draft.progress_percent} className="h-1.5" />
           </div>
+        )}
 
-          {/* League Status */}
-          {draft.league_id && (
-            <div className="flex items-center gap-2 p-2 bg-purple-500/10 rounded-md border border-purple-500/20">
-              <Trophy className="h-4 w-4 text-purple-500" />
-              <span className="text-sm text-purple-500 font-medium">
-                League Created - {draft.league_status}
-              </span>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-2">
-            {draft.status === 'active' && (
-              <Button
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  router.push(`/draft/${draft.room_code.toLowerCase()}`)
-                }}
-              >
-                Continue Draft
-              </Button>
-            )}
-
-            {draft.status === 'setup' && (
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  router.push(`/draft/${draft.room_code.toLowerCase()}`)
-                }}
-              >
-                Setup Draft
-              </Button>
-            )}
-
-            {draft.status === 'completed' && !draft.league_id && (
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  router.push(`/draft/${draft.room_code.toLowerCase()}/results`)
-                }}
-              >
-                View Results
-              </Button>
-            )}
-
-            {draft.status === 'completed' && draft.league_id && (
-              <Button
-                className="flex-1"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  router.push(`/league/${draft.league_id}`)
-                }}
-              >
-                View League
-              </Button>
-            )}
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <div>
+            <p className="text-xs text-muted-foreground">Picks</p>
+            <p className="text-sm font-semibold">{draft.picks_made}/{draft.pokemon_per_team}</p>
           </div>
-        </CardContent>
-      </Card>
-    )
-  }
+          <div>
+            <p className="text-xs text-muted-foreground">Budget</p>
+            <p className="text-sm font-semibold">{draft.budget_remaining}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Teams</p>
+            <p className="text-sm font-semibold">{draft.total_participant_count}/{draft.max_teams}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Format</p>
+            <p className="text-sm font-semibold capitalize">{draft.format}</p>
+          </div>
+        </div>
+
+        {draft.league_id && (
+          <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-md text-xs">
+            <Trophy className="h-3.5 w-3.5 text-primary" />
+            <span className="text-primary font-medium">League &middot; {draft.league_status}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 
   return (
     <SidebarLayout>
-      <main className="min-h-screen p-8">
-        <div className="max-w-7xl mx-auto space-y-8">
-          {/* Header */}
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Welcome back, {displayName}!</h1>
-            <p className="text-muted-foreground">
-              Manage your drafts, view your teams, and track your progress.
-            </p>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">Welcome back, {displayName}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your drafts and track progress.
+          </p>
+        </div>
+
+        {/* Error */}
+        {fetchError && (
+          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <p className="text-sm font-medium text-destructive">{fetchError}</p>
           </div>
+        )}
 
-          {/* Error Display */}
-          {fetchError && (
-            <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <Trophy className="h-5 w-5 text-red-500" />
-                  <div>
-                    <p className="font-medium text-red-800 dark:text-red-200">{fetchError}</p>
-                    <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                      This may be due to a database issue. Try refreshing the page.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Drafts</CardTitle>
-                <Trophy className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{totalDrafts}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Drafts</CardTitle>
-                <Zap className="h-4 w-4 text-green-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-500">{totalActive}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                <Clock className="h-4 w-4 text-blue-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-500">{totalCompleted}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Leagues</CardTitle>
-                <Users className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-500">{draftsWithLeagues}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Drafts Section */}
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>My Drafts</CardTitle>
-                  <CardDescription>View and manage all your draft rooms</CardDescription>
-                </div>
-                <Button asChild>
-                  <Link href="/create-draft">
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Draft
-                  </Link>
-                </Button>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground">Total</p>
+                <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-            </CardHeader>
-
-            <CardContent>
-              {totalDrafts === 0 ? (
-                <div className="text-center py-12">
-                  <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No drafts yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create your first draft to get started!
-                  </p>
-                  <Button asChild>
-                    <Link href="/create-draft">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create Draft
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="active">
-                      Active ({totalActive})
-                    </TabsTrigger>
-                    <TabsTrigger value="completed">
-                      Completed ({totalCompleted})
-                    </TabsTrigger>
-                    <TabsTrigger value="all">
-                      All ({totalDrafts})
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="active" className="space-y-4">
-                    {activeDrafts.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No active drafts. Create one to get started!
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {activeDrafts.map(draft => (
-                          <DraftCard key={draft.draft_id} draft={draft} />
-                        ))}
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="completed" className="space-y-4">
-                    {completedDrafts.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No completed drafts yet.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        {completedDrafts.map(draft => (
-                          <DraftCard key={draft.draft_id} draft={draft} />
-                        ))}
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  <TabsContent value="all" className="space-y-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {drafts.map(draft => (
-                        <DraftCard key={draft.draft_id} draft={draft} />
-                      ))}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              )}
+              <p className="text-2xl font-bold">{drafts.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground">Active</p>
+                <Zap className="h-3.5 w-3.5 text-green-500" />
+              </div>
+              <p className="text-2xl font-bold">{activeDrafts.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground">Completed</p>
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold">{completedDrafts.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground">Leagues</p>
+                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold">{drafts.filter(d => d.league_id).length}</p>
             </CardContent>
           </Card>
         </div>
-      </main>
+
+        {/* Drafts */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">My Drafts</CardTitle>
+              <Button size="sm" asChild>
+                <Link href="/create-draft">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  New Draft
+                </Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {drafts.length === 0 ? (
+              <div className="text-center py-12 space-y-3">
+                <Trophy className="h-10 w-10 mx-auto text-muted-foreground/50" />
+                <div>
+                  <p className="font-medium text-sm">No drafts yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Create your first draft to get started.</p>
+                </div>
+                <Button size="sm" asChild>
+                  <Link href="/create-draft">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Create Draft
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="active">Active ({activeDrafts.length})</TabsTrigger>
+                  <TabsTrigger value="completed">Completed ({completedDrafts.length})</TabsTrigger>
+                  <TabsTrigger value="all">All ({drafts.length})</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="active">
+                  {activeDrafts.length === 0 ? (
+                    <p className="text-center py-8 text-sm text-muted-foreground">No active drafts.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      {activeDrafts.map(draft => <DraftCard key={draft.draft_id} draft={draft} />)}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="completed">
+                  {completedDrafts.length === 0 ? (
+                    <p className="text-center py-8 text-sm text-muted-foreground">No completed drafts.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      {completedDrafts.map(draft => <DraftCard key={draft.draft_id} draft={draft} />)}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="all">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {drafts.map(draft => <DraftCard key={draft.draft_id} draft={draft} />)}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </SidebarLayout>
   )
 }

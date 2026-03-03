@@ -1659,8 +1659,8 @@ export default function DraftRoomPage() {
           </div>
         )}
 
-        {/* Draft Type Specific Controls */}
-        {draftState && draftState.status === 'drafting' && (
+        {/* Draft Type Specific Controls - hidden for spectators */}
+        {draftState && draftState.status === 'drafting' && !isSpectator && draftState.userTeamId && (
           <div className="mb-6">
             {isAuctionDraft ? (
               // Auction Draft Controls
@@ -1788,7 +1788,7 @@ export default function DraftRoomPage() {
           pokemon={detailsPokemon}
           isOpen={isDetailsOpen}
           onClose={() => setIsDetailsOpen(false)}
-          onSelect={!draftState || isAuctionDraft ? undefined : (isUserTurn && draftState?.status === 'drafting' ? handleInitiateDraft : undefined)}
+          onSelect={!draftState || isAuctionDraft || isSpectator || !draftState?.userTeamId ? undefined : (isUserTurn && draftState?.status === 'drafting' ? handleInitiateDraft : undefined)}
           isDrafted={detailsPokemon && draftState ? allDraftedIds.includes(detailsPokemon.id) : false}
           isAtPickLimit={userTeam ? userTeam.picks.length >= (draftState?.draftSettings?.pokemonPerTeam || 6) : false}
           currentPicks={userTeam?.picks.length || 0}
