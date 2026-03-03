@@ -1,7 +1,12 @@
-import { supabase } from './supabase'
-import { DraftService } from './draft-service'
+import { supabase, Database } from './supabase'
+import { DraftService, DraftState as ServiceDraftState } from './draft-service'
 import { DraftError, DraftErrorCode, DraftErrors } from './draft-errors'
 import { generateSnakeDraftOrder, getCurrentPick } from '@/utils/draft'
+import type { DraftSettings } from '@/types/supabase-helpers'
+
+type TeamRow = Database['public']['Tables']['teams']['Row']
+type PickRow = Database['public']['Tables']['picks']['Row']
+type ParticipantRow = Database['public']['Tables']['participants']['Row']
 
 export interface AutoSkipResult {
   skipped: boolean
@@ -108,12 +113,12 @@ export class AutoSkipService {
   private static async tryAutoPickFromWishlist(
     draftId: string,
     teamId: string,
-    team: any,
-    draftState: any
+    team: TeamRow,
+    draftState: ServiceDraftState
   ): Promise<{ success: boolean; pokemonId?: string; pokemonName?: string; cost?: number }> {
     // Get wishlist items for this team's participant
     const participant = draftState.participants.find(
-      (p: any) => p.team_id === teamId
+      (p: ParticipantRow) => p.team_id === teamId
     )
 
     if (!participant) {
@@ -134,10 +139,10 @@ export class AutoSkipService {
     }
 
     // Get all already picked Pokemon IDs
-    const pickedPokemonIds = new Set(draftState.picks.map((p: any) => p.pokemon_id))
+    const pickedPokemonIds = new Set(draftState.picks.map((p: PickRow) => p.pokemon_id))
 
     // Try each wishlist item in priority order
-    for (const item of wishlistItems as any[]) {
+    for (const item of wishlistItems) {
       // Skip if already drafted
       if (pickedPokemonIds.has(item.pokemon_id)) {
         continue
@@ -151,7 +156,7 @@ export class AutoSkipService {
 
       // Check pick limit
       const maxPokemonPerTeam = draftState.draft.settings?.maxPokemonPerTeam || 10
-      const currentPickCount = draftState.picks.filter((p: any) => p.team_id === teamId).length
+      const currentPickCount = draftState.picks.filter((p: PickRow) => p.team_id === teamId).length
       if (currentPickCount >= maxPokemonPerTeam) {
         console.log(`[AutoSkip] Team has reached pick limit (${maxPokemonPerTeam})`)
         return { success: false }
@@ -166,14 +171,14 @@ export class AutoSkipService {
           .eq('id', teamId)
           .single()
 
-        if (!(ownerData as any)?.owner_id) {
+        if (!ownerData?.owner_id) {
           console.error('[AutoSkip] No owner found for team')
           continue
         }
 
         await DraftService.makePick(
           draftId,
-          (ownerData as any).owner_id,
+          ownerData.owner_id,
           item.pokemon_id,
           item.pokemon_name,
           item.cost
@@ -215,11 +220,12 @@ export class AutoSkipService {
             event_type: 'turn_skipped',
             spectator_id: null,
             metadata: {
+              type: 'custom' as const,
               team_id: teamId,
               team_name: teamName,
               reason: 'Timer expired'
             }
-          } as any)
+          })
       }
     } catch (error) {
       console.error('[AutoSkip] Failed to log skip event:', error)
@@ -229,9 +235,9 @@ export class AutoSkipService {
   /**
    * Check if auto-skip is enabled for a draft
    */
-  static isAutoSkipEnabled(draftSettings: any): boolean {
+  static isAutoSkipEnabled(draftSettings: DraftSettings | null | undefined): boolean {
     // Auto-skip is enabled if there's a time limit
-    return draftSettings?.timeLimit && draftSettings.timeLimit > 0
+    return !!(draftSettings?.timeLimit && draftSettings.timeLimit > 0)
   }
 
   /**
@@ -327,17 +333,17 @@ export class AutoSkipService {
       .single()
 
     let budget = 0
-    if ((participant as any)?.team_id) {
+    if (participant?.team_id) {
       const { data: team } = await supabase
         .from('teams')
         .select('budget_remaining')
-        .eq('id', (participant as any).team_id)
+        .eq('id', participant.team_id)
         .single()
-      budget = (team as any)?.budget_remaining || 0
+      budget = team?.budget_remaining || 0
     }
 
-    const availableItems = (wishlistItems as any[]).filter((item: any) => item.is_available)
-    const affordableItems = availableItems.filter((item: any) => item.cost <= budget)
+    const availableItems = wishlistItems.filter((item) => item.is_available)
+    const affordableItems = availableItems.filter((item) => item.cost <= budget)
     const topPick = affordableItems.length > 0 ? affordableItems[0] : null
 
     return {
