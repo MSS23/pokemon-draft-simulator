@@ -28,35 +28,18 @@ if (typeof window !== 'undefined') {
   })
 }
 
-// Validate configuration with helpful error messages
-if (!supabaseUrl || !supabaseAnonKey) {
+// Validate configuration - warn but don't throw at module scope
+// (throwing crashes Next.js static page generation during build)
+const supabaseConfigured = !!(supabaseUrl && supabaseAnonKey)
+if (!supabaseConfigured) {
   const missingVars = []
   if (!supabaseUrl) missingVars.push('NEXT_PUBLIC_SUPABASE_URL')
   if (!supabaseAnonKey) missingVars.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
-  const errorMessage = `
-🔧 Supabase Configuration Error
-
-Missing required environment variables: ${missingVars.join(', ')}
-
-To fix this:
-1. Create a .env.local file in the project root
-2. Add the following variables:
-   NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-
-3. Get these values from your Supabase project:
-   • Go to https://app.supabase.com
-   • Select your project
-   • Go to Settings > API
-   • Copy the Project URL and anon/public key
-
-4. Restart your development server
-
-See .env.example for reference.
-  `.trim()
-
-  throw new Error(errorMessage)
+  // Only throw at runtime, not during build-time static generation
+  if (typeof window !== 'undefined') {
+    log.warn(`Missing required environment variables: ${missingVars.join(', ')}. Set these in your deployment environment.`)
+  }
 }
 
 // Database types
@@ -1197,6 +1180,11 @@ if (typeof window !== 'undefined') {
 }
 
 export const supabase = (() => {
+  if (!supabaseConfigured) {
+    // Return a placeholder during build — pages that use supabase
+    // are dynamic and won't be statically generated
+    return null as unknown as SupabaseClient<Database>
+  }
   if (!supabaseInstance) {
     supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
@@ -1222,5 +1210,5 @@ export const supabase = (() => {
 })()
 
 // Helper to check if Supabase is configured
-export const isSupabaseConfigured = true
-export const isSupabaseAvailable = () => true
+export const isSupabaseConfigured = supabaseConfigured
+export const isSupabaseAvailable = () => supabaseConfigured
