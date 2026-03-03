@@ -91,11 +91,11 @@ export default function HistoryPage() {
       console.log('[History] Fetching league history for user:', userId)
 
       // Query the user_league_history view
-      const { data: leagueData, error } = await supabase
+      const { data: leagueData, error } = await (supabase as any)
         .from('user_league_history')
         .select('*')
         .eq('user_id', userId)
-        .order('end_date', { ascending: false, nullsFirst: false }) as any
+        .order('end_date', { ascending: false, nullsFirst: false })
 
       if (error) {
         console.error('[History] Error fetching league history:', error)

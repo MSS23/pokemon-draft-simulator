@@ -1,13 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { RefreshCw, Download, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { getLastSyncTime, isSyncStale, clearShowdownCache } from '@/services/showdown-sync'
 
 export default function FormatSyncPanel() {
+  const router = useRouter()
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{
     success: boolean
@@ -41,7 +44,7 @@ export default function FormatSyncPanel() {
       // Reload the page to apply new formats
       if (data.success) {
         setTimeout(() => {
-          window.location.reload()
+          router.refresh()
         }, 2000)
       }
     } catch (error) {
@@ -54,17 +57,22 @@ export default function FormatSyncPanel() {
     }
   }
 
+  const [clearCacheOpen, setClearCacheOpen] = useState(false)
+
   const handleClearCache = () => {
-    if (confirm('Are you sure you want to clear the cached format data? This will revert to default formats.')) {
-      clearShowdownCache()
-      setSyncResult({
-        success: true,
-        message: 'Cache cleared successfully'
-      })
-      setTimeout(() => {
-        window.location.reload()
-      }, 1000)
-    }
+    setClearCacheOpen(true)
+  }
+
+  const executeClearCache = () => {
+    clearShowdownCache()
+    setSyncResult({
+      success: true,
+      message: 'Cache cleared successfully'
+    })
+    setClearCacheOpen(false)
+    setTimeout(() => {
+      window.location.reload()
+    }, 1000)
   }
 
   return (
@@ -184,6 +192,16 @@ export default function FormatSyncPanel() {
           </div>
         )}
       </CardContent>
+
+      <ConfirmDialog
+        open={clearCacheOpen}
+        onOpenChange={setClearCacheOpen}
+        title="Clear Format Cache"
+        description="Are you sure you want to clear the cached format data? This will revert to default formats."
+        confirmLabel="Clear Cache"
+        variant="destructive"
+        onConfirm={executeClearCache}
+      />
     </Card>
   )
 }

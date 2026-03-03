@@ -1,4 +1,4 @@
-import { Pokemon, PokemonType } from '@/types'
+import { Pokemon } from '@/types'
 
 // Pokemon type colors based on official colors
 export const TYPE_COLORS: Record<string, string> = {

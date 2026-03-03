@@ -176,24 +176,24 @@ export class LeagueStatsService {
 
       const pick = pickResponse.data
 
-      const statusResponse = await supabase
+      const statusResponse = await (supabase as any)
         .from('team_pokemon_status')
         .select('*')
         .eq('pick_id', pickId)
-        .single() as any
+        .single()
 
       const status = statusResponse?.data
 
       // Get all KOs this Pokemon has given
-      const kosGivenResponse = await supabase
+      const kosGivenResponse = await (supabase as any)
         .from('match_pokemon_kos')
         .select('ko_count')
-        .eq('pick_id', pickId) as any
+        .eq('pick_id', pickId)
 
       const kosGiven = kosGivenResponse?.data
 
       // Get all KOs this Pokemon has taken (opponent's KOs)
-      const kosTakenResponse = await supabase
+      const kosTakenResponse = await (supabase as any)
         .from('match_pokemon_kos')
         .select(`
           ko_count,
@@ -202,7 +202,7 @@ export class LeagueStatsService {
             away_team_id
           )
         `)
-        .neq('pick_id', pickId) as any  // KOs by OTHER Pokemon
+        .neq('pick_id', pickId)  // KOs by OTHER Pokemon
 
       const kosTaken = kosTakenResponse?.data
 
@@ -585,18 +585,18 @@ export class LeagueStatsService {
       const picks = picksResponse?.data
       const pickIds = picks?.map((p: any) => p.id) || []
 
-      const kosGivenResponse = await supabase
+      const kosGivenResponse = await (supabase as any)
         .from('match_pokemon_kos')
         .select('ko_count')
-        .in('pick_id', pickIds) as any
+        .in('pick_id', pickIds)
 
       const kosGiven = kosGivenResponse?.data
 
       // Get Pokemon status counts
-      const pokemonStatusesResponse = await supabase
+      const pokemonStatusesResponse = await (supabase as any)
         .from('team_pokemon_status')
         .select('status')
-        .eq('team_id', teamId) as any
+        .eq('team_id', teamId)
 
       const pokemonStatuses = pokemonStatusesResponse?.data
 

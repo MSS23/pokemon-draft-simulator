@@ -108,7 +108,6 @@ export async function middleware(request: NextRequest) {
   if (isDemoMode || !supabaseUrl || !supabaseKey || 
       supabaseUrl === 'your-supabase-project-url' || 
       supabaseKey === 'your-supabase-anon-key') {
-    console.log('Middleware: Skipping auth checks (demo mode or invalid credentials)')
     return supabaseResponse
   }
 
@@ -149,41 +148,27 @@ export async function middleware(request: NextRequest) {
       data: { user: authUser },
     } = await supabase.auth.getUser()
     user = authUser
-  } catch (error) {
-    console.warn('Middleware: Failed to create Supabase client, skipping auth:', error)
+  } catch {
+    // Auth service unavailable - allow pages through since they handle auth client-side.
+    // Only block admin routes.
+    const adminPaths = ['/admin']
+    const needsAdmin = adminPaths.some(r => pathname.startsWith(r))
+
+    if (needsAdmin) {
+      return NextResponse.json(
+        { error: 'Authentication service unavailable' },
+        { status: 500 }
+      )
+    }
     return supabaseResponse
   }
 
-  // Define protected routes that require authentication
-  const protectedRoutes = [
-    '/leagues',
-    '/friends',
-    '/achievements',
-    '/settings',
-    '/dashboard',
-    '/history',
-  ]
-
-  // Define admin routes that require admin access
-  const adminRoutes = [
-    '/admin',
-  ]
-
-  // Check if current path is protected
-  const isProtectedRoute = protectedRoutes.some(route =>
-    request.nextUrl.pathname.startsWith(route)
-  )
+  // Admin routes require admin access
+  const adminRoutes = ['/admin']
 
   const isAdminRoute = adminRoutes.some(route =>
     request.nextUrl.pathname.startsWith(route)
   )
-
-  // Redirect unauthenticated users from protected routes
-  if (isProtectedRoute && !user) {
-    const redirectUrl = new URL('/auth/login', request.url)
-    redirectUrl.searchParams.set('redirectTo', request.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
-  }
 
   // Check admin access for admin routes
   if (isAdminRoute && user && supabase) {
@@ -197,8 +182,8 @@ export async function middleware(request: NextRequest) {
       if (!profile) {
         return NextResponse.redirect(new URL('/unauthorized', request.url))
       }
-    } catch (error) {
-      console.warn('Middleware: Failed to check admin access, allowing through:', error)
+    } catch {
+      return NextResponse.redirect(new URL('/unauthorized', request.url))
     }
   }
 

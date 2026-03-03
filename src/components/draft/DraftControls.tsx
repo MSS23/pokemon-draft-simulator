@@ -5,6 +5,17 @@ import { useState, useCallback, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import {
   Play,
   Pause,
@@ -85,6 +96,15 @@ const DraftControls = memo(function DraftControls({
   notificationsEnabled = false
 }: DraftControlsProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<{
+    title: string
+    description: string
+    confirmLabel: string
+    variant: 'default' | 'destructive'
+    onConfirm: () => void
+  } | null>(null)
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const notify = useNotify()
 
   const handlePauseDraft = () => {
@@ -98,17 +118,29 @@ const DraftControls = memo(function DraftControls({
   }
 
   const handleEndDraft = () => {
-    if (window.confirm('Are you sure you want to end this draft? This action cannot be undone.')) {
-      onEndDraft()
-      notify.info('Draft Ended', 'The draft has been ended by the host')
-    }
+    setConfirmAction({
+      title: 'End Draft',
+      description: 'Are you sure you want to end this draft? This action cannot be undone.',
+      confirmLabel: 'End Draft',
+      variant: 'destructive',
+      onConfirm: () => {
+        onEndDraft()
+        notify.info('Draft Ended', 'The draft has been ended by the host')
+      },
+    })
   }
 
   const handleAdvanceTurn = () => {
-    if (window.confirm('Are you sure you want to skip the current turn?')) {
-      onAdvanceTurn()
-      notify.warning('Turn Skipped', 'The current turn has been skipped')
-    }
+    setConfirmAction({
+      title: 'Skip Turn',
+      description: 'Are you sure you want to skip the current turn?',
+      confirmLabel: 'Skip Turn',
+      variant: 'default',
+      onConfirm: () => {
+        onAdvanceTurn()
+        notify.warning('Turn Skipped', 'The current turn has been skipped')
+      },
+    })
   }
 
   const handleSetTimer = useCallback((value: string) => {
@@ -117,27 +149,19 @@ const DraftControls = memo(function DraftControls({
     // Don't show notification immediately - it causes re-renders
   }, [onSetTimer])
 
-  const handleEnableProxyPicking = () => {
-    if (onEnableProxyPicking) {
-      onEnableProxyPicking()
-      notify.success('Proxy Picking Enabled', 'You can now pick Pokémon for other teams')
-    }
-  }
-
-  const handleDisableProxyPicking = () => {
-    if (onDisableProxyPicking) {
-      onDisableProxyPicking()
-      notify.info('Proxy Picking Disabled', 'Proxy picking has been turned off')
-    }
-  }
-
   const handleUndo = () => {
-    if (window.confirm('Are you sure you want to undo the last pick?')) {
-      if (onUndoLastPick) {
-        onUndoLastPick()
-        notify.info('Pick Undone', 'The last pick has been undone')
-      }
-    }
+    setConfirmAction({
+      title: 'Undo Last Pick',
+      description: 'Are you sure you want to undo the last pick?',
+      confirmLabel: 'Undo Pick',
+      variant: 'default',
+      onConfirm: () => {
+        if (onUndoLastPick) {
+          onUndoLastPick()
+          notify.info('Pick Undone', 'The last pick has been undone')
+        }
+      },
+    })
   }
 
   const handleRequestNotifications = () => {
@@ -154,27 +178,31 @@ const DraftControls = memo(function DraftControls({
   }
 
   const handleResetDraft = () => {
-    if (window.confirm('Are you sure you want to RESET this draft? This will delete all picks and teams will keep their positions. This action cannot be undone!')) {
-      if (onResetDraft) {
-        onResetDraft()
-        notify.warning('Draft Reset', 'All picks have been cleared. Teams remain but draft is back to setup.')
-      }
-    }
+    setConfirmAction({
+      title: 'Reset Draft',
+      description: 'Are you sure you want to RESET this draft? This will delete all picks and teams will keep their positions. This action cannot be undone!',
+      confirmLabel: 'Reset Draft',
+      variant: 'destructive',
+      onConfirm: () => {
+        if (onResetDraft) {
+          onResetDraft()
+          notify.warning('Draft Reset', 'All picks have been cleared. Teams remain but draft is back to setup.')
+        }
+      },
+    })
   }
 
   const handleDeleteDraft = () => {
-    const confirmed = window.confirm('⚠️ DANGER: Are you sure you want to DELETE this entire draft?\n\nThis will:\n- Remove the draft room\n- Kick out all participants\n- Remove it from everyone\'s draft list\n\nThis action CANNOT be undone!')
+    setDeleteConfirmInput('')
+    setShowDeleteConfirm(true)
+  }
 
-    if (confirmed) {
-      const doubleConfirm = window.prompt('Type "DELETE" to confirm deletion:')
-      if (doubleConfirm === 'DELETE') {
-        if (onDeleteDraft) {
-          notify.info('Deleting Draft...', 'Notifying all participants and cleaning up data')
-          onDeleteDraft()
-        }
-      } else {
-        notify.info('Cancelled', 'Draft deletion cancelled')
-      }
+  const handleDeleteConfirmed = () => {
+    if (deleteConfirmInput === 'DELETE' && onDeleteDraft) {
+      setShowDeleteConfirm(false)
+      setDeleteConfirmInput('')
+      notify.info('Deleting Draft...', 'Notifying all participants and cleaning up data')
+      onDeleteDraft()
     }
   }
 
@@ -339,47 +367,6 @@ const DraftControls = memo(function DraftControls({
               </div>
             )}
 
-            {/* Proxy Picking Controls */}
-            {draftStatus === 'drafting' && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Proxy Picking
-                </label>
-                <div className="flex items-center gap-2">
-                  {!isProxyPickingEnabled ? (
-                    <Button
-                      onClick={handleEnableProxyPicking}
-                      variant="outline"
-                      size="sm"
-                      className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                    >
-                      <Users className="h-4 w-4 mr-1" />
-                      Enable Proxy Picking
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleDisableProxyPicking}
-                      variant="outline"
-                      size="sm"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                    >
-                      <Users className="h-4 w-4 mr-1" />
-                      Disable Proxy Picking
-                    </Button>
-                  )}
-                  <span className="text-xs text-gray-500">
-                    {isProxyPickingEnabled ? 'You can pick for any team' : 'Pick Pokémon for other players'}
-                  </span>
-                </div>
-                {isProxyPickingEnabled && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
-                    <strong>Proxy picking enabled:</strong> You can now select Pokémon for any team when it's their turn.
-                    Click on a Pokémon and it will be drafted for the current team.
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Timer Controls */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -452,6 +439,63 @@ const DraftControls = memo(function DraftControls({
           </div>
         )}
       </CardContent>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmAction !== null}
+        onOpenChange={(open) => { if (!open) setConfirmAction(null) }}
+        title={confirmAction?.title ?? ''}
+        description={confirmAction?.description ?? ''}
+        confirmLabel={confirmAction?.confirmLabel}
+        variant={confirmAction?.variant}
+        onConfirm={() => {
+          confirmAction?.onConfirm()
+          setConfirmAction(null)
+        }}
+      />
+
+      {/* Delete Draft Dialog (requires typing DELETE) */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Draft Permanently</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>This will:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Remove the draft room</li>
+                  <li>Kick out all participants</li>
+                  <li>Remove it from everyone&apos;s draft list</li>
+                </ul>
+                <p className="font-medium">This action CANNOT be undone!</p>
+                <div className="pt-2">
+                  <label className="text-sm font-medium">
+                    Type &quot;DELETE&quot; to confirm:
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmInput}
+                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    placeholder="DELETE"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteConfirmInput('')}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirmed}
+              disabled={deleteConfirmInput !== 'DELETE'}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+            >
+              Delete Draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 })

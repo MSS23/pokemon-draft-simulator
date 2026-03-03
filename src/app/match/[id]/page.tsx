@@ -57,8 +57,8 @@ export default function MatchDetailPage() {
 
         setMatch({
           ...matchData,
-          homeTeam: { ...matchData.homeTeam, picks: homePicks || [] },
-          awayTeam: { ...matchData.awayTeam, picks: awayPicks || [] }
+          homeTeam: { ...matchData.homeTeam, picks: (homePicks || []) as unknown as Pick[] },
+          awayTeam: { ...matchData.awayTeam, picks: (awayPicks || []) as unknown as Pick[] }
         })
 
         // Load league standings

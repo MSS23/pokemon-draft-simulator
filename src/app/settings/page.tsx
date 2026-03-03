@@ -13,6 +13,7 @@ import { Pencil } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { toast } from 'sonner'
 
 interface UserProfile {
   user_id: string
@@ -98,7 +99,9 @@ export default function SettingsPage() {
     setSaving(false)
 
     if (!updateResponse?.error) {
-      alert('Profile saved successfully!')
+      toast.success('Profile saved successfully!')
+    } else {
+      toast.error('Failed to save profile')
     }
   }
 

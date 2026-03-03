@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useDraftStore } from '@/stores/draftStore'
 import { Draft, Team, Participant, Auction } from '@/types'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('RealtimeDraft')
 
 export const useRealtimeDraft = (draftId: string) => {
   const [isConnected, setIsConnected] = useState(false)
@@ -36,19 +39,26 @@ export const useRealtimeDraft = (draftId: string) => {
           filter: `draft_id=eq.${draftId}`,
         },
         async () => {
-          // Refetch all teams when any team changes
-          if (!supabase) return
-          const { data } = await supabase
-            .from('teams')
-            .select(`
-              *,
-              picks:picks(*)
-            `)
-            .eq('draft_id', draftId)
-            .order('draft_order')
+          try {
+            if (!supabase) return
+            const { data, error } = await supabase
+              .from('teams')
+              .select(`
+                *,
+                picks:picks(*)
+              `)
+              .eq('draft_id', draftId)
+              .order('draft_order')
 
-          if (data) {
-            setTeams(data as Team[])
+            if (error) {
+              log.error('Failed to refetch teams:', error)
+              return
+            }
+            if (data) {
+              setTeams(data as unknown as Team[])
+            }
+          } catch (err) {
+            log.error('Error in teams subscription handler:', err)
           }
         }
       )
@@ -61,14 +71,22 @@ export const useRealtimeDraft = (draftId: string) => {
           filter: `draft_id=eq.${draftId}`,
         },
         async () => {
-          if (!supabase) return
-          const { data } = await supabase
-            .from('participants')
-            .select('*')
-            .eq('draft_id', draftId)
+          try {
+            if (!supabase) return
+            const { data, error } = await supabase
+              .from('participants')
+              .select('*')
+              .eq('draft_id', draftId)
 
-          if (data) {
-            setParticipants(data as Participant[])
+            if (error) {
+              log.error('Failed to refetch participants:', error)
+              return
+            }
+            if (data) {
+              setParticipants(data as unknown as Participant[])
+            }
+          } catch (err) {
+            log.error('Error in participants subscription handler:', err)
           }
         }
       )
@@ -81,15 +99,24 @@ export const useRealtimeDraft = (draftId: string) => {
           filter: `draft_id=eq.${draftId}`,
         },
         async () => {
-          if (!supabase) return
-          const { data } = await supabase
-            .from('auctions')
-            .select('*')
-            .eq('draft_id', draftId)
-            .eq('status', 'active')
-            .single()
+          try {
+            if (!supabase) return
+            const { data, error } = await supabase
+              .from('auctions')
+              .select('*')
+              .eq('draft_id', draftId)
+              .eq('status', 'active')
+              .single()
 
-          setCurrentAuction(data ? (data as Auction) : null)
+            // PGRST116 = no rows found, which is expected when no active auction
+            if (error && error.code !== 'PGRST116') {
+              log.error('Failed to refetch auction:', error)
+              return
+            }
+            setCurrentAuction(data ? (data as unknown as Auction) : null)
+          } catch (err) {
+            log.error('Error in auctions subscription handler:', err)
+          }
         }
       )
       .subscribe((status) => {
@@ -124,33 +151,30 @@ export const useDraftActions = () => {
     if (!draft) throw new Error('Draft not found')
 
     // Insert the pick
-    if (!supabase) throw new Error('Supabase not available')
     const { error: pickError } = await (supabase
-      .from('picks') as any)
+      .from('picks') as unknown as { insert: (data: Record<string, unknown>) => Promise<{ error: unknown }> })
       .insert({
         draft_id: draftId,
         team_id: teamId,
         pokemon_id: pokemonId,
         pokemon_name: pokemonName,
         cost,
-        pick_order: (draft as any).current_turn || 1,
-        round: (draft as any).current_round,
+        pick_order: draft.current_turn || 1,
+        round: draft.current_round,
       })
 
     if (pickError) throw pickError
 
-    // Update team budget
-    if (!supabase) throw new Error('Supabase not available')
-    const { error: teamError } = await (supabase.rpc as any)('update_team_budget', {
+    // Update team budget - RPC not in generated types
+    const { error: teamError } = await (supabase.rpc as unknown as (name: string, params: Record<string, unknown>) => Promise<{ error: unknown }>)('update_team_budget', {
       team_id: teamId,
       cost_to_subtract: cost,
     })
 
     if (teamError) throw teamError
 
-    // Advance the draft turn
-    if (!supabase) throw new Error('Supabase not available')
-    const { error: draftError } = await (supabase.rpc as any)('advance_draft_turn', {
+    // Advance the draft turn - RPC not in generated types
+    const { error: draftError } = await (supabase.rpc as unknown as (name: string, params: Record<string, unknown>) => Promise<{ error: unknown }>)('advance_draft_turn', {
       draft_id: draftId,
     })
 
@@ -163,7 +187,8 @@ export const useDraftActions = () => {
     bidAmount: number
   ) => {
     if (!supabase) throw new Error('Supabase not available')
-    const { error } = await (supabase.rpc as any)('place_bid', {
+    // RPC not in generated types
+    const { error } = await (supabase.rpc as unknown as (name: string, params: Record<string, unknown>) => Promise<{ error: unknown }>)('place_bid', {
       auction_id: auctionId,
       bidder_team_id: teamId,
       bid_amount: bidAmount,
@@ -183,7 +208,7 @@ export const useDraftActions = () => {
 
     if (!supabase) throw new Error('Supabase not available')
     const { error } = await (supabase
-      .from('auctions') as any)
+      .from('auctions') as unknown as { insert: (data: Record<string, unknown>) => Promise<{ error: unknown }> })
       .insert({
         draft_id: draftId,
         pokemon_id: pokemonId,
@@ -204,7 +229,7 @@ export const useDraftActions = () => {
   ) => {
     if (!supabase) throw new Error('Supabase not available')
     const { error } = await (supabase
-      .from('participants') as any)
+      .from('participants') as unknown as { insert: (data: Record<string, unknown>) => Promise<{ error: unknown }> })
       .insert({
         draft_id: draftId,
         user_id: userId || null,

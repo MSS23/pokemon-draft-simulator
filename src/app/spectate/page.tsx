@@ -89,7 +89,7 @@ export default function SpectatePage() {
       if (error) {
         console.error("Error loading public drafts:", error);
       } else {
-        setDrafts(data || []);
+        setDrafts((data || []) as unknown as PublicDraft[]);
       }
     } catch (error) {
       console.error("Failed to load public drafts:", error);
@@ -124,7 +124,7 @@ export default function SpectatePage() {
               data,
               error,
             }: {
-              data: { room_code: string } | null;
+              data: { room_code: string | null } | null;
               error: any;
             }) => {
               if (error || !data?.room_code) {

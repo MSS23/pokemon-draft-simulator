@@ -55,7 +55,7 @@ export class MatchKOService {
     const pick = pickResponse.data
 
     // Insert KO record
-    const koResponse = (await supabase
+    const koResponse = (await (supabase as any)
       .from('match_pokemon_kos')
       .insert({
         match_id: matchId,
@@ -65,7 +65,7 @@ export class MatchKOService {
         ko_count: koCount,
         is_death: isDeath,
         ko_details: details || null,
-      } as any)
+      })
       .select()
       .single()) as any
 
@@ -120,8 +120,8 @@ export class MatchKOService {
     }
 
     // Update status to 'dead'
-    const statusResponse = await (supabase
-      .from('team_pokemon_status') as any)
+    const statusResponse = await (supabase as any)
+      .from('team_pokemon_status')
       .update({
         status: 'dead',
         death_match_id: matchId,
@@ -156,7 +156,7 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('team_pokemon_status')
       .select('*')
       .eq('pick_id', pickId)
@@ -184,12 +184,12 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    const response = await supabase
+    const response = await (supabase as any)
       .from('match_pokemon_kos')
       .select('*')
       .eq('match_id', matchId)
       .order('game_number', { ascending: true })
-      .order('created_at', { ascending: true }) as any
+      .order('created_at', { ascending: true })
 
     const data = response?.data
     const error = response?.error
@@ -238,8 +238,8 @@ export class MatchKOService {
       matches_won: 0,
     }))
 
-    const response = await (supabase
-      .from('team_pokemon_status') as any)
+    const response = await (supabase as any)
+      .from('team_pokemon_status')
       .upsert(statusRecords, {
         onConflict: 'pick_id,league_id',
         ignoreDuplicates: false,
@@ -266,7 +266,7 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('team_pokemon_status')
       .select('*')
       .eq('team_id', teamId)
@@ -433,7 +433,7 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('team_pokemon_status')
       .select('*')
       .eq('league_id', leagueId)

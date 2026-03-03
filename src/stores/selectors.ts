@@ -343,7 +343,6 @@ export const selectIsDraftComplete = createMemoizedSelector((state: DraftState):
   if (!state.draft) return false
 
   const maxPokemonPerTeam = state.draft.settings?.maxPokemonPerTeam || 6
-  const totalTeams = state.teamIds.length
 
   // Check if all teams have max picks
   return state.teamIds.every(teamId => {

@@ -13,18 +13,25 @@ import { AIAnalysisService } from '@/lib/ai-analysis-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { supabase } from '@/lib/supabase'
+import { analyzeTeamSchema, validateRequestBody } from '@/lib/schemas'
+import { createLogger } from '@/lib/logger'
+import type { Pick } from '@/types'
+
+const log = createLogger('AnalyzeTeamAPI')
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { teamId, leagueId } = body
+    const validation = validateRequestBody(analyzeTeamSchema, body)
 
-    if (!teamId || !leagueId) {
+    if (!validation.success) {
       return NextResponse.json(
-        { error: 'Missing required fields: teamId, leagueId' },
+        { error: validation.error },
         { status: 400 }
       )
     }
+
+    const { teamId, leagueId } = validation.data
 
     // Check authorization
     const accessCheck = await AIAccessControl.canAnalyzeTeam({
@@ -65,12 +72,25 @@ export async function POST(request: NextRequest) {
     // Get team stats
     const stats = await LeagueStatsService.getAdvancedTeamStats(teamId)
 
+    // Map snake_case DB rows to camelCase Pick type
+    const mappedPicks: Pick[] = picks.map(p => ({
+      id: p.id,
+      draftId: p.draft_id,
+      teamId: p.team_id,
+      pokemonId: p.pokemon_id,
+      pokemonName: p.pokemon_name,
+      cost: p.cost,
+      pickOrder: p.pick_order,
+      round: p.round,
+      createdAt: p.created_at,
+    }))
+
     // Run AI analysis
-    const analysis = await AIAnalysisService.analyzeTeam(teamId, picks, stats || undefined)
+    const analysis = await AIAnalysisService.analyzeTeam(teamId, mappedPicks, stats || undefined)
 
     return NextResponse.json(analysis)
   } catch (error) {
-    console.error('Error in analyze-team API:', error)
+    log.error('Error in analyze-team API:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Internal server error' },
       { status: 500 }

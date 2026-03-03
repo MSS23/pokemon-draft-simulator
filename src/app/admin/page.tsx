@@ -2,11 +2,40 @@
 
 import FormatSyncPanel from '@/components/admin/FormatSyncPanel'
 import DraftManagementPanel from '@/components/admin/DraftManagementPanel'
-import { Shield, Database, Settings, Trash2 } from 'lucide-react'
+import { Shield, Database, Settings, Trash2, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function AdminPage() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Admin Access Required
+            </CardTitle>
+            <CardDescription>
+              You must be signed in as an admin to access this page.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -97,13 +126,13 @@ export default function AdminPage() {
               <CardHeader>
                 <CardTitle>System Settings</CardTitle>
                 <CardDescription>
-                  Additional configuration options coming soon
+                  System configuration
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="p-8 text-center text-slate-500 dark:text-slate-400">
                   <Settings className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">More settings will be available here in future updates</p>
+                  <p className="text-sm">No additional settings configured</p>
                 </div>
               </CardContent>
             </Card>

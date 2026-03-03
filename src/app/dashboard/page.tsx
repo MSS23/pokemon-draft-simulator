@@ -86,11 +86,11 @@ export default function DashboardPage() {
         }
 
         // Query the user_draft_summary view for efficient data retrieval
-        const { data: draftSummaries, error } = await supabase
+        const { data: draftSummaries, error } = await (supabase as any)
           .from('user_draft_summary')
           .select('*')
           .eq('user_id', user.id)
-          .order('updated_at', { ascending: false }) as any
+          .order('updated_at', { ascending: false })
 
         if (error) {
           console.error('[Dashboard] Error fetching drafts:', error)
@@ -315,28 +315,16 @@ export default function DashboardPage() {
             )}
 
             {draft.status === 'completed' && !draft.league_id && (
-              <>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    router.push(`/draft/${draft.room_code.toLowerCase()}/results`)
-                  }}
-                >
-                  View Results
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // TODO: Implement league creation
-                    alert('League creation coming soon!')
-                  }}
-                >
-                  Create League
-                </Button>
-              </>
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/draft/${draft.room_code.toLowerCase()}/results`)
+                }}
+              >
+                View Results
+              </Button>
             )}
 
             {draft.status === 'completed' && draft.league_id && (

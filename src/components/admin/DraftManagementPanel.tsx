@@ -17,7 +17,7 @@ interface Draft {
   created_at: string
   is_public: boolean
   max_teams: number
-  draft_type: string
+  format: string
 }
 
 export default function DraftManagementPanel() {
@@ -38,7 +38,7 @@ export default function DraftManagementPanel() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setDrafts(data || [])
+      setDrafts(data as unknown as Draft[] || [])
     } catch (error) {
       console.error('Error loading drafts:', error)
       notify.error('Error', 'Failed to load drafts')
@@ -211,7 +211,7 @@ export default function DraftManagementPanel() {
                         {draft.status}
                       </Badge>
                       {draft.is_public && <Badge variant="outline">Public</Badge>}
-                      <Badge variant="outline">{draft.draft_type}</Badge>
+                      <Badge variant="outline">{draft.format}</Badge>
                     </div>
                     <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
                       {draft.name}

@@ -259,7 +259,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trade_history')
       .select('*')
       .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`)
@@ -287,7 +287,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    let query = supabase
+    let query = (supabase as any)
       .from('trade_history')
       .select('*')
       .eq('league_id', leagueId)
@@ -326,7 +326,7 @@ export class TradeService {
     }
 
     // Check if any of the Pokemon are dead
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('team_pokemon_status')
       .select('pick_id, status')
       .eq('league_id', leagueId)
@@ -418,7 +418,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trade_history')
       .select('*')
       .eq('league_id', leagueId)
@@ -443,7 +443,7 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('trade_history')
       .select('*')
       .eq('id', tradeId)
@@ -463,7 +463,7 @@ export class TradeService {
         .in('id', trade.teamAGives)
 
       if (!teamAError && teamAPicks) {
-        trade.teamAGivesPokemon = teamAPicks as Pick[]
+        trade.teamAGivesPokemon = teamAPicks as unknown as Pick[]
       }
     }
 
@@ -475,7 +475,7 @@ export class TradeService {
         .in('id', trade.teamBGives)
 
       if (!teamBError && teamBPicks) {
-        trade.teamBGivesPokemon = teamBPicks as Pick[]
+        trade.teamBGivesPokemon = teamBPicks as unknown as Pick[]
       }
     }
 

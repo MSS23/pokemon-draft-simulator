@@ -1183,7 +1183,7 @@ export default function DraftRoomPage() {
       await DraftService.resetDraft(roomCode.toLowerCase())
       notify.success('Draft Reset', 'All picks have been cleared. Teams remain intact.')
       // Refresh the page to show the reset state
-      window.location.reload()
+      router.refresh()
     } catch (err) {
       console.error('Error resetting draft:', err)
       notify.error('Failed to Reset Draft', err instanceof Error ? err.message : 'Failed to reset draft')

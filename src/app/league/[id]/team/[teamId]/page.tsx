@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -75,7 +76,7 @@ export default function TeamDetailPage() {
         .single()
 
       if (teamError) throw teamError
-      setTeam(teamData)
+      setTeam(teamData as unknown as Team)
 
       // Load picks
       const { data: picksData } = await supabase
@@ -84,7 +85,7 @@ export default function TeamDetailPage() {
         .eq('team_id', teamId)
         .order('pick_order', { ascending: true })
 
-      setPicks(picksData || [])
+      setPicks((picksData || []) as unknown as Pick[])
 
       // Load advanced stats
       const statsData = await LeagueStatsService.getAdvancedTeamStats(teamId)
@@ -115,7 +116,7 @@ export default function TeamDetailPage() {
 
     // Double-check access before making API call
     if (!canAnalyzeTeams) {
-      alert('AI analysis is only available to league participants')
+      toast.error('AI analysis is only available to league participants')
       return
     }
 
@@ -138,7 +139,7 @@ export default function TeamDetailPage() {
       setAnalysis(analysisData)
     } catch (err) {
       console.error('Error analyzing team:', err)
-      alert(err instanceof Error ? err.message : 'Failed to analyze team')
+      toast.error(err instanceof Error ? err.message : 'Failed to analyze team')
     } finally {
       setIsAnalyzing(false)
     }
@@ -411,10 +412,9 @@ export default function TeamDetailPage() {
 
         {/* Detailed Stats Tabs */}
         <Tabs defaultValue="roster" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="roster">Roster</TabsTrigger>
             <TabsTrigger value="stats">Advanced Stats</TabsTrigger>
-            <TabsTrigger value="matchups">Matchups</TabsTrigger>
           </TabsList>
 
           {/* Roster Tab */}
@@ -552,22 +552,6 @@ export default function TeamDetailPage() {
             </div>
           </TabsContent>
 
-          {/* Matchups Tab */}
-          <TabsContent value="matchups">
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Matchups</CardTitle>
-                <CardDescription>
-                  AI-powered predictions for upcoming matches
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center text-muted-foreground py-8">
-                  Matchup predictions coming soon...
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </div>

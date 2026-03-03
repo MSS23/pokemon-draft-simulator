@@ -39,7 +39,7 @@ export default function DraftHistory() {
     try {
       setIsLoading(true)
       const data = await DraftService.getDraftHistory(itemsPerPage, currentPage * itemsPerPage)
-      setHistory(data)
+      setHistory(data as unknown as DraftHistoryItem[])
       setHasMore(data.length === itemsPerPage)
     } catch (error) {
       console.error('Failed to load draft history:', error)

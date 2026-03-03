@@ -1,8 +1,22 @@
 /**
  * Environment Configuration
  *
- * Centralized access to environment variables and feature flags
+ * Centralized access to environment variables and feature flags.
+ * Uses Zod for validation. Throws in production when required vars missing.
  */
+
+import { z } from 'zod'
+
+// Zod schema for required Supabase env vars
+const supabaseEnvSchema = z.object({
+  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+})
+
+const envResult = supabaseEnvSchema.safeParse({
+  NEXT_PUBLIC_SUPABASE_URL: (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim(),
+})
 
 export const env = {
   // Supabase
@@ -53,28 +67,36 @@ export function isFeatureEnabled(feature: keyof typeof env.features): boolean {
  * Get environment variable with fallback
  */
 export function getEnv(key: string, fallback: string = ''): string {
-  if (typeof window !== 'undefined') {
-    // Client-side
-    return (window as any).__ENV__?.[key] || process.env[key] || fallback
-  }
-  // Server-side
   return process.env[key] || fallback
 }
 
 /**
- * Validate required environment variables
+ * Validate required environment variables.
+ * Throws in production when required vars are missing.
  */
 export function validateEnv(): { isValid: boolean; missing: string[] } {
-  const missing: string[] = []
-
-  // Only validate if not in demo mode
-  if (!env.app.isDemoMode) {
-    if (!env.supabase.url) missing.push('NEXT_PUBLIC_SUPABASE_URL')
-    if (!env.supabase.anonKey) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  if (envResult.success) {
+    return { isValid: true, missing: [] }
   }
 
-  return {
-    isValid: missing.length === 0,
-    missing
+  const missing = envResult.error.issues.map((i) => i.path.join('.'))
+
+  // Demo mode in development skips validation
+  if (env.app.isDemoMode && env.app.isDevelopment) {
+    return { isValid: true, missing: [] }
   }
+
+  if (env.app.isProduction) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}. ` +
+      'Set these in your deployment environment.'
+    )
+  }
+
+  // Development: warn but don't throw
+  if (env.app.isDevelopment) {
+    console.warn(`[env] Missing environment variables: ${missing.join(', ')}`)
+  }
+
+  return { isValid: false, missing }
 }

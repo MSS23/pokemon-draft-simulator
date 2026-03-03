@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
 import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -48,6 +49,8 @@ export default function Home() {
   const [selectedFormatId, setSelectedFormatId] = useState<string>(DEFAULT_FORMAT)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authRedirectTo, setAuthRedirectTo] = useState<string | undefined>(undefined)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ draftId: string; event: React.MouseEvent } | null>(null)
 
   // Draft settings
   const totalBudget = 100
@@ -92,9 +95,7 @@ export default function Home() {
   }
 
   const handleResetDraft = () => {
-    if (confirm('Are you sure you want to reset your entire draft? This cannot be undone.')) {
-      setDraftedPokemon([])
-    }
+    setResetConfirmOpen(true)
   }
 
   const handleResumeDraft = async (draftId: string) => {
@@ -111,17 +112,22 @@ export default function Home() {
     }
   }
 
-  const handleDeleteDraft = async (draftId: string, event: React.MouseEvent) => {
+  const handleDeleteDraft = (draftId: string, event: React.MouseEvent) => {
     event.stopPropagation()
 
-    // Prevent deletion if not authenticated
     if (!user) {
       toast.error('Please log in to delete drafts')
       return
     }
 
-    const confirmed = window.confirm('Delete this draft permanently? This will remove the draft for all participants and cannot be undone.')
-    if (!confirmed) return
+    setDeleteConfirm({ draftId, event })
+  }
+
+  const executeDeleteDraft = async (draftId: string) => {
+    if (!user) {
+      toast.error('Please log in to delete drafts')
+      return
+    }
 
     try {
       // Optimistically remove from UI first
@@ -283,7 +289,7 @@ export default function Home() {
                   Could not load Pokemon data. Please check your internet connection.
                 </p>
               </div>
-              <Button size="sm" variant="outline" onClick={() => window.location.reload()} className="border-red-300 text-red-700">
+              <Button size="sm" variant="outline" onClick={() => router.refresh()} className="border-red-300 text-red-700">
                 Retry
               </Button>
             </div>
@@ -654,6 +660,36 @@ export default function Home() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         redirectTo={authRedirectTo}
+      />
+
+      {/* Reset Draft Confirmation */}
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        onOpenChange={setResetConfirmOpen}
+        title="Reset Draft"
+        description="Are you sure you want to reset your entire draft? This cannot be undone."
+        confirmLabel="Reset Draft"
+        variant="destructive"
+        onConfirm={() => {
+          setDraftedPokemon([])
+          setResetConfirmOpen(false)
+        }}
+      />
+
+      {/* Delete Draft Confirmation */}
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        onOpenChange={(open) => { if (!open) setDeleteConfirm(null) }}
+        title="Delete Draft"
+        description="Delete this draft permanently? This will remove the draft for all participants and cannot be undone."
+        confirmLabel="Delete Draft"
+        variant="destructive"
+        onConfirm={() => {
+          if (deleteConfirm) {
+            executeDeleteDraft(deleteConfirm.draftId)
+            setDeleteConfirm(null)
+          }
+        }}
       />
     </SidebarLayout>
   )

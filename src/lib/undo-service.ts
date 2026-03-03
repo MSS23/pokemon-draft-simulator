@@ -138,7 +138,7 @@ export class UndoService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('teams')
         .select('undos_remaining')
         .eq('id', teamId)

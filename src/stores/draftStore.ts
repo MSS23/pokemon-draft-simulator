@@ -11,7 +11,6 @@ import {
   PokemonTier,
   WishlistItem
 } from '@/types'
-import { generateSnakeDraftOrder } from '@/utils/draft'
 
 // ============================================
 // NORMALIZED STATE STRUCTURE

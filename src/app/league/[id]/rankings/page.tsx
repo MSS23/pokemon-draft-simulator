@@ -75,7 +75,7 @@ export default function PowerRankingsPage() {
         .eq('draft_id', draftId)
 
       if (teamsResponse.error) throw teamsResponse.error
-      const teams = teamsResponse.data as Team[]
+      const teams = teamsResponse.data as unknown as Team[]
       if (!teams || teams.length === 0) throw new Error('No teams found')
 
       // Load stats and form for each team

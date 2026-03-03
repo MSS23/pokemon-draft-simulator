@@ -160,7 +160,7 @@ class FormatLoaderService {
         isValid: true,
         cost
       }
-    } catch (error) {
+    } catch {
       return {
         isValid: false,
         reason: 'Failed to validate Pokemon',

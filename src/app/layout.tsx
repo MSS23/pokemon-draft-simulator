@@ -13,7 +13,11 @@ import { Header } from "@/components/layout/Header";
 import { HydrationErrorFilter } from "./hydration-error-filter";
 import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
 import { Toaster } from "sonner";
+import { validateEnv } from "@/lib/env";
 // import ErrorBoundary from "@/components/ui/error-boundary";
+
+// Validate environment variables at startup
+validateEnv();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
