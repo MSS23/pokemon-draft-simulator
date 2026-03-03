@@ -3,17 +3,59 @@ import type { Database } from './supabase'
 import { generateSnakeDraftOrder, getCurrentPick } from '@/utils/draft'
 import { getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { createFormatRulesEngine as createNewFormatRulesEngine } from '@/domain/rules'
-import { Pokemon } from '@/types'
+import { Pokemon, Team as AppTeam } from '@/types'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { generateRoomCode } from '@/lib/room-utils'
 import { fetchPokemon } from '@/lib/pokemon-api'
+import type {
+  DraftRow, DraftInsert, DraftUpdate,
+  TeamRow, TeamInsert, TeamUpdate,
+  ParticipantRow, ParticipantInsert, ParticipantUpdate,
+  PickRow, PickInsert,
+  AuctionRow, AuctionInsert, AuctionUpdate,
+  CustomFormatInsert,
+  UserProfileInsert,
+  DraftSettings as DraftSettingsJson,
+} from '@/types/supabase-helpers'
 import bcrypt from 'bcryptjs'
 
-type Draft = Database['public']['Tables']['drafts']['Row']
-type Team = Database['public']['Tables']['teams']['Row']
-type Participant = Database['public']['Tables']['participants']['Row']
-type Pick = Database['public']['Tables']['picks']['Row']
-type Auction = Database['public']['Tables']['auctions']['Row']
+type Draft = DraftRow
+type Team = TeamRow
+type Participant = ParticipantRow
+type Pick = PickRow
+type Auction = AuctionRow
+
+/** Type for draft query results that include nested relations */
+type DraftWithRelations = DraftRow & {
+  teams: TeamRow[]
+  participants: ParticipantRow[]
+  picks: PickRow[]
+  auctions: AuctionRow[]
+}
+
+/** Type for draft query results with only participants */
+type DraftWithParticipants = DraftRow & {
+  participants: ParticipantRow[]
+}
+
+/** Type for draft query results with teams and participants */
+type DraftWithTeamsAndParticipants = DraftRow & {
+  teams: TeamRow[]
+  participants: ParticipantRow[]
+}
+
+/** Type for the make_draft_pick RPC response */
+interface MakeDraftPickResponse {
+  success: boolean
+  error?: string
+  pickId?: string
+  newBudget?: number
+  nextTurn?: number
+  isComplete?: boolean
+  budgetRemaining?: number
+  cost?: number
+  maxPicks?: number
+}
 
 export interface DraftSettings {
   maxTeams: number
@@ -85,8 +127,8 @@ export class DraftService {
       throw new Error('Supabase is not configured')
     }
 
-    const { data: draft, error } = await (supabase
-      .from('drafts') as any)
+    const { data: draft, error } = await supabase
+      .from('drafts')
       .select('password')
       .eq('room_code', roomCode.toLowerCase())
       .single()
@@ -136,7 +178,7 @@ export class DraftService {
       }
 
       // Use database updated_at as server time reference
-      const serverTime = new Date((draft as any).updated_at).getTime()
+      const serverTime = new Date(draft.updated_at).getTime()
 
       return {
         serverTime,
@@ -182,16 +224,17 @@ export class DraftService {
 
     // If custom format is provided, create it in the database first
     if (customFormat) {
-      const { data: formatData, error: formatError } = await (supabase
-        .from('custom_formats') as any)
-        .insert({
-          name: customFormat.name,
-          description: customFormat.description,
-          created_by_user_id: hostId,
-          created_by_display_name: hostName,
-          is_public: false,
-          pokemon_pricing: customFormat.pokemonPricing
-        })
+      const customFormatData: CustomFormatInsert = {
+        name: customFormat.name,
+        description: customFormat.description,
+        created_by_user_id: hostId,
+        created_by_display_name: hostName,
+        is_public: false,
+        pokemon_pricing: customFormat.pokemonPricing
+      }
+      const { data: formatData, error: formatError } = await supabase
+        .from('custom_formats')
+        .insert(customFormatData)
         .select()
         .single()
 
@@ -204,7 +247,7 @@ export class DraftService {
     }
 
     // Create draft - build insert object conditionally based on table columns
-    const draftInsert: any = {
+    const draftInsert: DraftInsert = {
       room_code: roomCode.toLowerCase(),
       name: name || `${hostName}'s Draft`,
       host_id: hostId,
@@ -233,8 +276,8 @@ export class DraftService {
     if (password) draftInsert.password = await bcrypt.hash(password, 10)
     if (customFormatId) draftInsert.custom_format_id = customFormatId
 
-    const { data: draft, error: draftError } = await (supabase
-      .from('drafts') as any)
+    const { data: draft, error: draftError } = await supabase
+      .from('drafts')
       .insert(draftInsert)
       .select()
       .single()
@@ -245,15 +288,16 @@ export class DraftService {
     }
 
     // Create host team
-    const { data: team, error: teamError } = await (supabase
-      .from('teams') as any)
-      .insert({
-        draft_id: (draft as any).id,
-        name: teamName,
-        owner_id: hostId,
-        draft_order: 1,
-        budget_remaining: settings.budgetPerTeam || 100
-      })
+    const hostTeamInsert: TeamInsert = {
+      draft_id: draft.id,
+      name: teamName,
+      owner_id: hostId,
+      draft_order: 1,
+      budget_remaining: settings.budgetPerTeam || 100
+    }
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .insert(hostTeamInsert)
       .select()
       .single()
 
@@ -263,16 +307,17 @@ export class DraftService {
     }
 
     // Create host participant
-    const { data: participant, error: participantError } = await (supabase
-      .from('participants') as any)
-      .insert({
-        draft_id: (draft as any).id,
-        user_id: hostId,
-        display_name: hostName,
-        team_id: team.id,
-        is_host: true,
-        last_seen: new Date().toISOString()
-      })
+    const hostParticipantInsert: ParticipantInsert = {
+      draft_id: draft.id,
+      user_id: hostId,
+      display_name: hostName,
+      team_id: team.id,
+      is_host: true,
+      last_seen: new Date().toISOString()
+    }
+    const { data: participant, error: participantError } = await supabase
+      .from('participants')
+      .insert(hostParticipantInsert)
       .select()
       .single()
 
@@ -306,7 +351,7 @@ export class DraftService {
 
     // Fetch user's display name from user_profiles
     const { data: userProfile, error: profileError } = await (supabase
-      .from('user_profiles') as any)
+      .from('user_profiles'))
       .select('display_name')
       .eq('user_id', userId)
       .single()
@@ -319,7 +364,7 @@ export class DraftService {
       displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
 
       // Auto-create missing profile
-      const { error: createError } = await (supabase as any)
+      const { error: createError } = await supabase
         .from('user_profiles')
         .insert({
           user_id: userId,
@@ -330,7 +375,7 @@ export class DraftService {
         console.error('Failed to auto-create user profile:', createError)
       }
     } else {
-      displayName = (userProfile as any).display_name
+      displayName = userProfile.display_name || 'User'
     }
 
     const { data: draft, error: draftError } = await supabase
@@ -343,19 +388,19 @@ export class DraftService {
       throw new Error('Draft room not found')
     }
 
-    const draftUuid = (draft as any).id  // Actual UUID from database
-    const existingParticipants = (draft as any).participants || []
-    const existingTeams = (draft as any).teams || []
+    const draftUuid = draft.id as string  // Actual UUID from database
+    const existingParticipants = (draft as unknown as DraftWithTeamsAndParticipants).participants || []
+    const existingTeams = (draft as unknown as DraftWithTeamsAndParticipants).teams || []
 
     // Check if user is already a participant in this draft (rejoining case)
-    const existingParticipant = existingParticipants.find((p: any) => p.user_id === userId)
+    const existingParticipant = existingParticipants.find((p: ParticipantRow) => p.user_id === userId)
 
     if (existingParticipant) {
       // User is already part of this draft - update their last_seen and return their existing team
       console.log('User already participant, updating last_seen and returning existing team')
 
       await (supabase
-        .from('participants') as any)
+        .from('participants'))
         .update({
           last_seen: new Date().toISOString()
         })
@@ -363,7 +408,7 @@ export class DraftService {
         .eq('user_id', userId)
 
       // Find their existing team
-      const existingTeam = existingTeams.find((t: any) => t.id === existingParticipant.team_id)
+      const existingTeam = existingTeams.find((t: TeamRow) => t.id === existingParticipant.team_id)
 
       if (existingTeam) {
         // Update user session to reflect active participation
@@ -402,7 +447,7 @@ export class DraftService {
     }
 
     // If draft is full or already started, join as spectator instead
-    if (existingTeams.length >= (draft as any).max_teams || (draft as any).status !== 'setup') {
+    if (existingTeams.length >= (draft as unknown as DraftWithTeamsAndParticipants).max_teams || (draft as unknown as DraftWithTeamsAndParticipants).status !== 'setup') {
       console.log('Draft is full or started, joining as spectator instead')
       const result = await this.joinAsSpectator({ roomCode, userId })
       return {
@@ -413,7 +458,7 @@ export class DraftService {
     }
 
     // Check for duplicate team name only (username is globally unique now)
-    if (existingTeams.some((team: any) => team.name.toLowerCase() === teamName.toLowerCase())) {
+    if (existingTeams.some((team: TeamRow) => team.name.toLowerCase() === teamName.toLowerCase())) {
       throw new Error(`Team name "${teamName}" is already taken in this draft. Please choose a different team name.`)
     }
 
@@ -422,13 +467,13 @@ export class DraftService {
 
     // Create team
     const { data: team, error: teamError } = await (supabase
-      .from('teams') as any)
+      .from('teams'))
       .insert({
         draft_id: draftUuid,
         name: teamName,
         owner_id: userId,
         draft_order: nextDraftOrder,
-        budget_remaining: (draft as any).budget_per_team
+        budget_remaining: (draft as unknown as DraftWithTeamsAndParticipants).budget_per_team
       })
       .select()
       .single()
@@ -440,7 +485,7 @@ export class DraftService {
 
     // Create participant
     const { error: participantError } = await (supabase
-      .from('participants') as any)
+      .from('participants'))
       .insert({
         draft_id: draftUuid,
         user_id: userId,
@@ -477,7 +522,7 @@ export class DraftService {
 
     // Fetch user's display name from user_profiles
     const { data: userProfile, error: profileError } = await (supabase
-      .from('user_profiles') as any)
+      .from('user_profiles'))
       .select('display_name')
       .eq('user_id', userId)
       .single()
@@ -490,7 +535,7 @@ export class DraftService {
       displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
 
       // Auto-create missing profile
-      const { error: createError } = await (supabase as any)
+      const { error: createError } = await supabase
         .from('user_profiles')
         .insert({
           user_id: userId,
@@ -501,7 +546,7 @@ export class DraftService {
         console.error('Failed to auto-create user profile:', createError)
       }
     } else {
-      displayName = (userProfile as any).display_name
+      displayName = userProfile.display_name || 'User'
     }
 
     const { data: draft, error: draftError } = await supabase
@@ -514,18 +559,18 @@ export class DraftService {
       throw new Error('Draft room not found')
     }
 
-    const draftUuid = (draft as any).id
-    const existingParticipants = (draft as any).participants || []
+    const draftUuid = draft.id as string
+    const existingParticipants = (draft as unknown as DraftWithTeamsAndParticipants).participants || []
 
     // Check if user is already a spectator (rejoining case)
-    const existingParticipant = existingParticipants.find((p: any) => p.user_id === userId)
+    const existingParticipant = existingParticipants.find((p: ParticipantRow) => p.user_id === userId)
 
     if (existingParticipant) {
       console.log('User already spectator, updating last_seen')
 
       // Update their last_seen
       await (supabase
-        .from('participants') as any)
+        .from('participants'))
         .update({
           last_seen: new Date().toISOString()
         })
@@ -548,7 +593,7 @@ export class DraftService {
 
     // Create spectator participant (no team assignment)
     const { error: participantError } = await (supabase
-      .from('participants') as any)
+      .from('participants'))
       .insert({
         draft_id: draftUuid,
         user_id: userId,
@@ -608,10 +653,10 @@ export class DraftService {
 
       return {
         draft: data,
-        teams: (data as any).teams || [],
-        participants: (data as any).participants || [],
-        picks: (data as any).picks || [],
-        auctions: (data as any).auctions || []
+        teams: ((data as unknown as DraftWithRelations)).teams || [],
+        participants: ((data as unknown as DraftWithRelations)).participants || [],
+        picks: ((data as unknown as DraftWithRelations)).picks || [],
+        auctions: ((data as unknown as DraftWithRelations)).auctions || []
       }
     } catch (err) {
       console.error('Unexpected error in getDraftState:', err)
@@ -651,11 +696,11 @@ export class DraftService {
 
     // Update each team with new randomized draft order
     const updatePromises = teams.map((team, index) => {
-      console.log(`[Shuffle] Updating team ${(team as any).name} to draft_order ${randomizedOrder[index]}`)
-      return (supabase as any)
+      console.log(`[Shuffle] Updating team ${team.name} to draft_order ${randomizedOrder[index]}`)
+      return supabase
         .from('teams')
         .update({ draft_order: randomizedOrder[index] })
-        .eq('id', (team as any).id)
+        .eq('id', team.id)
     })
 
     const results = await Promise.all(updatePromises)
@@ -667,7 +712,7 @@ export class DraftService {
       draftOrderShuffled: true
     }
 
-    const { error: draftUpdateError } = await (supabase as any)
+    const { error: draftUpdateError } = await supabase
       .from('drafts')
       .update({
         settings: updatedSettings,
@@ -682,7 +727,7 @@ export class DraftService {
    * Validate that a draft can be started
    * Returns validation result with detailed error messages
    */
-  private static async validateDraftCanStart(draftState: any): Promise<{ valid: boolean; error?: string }> {
+  private static async validateDraftCanStart(draftState: { draft: DraftRow; teams: TeamRow[]; participants: ParticipantRow[] }): Promise<{ valid: boolean; error?: string }> {
     const { draft, teams, participants } = draftState
 
     // Check 1: Draft must be in setup status
@@ -700,18 +745,18 @@ export class DraftService {
     }
 
     // Check 3: Each team must have at least one participant
-    const teamsWithoutParticipants = teams.filter((team: any) => {
-      const teamParticipants = participants.filter((p: any) => p.team_id === team.id)
+    const teamsWithoutParticipants = teams.filter((team: TeamRow) => {
+      const teamParticipants = participants.filter((p: ParticipantRow) => p.team_id === team.id)
       return teamParticipants.length === 0
     })
 
     if (teamsWithoutParticipants.length > 0) {
-      const teamNames = teamsWithoutParticipants.map((t: any) => t.name).join(', ')
+      const teamNames = teamsWithoutParticipants.map((t: TeamRow) => t.name).join(', ')
       return { valid: false, error: `The following teams have no participants: ${teamNames}` }
     }
 
     // Check 4: Draft order values must be valid (1 to N, no gaps, no duplicates)
-    const draftOrders = teams.map((t: any) => t.draft_order).sort((a: number, b: number) => a - b)
+    const draftOrders = teams.map((t: TeamRow) => t.draft_order).sort((a: number, b: number) => a - b)
     const expectedOrders = Array.from({ length: teams.length }, (_, i) => i + 1)
 
     if (JSON.stringify(draftOrders) !== JSON.stringify(expectedOrders)) {
@@ -719,8 +764,8 @@ export class DraftService {
     }
 
     // Check 5: All participants must have valid team_id
-    const orphanedParticipants = participants.filter((p: any) => {
-      return p.team_id && !teams.find((t: any) => t.id === p.team_id)
+    const orphanedParticipants = participants.filter((p: ParticipantRow) => {
+      return p.team_id && !teams.find((t: TeamRow) => t.id === p.team_id)
     })
 
     if (orphanedParticipants.length > 0) {
@@ -770,15 +815,15 @@ export class DraftService {
       console.log('[startDraft] Auto-shuffling draft order (not manually shuffled)')
 
       // Generate randomized order
-      const randomizedOrder = teams.map((_: any, index: number) => index + 1)
+      const randomizedOrder = teams.map((_: TeamRow, index: number) => index + 1)
       for (let i = randomizedOrder.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [randomizedOrder[i], randomizedOrder[j]] = [randomizedOrder[j], randomizedOrder[i]]
       }
 
       // Update each team with new randomized draft order
-      const updatePromises = teams.map((team: any, index: number) =>
-        (supabase as any)
+      const updatePromises = teams.map((team: TeamRow, index: number) =>
+        supabase
           .from('teams')
           .update({ draft_order: randomizedOrder[index] })
           .eq('id', team.id)
@@ -806,7 +851,7 @@ export class DraftService {
 
     // Atomically set draft to active with first turn AND update settings in single operation
     // This reduces subscription triggers from 2 to 1, preventing race conditions
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('drafts')
       .update({
         status: 'active',
@@ -869,7 +914,7 @@ export class DraftService {
 
     // Call the atomic database function
     // This performs all validation and updates in a single transaction with row-level locking
-    const { data, error } = await (supabase as any).rpc('make_draft_pick', {
+    const { data, error } = await (supabase.rpc as (fn: string, params: Record<string, unknown>) => ReturnType<typeof supabase.rpc>)('make_draft_pick', {
       p_draft_id: draftUuid,
       p_team_id: teamId,
       p_user_id: userId,
@@ -969,7 +1014,7 @@ export class DraftService {
       .eq('user_id', userId)
       .single()
 
-    return (participant as any)?.team_id === teamId
+    return participant?.team_id === teamId
   }
 
   static async getUserTeam(draftId: string, userId: string): Promise<string | null> {
@@ -1006,7 +1051,7 @@ export class DraftService {
       )
     }
 
-    return (participant as any)?.team_id || null
+    return participant?.team_id || null
   }
 
   static async validateUserCanPick(draftId: string, userId: string): Promise<{ canPick: boolean; teamId: string | null; reason?: string }> {
@@ -1036,7 +1081,7 @@ export class DraftService {
     const maxRounds = draftState.draft.settings?.maxPokemonPerTeam || 10
     const currentTurn = draftState.draft.current_turn || 1
 
-    const draftOrder = generateSnakeDraftOrder(draftState.teams as any, maxRounds)
+    const draftOrder = generateSnakeDraftOrder(draftState.teams as unknown as AppTeam[], maxRounds)
     if (currentTurn > draftOrder.length) {
       return { canPick: false, teamId: userTeamId, reason: 'Draft is complete' }
     }
@@ -1060,7 +1105,7 @@ export class DraftService {
     }
 
     const { error } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         status: 'paused',
         updated_at: new Date().toISOString()
@@ -1086,7 +1131,7 @@ export class DraftService {
     }
 
     const { error } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         status: 'active',
         turn_started_at: new Date().toISOString(), // Reset turn timer when resuming
@@ -1109,7 +1154,7 @@ export class DraftService {
     }
 
     const { error } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         status: 'completed',
         updated_at: new Date().toISOString()
@@ -1133,7 +1178,7 @@ export class DraftService {
 
     // Delete all picks
     const { error: picksError } = await (supabase
-      .from('picks') as any)
+      .from('picks'))
       .delete()
       .eq('draft_id', draftState.draft.id)
 
@@ -1144,7 +1189,7 @@ export class DraftService {
 
     // Delete all auctions if any
     const { error: auctionsError } = await (supabase
-      .from('auctions') as any)
+      .from('auctions'))
       .delete()
       .eq('draft_id', draftState.draft.id)
 
@@ -1155,7 +1200,7 @@ export class DraftService {
 
     // Delete all bid history if any
     const { error: bidsError } = await (supabase
-      .from('bid_history') as any)
+      .from('bid_history'))
       .delete()
       .eq('draft_id', draftState.draft.id)
 
@@ -1166,7 +1211,7 @@ export class DraftService {
 
     // Reset team budgets and picks
     const { error: teamsError } = await (supabase
-      .from('teams') as any)
+      .from('teams'))
       .update({
         budget_remaining: draftState.draft.budget_per_team
       })
@@ -1179,7 +1224,7 @@ export class DraftService {
 
     // Reset draft status
     const { error: draftError } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         status: 'setup',
         current_turn: null,
@@ -1232,7 +1277,7 @@ export class DraftService {
 
     // STEP 2: Soft delete the draft
     const { error: draftError } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         deleted_at: new Date().toISOString(),
         deleted_by: userId,
@@ -1266,48 +1311,48 @@ export class DraftService {
     // Delete in order due to foreign key constraints
     // Note: Some tables may not exist or may be empty - that's okay
     // 1. Delete picks
-    await (supabase.from('picks') as any).delete().eq('draft_id', internalId)
+    await (supabase.from('picks')).delete().eq('draft_id', internalId)
 
     // 2. Delete bid history (may not exist)
     try {
-      await (supabase.from('bid_history') as any).delete().eq('draft_id', internalId)
+      await (supabase.from('bid_history')).delete().eq('draft_id', internalId)
     } catch (error) {
       console.debug('No bid_history table or no records to delete')
     }
 
     // 3. Delete auctions
-    await (supabase.from('auctions') as any).delete().eq('draft_id', internalId)
+    await (supabase.from('auctions')).delete().eq('draft_id', internalId)
 
     // 4. Delete wishlists (may not exist)
     try {
-      await (supabase.from('wishlists') as any).delete().eq('draft_id', internalId)
+      await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)('wishlists').delete().eq('draft_id', internalId)
     } catch (error) {
       console.debug('No wishlists table or no records to delete')
     }
 
     // 5. Delete wishlist_items (actual table name)
     try {
-      await (supabase.from('wishlist_items') as any).delete().eq('draft_id', internalId)
+      await supabase.from('wishlist_items').delete().eq('draft_id', internalId)
     } catch (error) {
       console.debug('No wishlist_items to delete')
     }
 
     // 6. Delete participants
-    await (supabase.from('participants') as any).delete().eq('draft_id', internalId)
+    await (supabase.from('participants')).delete().eq('draft_id', internalId)
 
     // 7. Delete teams
-    await (supabase.from('teams') as any).delete().eq('draft_id', internalId)
+    await (supabase.from('teams')).delete().eq('draft_id', internalId)
 
     // 8. Delete draft results if any (may not exist)
     try {
-      await (supabase.from('draft_results') as any).delete().eq('draft_id', internalId)
+      await (supabase.from as (table: string) => ReturnType<typeof supabase.from>)('draft_results').delete().eq('draft_id', internalId)
     } catch (error) {
       console.debug('No draft_results table or no records to delete')
     }
 
     // 9. Finally, delete the draft itself
     const { error: draftError } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .delete()
       .eq('id', internalId)
 
@@ -1341,7 +1386,7 @@ export class DraftService {
     }
 
     const { error } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         settings: updatedSettings,
         updated_at: new Date().toISOString()
@@ -1399,7 +1444,7 @@ export class DraftService {
 
     // Add optimistic locking to prevent concurrent turn advancements
     const { data: updateResult, error } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update(updateData)
       .eq('id', internalId)
       .eq('current_turn', currentTurn) // Optimistic lock: only update if turn hasn't changed
@@ -1424,7 +1469,7 @@ export class DraftService {
     if (!draftState) return
     
     await (supabase
-      .from('participants') as any)
+      .from('participants'))
       .update({
         last_seen: new Date().toISOString()
       })
@@ -1504,7 +1549,7 @@ export class DraftService {
       return null
     }
 
-    return (draft as any).settings?.formatId || DEFAULT_FORMAT
+    return draft.settings?.formatId || DEFAULT_FORMAT
   }
 
   /**
@@ -1591,7 +1636,7 @@ export class DraftService {
     }
 
     const { error } = await (supabase
-      .from('teams') as any)
+      .from('teams'))
       .update({
         budget_remaining: newBudget,
         updated_at: new Date().toISOString()
@@ -1637,14 +1682,14 @@ export class DraftService {
     }
 
     // Update settings with new auction duration
-    const currentSettings = (draft as any).settings || {}
+    const currentSettings = draft.settings || {}
     const updatedSettings = {
       ...currentSettings,
       auctionDurationSeconds: durationSeconds
     }
 
     const { error } = await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         settings: updatedSettings,
         updated_at: new Date().toISOString()
@@ -1662,7 +1707,7 @@ export class DraftService {
    */
   private static async createLeagueForCompletedDraft(
     draftId: string,
-    settings: any
+    settings: DraftSettingsJson
   ): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 
@@ -1740,7 +1785,7 @@ export class DraftService {
 
     // Create auction
     const { error } = await (supabase
-      .from('auctions') as any)
+      .from('auctions'))
       .insert({
         draft_id: draftState.draft.id,
         pokemon_id: pokemonId,
@@ -1787,18 +1832,18 @@ export class DraftService {
       throw new Error('Auction not found')
     }
 
-    if ((auction as any).status !== 'active') {
+    if (auction.status !== 'active') {
       throw new Error('Auction is not active')
     }
 
     // Check if auction has expired
-    if (new Date() > new Date((auction as any).auction_end)) {
+    if (new Date() > new Date(auction.auction_end)) {
       throw new Error('Auction has expired')
     }
 
     // Validate bid amount
-    if (bidAmount <= (auction as any).current_bid) {
-      throw new Error(`Bid must be higher than current bid of $${(auction as any).current_bid}`)
+    if (bidAmount <= auction.current_bid) {
+      throw new Error(`Bid must be higher than current bid of $${auction.current_bid}`)
     }
 
     // Get user's team and validate budget
@@ -1817,12 +1862,12 @@ export class DraftService {
       throw new Error('Team not found')
     }
 
-    if (bidAmount > (team as any).budget_remaining) {
-      throw new Error(`Bid exceeds your remaining budget of $${(team as any).budget_remaining}`)
+    if (bidAmount > team.budget_remaining) {
+      throw new Error(`Bid exceeds your remaining budget of $${team.budget_remaining}`)
     }
 
     // Update auction with new bid
-    const { error: updateError } = await (supabase as any)
+    const { error: updateError } = await supabase
       .from('auctions')
       .update({
         current_bid: bidAmount,
@@ -1861,25 +1906,25 @@ export class DraftService {
       throw new Error('Auction not found')
     }
 
-    if ((auction as any).status !== 'active') {
+    if (auction.status !== 'active') {
       throw new Error('Auction is not active')
     }
 
     // Check if there was a winning bidder
-    if ((auction as any).current_bidder) {
+    if (auction.current_bidder) {
 
       const pickOrder = draftState.picks.length + 1
       const currentRound = Math.floor(pickOrder / draftState.teams.length) + 1
 
       // Create the pick
-      const { error: pickError } = await (supabase as any)
+      const { error: pickError } = await supabase
         .from('picks')
         .insert({
           draft_id: internalId,
-          team_id: (auction as any).current_bidder,
-          pokemon_id: (auction as any).pokemon_id,
-          pokemon_name: (auction as any).pokemon_name,
-          cost: (auction as any).current_bid,
+          team_id: auction.current_bidder,
+          pokemon_id: auction.pokemon_id,
+          pokemon_name: auction.pokemon_name,
+          cost: auction.current_bid,
           pick_order: pickOrder,
           round: currentRound
         })
@@ -1893,7 +1938,7 @@ export class DraftService {
       const { data: team, error: teamFetchError} = await supabase
         .from('teams')
         .select('budget_remaining')
-        .eq('id', (auction as any).current_bidder)
+        .eq('id', auction.current_bidder)
         .single()
 
       if (teamFetchError || !team) {
@@ -1901,14 +1946,14 @@ export class DraftService {
         throw new Error('Failed to fetch team budget after auction')
       }
 
-      const oldBudget = (team as any).budget_remaining
-      const newBudget = oldBudget - (auction as any).current_bid
+      const oldBudget = team.budget_remaining
+      const newBudget = oldBudget - auction.current_bid
 
       // Use optimistic locking to prevent budget race conditions
-      const { data: budgetUpdateResult, error: teamError } = await (supabase as any)
+      const { data: budgetUpdateResult, error: teamError } = await supabase
         .from('teams')
         .update({ budget_remaining: newBudget })
-        .eq('id', (auction as any).current_bidder)
+        .eq('id', auction.current_bidder)
         .eq('budget_remaining', oldBudget) // Optimistic lock
         .select()
 
@@ -1919,18 +1964,18 @@ export class DraftService {
 
       // Verify budget didn't go negative
       if (budgetUpdateResult[0].budget_remaining < 0) {
-        console.error(`[completeAuction] Budget went negative for team ${(auction as any).current_bidder}`)
+        console.error(`[completeAuction] Budget went negative for team ${auction.current_bidder}`)
         // Rollback budget
-        await (supabase as any)
+        await supabase
           .from('teams')
           .update({ budget_remaining: oldBudget })
-          .eq('id', (auction as any).current_bidder)
+          .eq('id', auction.current_bidder)
         throw new Error('Insufficient budget for auction win')
       }
     }
 
     // Mark auction as completed
-    const { error: updateError } = await (supabase as any)
+    const { error: updateError } = await supabase
       .from('auctions')
       .update({
         status: 'completed',
@@ -1974,9 +2019,9 @@ export class DraftService {
       throw new Error('Auction not found')
     }
 
-    const newEndTime = new Date(new Date((auction as any).auction_end).getTime() + additionalSeconds * 1000)
+    const newEndTime = new Date(new Date(auction.auction_end).getTime() + additionalSeconds * 1000)
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('auctions')
       .update({
         auction_end: newEndTime.toISOString(),
@@ -2097,7 +2142,7 @@ export class DraftService {
 
     // Check if draft is complete
     if (currentPicks >= totalPossiblePicks) {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('drafts')
         .update({
           status: 'completed',
@@ -2124,7 +2169,7 @@ export class DraftService {
     const currentTurn = currentPicks + 1
     const currentRound = Math.floor(currentPicks / draftState.teams.length) + 1
 
-    const { error: turnError } = await (supabase as any)
+    const { error: turnError } = await supabase
       .from('drafts')
       .update({
         current_turn: currentTurn,
@@ -2168,7 +2213,7 @@ export class DraftService {
 
     // Delete the pick
     const { error: deleteError } = await (supabase
-      .from('picks') as any)
+      .from('picks'))
       .delete()
       .eq('id', lastPick.id)
 
@@ -2187,8 +2232,8 @@ export class DraftService {
     if (teamFetchError || !teamBudgetData) {
       console.error('Error fetching team budget for undo:', teamFetchError)
     } else {
-      const newBudget = (teamBudgetData as any).budget_remaining + lastPick.cost
-      const { error: budgetError } = await (supabase as any)
+      const newBudget = teamBudgetData.budget_remaining + lastPick.cost
+      const { error: budgetError } = await supabase
         .from('teams')
         .update({ budget_remaining: newBudget })
         .eq('id', lastPick.team_id)
@@ -2204,7 +2249,7 @@ export class DraftService {
     const newRound = Math.floor((newTurn - 1) / totalTeams) + 1
 
     await (supabase
-      .from('drafts') as any)
+      .from('drafts'))
       .update({
         current_turn: newTurn,
         current_round: newRound,
@@ -2255,11 +2300,11 @@ export class DraftService {
   /**
    * Get draft history/results for browsing past drafts
    */
-  static async getDraftHistory(limit: number = 20, offset: number = 0): Promise<any[]> {
+  static async getDraftHistory(limit: number = 20, offset: number = 0): Promise<Record<string, unknown>[]> {
     if (!supabase) throw new Error('Supabase not available')
 
-    const { data, error } = await supabase
-      .from('draft_history')
+    // draft_history is a view/table not in Database type
+    const { data, error } = await (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)('draft_history')
       .select('*')
       .order('completed_at', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -2275,14 +2320,14 @@ export class DraftService {
   /**
    * Get detailed results for a specific completed draft
    */
-  static async getDraftResults(draftId: string): Promise<any | null> {
+  static async getDraftResults(draftId: string): Promise<Record<string, unknown> | null> {
     if (!supabase) throw new Error('Supabase not available')
 
     const draftState = await this.getDraftState(draftId)
     if (!draftState) return null
 
-    const { data: result, error } = await supabase
-      .from('draft_results')
+    // draft_results is a table not in Database type
+    const { data: result, error } = await (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)('draft_results')
       .select(`
         *,
         teams:draft_result_teams(*)
@@ -2324,7 +2369,7 @@ export class DraftService {
 
     // Manually trigger the save by updating the draft status
     // This will trigger the save_draft_results_trigger
-    const { error: updateError } = await (supabase as any)
+    const { error: updateError } = await supabase
       .from('drafts')
       .update({
         updated_at: new Date().toISOString()
@@ -2342,8 +2387,8 @@ export class DraftService {
   static async deleteDraftResults(draftResultId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 
-    const { error } = await supabase
-      .from('draft_results')
+    // draft_results is a table not in Database type
+    const { error } = await (supabase.from as unknown as (table: string) => ReturnType<typeof supabase.from>)('draft_results')
       .delete()
       .eq('id', draftResultId)
 
@@ -2428,12 +2473,12 @@ export class DraftService {
       throw new Error('Failed to fetch public drafts')
     }
 
-    return (data || []).map((draft: any) => ({
-      roomCode: draft.room_code,
+    return (data || []).map((draft) => ({
+      roomCode: draft.room_code || '',
       name: draft.name,
       status: draft.status,
       maxTeams: draft.max_teams,
-      currentTeams: draft.teams?.[0]?.count || 0,
+      currentTeams: (draft.teams as unknown as { count: number }[])?.[0]?.count || 0,
       format: draft.format,
       createdAt: draft.created_at,
       description: draft.description,
