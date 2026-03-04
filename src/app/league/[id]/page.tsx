@@ -19,13 +19,17 @@ import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
 import { MatchRecorderModal } from '@/components/league/MatchRecorderModal'
+import { LeagueSettingsModal } from '@/components/league/LeagueSettingsModal'
 import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, Calendar, TrendingUp, Skull, Swords, Users, Repeat, Loader2 } from 'lucide-react'
+import { ArrowLeft, Trophy, Calendar, TrendingUp, Skull, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
 import type { PickRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 import { buildTeamColorMap } from '@/utils/team-colors'
+import { getPokemonAnimatedUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
 const log = createLogger('LeaguePage')
 
@@ -42,10 +46,17 @@ export default function LeaguePage() {
   const [selectedMatch, setSelectedMatch] = useState<(Match & { homeTeam: Team; awayTeam: Team }) | null>(null)
   const [homeTeamPicks, setHomeTeamPicks] = useState<Pick[]>([])
   const [awayTeamPicks, setAwayTeamPicks] = useState<Pick[]>([])
+  const [teamPicks, setTeamPicks] = useState<Record<string, Pick[]>>({})
+  const [viewingWeek, setViewingWeek] = useState<number | null>(null)
+  const [copiedInvite, setCopiedInvite] = useState(false)
+  const [draftRoomCode, setDraftRoomCode] = useState<string | null>(null)
+  const [draftHostId, setDraftHostId] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [canAdvance, setCanAdvance] = useState(false)
   const [isAdvancing, setIsAdvancing] = useState(false)
+  const { user } = useAuth()
 
   const loadLeagueData = useCallback(async () => {
     try {
@@ -82,6 +93,43 @@ export default function LeaguePage() {
       // Check if we can advance to next week
       const canAdvanceWeek = await LeagueService.canAdvanceWeek(leagueId, leagueData.currentWeek || 1)
       setCanAdvance(canAdvanceWeek)
+
+      // Fetch picks for all teams (for Teams & Pokemon tab)
+      if (supabase && leagueData.teams.length > 0) {
+        const teamIds = leagueData.teams.map(t => t.id)
+        const { data: allPicks } = await supabase
+          .from('picks')
+          .select('*')
+          .in('team_id', teamIds)
+          .order('pick_order', { ascending: true })
+
+        if (allPicks) {
+          const picksByTeam: Record<string, Pick[]> = {}
+          for (const p of allPicks) {
+            const pick: Pick = {
+              id: p.id, draftId: p.draft_id, teamId: p.team_id,
+              pokemonId: p.pokemon_id, pokemonName: p.pokemon_name,
+              cost: p.cost, pickOrder: p.pick_order, round: p.round,
+              createdAt: p.created_at,
+            }
+            if (!picksByTeam[p.team_id]) picksByTeam[p.team_id] = []
+            picksByTeam[p.team_id].push(pick)
+          }
+          setTeamPicks(picksByTeam)
+        }
+
+        // Fetch draft room code for invite link
+        const { data: draft } = await supabase
+          .from('drafts')
+          .select('room_code, host_id')
+          .eq('id', leagueData.draftId)
+          .single()
+
+        if (draft) {
+          setDraftRoomCode(draft.room_code)
+          setDraftHostId(draft.host_id)
+        }
+      }
     } catch (err) {
       log.error('Error loading league data:', err)
       setError(err instanceof Error ? err.message : 'Failed to load league')
@@ -105,6 +153,38 @@ export default function LeaguePage() {
     } finally {
       setIsAdvancing(false)
     }
+  }
+
+  const currentViewWeek = viewingWeek ?? league?.currentWeek ?? 1
+
+  const handleChangeWeek = async (newWeek: number) => {
+    if (!league || newWeek < 1 || newWeek > league.totalWeeks) return
+    setViewingWeek(newWeek)
+    try {
+      const fixtures = await LeagueService.getWeekFixtures(leagueId, newWeek)
+      setWeekFixtures(fixtures)
+    } catch (err) {
+      log.error('Error loading week fixtures:', err)
+    }
+  }
+
+  const handleCopyInvite = async () => {
+    const url = `${window.location.origin}/league/${leagueId}`
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: league?.name || 'Pokemon Draft League',
+          text: `Check out our draft league${draftRoomCode ? ` (Code: ${draftRoomCode})` : ''}!`,
+          url,
+        })
+        return
+      } catch {
+        // User cancelled or share failed, fall through to clipboard
+      }
+    }
+    await navigator.clipboard.writeText(url)
+    setCopiedInvite(true)
+    setTimeout(() => setCopiedInvite(false), 2000)
   }
 
   const handleRecordMatch = async (match: Match & { homeTeam: Team; awayTeam: Team }) => {
@@ -182,9 +262,11 @@ export default function LeaguePage() {
               <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent">
                 {league.name}
               </h1>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge variant="secondary">Week {league.currentWeek} of {league.totalWeeks}</Badge>
-                <Badge variant="outline">{league.leagueType.replace('_', ' ')}</Badge>
+                {draftRoomCode && (
+                  <Badge variant="outline" className="font-mono">{draftRoomCode}</Badge>
+                )}
                 {leagueSettings.enableNuzlocke && (
                   <Badge variant="destructive" className="flex items-center gap-1">
                     <Skull className="h-3 w-3" />
@@ -208,6 +290,14 @@ export default function LeaguePage() {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => router.push(`/league/${leagueId}/schedule`)}
+          >
+            <CalendarDays className="h-4 w-4 mr-2" />
+            Schedule
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => router.push(`/league/${leagueId}/rankings`)}
           >
             <TrendingUp className="h-4 w-4 mr-2" />
@@ -221,6 +311,24 @@ export default function LeaguePage() {
             >
               <Repeat className="h-4 w-4 mr-2" />
               Trade Center
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyInvite}
+          >
+            {copiedInvite ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+            {copiedInvite ? 'Copied!' : 'Share Link'}
+          </Button>
+          {user && draftHostId === user.id && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              League Settings
             </Button>
           )}
         </div>
@@ -302,7 +410,30 @@ export default function LeaguePage() {
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="h-5 w-5" />
-                      Week {league.currentWeek} Fixtures
+                      Week {currentViewWeek} Fixtures
+                      <div className="flex items-center gap-1 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={currentViewWeek <= 1}
+                          onClick={() => handleChangeWeek(currentViewWeek - 1)}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={currentViewWeek >= league.totalWeeks}
+                          onClick={() => handleChangeWeek(currentViewWeek + 1)}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {currentViewWeek === league.currentWeek && (
+                        <Badge variant="default" className="text-[10px]">Current</Badge>
+                      )}
                     </CardTitle>
                     <CardDescription>
                       {leagueSettings.matchFormat?.replace('_', ' ') || 'Best of 3'} format
@@ -519,27 +650,65 @@ export default function LeaguePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {team.pokemonStatuses.map(status => (
-                      <div
-                        key={status.id}
-                        className="flex items-center justify-between p-2 border rounded-md"
-                      >
-                        <div>
-                          <div className="font-medium text-sm">Pokemon #{status.pickId.slice(0, 8)}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {status.totalKos} KOs • {status.matchesPlayed} matches
+                  {(teamPicks[team.id] ?? []).length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {(teamPicks[team.id] ?? []).map(pick => {
+                        const status = team.pokemonStatuses.find(s => s.pickId === pick.id)
+                        return (
+                          <div
+                            key={pick.id}
+                            className="flex items-center gap-2 p-2 border rounded-md"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
+                              alt={pick.pokemonName}
+                              className="w-10 h-10 pixelated shrink-0"
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                if (!target.dataset.fallback) {
+                                  target.dataset.fallback = '1'
+                                  target.src = getPokemonSpriteUrl(pick.pokemonId)
+                                }
+                              }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-sm capitalize truncate">{pick.pokemonName}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {status ? `${status.totalKos} KOs • ${status.matchesPlayed} matches` : `${pick.cost} pts`}
+                              </div>
+                            </div>
+                            {status && (
+                              <PokemonStatusBadge status={status.status} size="sm" showText={false} />
+                            )}
                           </div>
-                        </div>
-                        <PokemonStatusBadge status={status.status} size="sm" showText={false} />
-                      </div>
-                    ))}
-                  </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-4">No Pokemon data</p>
+                  )}
                 </CardContent>
               </Card>
             ))}
           </TabsContent>
         </Tabs>
+
+        {/* League Settings Modal */}
+        {settingsOpen && leagueSettings && (
+          <LeagueSettingsModal
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            leagueId={leagueId}
+            currentSettings={leagueSettings}
+            totalWeeks={league.totalWeeks}
+            onSave={() => {
+              setSettingsOpen(false)
+              loadLeagueData()
+            }}
+          />
+        )}
 
         {/* Match Recorder Modal */}
         {selectedMatch && leagueSettings && (

@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays } from 'lucide-react'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
@@ -75,6 +75,7 @@ interface LeagueStanding {
   losses: number
   draws: number
   rank: number | null
+  currentStreak: string | null
 }
 
 function buildDraftSummaries(
@@ -257,7 +258,8 @@ export default function DashboardPage() {
       setup: { label: 'Setup', variant: 'outline' },
       active: { label: 'Active', variant: 'default' },
       completed: { label: 'Completed', variant: 'secondary' },
-      paused: { label: 'Paused', variant: 'outline' }
+      paused: { label: 'Paused', variant: 'outline' },
+      scheduled: { label: 'Starts Soon', variant: 'outline' }
     }
     const c = config[status] || config.setup
     return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>
@@ -390,7 +392,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center">
+          <div className="flex items-center justify-between">
+            <button
+              className="text-[10px] text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
+                router.push(`/league/${matchup.league.id}/schedule`)
+              }}
+            >
+              <CalendarDays className="h-3 w-3" />
+              Full Schedule
+            </button>
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               View opponent&apos;s team <ChevronRight className="h-3 w-3" />
             </span>
@@ -513,7 +525,7 @@ export default function DashboardPage() {
                         </div>
                         {getStatusBadge(standing.league.status)}
                       </div>
-                      <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="grid grid-cols-4 gap-2 text-center">
                         <div>
                           <p className="text-xs text-muted-foreground">Record</p>
                           <p className="text-sm font-semibold">
@@ -530,6 +542,15 @@ export default function DashboardPage() {
                           <p className="text-xs text-muted-foreground">Rank</p>
                           <p className="text-sm font-semibold">
                             {standing.rank ? `#${standing.rank}` : '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Streak</p>
+                          <p className={`text-sm font-semibold ${
+                            standing.currentStreak?.startsWith('W') ? 'text-green-600 dark:text-green-400' :
+                            standing.currentStreak?.startsWith('L') ? 'text-red-600 dark:text-red-400' : ''
+                          }`}>
+                            {standing.currentStreak || '-'}
                           </p>
                         </div>
                       </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Trophy, Users, Calendar, Crown } from 'lucide-react'
+import { ArrowLeft, Trophy, Users, Calendar, Crown, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,7 @@ import type { Match, League, Team, Standing, Pick } from '@/types'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
+import { getPokemonAnimatedUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
 
 const log = createLogger('MatchPage')
 
@@ -29,6 +30,10 @@ export default function MatchDetailPage() {
 
   const [match, setMatch] = useState<MatchDetails | null>(null)
   const [standings, setStandings] = useState<(Standing & { team: Team })[]>([])
+  const [submissionStatus, setSubmissionStatus] = useState<{
+    homeSubmitted: boolean; awaySubmitted: boolean
+    confirmationStatus: 'none' | 'pending' | 'confirmed' | 'disputed'
+  }>({ homeSubmitted: false, awaySubmitted: false, confirmationStatus: 'none' })
   const [isLoading, setIsLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
 
@@ -41,7 +46,7 @@ export default function MatchDetailPage() {
         // Load match details
         const matchData = await LeagueService.getMatch(matchId)
         if (!matchData) {
-          router.push('/my-drafts')
+          router.push('/dashboard')
           return
         }
 
@@ -64,9 +69,13 @@ export default function MatchDetailPage() {
           awayTeam: { ...matchData.awayTeam, picks: (awayPicks || []) as unknown as Pick[] }
         })
 
-        // Load league standings
-        const standingsData = await LeagueService.getStandings(matchData.leagueId)
+        // Load league standings and submission status
+        const [standingsData, statusData] = await Promise.all([
+          LeagueService.getStandings(matchData.leagueId),
+          LeagueService.getMatchSubmissionStatus(matchId),
+        ])
         setStandings(standingsData)
+        setSubmissionStatus(statusData)
       } catch (error) {
         log.error('Failed to load match data:', error)
       } finally {
@@ -104,9 +113,9 @@ export default function MatchDetailPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 pb-20">
       <div className="max-w-7xl mx-auto pt-8 space-y-6">
         {/* Back Button */}
-        <Button variant="ghost" onClick={() => router.push('/my-drafts')}>
+        <Button variant="ghost" onClick={() => router.push('/dashboard')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to My Drafts
+          Back to Dashboard
         </Button>
 
         {/* Match Header */}
@@ -188,6 +197,34 @@ export default function MatchDetailPage() {
               <div className="flex items-center justify-center gap-2 text-slate-600 dark:text-slate-400 mt-4">
                 <Calendar className="h-4 w-4" />
                 {format(new Date(match.scheduledDate), 'EEEE, MMMM d, yyyy • h:mm a')}
+              </div>
+            )}
+
+            {/* Submission Status */}
+            {match.status !== 'completed' && submissionStatus.confirmationStatus !== 'none' && (
+              <div className="flex items-center justify-center gap-3 mt-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                {submissionStatus.confirmationStatus === 'pending' && (
+                  <>
+                    <Clock className="h-4 w-4 text-yellow-500" />
+                    <span className="text-sm">
+                      Waiting for {!submissionStatus.homeSubmitted ? 'home' : 'away'} team to submit result
+                    </span>
+                  </>
+                )}
+                {submissionStatus.confirmationStatus === 'disputed' && (
+                  <>
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <span className="text-sm text-red-600 dark:text-red-400">
+                      Results disputed - both teams submitted different scores
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+            {match.status === 'completed' && submissionStatus.confirmationStatus === 'confirmed' && (
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <span className="text-xs text-green-600 dark:text-green-400">Both teams confirmed this result</span>
               </div>
             )}
           </CardContent>
@@ -315,6 +352,20 @@ function TeamRoster({ team, isUserTeam, title }: { team: Team & { picks: Pick[] 
               >
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-semibold text-slate-500 w-6">#{index + 1}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
+                    alt={pick.pokemonName}
+                    className="w-10 h-10 pixelated"
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      if (!target.dataset.fallback) {
+                        target.dataset.fallback = '1'
+                        target.src = getPokemonSpriteUrl(pick.pokemonId)
+                      }
+                    }}
+                  />
                   <span className="font-medium capitalize">{pick.pokemonName}</span>
                 </div>
                 <Badge variant="outline">{pick.cost} pts</Badge>

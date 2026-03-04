@@ -203,13 +203,14 @@ export class LeagueService {
   ): Promise<League> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    // Create league
+    // Create league as active immediately (draft is already completed)
     const { data: league, error: leagueError } = await supabase
       .from('leagues')
       .insert({
         draft_id: draftId,
         name,
         league_type: leagueType,
+        status: 'active',
         total_weeks: config.totalWeeks,
         start_date: config.startDate?.toISOString(),
         settings: {
@@ -538,6 +539,24 @@ export class LeagueService {
       .eq('id', matchId)
 
     if (error) throw new Error('Failed to update match result')
+
+    // Auto-update standings when a match is completed
+    if (result.status === 'completed' || !result.status) {
+      // Get the match to find its league_id
+      const { data: matchRow } = await supabase
+        .from('matches')
+        .select('league_id')
+        .eq('id', matchId)
+        .single()
+
+      if (matchRow) {
+        try {
+          await this.updateStandings(matchRow.league_id)
+        } catch (err) {
+          log.error('Failed to update standings after match result:', err)
+        }
+      }
+    }
   }
 
   /**
@@ -609,6 +628,13 @@ export class LeagueService {
           })
           .eq('id', matchId)
         if (error) log.error('Failed to update match notes:', error)
+
+        // Update standings after confirmed match
+        try {
+          await this.updateStandings(match.league_id)
+        } catch (err) {
+          log.error('Failed to update standings after match confirmation:', err)
+        }
 
         return { status: 'confirmed' }
       } else {
@@ -1114,6 +1140,7 @@ export class LeagueService {
     losses: number
     draws: number
     rank: number | null
+    currentStreak: string | null
   }[]> {
     if (!supabase) throw new Error('Supabase not configured')
 
@@ -1135,7 +1162,7 @@ export class LeagueService {
 
     const leagueTeams = rawLeagueTeams as unknown as LeagueTeamJoin[]
     const activeLeagueTeams = leagueTeams.filter(
-      lt => lt.leagues.status === 'active' || lt.leagues.status === 'completed'
+      lt => lt.leagues.status === 'active' || lt.leagues.status === 'completed' || lt.leagues.status === 'scheduled'
     )
 
     const results: {
@@ -1146,6 +1173,7 @@ export class LeagueService {
       losses: number
       draws: number
       rank: number | null
+      currentStreak: string | null
     }[] = []
 
     for (const lt of activeLeagueTeams) {
@@ -1160,10 +1188,174 @@ export class LeagueService {
         losses: userStanding?.losses ?? 0,
         draws: userStanding?.draws ?? 0,
         rank: userStanding?.rank ?? null,
+        currentStreak: userStanding?.currentStreak ?? null,
       })
     }
 
     return results
+  }
+
+  /**
+   * Recalculate standings for all teams in a league based on completed matches.
+   * Updates W/L/D, points_for/against, point_differential, rank, and streak.
+   */
+  static async updateStandings(leagueId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Get league settings for point values
+    const settings = await this.getLeagueSettings(leagueId)
+    const pointsPerWin = settings.pointsPerWin ?? 3
+    const pointsPerDraw = settings.pointsPerDraw ?? 1
+
+    // Get all completed matches
+    const { data: matches } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('league_id', leagueId)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: true })
+
+    if (!matches) return
+
+    // Get all standings records
+    const { data: standingRows } = await supabase
+      .from('standings')
+      .select('id, team_id')
+      .eq('league_id', leagueId)
+
+    if (!standingRows || standingRows.length === 0) return
+
+    // Build a map of team stats
+    const teamStats = new Map<string, {
+      wins: number; losses: number; draws: number
+      pointsFor: number; pointsAgainst: number
+      results: ('W' | 'L' | 'D')[]
+    }>()
+
+    for (const row of standingRows) {
+      teamStats.set(row.team_id, {
+        wins: 0, losses: 0, draws: 0,
+        pointsFor: 0, pointsAgainst: 0,
+        results: [],
+      })
+    }
+
+    // Tally match results
+    for (const m of matches) {
+      const home = teamStats.get(m.home_team_id)
+      const away = teamStats.get(m.away_team_id)
+      if (!home || !away) continue
+
+      home.pointsFor += m.home_score
+      home.pointsAgainst += m.away_score
+      away.pointsFor += m.away_score
+      away.pointsAgainst += m.home_score
+
+      if (m.winner_team_id === m.home_team_id) {
+        home.wins++; home.results.push('W')
+        away.losses++; away.results.push('L')
+      } else if (m.winner_team_id === m.away_team_id) {
+        away.wins++; away.results.push('W')
+        home.losses++; home.results.push('L')
+      } else {
+        // Draw
+        home.draws++; home.results.push('D')
+        away.draws++; away.results.push('D')
+      }
+    }
+
+    // Compute streak from most recent results
+    const computeStreak = (results: ('W' | 'L' | 'D')[]): string | null => {
+      if (results.length === 0) return null
+      const last = results[results.length - 1]
+      let count = 0
+      for (let i = results.length - 1; i >= 0 && results[i] === last; i--) {
+        count++
+      }
+      return `${last}${count}`
+    }
+
+    // Sort teams for ranking: by wins desc, then point differential desc
+    const sortedTeams = [...teamStats.entries()]
+      .map(([teamId, stats]) => ({
+        teamId,
+        ...stats,
+        totalPoints: stats.wins * pointsPerWin + stats.draws * pointsPerDraw,
+        diff: stats.pointsFor - stats.pointsAgainst,
+      }))
+      .sort((a, b) => {
+        if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints
+        if (b.diff !== a.diff) return b.diff - a.diff
+        return b.wins - a.wins
+      })
+
+    // Update each standing row
+    const now = new Date().toISOString()
+    for (let i = 0; i < sortedTeams.length; i++) {
+      const t = sortedTeams[i]
+      const standingRow = standingRows.find(s => s.team_id === t.teamId)
+      if (!standingRow) continue
+
+      const { error } = await supabase
+        .from('standings')
+        .update({
+          wins: t.wins,
+          losses: t.losses,
+          draws: t.draws,
+          points_for: t.pointsFor,
+          points_against: t.pointsAgainst,
+          point_differential: t.diff,
+          rank: i + 1,
+          current_streak: computeStreak(t.results),
+          updated_at: now,
+        })
+        .eq('id', standingRow.id)
+
+      if (error) {
+        log.error(`Failed to update standing for team ${t.teamId}:`, error)
+      }
+    }
+  }
+
+  /**
+   * Get full season schedule grouped by week
+   */
+  static async getFullSchedule(leagueId: string): Promise<{
+    weekNumber: number
+    matches: (Match & { homeTeam: Team; awayTeam: Team })[]
+  }[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data: rawMatches } = await supabase
+      .from('matches')
+      .select(`
+        *,
+        home_team:teams!matches_home_team_id_fkey(*),
+        away_team:teams!matches_away_team_id_fkey(*)
+      `)
+      .eq('league_id', leagueId)
+      .order('week_number', { ascending: true })
+      .order('match_number', { ascending: true })
+
+    if (!rawMatches) return []
+
+    const matches = rawMatches as unknown as MatchWithTeams[]
+
+    // Group by week
+    const weekMap = new Map<number, (Match & { homeTeam: Team; awayTeam: Team })[]>()
+    for (const m of matches) {
+      const mapped = {
+        ...mapMatchRow(m),
+        homeTeam: m.home_team as unknown as Team,
+        awayTeam: m.away_team as unknown as Team,
+      }
+      if (!weekMap.has(m.week_number)) weekMap.set(m.week_number, [])
+      weekMap.get(m.week_number)!.push(mapped)
+    }
+
+    return Array.from(weekMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([weekNumber, matches]) => ({ weekNumber, matches }))
   }
 
   /**
