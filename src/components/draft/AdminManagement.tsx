@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Shield, ShieldCheck, ShieldOff, Crown, Users } from 'lucide-react'
+import { PokeballIcon } from '@/components/ui/pokeball-icon'
 import { AdminService } from '@/lib/admin-service'
 import { notify } from '@/lib/notifications'
 import type { Participant } from '@/types'
@@ -97,9 +98,7 @@ export default function AdminManagement({
             </div>
             <div className="flex items-center justify-between p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center text-white font-bold text-sm">
-                  {host.displayName.charAt(0).toUpperCase()}
-                </div>
+                <PokeballIcon size="md" color="#ca8a04" />
                 <div>
                   <div className="font-medium text-slate-800 dark:text-slate-100">
                     {host.displayName}
@@ -131,9 +130,7 @@ export default function AdminManagement({
                   className="flex items-center justify-between p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm">
-                      {admin.displayName.charAt(0).toUpperCase()}
-                    </div>
+                    <PokeballIcon size="md" color="#9333ea" />
                     <div>
                       <div className="font-medium text-slate-800 dark:text-slate-100">
                         {admin.displayName}
@@ -179,9 +176,7 @@ export default function AdminManagement({
                   className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-white font-bold text-sm">
-                      {participant.displayName.charAt(0).toUpperCase()}
-                    </div>
+                    <PokeballIcon size="md" color="#94a3b8" />
                     <div className="font-medium text-slate-800 dark:text-slate-100">
                       {participant.displayName}
                       {participant.userId === currentUserId && (

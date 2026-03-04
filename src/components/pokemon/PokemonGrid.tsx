@@ -484,59 +484,23 @@ export default function PokemonGrid({
       )}
 
       {/* Results info */}
-      <div className="p-4 bg-card rounded-lg border">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="text-sm font-medium text-foreground">
-              Showing <span className="font-bold text-primary">{availablePokemon.length}</span> of <span className="font-bold">{pokemon.length}</span> Pokemon
-              {searchQuery && (
-                <span className="ml-2 text-muted-foreground">
-                  matching &ldquo;{searchQuery}&rdquo;
-                </span>
-              )}
-            </div>
-          </div>
-
-          {(draftedPokemonIds.length > 0 || typeFilter !== 'all' || costFilter !== 'all' || searchQuery) && (
-            <div className="flex flex-wrap items-center gap-2">
-              {searchQuery && (
-                <Badge variant="outline">
-                  <Search className="h-3 w-3 mr-1" />
-                  Search: {searchQuery}
-                </Badge>
-              )}
-              {draftedPokemonIds.length > 0 && (
-                <Badge variant="outline" className="text-destructive border-destructive/30">
-                  {draftedPokemonIds.length} drafted
-                </Badge>
-              )}
-              {typeFilter !== 'all' && (
-                <Badge variant="outline" className="capitalize">
-                  Type: {typeFilter}
-                </Badge>
-              )}
-              {costFilter !== 'all' && (
-                <Badge variant="outline">
-                  Cost: {costFilter}
-                </Badge>
-              )}
-              {(searchQuery || typeFilter !== 'all' || costFilter !== 'all') && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSearchQuery('')
-                    setTypeFilter('all')
-                    setCostFilter('all')
-                  }}
-                  className="text-muted-foreground text-xs h-6 px-2"
-                >
-                  Clear filters
-                </Button>
-              )}
-            </div>
+      <div className="flex items-center justify-between px-1 text-sm text-muted-foreground">
+        <span>
+          <span className="font-semibold text-foreground">{availablePokemon.length}</span> available
+          {draftedPokemonIds.length > 0 && (
+            <span className="ml-1.5 text-xs">({draftedPokemonIds.length} drafted)</span>
           )}
-        </div>
+        </span>
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearAllFilters}
+            className="text-xs h-6 px-2"
+          >
+            Clear all
+          </Button>
+        )}
       </div>
 
       {/* Pokemon Grid - Virtualized for large lists */}

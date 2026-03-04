@@ -23,7 +23,7 @@ BEGIN
   IF v_trade.team_a_gives IS NOT NULL THEN
     FOREACH v_pick_id IN ARRAY v_trade.team_a_gives
     LOOP
-      UPDATE picks SET team_id = v_trade.team_b_id, updated_at = NOW()
+      UPDATE picks SET team_id = v_trade.team_b_id
       WHERE id = v_pick_id::uuid AND team_id = v_trade.team_a_id;
 
       IF NOT FOUND THEN
@@ -36,7 +36,7 @@ BEGIN
   IF v_trade.team_b_gives IS NOT NULL THEN
     FOREACH v_pick_id IN ARRAY v_trade.team_b_gives
     LOOP
-      UPDATE picks SET team_id = v_trade.team_a_id, updated_at = NOW()
+      UPDATE picks SET team_id = v_trade.team_a_id
       WHERE id = v_pick_id::uuid AND team_id = v_trade.team_b_id;
 
       IF NOT FOUND THEN

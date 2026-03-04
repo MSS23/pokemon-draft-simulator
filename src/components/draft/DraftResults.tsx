@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
 import { TEAM_COLORS, buildTeamColorMap } from '@/utils/team-colors'
+import { PokeballIcon } from '@/components/ui/pokeball-icon'
 import TournamentSchedule from '@/components/tournament/TournamentSchedule'
 
 interface Team {
@@ -303,10 +304,7 @@ export default function DraftResults({
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: colors.hex }}
-                          />
+                          <PokeballIcon size="sm" color={colors.hex} />
                           <div>
                             <CardTitle className="text-lg">{team.name}</CardTitle>
                             <CardDescription>{team.userName}</CardDescription>

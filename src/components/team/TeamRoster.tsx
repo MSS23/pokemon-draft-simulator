@@ -8,6 +8,8 @@ import { usePokemonList } from '@/hooks/usePokemon'
 import { Pokemon } from '@/types'
 import { cn } from '@/lib/utils'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
+import { PokeballIcon } from '@/components/ui/pokeball-icon'
+import { getTeamColor } from '@/utils/team-colors'
 
 interface TeamRosterProps {
   team: {
@@ -32,6 +34,7 @@ const TeamRoster = memo(function TeamRoster({
   maxPokemonPerTeam = 6
 }: TeamRosterProps) {
   const { data: allPokemon } = usePokemonList()
+  const teamColor = getTeamColor(team.draftOrder - 1)
 
   const teamPokemon = useMemo(() => {
     if (!allPokemon || !team.picks.length) return []
@@ -42,9 +45,10 @@ const TeamRoster = memo(function TeamRoster({
 
   return (
     <Card className={cn(
-      'w-full transition-all',
+      'w-full transition-all border-l-4',
+      teamColor.border,
       isUserTeam && 'ring-2 ring-primary shadow-md',
-      isCurrentTeam && !isUserTeam && 'border-yellow-400 border-2',
+      isCurrentTeam && !isUserTeam && 'border-t-2 border-t-yellow-400',
       isCurrentTeam && isUserTeam && 'ring-2 ring-yellow-400 shadow-lg',
       !isCurrentTeam && !isUserTeam && 'shadow-sm'
     )}>
@@ -52,6 +56,7 @@ const TeamRoster = memo(function TeamRoster({
         {/* Team header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
+            <PokeballIcon size="sm" color={teamColor.hex} className="flex-shrink-0" />
             {isCurrentTeam && showTurnIndicator && (
               <Crown className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0" />
             )}
@@ -79,15 +84,12 @@ const TeamRoster = memo(function TeamRoster({
         {/* Progress bar */}
         <div className="w-full bg-muted rounded-full h-1 mb-2">
           <div
-            className={cn(
-              'h-1 rounded-full transition-all duration-300',
-              isCurrentTeam ? 'bg-yellow-500' : 'bg-primary'
-            )}
-            style={{ width: `${(team.picks.length / maxPokemonPerTeam) * 100}%` }}
+            className="h-1 rounded-full transition-all duration-300"
+            style={{ width: `${(team.picks.length / maxPokemonPerTeam) * 100}%`, backgroundColor: teamColor.hex }}
           />
         </div>
 
-        {/* Pokemon party - compact circles */}
+        {/* Pokemon party */}
         <div className="flex items-center gap-1 flex-wrap">
           {teamPokemon.map((pokemon) => (
             <div
@@ -114,8 +116,10 @@ const TeamRoster = memo(function TeamRoster({
           {Array.from({ length: Math.max(0, maxPokemonPerTeam - teamPokemon.length) }).map((_, i) => (
             <div
               key={`empty-${i}`}
-              className="w-8 h-8 sm:w-9 sm:h-9 bg-muted/50 rounded-full border border-dashed border-border"
-            />
+              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center opacity-30"
+            >
+              <PokeballIcon size="md" color={teamColor.hex} />
+            </div>
           ))}
         </div>
       </CardContent>

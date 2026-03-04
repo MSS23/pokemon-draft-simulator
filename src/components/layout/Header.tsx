@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,7 +44,6 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-1.5">
-            <ImageTypeToggle />
             <ThemeToggle />
 
             <div suppressHydrationWarning>

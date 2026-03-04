@@ -1,10 +1,7 @@
 'use client'
 
-// Cache bust: 2025-10-13-fix-infinite-loop
 import { useState, useCallback, memo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   AlertDialog,
@@ -21,11 +18,10 @@ import {
   Pause,
   Square,
   SkipForward,
-  Settings,
+  ChevronDown,
+  ChevronUp,
   Timer,
   Crown,
-  Users,
-  AlertCircle,
   Undo,
   Bell,
   RotateCcw,
@@ -33,6 +29,7 @@ import {
   Shuffle
 } from 'lucide-react'
 import { notify } from '@/lib/notifications'
+import { cn } from '@/lib/utils'
 
 interface DraftControlsProps {
   draftStatus: 'waiting' | 'drafting' | 'completed' | 'paused'
@@ -72,8 +69,8 @@ interface DraftControlsProps {
 
 const DraftControls = memo(function DraftControls({
   draftStatus,
-  currentTurn,
-  totalTeams,
+  currentTurn: _currentTurn,
+  totalTeams: _totalTeams,
   currentTeam: _currentTeam,
   teams,
   isHost,
@@ -99,7 +96,7 @@ const DraftControls = memo(function DraftControls({
   canUndo = false,
   notificationsEnabled = false
 }: DraftControlsProps) {
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{
     title: string
     description: string
@@ -109,6 +106,7 @@ const DraftControls = memo(function DraftControls({
   } | null>(null)
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
   const handlePauseDraft = () => {
     onPauseDraft()
     notify.warning('Draft Paused', 'The draft has been paused by the host')
@@ -148,7 +146,6 @@ const DraftControls = memo(function DraftControls({
   const handleSetTimer = useCallback((value: string) => {
     const seconds = parseInt(value)
     onSetTimer(seconds)
-    // Don't show notification immediately - it causes re-renders
   }, [onSetTimer])
 
   const handleUndo = () => {
@@ -164,12 +161,6 @@ const DraftControls = memo(function DraftControls({
         }
       },
     })
-  }
-
-  const handleRequestNotifications = () => {
-    if (onRequestNotificationPermission) {
-      onRequestNotificationPermission()
-    }
   }
 
   const handleShuffleDraftOrder = () => {
@@ -188,7 +179,7 @@ const DraftControls = memo(function DraftControls({
       onConfirm: () => {
         if (onResetDraft) {
           onResetDraft()
-          notify.warning('Draft Reset', 'All picks have been cleared. Teams remain but draft is back to setup.')
+          notify.warning('Draft Reset', 'All picks have been cleared.')
         }
       },
     })
@@ -208,252 +199,161 @@ const DraftControls = memo(function DraftControls({
     }
   }
 
-
   if (!isHost && !isAdmin) {
-    return null // Only show to hosts and admins
+    return null
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Crown className="h-5 w-5 text-yellow-600" />
-          Draft Controls
-          <Badge variant="secondary" className="text-xs">{isHost ? 'Host' : 'Admin'}</Badge>
-        </CardTitle>
-      </CardHeader>
+    <>
+      {/* Collapsed bar with primary actions */}
+      <div className="rounded-lg border bg-card shadow-sm">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <Crown className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+          <span className="text-sm font-medium text-muted-foreground flex-shrink-0">
+            {isHost ? 'Host' : 'Admin'}
+          </span>
 
-      <CardContent className="space-y-4">
-        {/* Primary Controls */}
-        <div className="flex gap-2 flex-wrap">
-          {draftStatus === 'waiting' && (
-            <>
-              <Button
-                onClick={handleShuffleDraftOrder}
-                disabled={teams.length < 2 || !onShuffleDraftOrder || isShuffling}
-                variant="outline"
-                className="border-purple-300 text-purple-700 hover:bg-purple-50"
-              >
-                <Shuffle className={`h-4 w-4 mr-2 ${isShuffling ? 'animate-spin' : ''}`} />
-                {isShuffling ? 'Shuffling...' : 'Shuffle Draft Order'}
-              </Button>
-              <Button
-                onClick={onStartDraft}
-                disabled={teams.length < 2 || isStarting}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                <Play className={`h-4 w-4 mr-2 ${isStarting ? 'animate-spin' : ''}`} />
-                {isStarting ? 'Starting...' : `Start Draft (${teams.length} teams)`}
-              </Button>
-            </>
-          )}
-
-          {draftStatus === 'drafting' && (
-            <>
-              {onPingCurrentPlayer && (
+          {/* Primary actions inline */}
+          <div className="flex items-center gap-1.5 ml-auto">
+            {draftStatus === 'waiting' && (
+              <>
                 <Button
-                  onClick={onPingCurrentPlayer}
+                  onClick={handleShuffleDraftOrder}
+                  disabled={teams.length < 2 || !onShuffleDraftOrder || isShuffling}
                   variant="outline"
-                  className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400"
+                  size="sm"
+                  className="h-7 text-xs"
                 >
-                  <Bell className="h-4 w-4 mr-2" />
-                  Ping Player
+                  <Shuffle className={cn('h-3 w-3 mr-1', isShuffling && 'animate-spin')} />
+                  Shuffle
                 </Button>
-              )}
-
-              <Button
-                onClick={handlePauseDraft}
-                variant="outline"
-                className="border-yellow-300 text-yellow-700 hover:bg-yellow-50"
-              >
-                <Pause className="h-4 w-4 mr-2" />
-                Pause
-              </Button>
-
-              <Button
-                onClick={handleEndDraft}
-                variant="destructive"
-              >
-                <Square className="h-4 w-4 mr-2" />
-                End Draft
-              </Button>
-            </>
-          )}
-
-          {draftStatus === 'paused' && (
-            <Button
-              onClick={handleResumeDraft}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Resume Draft
-            </Button>
-          )}
-
-          <Button
-            variant="outline"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            {showAdvanced ? 'Hide' : 'Show'} Advanced
-          </Button>
-        </div>
-
-        {/* Draft Status Info */}
-        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-          <div className="flex items-center gap-1">
-            <Users className="h-4 w-4" />
-            <span>{teams.length} teams</span>
-          </div>
-
-          {draftStatus === 'drafting' && (
-            <>
-              <div className="flex items-center gap-1">
-                <Timer className="h-4 w-4" />
-                <span>{timeRemaining}s remaining</span>
-              </div>
-              <div>
-                Turn {currentTurn} of {totalTeams * 6}
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Advanced Controls */}
-        {showAdvanced && (
-          <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Advanced Controls</h4>
-
-            {/* Turn Controls */}
-            {draftStatus === 'drafting' && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleAdvanceTurn}
-                    variant="outline"
-                    size="sm"
-                    className="border-orange-300 text-orange-700 hover:bg-orange-50"
-                  >
-                    <SkipForward className="h-4 w-4 mr-1" />
-                    Skip Turn
-                  </Button>
-                  <span className="text-xs text-gray-500">Skip current player&apos;s turn</span>
-                </div>
-              </div>
+                <Button
+                  onClick={onStartDraft}
+                  disabled={teams.length < 2 || isStarting}
+                  size="sm"
+                  className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                >
+                  <Play className={cn('h-3 w-3 mr-1', isStarting && 'animate-spin')} />
+                  {isStarting ? 'Starting...' : `Start (${teams.length})`}
+                </Button>
+              </>
             )}
 
-
-            {/* Undo Controls */}
             {draftStatus === 'drafting' && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleUndo}
-                    variant="outline"
-                    size="sm"
-                    disabled={!canUndo}
-                    className="border-purple-300 text-purple-700 hover:bg-purple-50 disabled:opacity-50"
-                  >
-                    <Undo className="h-4 w-4 mr-1" />
-                    Undo Last Pick
+              <>
+                {onPingCurrentPlayer && (
+                  <Button onClick={onPingCurrentPlayer} variant="outline" size="sm" className="h-7 text-xs">
+                    <Bell className="h-3 w-3 mr-1" />
+                    Ping
                   </Button>
-                  <span className="text-xs text-gray-500">Remove the most recent pick</span>
+                )}
+                {canUndo && onUndoLastPick && (
+                  <Button onClick={handleUndo} variant="outline" size="sm" className="h-7 text-xs">
+                    <Undo className="h-3 w-3 mr-1" />
+                    Undo
+                  </Button>
+                )}
+                <Button onClick={handleAdvanceTurn} variant="outline" size="sm" className="h-7 text-xs">
+                  <SkipForward className="h-3 w-3 mr-1" />
+                  Skip
+                </Button>
+                <Button onClick={handlePauseDraft} variant="outline" size="sm" className="h-7 text-xs">
+                  <Pause className="h-3 w-3" />
+                </Button>
+                <Button onClick={handleEndDraft} variant="destructive" size="sm" className="h-7 text-xs">
+                  <Square className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+
+            {draftStatus === 'paused' && (
+              <Button onClick={handleResumeDraft} size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700">
+                <Play className="h-3 w-3 mr-1" />
+                Resume
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="h-7 w-7 p-0"
+            >
+              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Expanded panel */}
+        {isExpanded && (
+          <div className="border-t px-3 py-3 space-y-3">
+            {/* Timer Controls */}
+            {draftStatus === 'drafting' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  Turn Timer: {timeRemaining}s
+                </label>
+                <div className="flex gap-1 flex-wrap">
+                  {[30, 60, 90, 120, 180, 300, 0].map(seconds => (
+                    <Button
+                      key={seconds}
+                      variant={timeRemaining === seconds ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleSetTimer(String(seconds))}
+                      className="h-6 text-xs px-2"
+                    >
+                      {seconds === 0 ? 'None' : `${seconds}s`}
+                    </Button>
+                  ))}
                 </div>
               </div>
             )}
 
             {/* Notification Permission */}
-            {!notificationsEnabled && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={handleRequestNotifications}
-                    variant="outline"
-                    size="sm"
-                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
-                  >
-                    <Bell className="h-4 w-4 mr-1" />
-                    Enable Notifications
-                  </Button>
-                  <span className="text-xs text-gray-500">Get notified when it&apos;s your turn</span>
-                </div>
-              </div>
+            {!notificationsEnabled && onRequestNotificationPermission && (
+              <Button
+                onClick={onRequestNotificationPermission}
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+              >
+                <Bell className="h-3 w-3 mr-1" />
+                Enable Notifications
+              </Button>
             )}
-
-            {/* Timer Controls */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Turn Timer: {timeRemaining}s
-              </label>
-              <div className="grid grid-cols-4 gap-2">
-                {[30, 60, 90, 120, 180, 300, 0].map(seconds => (
-                  <Button
-                    key={seconds}
-                    variant={timeRemaining === seconds ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleSetTimer(String(seconds))}
-                    className="text-xs"
-                  >
-                    {seconds === 0 ? 'None' : `${seconds}s`}
-                  </Button>
-                ))}
-              </div>
-            </div>
 
             {/* Danger Zone - Host Only */}
             {isHost && (
-            <div className="space-y-3 pt-3 border-t-2 border-red-200 dark:border-red-800">
-              <h4 className="font-medium text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Danger Zone (Host Only)
-              </h4>
-
-              {/* Reset Draft */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
+              <div className="pt-2 border-t border-destructive/20 space-y-2">
+                <span className="text-xs font-medium text-destructive">Danger Zone</span>
+                <div className="flex gap-1.5 flex-wrap">
                   <Button
                     onClick={handleResetDraft}
                     variant="outline"
                     size="sm"
-                    className="border-orange-400 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-400"
+                    className="h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
                     disabled={!onResetDraft}
                   >
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Reset Draft
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reset
                   </Button>
-                  <span className="text-xs text-gray-500">Clear all picks, keep teams</span>
-                </div>
-              </div>
-
-              {/* Delete Draft */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
                   <Button
                     onClick={handleDeleteDraft}
                     variant="destructive"
                     size="sm"
+                    className="h-7 text-xs"
                     disabled={!onDeleteDraft}
                   >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete Draft Permanently
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete
                   </Button>
-                  <span className="text-xs text-gray-500">Remove entire draft and all data</span>
                 </div>
               </div>
-            </div>
             )}
-
-            {/* Warning */}
-            <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
-              <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
-              <div className="text-xs text-yellow-800 dark:text-yellow-200">
-                <strong>Use with caution:</strong> Advanced controls can disrupt the draft flow.
-                Only use these if necessary to resolve issues or maintain fair play.
-              </div>
-            </div>
           </div>
         )}
-      </CardContent>
+      </div>
 
       {/* Confirmation Dialog */}
       <ConfirmDialog
@@ -469,19 +369,14 @@ const DraftControls = memo(function DraftControls({
         }}
       />
 
-      {/* Delete Draft Dialog (requires typing DELETE) */}
+      {/* Delete Draft Dialog */}
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Draft Permanently</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
-                <p>This will:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Remove the draft room</li>
-                  <li>Kick out all participants</li>
-                  <li>Remove it from everyone&apos;s draft list</li>
-                </ul>
+                <p>This will remove the draft, kick all participants, and delete all data.</p>
                 <p className="font-medium">This action CANNOT be undone!</p>
                 <div className="pt-2">
                   <label className="text-sm font-medium">
@@ -511,7 +406,7 @@ const DraftControls = memo(function DraftControls({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </>
   )
 })
 

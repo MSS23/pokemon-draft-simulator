@@ -14,9 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
 // ConnectionStatus from ui/ConnectionStatus is replaced by DraftConnectionStatusBadge
-import { Copy, Share2, History, Users, Clock, CheckCircle2 } from 'lucide-react'
+import { Copy, Share2, History, Crown, Clock, CheckCircle2 } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
 import { useAuth } from '@/contexts/AuthContext'
@@ -1438,7 +1437,6 @@ export default function DraftRoomPage() {
           {/* Header */}
           <div className="relative text-center mb-6">
             <div className="absolute top-0 right-0 flex gap-2">
-              <ImageTypeToggle />
               <ThemeToggle />
             </div>
             <h1 className="text-3xl font-bold brand-gradient-text mb-2">
@@ -1517,165 +1515,109 @@ export default function DraftRoomPage() {
     <div className="min-h-screen bg-background transition-colors duration-500">
       <div className="container mx-auto px-4 py-4 max-w-screen-2xl">
         {/* Header */}
-        <div className="mb-4 bg-card rounded-lg shadow-sm border px-4 py-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg sm:text-xl font-bold font-mono tracking-wider">
-                {roomCode}
-              </h1>
-              <Badge variant={draftState?.status === 'waiting' ? 'secondary' : draftState?.status === 'drafting' ? 'default' : 'outline'}>
-                {draftState?.status === 'waiting' ? 'Waiting' : draftState?.status === 'drafting' ? 'Live' : 'Done'}
-              </Badge>
-              {connectionStatus === 'reconnecting' && (
-                <Badge variant="destructive" className="animate-pulse text-xs">Reconnecting</Badge>
+        <div className="mb-3 flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="text-lg font-bold font-mono tracking-wider truncate">
+              {roomCode}
+            </h1>
+            <Badge
+              variant={draftState?.status === 'drafting' ? 'default' : 'secondary'}
+              className={cn(
+                'flex-shrink-0',
+                draftState?.status === 'drafting' && 'animate-pulse'
               )}
-              {connectionStatus === 'offline' && (
-                <Badge variant="destructive" className="text-xs">Offline</Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Button variant="ghost" size="sm" onClick={copyRoomCode} className="h-8 px-2.5">
-                <Copy className="h-3.5 w-3.5 mr-1" />
-                <span className="hidden sm:inline">Copy</span>
+            >
+              {draftState?.status === 'waiting' ? 'Waiting' : draftState?.status === 'drafting' ? 'Live' : 'Done'}
+            </Badge>
+            <DraftConnectionStatusBadge
+              status={realtimeConnectionStatus}
+              onReconnect={realtimeReconnect}
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={copyRoomCode} className="h-8 w-8" title="Copy room code">
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={shareRoom} className="h-8 w-8" title="Share room">
+              <Share2 className="h-3.5 w-3.5" />
+            </Button>
+            {draftState && draftState.status === 'drafting' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsActivitySidebarOpen(true)}
+                className="h-8 w-8 relative"
+                title="Draft activity"
+              >
+                <History className="h-3.5 w-3.5" />
+                {allDraftedIds.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+                    {allDraftedIds.length}
+                  </span>
+                )}
               </Button>
-              <Button variant="ghost" size="sm" onClick={shareRoom} className="h-8 px-2.5">
-                <Share2 className="h-3.5 w-3.5 mr-1" />
-                <span className="hidden sm:inline">Share</span>
+            )}
+            {draftState && (draftState.status as string) === 'completed' && (
+              <Button
+                size="sm"
+                onClick={() => router.push(`/draft/${roomCode}/results`)}
+                className="h-8"
+              >
+                Results
               </Button>
-              {draftState && draftState.status === 'drafting' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsActivitySidebarOpen(true)}
-                  className="h-8 px-2.5"
-                >
-                  <History className="h-3.5 w-3.5 mr-1" />
-                  <span className="hidden sm:inline">Activity</span>
-                  {allDraftedIds.length > 0 && (
-                    <Badge variant="default" size="sm" className="ml-1.5 h-4 px-1">
-                      {allDraftedIds.length}
-                    </Badge>
-                  )}
-                </Button>
-              )}
-              {draftState && ['completed'].includes(draftState.status) && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => router.push(`/draft/${roomCode}/results`)}
-                  className="h-8"
-                >
-                  Results
-                </Button>
-              )}
-              <DraftConnectionStatusBadge
-                status={realtimeConnectionStatus}
-                onReconnect={realtimeReconnect}
-              />
-              <ImageTypeToggle />
-              <ThemeToggle />
-            </div>
+            )}
+            <ThemeToggle />
           </div>
         </div>
 
-        {/* Waiting Lobby - Show when draft hasn't started */}
+        {/* Waiting Lobby */}
         {draftState?.status === 'waiting' && (
-          <div className="mb-6">
-            <Card className="border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/20">
-              <CardContent className="pt-6">
-                <div className="text-center space-y-4">
-                  <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400">
-                    <Clock className="h-6 w-6 animate-pulse" />
-                    <h2 className="text-xl font-bold">Waiting for Players</h2>
-                  </div>
+          <div className="mb-4 rounded-lg border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/10 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="h-4 w-4 text-blue-500 animate-pulse" />
+              <span className="font-semibold text-sm">
+                {draftState.teams.length}/{draftState.draftSettings.maxTeams} Teams
+              </span>
+              <div className="flex-1 bg-muted rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="brand-gradient-bg h-full rounded-full transition-all duration-500"
+                  style={{ width: `${(draftState.teams.length / draftState.draftSettings.maxTeams) * 100}%` }}
+                />
+              </div>
+            </div>
 
-                  {/* Progress indicator */}
-                  <div className="max-w-md mx-auto">
-                    <div className="flex items-center justify-between text-sm mb-2">
-                      <span className="text-muted-foreground">Teams joined</span>
-                      <span className="font-semibold">
-                        {draftState.teams.length} / {draftState.draftSettings.maxTeams}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                      <div
-                        className="brand-gradient-bg h-full rounded-full transition-all duration-500"
-                        style={{ width: `${(draftState.teams.length / draftState.draftSettings.maxTeams) * 100}%` }}
-                      />
-                    </div>
-                  </div>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {draftState.teams.map((team, idx) => (
+                <Badge key={team.id} variant="secondary" className="text-xs py-0.5 px-2">
+                  <CheckCircle2 className="h-3 w-3 text-green-500 mr-1" />
+                  {team.name}
+                  {idx === 0 && <Crown className="h-3 w-3 text-yellow-500 ml-1" />}
+                </Badge>
+              ))}
+              {Array.from({ length: draftState.draftSettings.maxTeams - draftState.teams.length }).map((_, i) => (
+                <Badge key={`empty-${i}`} variant="outline" className="text-xs py-0.5 px-2 border-dashed">
+                  Waiting...
+                </Badge>
+              ))}
+            </div>
 
-                  {/* Joined teams list */}
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    {draftState.teams.map((team, idx) => (
-                      <Badge
-                        key={team.id}
-                        variant="secondary"
-                        className="text-sm py-1 px-3 flex items-center gap-1.5"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                        <span className="font-medium">{team.name}</span>
-                        <span className="text-muted-foreground">({team.userName})</span>
-                        {idx === 0 && (
-                          <Badge variant="outline" size="sm" className="ml-1">Host</Badge>
-                        )}
-                      </Badge>
-                    ))}
-                    {/* Empty slots */}
-                    {Array.from({ length: draftState.draftSettings.maxTeams - draftState.teams.length }).map((_, i) => (
-                      <Badge
-                        key={`empty-${i}`}
-                        variant="outline"
-                        className="text-sm py-1 px-3 border-dashed text-muted-foreground"
-                      >
-                        <Users className="h-3.5 w-3.5 mr-1.5" />
-                        Waiting...
-                      </Badge>
-                    ))}
-                  </div>
+            <div className="text-xs text-muted-foreground">
+              Share code <span className="font-mono font-bold text-foreground">{roomCode}</span> to invite players
+              {!isHost && !isAdmin && ' — host will start once everyone joins'}
+              {(isHost || isAdmin) && draftState.teams.length < 2 && ' — need at least 2 teams'}
+              {(isHost || isAdmin) && draftState.teams.length >= 2 && draftState.teams.length < draftState.draftSettings.maxTeams &&
+                ` — you can start now or wait for all ${draftState.draftSettings.maxTeams}`}
+            </div>
 
-                  {/* Room code share prompt */}
-                  <div className="text-sm text-muted-foreground">
-                    Share room code <span className="font-mono font-bold text-foreground">{roomCode}</span> with other players to join
-                  </div>
-
-                  {/* Host start button (prominent when teams are filled) */}
-                  {(isHost || isAdmin) && draftState.teams.length >= draftState.draftSettings.maxTeams && (
-                    <div className="pt-2">
-                      <Button
-                        onClick={startDraft}
-                        disabled={isStarting}
-                        size="lg"
-                        className="bg-green-600 hover:bg-green-700 text-lg px-8 py-6 animate-pulse"
-                      >
-                        {isStarting ? 'Starting...' : `Start Draft (${draftState.teams.length} Teams Ready!)`}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Non-host message */}
-                  {!isHost && !isAdmin && (
-                    <p className="text-sm text-muted-foreground italic">
-                      The host will start the draft once all players have joined.
-                    </p>
-                  )}
-
-                  {/* Host/Admin: not enough teams yet */}
-                  {(isHost || isAdmin) && draftState.teams.length < 2 && (
-                    <p className="text-sm text-orange-600 dark:text-orange-400">
-                      Need at least 2 teams to start the draft.
-                    </p>
-                  )}
-
-                  {/* Host: can start early */}
-                  {(isHost || isAdmin) && draftState.teams.length >= 2 && draftState.teams.length < draftState.draftSettings.maxTeams && (
-                    <p className="text-sm text-muted-foreground">
-                      You can start early with {draftState.teams.length} teams, or wait for all {draftState.draftSettings.maxTeams} to join.
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {(isHost || isAdmin) && draftState.teams.length >= draftState.draftSettings.maxTeams && (
+              <Button
+                onClick={startDraft}
+                disabled={isStarting}
+                className="mt-3 bg-green-600 hover:bg-green-700 w-full animate-pulse"
+              >
+                {isStarting ? 'Starting...' : 'All Teams Ready — Start Draft'}
+              </Button>
+            )}
           </div>
         )}
 
@@ -1718,7 +1660,7 @@ export default function DraftRoomPage() {
 
         {/* Spectator Mode */}
         {draftState && (isSpectator || !draftState.userTeamId) && (
-          <div className="mb-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="mb-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div className="lg:col-span-2">
               <SpectatorMode
                 draftId={roomCode?.toLowerCase() || ''}
@@ -1753,7 +1695,7 @@ export default function DraftRoomPage() {
 
         {/* Draft Controls */}
         {draftState && (isHost || isAdmin) && !isSpectator && (
-          <div className="mb-6">
+          <div className="mb-3">
             <DraftControls
               draftStatus={draftState?.status}
               currentTurn={draftState?.currentTurn}
@@ -1787,7 +1729,7 @@ export default function DraftRoomPage() {
 
         {/* Draft Type Specific Controls - hidden for spectators */}
         {draftState && draftState.status === 'drafting' && !isSpectator && draftState.userTeamId && (
-          <div className="mb-6">
+          <div className="mb-3">
             {isAuctionDraft ? (
               // Auction Draft Controls
               <div className="space-y-4">
@@ -1829,32 +1771,28 @@ export default function DraftRoomPage() {
                 )}
               </div>
             ) : (
-              // Snake Draft Controls
               <div className={cn(
-                'px-4 py-3 rounded-lg border transition-all',
+                'px-3 py-2 rounded-lg border transition-all',
                 isUserTurn
-                  ? 'bg-primary/5 border-primary/30 shadow-md'
-                  : 'bg-card border-border shadow-sm'
+                  ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20'
+                  : 'bg-muted/50 border-border'
               )}>
                 {selectedPokemon && isUserTurn ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <p className="text-xs text-muted-foreground mb-0.5">Selected</p>
-                      <p className="font-semibold">{selectedPokemon.name}</p>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium truncate flex-1">{selectedPokemon.name}</span>
                     <Button
                       onClick={() => handleDraftPokemon(selectedPokemon)}
-                      size="lg"
-                      className="px-6"
+                      size="sm"
+                      className="px-4 flex-shrink-0"
                     >
                       Confirm Pick
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground text-center py-1">
+                  <p className="text-xs text-muted-foreground text-center">
                     {!isUserTurn
-                      ? `Waiting for ${currentTeam?.name} to pick...`
-                      : 'Tap a Pokémon below to select it'
+                      ? `Waiting for ${currentTeam?.name}...`
+                      : 'Select a Pokémon below'
                     }
                   </p>
                 )}
@@ -1865,19 +1803,9 @@ export default function DraftRoomPage() {
 
         {/* Loading Notice */}
         {!draftState && (
-          <div className="mb-6 bg-primary/5 border border-primary/20 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mt-0.5"></div>
-              <div>
-                <h3 className="font-semibold mb-1">
-                  Connecting to Draft Room
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  You can browse and select Pokemon while we load the team information.
-                  The draft order will be determined once all teams have joined.
-                </p>
-              </div>
-            </div>
+          <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg px-3 py-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary flex-shrink-0"></div>
+            Connecting to draft room...
           </div>
         )}
 
@@ -1896,7 +1824,7 @@ export default function DraftRoomPage() {
         )}
 
         {/* Pokemon Grid */}
-        <div className="bg-card rounded-lg shadow p-3 sm:p-6">
+        <div className="bg-card rounded-lg shadow-sm border p-3 sm:p-4">
           <EnhancedErrorBoundary>
             <PokemonGrid
               pokemon={pokemon?.filter(p => p.isLegal) || []}
