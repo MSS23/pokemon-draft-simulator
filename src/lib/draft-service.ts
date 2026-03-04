@@ -1719,26 +1719,26 @@ export class DraftService {
     if (!supabase) throw new Error('Supabase not available')
 
     try {
-      // Get draft state to verify format
-      const draftState = await this.getDraftState(draftId)
-
-      // Only create leagues from snake drafts
-      if (draftState?.draft?.format !== 'snake') {
-        log.info('League auto-creation skipped: Only snake drafts supported')
-        return
-      }
-
       const { LeagueService } = await import('./league-service')
 
       const leagueWeeks = settings.leagueWeeks || 4
       const splitIntoConferences = settings.splitIntoConferences || false
 
-      await LeagueService.createLeagueFromDraft(draftId, {
+      const { leagues } = await LeagueService.createLeagueFromDraft(draftId, {
         splitIntoConferences,
         totalWeeks: leagueWeeks,
         matchFormat: 'best_of_3',
-        maxMatchesPerWeek: 1  // Limit each team to 1 match per week
+        maxMatchesPerWeek: 1
       })
+
+      // Initialize Pokemon status tracking and league settings for each league
+      for (const league of leagues) {
+        await LeagueService.initializeLeaguePokemonStatus(league.id)
+        await LeagueService.updateLeagueSettings(league.id, {
+          enableTrades: true,
+          matchFormat: 'best_of_3',
+        })
+      }
 
       log.info('League created successfully for draft:', draftId)
     } catch (error) {
