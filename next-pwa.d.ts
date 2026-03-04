@@ -7,7 +7,7 @@ declare module 'next-pwa' {
     register?: boolean
     skipWaiting?: boolean
     disable?: boolean
-    runtimeCaching?: any[]
+    runtimeCaching?: Array<Record<string, unknown>>
     buildExcludes?: (string | RegExp)[]
     publicExcludes?: string[]
     cacheOnFrontEndNav?: boolean

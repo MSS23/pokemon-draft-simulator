@@ -99,14 +99,14 @@ export default function PokemonDetailsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700">
+      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto bg-white dark:bg-background border-2 border-border">
         <DialogHeader className="pb-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <DialogTitle className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+              <DialogTitle className="text-3xl font-bold text-foreground mb-2">
                 {pokemon.name}
               </DialogTitle>
-              <DialogDescription className="text-slate-600 dark:text-slate-400 flex items-center gap-2 text-sm">
+              <DialogDescription className="text-muted-foreground flex items-center gap-2 text-sm">
                 <span>Pokémon #{pokemon.id.padStart(3, '0')}</span>
                 {!isDrafted && !isDisabled && (
                   <>
@@ -160,7 +160,7 @@ export default function PokemonDetailsModal({
                   />
                 </>
               ) : (
-                <div className="w-48 h-48 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 dark:text-slate-400">
+                <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center text-muted-foreground">
                   No Image Available
                 </div>
               )}
@@ -180,14 +180,14 @@ export default function PokemonDetailsModal({
             </div>
 
             {/* Abilities */}
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-              <h3 className="font-semibold mb-3 text-slate-900 dark:text-white">Abilities</h3>
+            <div className="bg-muted rounded-lg p-4">
+              <h3 className="font-semibold mb-3 text-foreground">Abilities</h3>
               <div className="flex flex-wrap gap-2">
                 {pokemon.abilities.map((ability, index) => (
                   <Badge
                     key={index}
                     variant="outline"
-                    className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300"
+                    className="border-border text-muted-foreground"
                   >
                     {ability}
                   </Badge>
@@ -198,7 +198,7 @@ export default function PokemonDetailsModal({
 
           {/* Right Column - Stats */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Base Stats</h3>
+            <h3 className="font-semibold text-lg text-foreground">Base Stats</h3>
 
             <div className="space-y-3">
               {[
@@ -211,7 +211,7 @@ export default function PokemonDetailsModal({
               ].map((stat) => (
                 <div key={stat.key} className="space-y-1.5">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">{stat.name}</span>
+                    <span className="text-sm font-medium text-muted-foreground">{stat.name}</span>
                     <span
                       className="font-bold text-base"
                       style={{ color: getStatColor(stat.value) }}
@@ -227,9 +227,9 @@ export default function PokemonDetailsModal({
               ))}
 
               {/* Total */}
-              <div className="pt-3 mt-2 border-t border-slate-200 dark:border-slate-700">
+              <div className="pt-3 mt-2 border-t border-border">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-slate-900 dark:text-white">Total</span>
+                  <span className="font-semibold text-foreground">Total</span>
                   <span className="font-bold text-lg text-purple-600 dark:text-purple-400">
                     {pokemon.stats.total}
                   </span>
@@ -245,7 +245,7 @@ export default function PokemonDetailsModal({
 
         {/* Action Buttons */}
         {!isDrafted && !isDisabled && onSelect && (
-          <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex justify-end gap-3 pt-6 border-t border-border">
             <Button
               variant="outline"
               onClick={onClose}
@@ -267,7 +267,7 @@ export default function PokemonDetailsModal({
         )}
 
         {isDrafted && (
-          <div className="flex justify-center pt-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="flex justify-center pt-4 border-t border-border">
             <Badge variant="destructive" className="px-4 py-2">
               This Pokémon has already been drafted
             </Badge>

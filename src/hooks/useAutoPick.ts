@@ -61,7 +61,11 @@ export function useAutoPick({
         if (prev <= 1) {
           // Auto-pick the Pokemon
           if (nextPokemon && onAutoPick) {
-            onAutoPick(nextPokemon)
+            try {
+              onAutoPick(nextPokemon)
+            } catch {
+              // Auto-pick failed — don't advance turn, user must pick manually
+            }
           }
           setIsCountingDown(false)
           setHasStartedCountdown(false)

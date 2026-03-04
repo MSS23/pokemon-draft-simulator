@@ -42,6 +42,7 @@ const RATE_LIMITS: Record<string, { limit: number; window: number }> = {
   '/api/drafts': { limit: 10, window: 3600000 }, // 10 drafts per hour
   '/api/picks': { limit: 60, window: 60000 },    // 60 picks per minute
   '/api/bids': { limit: 120, window: 60000 },    // 120 bids per minute
+  '/api/user/export': { limit: 5, window: 3600000 }, // 5 exports per hour
   '/api/': { limit: 100, window: 60000 },        // 100 requests per minute (default)
 }
 

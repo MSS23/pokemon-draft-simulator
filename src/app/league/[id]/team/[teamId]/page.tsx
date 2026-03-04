@@ -21,12 +21,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { LeagueStatsService } from '@/lib/league-stats-service'
+import { MatchKOService } from '@/lib/match-ko-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/contexts/AuthContext'
 // UserSessionService used for guest ID fallback
-import { getPokemonAnimatedUrl, getPokemonSpriteUrl, formatPokemonName } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
 import {
   ArrowLeft,
   TrendingUp,
@@ -66,6 +67,7 @@ export default function TeamDetailPage() {
   const [form, setForm] = useState<TeamFormIndicator | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [analysis, setAnalysis] = useState<any>(null)
+  const [pokemonKOStats, setPokemonKOStats] = useState<Map<string, { kills: number; deaths: number; matchesPlayed: number }>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -136,6 +138,26 @@ export default function TeamDetailPage() {
       // Load form
       const formData = await LeagueStatsService.getTeamForm(teamId)
       setForm(formData)
+
+      // Load KO/death stats per Pokemon
+      try {
+        const [teamStatuses, deathCounts] = await Promise.all([
+          MatchKOService.getTeamPokemonStatuses(teamId, leagueId),
+          MatchKOService.getDeathCounts(leagueId),
+        ])
+
+        const koStatsMap = new Map<string, { kills: number; deaths: number; matchesPlayed: number }>()
+        for (const status of teamStatuses) {
+          koStatsMap.set(status.pickId, {
+            kills: status.totalKos,
+            deaths: deathCounts.get(status.pickId) || 0,
+            matchesPlayed: status.matchesPlayed,
+          })
+        }
+        setPokemonKOStats(koStatsMap)
+      } catch (err) {
+        log.warn('Failed to load KO stats:', err)
+      }
 
       // Check AI analysis access
       const accessInfo = await AIAccessControl.getLeagueAccessInfo(leagueId)
@@ -232,7 +254,7 @@ export default function TeamDetailPage() {
               Back to League
             </Button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold brand-gradient-text">
                 {team.name}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -498,43 +520,70 @@ export default function TeamDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {picks.map(pick => (
-                    <Card key={pick.id} className="overflow-hidden">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          {/* Animated sprite */}
-                          <div className="flex-shrink-0 w-14 h-14 flex items-center justify-center">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
-                              alt={pick.pokemonName}
-                              className="w-14 h-14 pixelated"
-                              loading="lazy"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                if (!target.dataset.fallback) {
-                                  target.dataset.fallback = '1'
-                                  target.src = getPokemonSpriteUrl(pick.pokemonId)
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm">{formatPokemonName(pick.pokemonName)}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              Round {pick.round} • Pick #{pick.pickOrder}
+                  {picks.map(pick => {
+                    const koStats = pokemonKOStats.get(pick.id)
+                    const kd = koStats ? (koStats.kills / Math.max(koStats.deaths, 1)) : null
+                    return (
+                      <Card key={pick.id} className="overflow-hidden">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3">
+                            {/* Animated sprite */}
+                            <div className="flex-shrink-0 w-14 h-14 flex items-center justify-center">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
+                                alt={pick.pokemonName}
+                                className="w-14 h-14 pixelated"
+                                loading="lazy"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  if (!target.dataset.fallback) {
+                                    target.dataset.fallback = '1'
+                                    target.src = getPokemonAnimatedBackupUrl(pick.pokemonId)
+                                  }
+                                }}
+                              />
                             </div>
-                            {/* Show cost only to owner and opponents, not spectators */}
-                            {viewerRole !== 'spectator' && (
-                              <Badge variant="outline" className="mt-1 text-[10px]">
-                                {pick.cost} pts
-                              </Badge>
-                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm">{formatPokemonName(pick.pokemonName)}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                Round {pick.round} • Pick #{pick.pickOrder}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                {/* Show cost only to owner and opponents, not spectators */}
+                                {viewerRole !== 'spectator' && (
+                                  <Badge variant="outline" size="sm">
+                                    {pick.cost} pts
+                                  </Badge>
+                                )}
+                                {koStats && koStats.matchesPlayed > 0 && (
+                                  <>
+                                    <Badge variant="secondary" size="sm">
+                                      {koStats.kills}K / {koStats.deaths}D
+                                    </Badge>
+                                    {kd !== null && (
+                                      <span className={`text-[10px] font-medium ${
+                                        kd >= 2 ? 'text-green-600 dark:text-green-400' :
+                                        kd >= 1 ? 'text-yellow-600 dark:text-yellow-400' :
+                                        'text-red-600 dark:text-red-400'
+                                      }`}>
+                                        {kd.toFixed(1)} K/D
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                              {koStats && koStats.matchesPlayed > 0 && (
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  {koStats.matchesPlayed} matches • {(koStats.kills / koStats.matchesPlayed).toFixed(1)} KOs/match
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>

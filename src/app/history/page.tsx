@@ -221,12 +221,12 @@ export default function HistoryPage() {
 
     const badges: Record<number, { label: string; className: string }> = {
       1: { label: '🥇 Champion', className: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' },
-      2: { label: '🥈 2nd Place', className: 'bg-slate-400/20 text-slate-400 border-slate-400/30' },
+      2: { label: '🥈 2nd Place', className: 'bg-muted text-muted-foreground border-border' },
       3: { label: '🥉 3rd Place', className: 'bg-orange-600/20 text-orange-600 border-orange-600/30' },
     }
     const badge = badges[finalPlacement] || {
       label: `#${finalPlacement}`,
-      className: 'bg-slate-600/20 text-slate-600 border-slate-600/30'
+      className: 'bg-muted text-muted-foreground border-border'
     }
     return <Badge variant="outline" className={badge.className}>{badge.label}</Badge>
   }

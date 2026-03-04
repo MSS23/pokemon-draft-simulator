@@ -88,7 +88,7 @@ function ToastContainer({
 function Toast({ title, description, variant = 'default', onClose }: ToastProps) {
   const variants = {
     default: {
-      bg: 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700',
+      bg: 'bg-white dark:bg-card border-border',
       icon: <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
     },
     success: {
@@ -123,12 +123,12 @@ function Toast({ title, description, variant = 'default', onClose }: ToastProps)
         {style.icon}
         <div className="flex-1 space-y-1">
           {title && (
-            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <div className="text-sm font-semibold text-foreground">
               {title}
             </div>
           )}
           {description && (
-            <div className="text-sm text-slate-700 dark:text-slate-300">
+            <div className="text-sm text-muted-foreground">
               {description}
             </div>
           )}
@@ -136,7 +136,7 @@ function Toast({ title, description, variant = 'default', onClose }: ToastProps)
       </div>
       <button
         onClick={onClose}
-        className="absolute right-2 top-2 rounded-md p-1 text-slate-500 opacity-0 transition-opacity hover:text-slate-900 focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 dark:text-slate-400 dark:hover:text-slate-100"
+        className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100"
       >
         <X className="h-4 w-4" />
       </button>

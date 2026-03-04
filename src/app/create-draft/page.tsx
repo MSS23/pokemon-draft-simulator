@@ -377,7 +377,7 @@ export default function CreateDraftPage() {
                 Signed in as: {user.email}
               </div>
             )}
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
+            <h1 className="text-4xl font-bold brand-gradient-text mb-4">
               Create Draft Room
             </h1>
             <p className="text-lg text-muted-foreground mb-6">
@@ -850,7 +850,7 @@ export default function CreateDraftPage() {
                       >
                         Pokémon per Team{" "}
                         {formData.draftType === "snake" && (
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-muted-foreground">
                             (min 6 for points-based)
                           </span>
                         )}
@@ -889,7 +889,7 @@ export default function CreateDraftPage() {
                         className="text-sm font-medium"
                       >
                         Budget per Team (Points){" "}
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-muted-foreground">
                           Used to draft Pokémon
                         </span>
                       </Label>

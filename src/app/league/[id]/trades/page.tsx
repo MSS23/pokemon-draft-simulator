@@ -169,7 +169,7 @@ export default function LeagueTradesPage() {
               Back to League
             </Button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold brand-gradient-text">
                 Trade Center
               </h1>
               <p className="text-sm text-muted-foreground mt-1">{league.name}</p>

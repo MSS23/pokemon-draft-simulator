@@ -2,12 +2,12 @@
 
 import { useState, useMemo, memo } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { X, History, Trophy } from 'lucide-react'
+import { X, History } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Pokemon } from '@/types'
 import { TEAM_COLORS } from '@/utils/team-colors'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 
 interface DraftActivityItem {
   id: string
@@ -27,6 +27,28 @@ interface DraftActivitySidebarProps {
   activities: DraftActivityItem[]
   pokemon: Pokemon[]
   currentUserTeamId?: string | null
+}
+
+/** Type color mapping for small colored dots */
+const TYPE_COLORS: Record<string, string> = {
+  normal: 'bg-stone-400',
+  fire: 'bg-orange-500',
+  water: 'bg-blue-500',
+  electric: 'bg-yellow-400',
+  grass: 'bg-green-500',
+  ice: 'bg-cyan-300',
+  fighting: 'bg-red-700',
+  poison: 'bg-purple-500',
+  ground: 'bg-amber-600',
+  flying: 'bg-indigo-300',
+  psychic: 'bg-pink-500',
+  bug: 'bg-lime-500',
+  rock: 'bg-amber-700',
+  ghost: 'bg-purple-700',
+  dragon: 'bg-violet-600',
+  dark: 'bg-stone-700',
+  steel: 'bg-slate-400',
+  fairy: 'bg-pink-300',
 }
 
 const DraftActivitySidebar = memo(function DraftActivitySidebar({
@@ -65,6 +87,22 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
     [activities, filter, currentUserTeamId]
   )
 
+  // Group activities by round for section headers
+  const groupedByRound = useMemo(() => {
+    const groups: { round: number; items: typeof filteredActivities }[] = []
+    let currentRound = -1
+
+    for (const activity of filteredActivities) {
+      if (activity.round !== currentRound) {
+        currentRound = activity.round
+        groups.push({ round: currentRound, items: [] })
+      }
+      groups[groups.length - 1].items.push(activity)
+    }
+
+    return groups
+  }, [filteredActivities])
+
   return (
     <>
       {/* Backdrop */}
@@ -84,14 +122,14 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
+            <div className="flex items-center gap-2.5">
               <History className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">Draft Activity</h2>
+              <h2 className="text-sm font-semibold tracking-tight">Draft Activity</h2>
               {activities.length > 0 && (
-                <Badge variant="secondary" className="text-xs h-5 px-1.5">
-                  {activities.length}
-                </Badge>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {activities.length} picks
+                </span>
               )}
             </div>
             <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
@@ -101,82 +139,114 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
 
           {/* Filters */}
           <div className="px-4 py-2 border-b">
-            <div className="flex gap-1.5">
+            <div className="flex gap-1">
               {(['all', 'my-team', 'opponents'] as const).map(f => (
-                <Button
+                <button
                   key={f}
-                  variant={filter === f ? 'default' : 'ghost'}
-                  size="sm"
                   onClick={() => setFilter(f)}
-                  className={cn('flex-1 h-7 text-xs', filter !== f && 'text-muted-foreground')}
+                  className={cn(
+                    'flex-1 py-1.5 text-xs font-medium rounded-md transition-colors',
+                    filter === f
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                  )}
                 >
                   {f === 'all' ? 'All' : f === 'my-team' ? 'My Team' : 'Opponents'}
-                </Button>
+                </button>
               ))}
             </div>
           </div>
 
           {/* Activity List */}
           <ScrollArea className="flex-1">
-            <div className="p-3">
+            <div className="px-3 py-2">
               {filteredActivities.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
-                  <Trophy className="h-8 w-8 text-muted-foreground/30 mb-2" />
                   <p className="text-sm text-muted-foreground">No picks yet</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Picks will appear here as they happen</p>
                 </div>
               ) : (
-                <div className="space-y-1.5">
-                  {filteredActivities.map((activity) => {
-                    const pokemonData = pokemonMap.get(activity.pokemonId)
-                    const isUserTeam = activity.teamId === currentUserTeamId
-                    const colors = teamColorMap.get(activity.teamId) || TEAM_COLORS[0]
-
-                    return (
-                      <div
-                        key={activity.id}
-                        className={cn(
-                          'flex items-center gap-3 px-3 py-2 rounded-lg border-l-[3px] transition-colors',
-                          colors.border,
-                          isUserTeam ? colors.bg : 'hover:bg-muted/50'
-                        )}
-                      >
-                        {/* Pokemon sprite */}
-                        {pokemonData && (
-                          <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
-                              alt={pokemonData.name}
-                              className="w-10 h-10 pixelated"
-                              loading="lazy"
-                            />
-                          </div>
-                        )}
-
-                        {/* Pick info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium text-sm truncate">
-                              {activity.pokemonName}
-                            </span>
-                            {pokemonData?.types?.map(type => (
-                              <Badge key={type.name} variant="outline" className="text-[10px] h-4 px-1 hidden sm:inline-flex">
-                                {type.name}
-                              </Badge>
-                            ))}
-                          </div>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={cn('text-xs font-medium', colors.text)}>
-                              {activity.teamName}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              R{activity.round} · #{activity.pickNumber}
-                            </span>
-                          </div>
-                        </div>
+                <div className="space-y-3">
+                  {groupedByRound.map(({ round, items }) => (
+                    <div key={round}>
+                      {/* Round divider */}
+                      <div className="flex items-center gap-2 mb-1.5 px-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                          Round {round}
+                        </span>
+                        <div className="flex-1 h-px bg-border" />
                       </div>
-                    )
-                  })}
+
+                      <div className="space-y-0.5">
+                        {items.map((activity) => {
+                          const pokemonData = pokemonMap.get(activity.pokemonId)
+                          const isUserTeam = activity.teamId === currentUserTeamId
+                          const colors = teamColorMap.get(activity.teamId) || TEAM_COLORS[0]
+
+                          return (
+                            <div
+                              key={activity.id}
+                              className={cn(
+                                'flex items-center gap-2.5 px-2.5 py-1.5 rounded-md border-l-[3px] transition-colors',
+                                colors.border,
+                                isUserTeam ? colors.bg : 'hover:bg-muted/40'
+                              )}
+                            >
+                              {/* Pick number */}
+                              <span className="text-[10px] font-mono text-muted-foreground/50 w-4 text-right flex-shrink-0 tabular-nums">
+                                {activity.pickNumber}
+                              </span>
+
+                              {/* Pokemon sprite */}
+                              {pokemonData && (
+                                <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={getPokemonAnimatedUrl(pokemonData.id, pokemonData.name)}
+                                    alt={pokemonData.name}
+                                    className="w-9 h-9"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement
+                                      if (!target.dataset.fallback) {
+                                        target.dataset.fallback = '1'
+                                        target.src = getPokemonAnimatedBackupUrl(pokemonData.id)
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              {/* Pick info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-[13px] leading-tight truncate capitalize">
+                                    {activity.pokemonName}
+                                  </span>
+                                  {/* Type dots */}
+                                  <div className="flex gap-0.5 flex-shrink-0">
+                                    {pokemonData?.types?.map(type => (
+                                      <span
+                                        key={type.name}
+                                        title={type.name}
+                                        className={cn(
+                                          'w-2 h-2 rounded-full inline-block',
+                                          TYPE_COLORS[type.name.toLowerCase()] || 'bg-gray-400'
+                                        )}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                                <span className={cn('text-[11px] leading-tight', colors.text)}>
+                                  {activity.teamName}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -184,26 +254,21 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
 
           {/* Footer Stats */}
           {activities.length > 0 && (
-            <div className="px-4 py-3 border-t bg-muted/30">
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <div className="text-lg font-bold">{activities.length}</div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Picks</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold">
-                    {Math.max(...activities.map(a => a.round))}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Round</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold">
-                    {currentUserTeamId
-                      ? activities.filter(a => a.teamId === currentUserTeamId).length
-                      : '-'}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Yours</div>
-                </div>
+            <div className="px-4 py-2.5 border-t bg-muted/20">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span className="tabular-nums">
+                  <span className="font-semibold text-foreground">{activities.length}</span> picks
+                </span>
+                <span className="tabular-nums">
+                  Round <span className="font-semibold text-foreground">{Math.max(...activities.map(a => a.round))}</span>
+                </span>
+                {currentUserTeamId && (
+                  <span className="tabular-nums">
+                    <span className="font-semibold text-foreground">
+                      {activities.filter(a => a.teamId === currentUserTeamId).length}
+                    </span> yours
+                  </span>
+                )}
               </div>
             </div>
           )}

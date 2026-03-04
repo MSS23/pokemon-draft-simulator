@@ -43,11 +43,11 @@ export default function AdminPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Shield className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold brand-gradient-text">
               Admin Panel
             </h1>
           </div>
-          <p className="text-slate-600 dark:text-slate-400">
+          <p className="text-muted-foreground">
             Manage format data, settings, and system configuration
           </p>
         </div>
@@ -88,29 +88,29 @@ export default function AdminPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                     <div className="w-2 h-2 mt-2 rounded-full bg-green-500" />
                     <div>
                       <p className="font-medium text-sm">VGC 2024 Regulation H</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         Official VGC format - Paldea, Kitakami, Blueberry Academy Pokédex
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                     <div className="w-2 h-2 mt-2 rounded-full bg-blue-500" />
                     <div>
                       <p className="font-medium text-sm">VGC Doubles</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         Standard VGC doubles format
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                     <div className="w-2 h-2 mt-2 rounded-full bg-purple-500" />
                     <div>
                       <p className="font-medium text-sm">Gen 9 OU</p>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         Smogon Gen 9 Overused tier
                       </p>
                     </div>
@@ -130,7 +130,7 @@ export default function AdminPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                <div className="p-8 text-center text-muted-foreground">
                   <Settings className="h-12 w-12 mx-auto mb-3 opacity-50" />
                   <p className="text-sm">No additional settings configured</p>
                 </div>

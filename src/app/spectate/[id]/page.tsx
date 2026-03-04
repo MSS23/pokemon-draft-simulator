@@ -103,7 +103,7 @@ export default function SpectateRoomPage() {
               <div className="text-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
                 <h2 className="text-xl font-semibold mb-2">Loading Draft...</h2>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   Connecting to spectator view
                 </p>
               </div>
@@ -123,7 +123,7 @@ export default function SpectateRoomPage() {
               <CardTitle>Error</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-600 dark:text-slate-400 mb-4">
+              <p className="text-muted-foreground mb-4">
                 {displayError || "Draft room not found"}
               </p>
               <div className="flex gap-2">
@@ -184,7 +184,7 @@ export default function SpectateRoomPage() {
             </div>
             <div className="flex items-center justify-center gap-2">
               <Eye className="h-6 w-6 text-primary" />
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold brand-gradient-text">
                 Spectating: {roomCode.toUpperCase()}
               </h1>
             </div>

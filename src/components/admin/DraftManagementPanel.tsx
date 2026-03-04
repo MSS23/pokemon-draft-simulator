@@ -134,7 +134,7 @@ export default function DraftManagementPanel() {
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by room code or name..."
                 value={searchTerm}
@@ -162,7 +162,7 @@ export default function DraftManagementPanel() {
             </Button>
           </div>
 
-          <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>Total Drafts: {drafts.length}</span>
             <span>Filtered: {filteredDrafts.length}</span>
           </div>
@@ -173,13 +173,13 @@ export default function DraftManagementPanel() {
         <Card>
           <CardContent className="py-12 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-slate-600 dark:text-slate-400">Loading drafts...</p>
+            <p className="text-muted-foreground">Loading drafts...</p>
           </CardContent>
         </Card>
       ) : filteredDrafts.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               {searchTerm ? 'No drafts match your search' : 'No drafts in the system'}
             </p>
           </CardContent>
@@ -203,10 +203,10 @@ export default function DraftManagementPanel() {
                       {draft.is_public && <Badge variant="outline">Public</Badge>}
                       <Badge variant="outline">{draft.format}</Badge>
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">
                       {draft.name}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       Created: {new Date(draft.created_at).toLocaleString()} &bull; {draft.max_teams} teams
                     </p>
                   </div>

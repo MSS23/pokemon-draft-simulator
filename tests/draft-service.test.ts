@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { DraftService } from '@/lib/draft-service'
 import { supabase } from '@/lib/supabase'
-import { mockAuthUser, mockUserProfile } from './utils/test-data'
+import { mockAuthUser } from './utils/test-data'
 
 // Mock bcrypt
 vi.mock('bcryptjs', () => ({

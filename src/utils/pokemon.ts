@@ -48,10 +48,22 @@ export const getStatColor = (stat: number): string => {
   return '#DDD'                     // Gray for low
 }
 
+// Convert a Pokemon name to Pokemon Showdown's sprite naming convention
+// Showdown strips most special chars but preserves hyphens for regional forms
+export const toShowdownName = (pokemonName: string): string => {
+  return pokemonName
+    .toLowerCase()
+    .replace(/♀/g, 'f')
+    .replace(/♂/g, 'm')
+    .replace(/[.':\s]+/g, '')       // Strip dots, apostrophes, colons, spaces
+    .replace(/é/g, 'e')             // Flabébé -> flabebe
+}
+
 // Pokemon GIF and sprite URL functions with fallback chain
 export const getPokemonAnimatedUrl = (pokemonId: string, pokemonName?: string): string => {
-  const id = parseInt(pokemonId)
-  const formattedName = pokemonName?.toLowerCase().replace(/[^a-z0-9]/g, '') || id.toString()
+  const formattedName = pokemonName
+    ? toShowdownName(pokemonName)
+    : parseInt(pokemonId).toString()
 
   // Primary: Pokemon Showdown animated sprites (best quality GIFs)
   return `https://play.pokemonshowdown.com/sprites/ani/${formattedName}.gif`

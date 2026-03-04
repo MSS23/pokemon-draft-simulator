@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
+import { TeamIcon } from '@/components/league/TeamIcon'
 import {
   ArrowLeft,
   TrendingUp,
@@ -196,7 +197,7 @@ export default function PowerRankingsPage() {
               Back to League
             </Button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold brand-gradient-text">
                 Power Rankings
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -248,6 +249,7 @@ export default function PowerRankingsPage() {
                   {/* Team Info */}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
+                      <TeamIcon teamName={ranking.team.name} teamIndex={index} size="lg" />
                       <h3 className="text-xl font-bold">{ranking.team.name}</h3>
                       {getFormIcon(ranking.form.formType)}
                     </div>

@@ -60,13 +60,13 @@ export default function ResetPasswordPage() {
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-lg max-w-md w-full">
+        <div className="bg-white dark:bg-card p-8 rounded-lg shadow-lg max-w-md w-full">
           <div className="text-center">
             <div className="text-green-500 text-5xl mb-4">✓</div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+            <h1 className="text-2xl font-bold text-foreground mb-2">
               Password Reset Successful
             </h1>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               Redirecting you to the home page...
             </p>
           </div>
@@ -77,14 +77,14 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="bg-white dark:bg-slate-800 p-8 rounded-lg shadow-lg max-w-md w-full">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">
+      <div className="bg-white dark:bg-card p-8 rounded-lg shadow-lg max-w-md w-full">
+        <h1 className="text-2xl font-bold text-foreground mb-6">
           Reset Your Password
         </h1>
 
         <form onSubmit={handleResetPassword} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
               New Password
             </label>
             <Input
@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
               Confirm Password
             </label>
             <Input
@@ -119,7 +119,7 @@ export default function ResetPasswordPage() {
 
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
+            className="w-full brand-gradient-bg text-white hover:brightness-110"
             disabled={loading}
           >
             {loading ? 'Resetting...' : 'Reset Password'}

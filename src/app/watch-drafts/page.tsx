@@ -165,22 +165,22 @@ export default function WatchDraftsPage() {
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
+            <h1 className="text-4xl font-bold brand-gradient-text mb-4">
               Watch Public Drafts
             </h1>
-            <p className="text-lg text-slate-700 dark:text-slate-300">
+            <p className="text-lg text-muted-foreground">
               Spectate live Pokémon drafts from around the community
             </p>
           </div>
 
           {/* Filters and Search */}
           <div className="max-w-4xl mx-auto mb-6">
-            <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
+            <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm">
               <CardContent className="pt-6">
                 <div className="flex flex-col md:flex-row gap-4">
                   {/* Search */}
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search by name, room code, or tags..."
                       value={searchQuery}
@@ -232,22 +232,22 @@ export default function WatchDraftsPage() {
           {/* Drafts List */}
           <div className="max-w-4xl mx-auto">
             {isLoading ? (
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
+              <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm">
                 <CardContent className="py-12 text-center">
-                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-slate-400" />
-                  <p className="text-slate-600 dark:text-slate-400">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">
                     Loading public drafts...
                   </p>
                 </CardContent>
               </Card>
             ) : filteredDrafts.length === 0 ? (
-              <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
+              <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm">
                 <CardContent className="py-12 text-center">
-                  <Eye className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                  <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
                     No Public Drafts Found
                   </h3>
-                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                  <p className="text-muted-foreground mb-4">
                     {searchQuery
                       ? "Try a different search term"
                       : "No public drafts available right now"}
@@ -267,7 +267,7 @@ export default function WatchDraftsPage() {
                 {filteredDrafts.map((draft) => (
                   <Card
                     key={draft.roomCode}
-                    className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
+                    className="bg-white/90 dark:bg-card/90 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
                     onClick={() => handleWatchDraft(draft.roomCode)}
                   >
                     <CardHeader>
@@ -344,7 +344,7 @@ export default function WatchDraftsPage() {
                     {(draft.description || draft.tags) && (
                       <CardContent className="pt-0">
                         {draft.description && (
-                          <p className="text-sm text-slate-700 dark:text-slate-300 mb-2">
+                          <p className="text-sm text-muted-foreground mb-2">
                             {draft.description}
                           </p>
                         )}

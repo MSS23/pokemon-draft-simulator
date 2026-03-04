@@ -187,20 +187,20 @@ export default function TournamentSchedule({ teams, onMatchComplete }: Tournamen
                 {sortedStandings.map((standing, index) => (
                   <div
                     key={standing.teamId}
-                    className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-muted rounded-lg"
                   >
                     <div className="flex items-center gap-3">
                       <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold ${
                         index === 0 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
                         index === 1 ? 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200' :
                         index === 2 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                        'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                        'bg-muted text-muted-foreground'
                       }`}>
                         {index + 1}
                       </div>
                       <div>
                         <div className="font-semibold text-sm">{standing.teamName}</div>
-                        <div className="text-xs text-slate-500">
+                        <div className="text-xs text-muted-foreground">
                           {standing.wins}W - {standing.losses}L
                         </div>
                       </div>
@@ -210,7 +210,7 @@ export default function TournamentSchedule({ teams, onMatchComplete }: Tournamen
                         {standing.pointsFor - standing.pointsAgainst > 0 ? '+' : ''}
                         {standing.pointsFor - standing.pointsAgainst}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-muted-foreground">
                         {standing.pointsFor} PF • {standing.pointsAgainst} PA
                       </div>
                     </div>
@@ -243,15 +243,15 @@ function MatchCard({
 
   if (match.winner) {
     return (
-      <div className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded">
+      <div className="flex items-center justify-between p-3 bg-white dark:bg-card border border-border rounded">
         <div className="flex items-center gap-2 flex-1">
           <CheckCircle className="h-4 w-4 text-green-600" />
           <div className="flex items-center gap-2 flex-1">
-            <span className={`text-sm font-medium ${match.winner === match.team1.id ? 'text-green-600' : 'text-slate-500'}`}>
+            <span className={`text-sm font-medium ${match.winner === match.team1.id ? 'text-green-600' : 'text-muted-foreground'}`}>
               {match.team1.name}
             </span>
-            <span className="text-xs text-slate-400">vs</span>
-            <span className={`text-sm font-medium ${match.winner === match.team2.id ? 'text-green-600' : 'text-slate-500'}`}>
+            <span className="text-xs text-muted-foreground">vs</span>
+            <span className={`text-sm font-medium ${match.winner === match.team2.id ? 'text-green-600' : 'text-muted-foreground'}`}>
               {match.team2.name}
             </span>
           </div>
@@ -264,12 +264,12 @@ function MatchCard({
   }
 
   return (
-    <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded">
+    <div className="flex items-center justify-between p-3 bg-muted border border-border rounded">
       <div className="flex items-center gap-2 flex-1">
-        <Circle className="h-4 w-4 text-slate-400" />
+        <Circle className="h-4 w-4 text-muted-foreground" />
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{match.team1.name}</span>
-          <span className="text-xs text-slate-400">vs</span>
+          <span className="text-xs text-muted-foreground">vs</span>
           <span className="text-sm font-medium">{match.team2.name}</span>
         </div>
       </div>

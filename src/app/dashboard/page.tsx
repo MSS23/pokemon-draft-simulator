@@ -17,7 +17,7 @@ import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
-import { getPokemonAnimatedUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('Dashboard')
@@ -262,7 +262,7 @@ export default function DashboardPage() {
       scheduled: { label: 'Starts Soon', variant: 'outline' }
     }
     const c = config[status] || config.setup
-    return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>
+    return <Badge variant={c.variant} size="sm">{c.label}</Badge>
   }
 
   const getMatchStatusBadge = (status: string) => {
@@ -273,12 +273,12 @@ export default function DashboardPage() {
       cancelled: { label: 'Cancelled', variant: 'outline' },
     }
     const c = config[status] || config.scheduled
-    return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>
+    return <Badge variant={c.variant} size="sm">{c.label}</Badge>
   }
 
   const DraftCard = ({ draft }: { draft: DraftSummary }) => (
     <Card
-      className="hover:border-primary/30 transition-colors cursor-pointer"
+      className="card-interactive"
       onClick={() => router.push(`/draft/${draft.room_code.toLowerCase()}`)}
     >
       <CardContent className="p-4 space-y-3">
@@ -286,7 +286,7 @@ export default function DashboardPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <p className="font-medium text-sm truncate">{draft.draft_name}</p>
-              {draft.is_host && <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">Host</Badge>}
+              {draft.is_host && <Badge variant="host" size="sm" className="shrink-0">Host</Badge>}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               <span className="font-mono">{draft.room_code}</span> &middot; {draft.user_team_name}
@@ -337,7 +337,7 @@ export default function DashboardPage() {
             const target = e.target as HTMLImageElement
             if (!target.dataset.fallback) {
               target.dataset.fallback = '1'
-              target.src = getPokemonSpriteUrl(p.pokemonId)
+              target.src = getPokemonAnimatedBackupUrl(p.pokemonId)
             }
           }}
         />
@@ -352,7 +352,7 @@ export default function DashboardPage() {
 
     return (
       <Card
-        className="hover:border-primary/30 transition-colors cursor-pointer"
+        className="card-interactive"
         onClick={() => router.push(`/league/${matchup.league.id}/team/${matchup.opponentTeamId}`)}
       >
         <CardContent className="p-4 space-y-3">
@@ -361,7 +361,7 @@ export default function DashboardPage() {
               {matchup.league.name}
             </p>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-[10px]">
+              <Badge variant="outline" size="sm">
                 Week {matchup.league.currentWeek}/{matchup.league.totalWeeks}
               </Badge>
               {getMatchStatusBadge(matchup.match.status)}
@@ -436,7 +436,7 @@ export default function DashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs text-muted-foreground">Total Drafts</p>
-                <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
+                <Trophy className="h-3.5 w-3.5 text-primary" />
               </div>
               <p className="text-2xl font-bold">{drafts.length}</p>
             </CardContent>
@@ -445,7 +445,7 @@ export default function DashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs text-muted-foreground">Active Drafts</p>
-                <Zap className="h-3.5 w-3.5 text-green-500" />
+                <Zap className="h-3.5 w-3.5 text-success" />
               </div>
               <p className="text-2xl font-bold">{activeDrafts.length}</p>
             </CardContent>
@@ -454,7 +454,7 @@ export default function DashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs text-muted-foreground">Active Leagues</p>
-                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                <Shield className="h-3.5 w-3.5 text-info" />
               </div>
               <p className="text-2xl font-bold">{activeLeagueCount}</p>
             </CardContent>
@@ -463,7 +463,7 @@ export default function DashboardPage() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs text-muted-foreground">League W-L</p>
-                <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                <Users className="h-3.5 w-3.5 text-accent" />
               </div>
               <p className="text-2xl font-bold">
                 {totalWins + totalLosses > 0 ? `${totalWins}-${totalLosses}` : '-'}
@@ -481,7 +481,7 @@ export default function DashboardPage() {
                   <Swords className="h-4 w-4" />
                   This Week&apos;s Matches
                 </CardTitle>
-                <Badge variant="secondary" className="text-[10px]">
+                <Badge variant="secondary" size="sm">
                   {upcomingMatches.length} {upcomingMatches.length === 1 ? 'match' : 'matches'}
                 </Badge>
               </div>
@@ -512,7 +512,7 @@ export default function DashboardPage() {
                 {leagueStandings.map(standing => (
                   <Card
                     key={standing.league.id}
-                    className="hover:border-primary/30 transition-colors cursor-pointer"
+                    className="card-interactive"
                     onClick={() => router.push(`/league/${standing.league.id}`)}
                   >
                     <CardContent className="p-4 space-y-2">
@@ -547,8 +547,8 @@ export default function DashboardPage() {
                         <div>
                           <p className="text-xs text-muted-foreground">Streak</p>
                           <p className={`text-sm font-semibold ${
-                            standing.currentStreak?.startsWith('W') ? 'text-green-600 dark:text-green-400' :
-                            standing.currentStreak?.startsWith('L') ? 'text-red-600 dark:text-red-400' : ''
+                            standing.currentStreak?.startsWith('W') ? 'text-success' :
+                            standing.currentStreak?.startsWith('L') ? 'text-destructive' : ''
                           }`}>
                             {standing.currentStreak || '-'}
                           </p>

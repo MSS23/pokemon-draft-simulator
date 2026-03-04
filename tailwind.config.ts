@@ -52,32 +52,43 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom blue palette for consistency
-        navy: {
-          50: "hsl(217, 100%, 97%)",
-          100: "hsl(217, 95%, 90%)",
-          200: "hsl(217, 90%, 80%)",
-          300: "hsl(217, 85%, 70%)",
-          400: "hsl(217, 85%, 60%)",
-          500: "hsl(217, 91%, 50%)", // Base navy
-          600: "hsl(217, 91%, 40%)",
-          700: "hsl(217, 85%, 30%)",
-          800: "hsl(217, 80%, 20%)",
-          900: "hsl(217, 75%, 10%)",
-          950: "hsl(217, 91%, 5%)", // Deep navy for backgrounds
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
         },
-        "slate-blue": {
-          50: "hsl(215, 35%, 95%)",
-          100: "hsl(215, 30%, 85%)",
-          200: "hsl(215, 28%, 70%)",
-          300: "hsl(215, 26%, 55%)",
-          400: "hsl(215, 25%, 40%)",
-          500: "hsl(215, 25%, 27%)", // Base slate-blue
-          600: "hsl(215, 25%, 20%)",
-          700: "hsl(215, 25%, 15%)",
-          800: "hsl(215, 25%, 12%)",
-          900: "hsl(215, 25%, 8%)",
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
         },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        // Pokemon type colors as Tailwind utilities
+        "type-normal": "hsl(var(--type-normal))",
+        "type-fire": "hsl(var(--type-fire))",
+        "type-water": "hsl(var(--type-water))",
+        "type-electric": "hsl(var(--type-electric))",
+        "type-grass": "hsl(var(--type-grass))",
+        "type-ice": "hsl(var(--type-ice))",
+        "type-fighting": "hsl(var(--type-fighting))",
+        "type-poison": "hsl(var(--type-poison))",
+        "type-ground": "hsl(var(--type-ground))",
+        "type-flying": "hsl(var(--type-flying))",
+        "type-psychic": "hsl(var(--type-psychic))",
+        "type-bug": "hsl(var(--type-bug))",
+        "type-rock": "hsl(var(--type-rock))",
+        "type-ghost": "hsl(var(--type-ghost))",
+        "type-dragon": "hsl(var(--type-dragon))",
+        "type-dark": "hsl(var(--type-dark))",
+        "type-steel": "hsl(var(--type-steel))",
+        "type-fairy": "hsl(var(--type-fairy))",
+      },
+      boxShadow: {
+        "sm": "var(--shadow-sm)",
+        "md": "var(--shadow-md)",
+        "lg": "var(--shadow-lg)",
+        "glow": "var(--shadow-glow)",
       },
       borderRadius: {
         lg: "var(--radius)",

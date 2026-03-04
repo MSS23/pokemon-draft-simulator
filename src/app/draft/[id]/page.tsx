@@ -116,6 +116,8 @@ interface DraftUIState {
     team_id: string | null
     display_name: string
     last_seen: string
+    is_admin?: boolean
+    is_host?: boolean
   }>
   draftSettings: {
     maxTeams: number
@@ -135,6 +137,10 @@ interface DraftUIState {
 }
 
 // No global subscription tracker needed - useDraftRealtime handles cleanup via AbortController
+
+// Stable empty array to prevent infinite re-renders (React #185)
+// Inline `return []` creates a new reference every render, triggering memo/effect loops
+const EMPTY_ARRAY: never[] = []
 
 export default function DraftRoomPage() {
   const params = useParams()
@@ -392,7 +398,9 @@ export default function DraftRoomPage() {
         userId: p.user_id,
         team_id: p.team_id,
         display_name: p.display_name,
-        last_seen: p.last_seen
+        last_seen: p.last_seen,
+        is_admin: p.is_admin,
+        is_host: p.is_host,
       })),
       draftSettings: {
         maxTeams: dbState.draft.max_teams,
@@ -434,6 +442,12 @@ export default function DraftRoomPage() {
     draftState?.userTeamId === draftState?.currentTeam,
     [draftState?.userTeamId, draftState?.currentTeam]
   )
+
+  const isAdmin = useMemo(() => {
+    if (!draftState?.participants || !userId) return false
+    const me = draftState.participants.find(p => p.userId === userId)
+    return me?.is_admin === true
+  }, [draftState?.participants, userId])
 
   const isAuctionDraft = useMemo(() =>
     draftState?.draftSettings?.draftType === 'auction',
@@ -719,7 +733,7 @@ export default function DraftRoomPage() {
           lastTurnNotificationTime.current = now
 
           if (draftState.userTeamId === draftState.currentTeam) {
-            notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
+          notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
           }
           // Removed opponent turn notifications - too spammy, pick notifications suffice
         }
@@ -727,6 +741,7 @@ export default function DraftRoomPage() {
     }
 
     prevDraftStateRef.current = draftState
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- pickTimeRemaining read from closure is intentional (avoid re-running effect every second)
   }, [draftState, pokemon, isAuctionDraft])
 
   // Load current auction for auction drafts
@@ -753,7 +768,7 @@ export default function DraftRoomPage() {
     }
 
     loadCurrentAuction()
-  }, [isAuctionDraft, roomCode, draftState])
+  }, [isAuctionDraft, roomCode, draftState?.currentTurn, draftState?.status])
 
   // Timer disabled - no turn time limits
 
@@ -903,8 +918,8 @@ export default function DraftRoomPage() {
 
   // Sidebar activities - only recalculate when picks change (not on every draftState update)
   const sidebarActivities = useMemo(() => {
-    // Early return for empty states
-    if (!draftState?.teams || !pokemon) return []
+    // Early return for empty states - use stable reference to prevent re-render loops
+    if (!draftState?.teams || !pokemon) return EMPTY_ARRAY
 
     const activities: Array<{
       id: string
@@ -1119,7 +1134,7 @@ export default function DraftRoomPage() {
 
   const handleResumeDraft = useCallback(async () => {
     try {
-      await DraftService.resumeDraft(roomCode.toLowerCase())
+      await DraftService.unpauseDraft(roomCode.toLowerCase())
     } catch (err) {
       log.error('Error resuming draft:', err)
       notify.error('Failed to Resume', err instanceof Error ? err.message : 'Failed to resume draft')
@@ -1382,7 +1397,7 @@ export default function DraftRoomPage() {
   // Memoize DraftResults teams to prevent re-renders on completed drafts
   // MUST be before conditional returns (Rules of Hooks)
   const completedDraftTeams = useMemo(() => {
-    if (!draftState?.teams) return []
+    if (!draftState?.teams) return EMPTY_ARRAY
     return draftState.teams.map(team => ({
       ...team,
       budgetRemaining: draftState?.draftSettings?.draftType === 'auction'
@@ -1426,7 +1441,7 @@ export default function DraftRoomPage() {
               <ImageTypeToggle />
               <ThemeToggle />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-2">
+            <h1 className="text-3xl font-bold brand-gradient-text mb-2">
               Draft Room: {roomCode}
             </h1>
           </div>
@@ -1537,7 +1552,7 @@ export default function DraftRoomPage() {
                   <History className="h-3.5 w-3.5 mr-1" />
                   <span className="hidden sm:inline">Activity</span>
                   {allDraftedIds.length > 0 && (
-                    <Badge variant="default" className="ml-1.5 h-4 px-1 text-[10px]">
+                    <Badge variant="default" size="sm" className="ml-1.5 h-4 px-1">
                       {allDraftedIds.length}
                     </Badge>
                   )}
@@ -1584,7 +1599,7 @@ export default function DraftRoomPage() {
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
                       <div
-                        className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full rounded-full transition-all duration-500"
+                        className="brand-gradient-bg h-full rounded-full transition-all duration-500"
                         style={{ width: `${(draftState.teams.length / draftState.draftSettings.maxTeams) * 100}%` }}
                       />
                     </div>
@@ -1602,7 +1617,7 @@ export default function DraftRoomPage() {
                         <span className="font-medium">{team.name}</span>
                         <span className="text-muted-foreground">({team.userName})</span>
                         {idx === 0 && (
-                          <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">Host</Badge>
+                          <Badge variant="outline" size="sm" className="ml-1">Host</Badge>
                         )}
                       </Badge>
                     ))}
@@ -1625,7 +1640,7 @@ export default function DraftRoomPage() {
                   </div>
 
                   {/* Host start button (prominent when teams are filled) */}
-                  {isHost && draftState.teams.length >= draftState.draftSettings.maxTeams && (
+                  {(isHost || isAdmin) && draftState.teams.length >= draftState.draftSettings.maxTeams && (
                     <div className="pt-2">
                       <Button
                         onClick={startDraft}
@@ -1639,21 +1654,21 @@ export default function DraftRoomPage() {
                   )}
 
                   {/* Non-host message */}
-                  {!isHost && (
+                  {!isHost && !isAdmin && (
                     <p className="text-sm text-muted-foreground italic">
                       The host will start the draft once all players have joined.
                     </p>
                   )}
 
-                  {/* Host: not enough teams yet */}
-                  {isHost && draftState.teams.length < 2 && (
+                  {/* Host/Admin: not enough teams yet */}
+                  {(isHost || isAdmin) && draftState.teams.length < 2 && (
                     <p className="text-sm text-orange-600 dark:text-orange-400">
                       Need at least 2 teams to start the draft.
                     </p>
                   )}
 
                   {/* Host: can start early */}
-                  {isHost && draftState.teams.length >= 2 && draftState.teams.length < draftState.draftSettings.maxTeams && (
+                  {(isHost || isAdmin) && draftState.teams.length >= 2 && draftState.teams.length < draftState.draftSettings.maxTeams && (
                     <p className="text-sm text-muted-foreground">
                       You can start early with {draftState.teams.length} teams, or wait for all {draftState.draftSettings.maxTeams} to join.
                     </p>
@@ -1737,7 +1752,7 @@ export default function DraftRoomPage() {
         )}
 
         {/* Draft Controls */}
-        {draftState && isHost && !isSpectator && (
+        {draftState && (isHost || isAdmin) && !isSpectator && (
           <div className="mb-6">
             <DraftControls
               draftStatus={draftState?.status}
@@ -1746,6 +1761,7 @@ export default function DraftRoomPage() {
               currentTeam={draftState?.currentTeam}
               teams={draftState?.teams || []}
               isHost={isHost}
+              isAdmin={isAdmin}
               timeRemaining={pickTimeRemaining}
               onStartDraft={startDraft}
               onShuffleDraftOrder={handleShuffleDraftOrder}
@@ -1796,7 +1812,7 @@ export default function DraftRoomPage() {
                         auctionEndTime={currentAuction.auction_end}
                         isActive={currentAuction.status === 'active'}
                         onTimeExpired={handleAuctionTimeExpired}
-                        onExtendTime={isHost ? handleExtendAuctionTime : undefined}
+                        onExtendTime={(isHost || isAdmin) ? handleExtendAuctionTime : undefined}
                         isHost={isHost}
                       />
                     </div>
@@ -1865,6 +1881,20 @@ export default function DraftRoomPage() {
           </div>
         )}
 
+        {/* Wishlist Manager - Above Pokemon Grid */}
+        {!isSpectator && draftState?.userTeamId && userId && (
+          <EnhancedErrorBoundary>
+            <WishlistManager
+              draftId={roomCode.toLowerCase()}
+              participantId={userId}
+              userTeam={userTeam}
+              currentBudget={userTeam?.budgetRemaining || 100}
+              usedBudget={(userTeam?.picks.length || 0) * 10}
+              isCompact={true}
+            />
+          </EnhancedErrorBoundary>
+        )}
+
         {/* Pokemon Grid */}
         <div className="bg-card rounded-lg shadow p-3 sm:p-6">
           <EnhancedErrorBoundary>
@@ -1910,20 +1940,6 @@ export default function DraftRoomPage() {
           draftedCount={userTeam?.picks.length || 0}
           maxDrafts={draftState?.draftSettings?.pokemonPerTeam || 6}
         />
-
-        {/* Wishlist Manager - Fixed Position */}
-        {!isSpectator && draftState?.userTeamId && userId && (
-          <EnhancedErrorBoundary>
-            <WishlistManager
-              draftId={roomCode.toLowerCase()}
-              participantId={userId}
-              userTeam={userTeam}
-              currentBudget={userTeam?.budgetRemaining || 100}
-              usedBudget={(userTeam?.picks.length || 0) * 10}
-              isCompact={true}
-            />
-          </EnhancedErrorBoundary>
-        )}
 
         {/* Draft Activity Sidebar */}
         {draftState && (

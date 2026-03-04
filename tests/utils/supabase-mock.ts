@@ -4,7 +4,7 @@ import { vi } from 'vitest'
  * Mock Supabase client for testing
  */
 export const createMockSupabaseClient = () => {
-  const mockData: Record<string, any> = {
+  const mockData: Record<string, Record<string, unknown>[]> = {
     drafts: [],
     teams: [],
     participants: [],
@@ -21,25 +21,25 @@ export const createMockSupabaseClient = () => {
 
   return {
     from: vi.fn((table: string) => ({
-      select: vi.fn((columns?: string) => ({
-        eq: vi.fn((column: string, value: any) => ({
+      select: vi.fn((_columns?: string) => ({
+        eq: vi.fn((column: string, value: unknown) => ({
           single: vi.fn(async () => {
-            const item = mockData[table]?.find((item: any) => item[column] === value)
+            const item = mockData[table]?.find((item: Record<string, unknown>) => item[column] === value)
             return { data: item || null, error: item ? null : { message: 'Not found' } }
           }),
           maybeSingle: vi.fn(async () => {
-            const item = mockData[table]?.find((item: any) => item[column] === value)
+            const item = mockData[table]?.find((item: Record<string, unknown>) => item[column] === value)
             return { data: item || null, error: null }
           }),
         })),
-        in: vi.fn((column: string, values: any[]) => ({
+        in: vi.fn((column: string, values: unknown[]) => ({
           async: vi.fn(async () => {
-            const items = mockData[table]?.filter((item: any) => values.includes(item[column]))
+            const items = mockData[table]?.filter((item: Record<string, unknown>) => values.includes(item[column]))
             return { data: items || [], error: null }
           }),
         })),
       })),
-      insert: vi.fn((data: any) => ({
+      insert: vi.fn((data: Record<string, unknown>) => ({
         select: vi.fn(() => ({
           single: vi.fn(async () => {
             const id = `${table}-${Date.now()}`
@@ -50,10 +50,10 @@ export const createMockSupabaseClient = () => {
           }),
         })),
       })),
-      update: vi.fn((data: any) => ({
-        eq: vi.fn((column: string, value: any) => ({
+      update: vi.fn((data: Record<string, unknown>) => ({
+        eq: vi.fn((column: string, value: unknown) => ({
           async: vi.fn(async () => {
-            const index = mockData[table]?.findIndex((item: any) => item[column] === value)
+            const index = mockData[table]?.findIndex((item: Record<string, unknown>) => item[column] === value)
             if (index >= 0) {
               mockData[table][index] = { ...mockData[table][index], ...data }
               return { data: mockData[table][index], error: null }
@@ -63,9 +63,9 @@ export const createMockSupabaseClient = () => {
         })),
       })),
       delete: vi.fn(() => ({
-        eq: vi.fn((column: string, value: any) => ({
+        eq: vi.fn((column: string, value: unknown) => ({
           async: vi.fn(async () => {
-            const index = mockData[table]?.findIndex((item: any) => item[column] === value)
+            const index = mockData[table]?.findIndex((item: Record<string, unknown>) => item[column] === value)
             if (index >= 0) {
               mockData[table].splice(index, 1)
               return { data: null, error: null }

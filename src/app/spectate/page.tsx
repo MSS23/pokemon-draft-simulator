@@ -198,17 +198,17 @@ export default function SpectatePage() {
               <ThemeToggle />
             </div>
 
-            <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
+            <h1 className="text-5xl font-bold brand-gradient-text mb-4">
               🎮 Spectate Drafts
             </h1>
-            <p className="text-xl text-slate-700 dark:text-slate-300 mb-6 max-w-2xl mx-auto">
+            <p className="text-xl text-muted-foreground mb-6 max-w-2xl mx-auto">
               Watch live Pokémon drafts and learn from the pros! Join as a
               spectator to see picks in real-time.
             </p>
           </div>
 
           {/* Join by Code */}
-          <Card className="mb-8 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+          <Card className="mb-8 bg-white/80 dark:bg-background/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Hash className="h-5 w-5" />
@@ -240,7 +240,7 @@ export default function SpectatePage() {
           </Card>
 
           {/* Search and Filter */}
-          <Card className="mb-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+          <Card className="mb-6 bg-white/80 dark:bg-background/80 backdrop-blur-sm">
             <CardContent className="pt-6">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -260,7 +260,7 @@ export default function SpectatePage() {
               Array.from({ length: 6 }).map((_, i) => (
                 <Card
                   key={i}
-                  className="animate-pulse bg-white/80 dark:bg-slate-900/80"
+                  className="animate-pulse bg-white/80 dark:bg-background/80"
                 >
                   <CardHeader>
                     <div className="h-4 bg-gray-300 rounded w-3/4"></div>
@@ -290,7 +290,7 @@ export default function SpectatePage() {
               filteredDrafts.map((draft) => (
                 <Card
                   key={draft.id}
-                  className="group hover:shadow-lg transition-all duration-200 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-2 hover:border-blue-300 dark:hover:border-blue-600"
+                  className="group hover:shadow-lg transition-all duration-200 bg-white/80 dark:bg-background/80 backdrop-blur-sm border-2 hover:border-blue-300 dark:hover:border-blue-600"
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between">

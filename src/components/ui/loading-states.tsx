@@ -34,11 +34,11 @@ export function LoadingScreen({
   showLogo?: boolean
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-background dark:via-secondary dark:to-background flex items-center justify-center">
       <div className="text-center space-y-6">
         {showLogo && (
           <div className="flex justify-center">
-            <div className="p-4 bg-white dark:bg-slate-800 rounded-full shadow-lg">
+            <div className="p-4 bg-white dark:bg-card rounded-full shadow-lg">
               <Zap className="h-12 w-12 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
@@ -61,7 +61,7 @@ export function LoadingScreen({
         {/* Animated progress indicator */}
         <div className="w-64 mx-auto">
           <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse" />
+            <div className="h-full brand-gradient-bg rounded-full animate-pulse" />
           </div>
         </div>
       </div>

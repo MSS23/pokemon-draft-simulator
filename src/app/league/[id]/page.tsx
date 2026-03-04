@@ -18,16 +18,21 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
+import { MatchKOService } from '@/lib/match-ko-service'
 import { MatchRecorderModal } from '@/components/league/MatchRecorderModal'
 import { LeagueSettingsModal } from '@/components/league/LeagueSettingsModal'
+import { StartPlayoffsModal } from '@/components/league/StartPlayoffsModal'
+import { PlayoffBracket } from '@/components/league/PlayoffBracket'
 import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
+import { TeamIcon } from '@/components/league/TeamIcon'
+import { importTournament, type Tournament } from '@/lib/tournament-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays, Skull, Crosshair } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
 import type { PickRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 import { buildTeamColorMap } from '@/utils/team-colors'
-import { getPokemonAnimatedUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -56,6 +61,17 @@ export default function LeaguePage() {
   const [error, setError] = useState<string | null>(null)
   const [canAdvance, setCanAdvance] = useState(false)
   const [isAdvancing, setIsAdvancing] = useState(false)
+  const [siblingLeague, setSiblingLeague] = useState<(League & { teams: Team[] }) | null>(null)
+  const [siblingStandings, setSiblingStandings] = useState<(Standing & { team: Team })[]>([])
+  const [siblingFixtures, setSiblingFixtures] = useState<(Match & { homeTeam: Team; awayTeam: Team })[]>([])
+  const [koLeaderboard, setKoLeaderboard] = useState<Array<{
+    pickId: string; pokemonId: string; pokemonName: string; totalKos: number; matchesPlayed: number; teamId: string
+  }>>([])
+  const [deadPokemon, setDeadPokemon] = useState<Array<{
+    pickId: string; teamId: string; pokemonName: string; deathDate: string | null
+  }>>([])
+  const [playoffTournament, setPlayoffTournament] = useState<Tournament | null>(null)
+  const [showStartPlayoffs, setShowStartPlayoffs] = useState(false)
   const { user } = useAuth()
 
   const loadLeagueData = useCallback(async () => {
@@ -94,6 +110,51 @@ export default function LeaguePage() {
       const canAdvanceWeek = await LeagueService.canAdvanceWeek(leagueId, leagueData.currentWeek || 1)
       setCanAdvance(canAdvanceWeek)
 
+      // Load sibling conference data if this is a split conference
+      if (leagueData.leagueType !== 'single') {
+        const sibling = await LeagueService.getSiblingConference(leagueId)
+        setSiblingLeague(sibling)
+        if (sibling) {
+          const [sibStandings, sibFixtures] = await Promise.all([
+            LeagueService.getStandings(sibling.id),
+            LeagueService.getWeekFixtures(sibling.id, leagueData.currentWeek || 1),
+          ])
+          setSiblingStandings(sibStandings)
+          setSiblingFixtures(sibFixtures)
+        }
+      }
+
+      // Load KO leaderboard and dead pokemon
+      try {
+        const [leaderboard, dead] = await Promise.all([
+          MatchKOService.getKOLeaderboard(leagueId, 15),
+          MatchKOService.getDeadPokemon(leagueId),
+        ])
+        setKoLeaderboard(leaderboard)
+
+        // Map dead pokemon to include names from picks
+        if (supabase && dead.length > 0) {
+          const pickIds = dead.map(d => d.pickId)
+          const { data: deadPicks } = await supabase
+            .from('picks')
+            .select('id, pokemon_name, team_id')
+            .in('id', pickIds)
+
+          const pickMap = new Map((deadPicks ?? []).map(p => [p.id, p]))
+          setDeadPokemon(dead.map(d => {
+            const pick = pickMap.get(d.pickId)
+            return {
+              pickId: d.pickId,
+              teamId: d.teamId,
+              pokemonName: pick?.pokemon_name || 'Unknown',
+              deathDate: d.deathDate,
+            }
+          }))
+        }
+      } catch (err) {
+        log.warn('Failed to load KO data (may not have match_pokemon_kos table):', err)
+      }
+
       // Fetch picks for all teams (for Teams & Pokemon tab)
       if (supabase && leagueData.teams.length > 0) {
         const teamIds = leagueData.teams.map(t => t.id)
@@ -130,6 +191,17 @@ export default function LeaguePage() {
           setDraftHostId(draft.host_id)
         }
       }
+
+      // Load playoff state if exists
+      try {
+        const playoffState = await LeagueService.getPlayoffState(leagueId)
+        if (playoffState) {
+          const tournament = importTournament(JSON.stringify(playoffState))
+          setPlayoffTournament(tournament)
+        }
+      } catch {
+        // No playoffs yet, that's fine
+      }
     } catch (err) {
       log.error('Error loading league data:', err)
       setError(err instanceof Error ? err.message : 'Failed to load league')
@@ -163,6 +235,10 @@ export default function LeaguePage() {
     try {
       const fixtures = await LeagueService.getWeekFixtures(leagueId, newWeek)
       setWeekFixtures(fixtures)
+      if (siblingLeague) {
+        const sibFixtures = await LeagueService.getWeekFixtures(siblingLeague.id, newWeek)
+        setSiblingFixtures(sibFixtures)
+      }
     } catch (err) {
       log.error('Error loading week fixtures:', err)
     }
@@ -245,7 +321,11 @@ export default function LeaguePage() {
     )
   }
 
-  const teamColorMap = buildTeamColorMap(league.teams.map(t => t.id))
+  const allTeamIds = [...league.teams.map(t => t.id), ...(siblingLeague?.teams.map(t => t.id) || [])]
+  const teamColorMap = buildTeamColorMap(allTeamIds)
+  const isConference = league.leagueType !== 'single'
+  const conferenceName = league.leagueType === 'split_conference_a' ? 'Conference A' : 'Conference B'
+  const siblingConferenceName = league.leagueType === 'split_conference_a' ? 'Conference B' : 'Conference A'
 
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
@@ -258,7 +338,7 @@ export default function LeaguePage() {
               Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold brand-gradient-text">
                 {league.name}
               </h1>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -314,6 +394,16 @@ export default function LeaguePage() {
             {copiedInvite ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
             {copiedInvite ? 'Copied!' : 'Share Link'}
           </Button>
+          {user && draftHostId === user.id && !playoffTournament && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowStartPlayoffs(true)}
+            >
+              <Trophy className="h-4 w-4 mr-2" />
+              Start Playoffs
+            </Button>
+          )}
           {user && draftHostId === user.id && (
             <Button
               variant="outline"
@@ -374,10 +464,14 @@ export default function LeaguePage() {
         </div>
 
         <Tabs defaultValue="fixtures" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="fixtures">This Week&apos;s Fixtures</TabsTrigger>
+          <TabsList className={`grid w-full ${playoffTournament ? 'grid-cols-5' : 'grid-cols-4'}`}>
+            <TabsTrigger value="fixtures">Fixtures</TabsTrigger>
             <TabsTrigger value="standings">Standings</TabsTrigger>
-            <TabsTrigger value="teams">Teams & Pokemon</TabsTrigger>
+            {playoffTournament && (
+              <TabsTrigger value="playoffs">Playoffs</TabsTrigger>
+            )}
+            <TabsTrigger value="kill-leaders">Kill Leaders</TabsTrigger>
+            <TabsTrigger value="teams">Teams</TabsTrigger>
           </TabsList>
 
           {/* Fixtures Tab */}
@@ -410,7 +504,7 @@ export default function LeaguePage() {
                         </Button>
                       </div>
                       {currentViewWeek === league.currentWeek && (
-                        <Badge variant="default" className="text-[10px]">Current</Badge>
+                        <Badge variant="default" size="sm">Current</Badge>
                       )}
                     </CardTitle>
                     <CardDescription>
@@ -542,28 +636,66 @@ export default function LeaguePage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Sibling conference fixtures */}
+            {isConference && siblingLeague && siblingFixtures.length > 0 && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Calendar className="h-4 w-4" />
+                    {siblingConferenceName} - Week {currentViewWeek}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto"
+                      onClick={() => router.push(`/league/${siblingLeague.id}`)}
+                    >
+                      View Full
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {siblingFixtures.map(match => (
+                    <div key={match.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{match.homeTeam.name}</div>
+                      </div>
+                      <div className="text-center px-3">
+                        {match.status === 'completed' ? (
+                          <span className="text-lg font-bold">{match.homeScore} - {match.awayScore}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">vs</span>
+                        )}
+                      </div>
+                      <div className="flex-1 text-right">
+                        <div className="font-medium text-sm">{match.awayTeam.name}</div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Standings Tab */}
-          <TabsContent value="standings">
+          <TabsContent value="standings" className="space-y-4">
+            {/* Current conference standings */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
-                  League Standings
+                  {isConference ? conferenceName : 'League Standings'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {standings.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">
-                      No standings data yet
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {standings.map((standing, index) => {
-                        const colors = teamColorMap.get(standing.teamId)
-                        return (
+                {standings.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-4">No standings data yet</p>
+                ) : (
+                  <div className="space-y-2">
+                    {standings.map((standing, index) => {
+                      const colors = teamColorMap.get(standing.teamId)
+                      const teamIndex = allTeamIds.indexOf(standing.teamId)
+                      return (
                         <div
                           key={standing.id}
                           className={`flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border-l-[3px] ${colors?.border || ''}`}
@@ -578,29 +710,235 @@ export default function LeaguePage() {
                             }`}>
                               {index + 1}
                             </div>
+                            <TeamIcon teamName={standing.team.name} teamIndex={teamIndex >= 0 ? teamIndex : index} size="md" />
                             <div>
                               <div className="font-semibold">{standing.team.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {standing.wins}W-{standing.losses}L-{standing.draws}D
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-sm text-muted-foreground">
+                                  {standing.wins}W-{standing.losses}L-{standing.draws}D
+                                </span>
+                                {standing.currentStreak && (
+                                  <Badge
+                                    variant={standing.currentStreak.startsWith('W') ? 'default' : 'destructive'}
+                                    size="sm"
+                                  >
+                                    {standing.currentStreak}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>
                           <div className="text-right">
                             <div className="font-semibold">{standing.pointsFor} pts</div>
-                            <div className="text-sm text-muted-foreground">
-                              {standing.pointDifferential > 0 ? '+' : ''}
-                              {standing.pointDifferential} diff
+                            <div className={`text-sm ${
+                              standing.pointDifferential > 0 ? 'text-green-600 dark:text-green-400' :
+                              standing.pointDifferential < 0 ? 'text-red-600 dark:text-red-400' :
+                              'text-muted-foreground'
+                            }`}>
+                              {standing.pointDifferential > 0 ? '+' : ''}{standing.pointDifferential} diff
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {standing.pointsFor} PF / {standing.pointsAgainst} PA
                             </div>
                           </div>
                         </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Sibling conference standings */}
+            {isConference && siblingLeague && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    {siblingConferenceName}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto"
+                      onClick={() => router.push(`/league/${siblingLeague.id}`)}
+                    >
+                      View Full
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {siblingStandings.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No standings data yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {siblingStandings.map((standing, index) => {
+                        const colors = teamColorMap.get(standing.teamId)
+                        const teamIndex = allTeamIds.indexOf(standing.teamId)
+                        return (
+                          <div
+                            key={standing.id}
+                            className={`flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border-l-[3px] ${colors?.border || ''}`}
+                            onClick={() => router.push(`/league/${siblingLeague.id}/team/${standing.teamId}`)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`text-2xl font-bold w-8 text-center ${
+                                index === 0 ? 'text-yellow-500' :
+                                index === 1 ? 'text-gray-400' :
+                                index === 2 ? 'text-orange-600' :
+                                'text-muted-foreground'
+                              }`}>
+                                {index + 1}
+                              </div>
+                              <TeamIcon teamName={standing.team.name} teamIndex={teamIndex >= 0 ? teamIndex : index} size="md" />
+                              <div>
+                                <div className="font-semibold">{standing.team.name}</div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-sm text-muted-foreground">
+                                    {standing.wins}W-{standing.losses}L-{standing.draws}D
+                                  </span>
+                                  {standing.currentStreak && (
+                                    <Badge
+                                      variant={standing.currentStreak.startsWith('W') ? 'default' : 'destructive'}
+                                      size="sm"
+                                    >
+                                      {standing.currentStreak}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold">{standing.pointsFor} pts</div>
+                              <div className={`text-sm ${
+                                standing.pointDifferential > 0 ? 'text-green-600 dark:text-green-400' :
+                                standing.pointDifferential < 0 ? 'text-red-600 dark:text-red-400' :
+                                'text-muted-foreground'
+                              }`}>
+                                {standing.pointDifferential > 0 ? '+' : ''}{standing.pointDifferential} diff
+                              </div>
+                            </div>
+                          </div>
                         )
                       })}
                     </div>
                   )}
-                </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Kill Leaders Tab */}
+          <TabsContent value="kill-leaders" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crosshair className="h-5 w-5" />
+                  Kill Leaders
+                </CardTitle>
+                <CardDescription>Top Pokemon by total KOs across all matches</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {koLeaderboard.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No KO data recorded yet. Record match results to track Pokemon KOs.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {koLeaderboard.map((entry, index) => {
+                      const team = league.teams.find(t => t.id === entry.teamId) || siblingLeague?.teams.find(t => t.id === entry.teamId)
+                      const teamIndex = allTeamIds.indexOf(entry.teamId)
+                      const colors = teamColorMap.get(entry.teamId)
+                      return (
+                        <div
+                          key={entry.pickId}
+                          className={`flex items-center gap-3 p-3 border rounded-lg border-l-[3px] ${colors?.border || ''}`}
+                        >
+                          <div className={`text-xl font-bold w-8 text-center ${
+                            index === 0 ? 'text-yellow-500' :
+                            index === 1 ? 'text-gray-400' :
+                            index === 2 ? 'text-orange-600' :
+                            'text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={getPokemonAnimatedUrl(entry.pokemonId, entry.pokemonName)}
+                            alt={entry.pokemonName}
+                            className="w-10 h-10 pixelated shrink-0"
+                            loading="lazy"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              if (!target.dataset.fallback) {
+                                target.dataset.fallback = '1'
+                                target.src = getPokemonAnimatedBackupUrl(entry.pokemonId)
+                              }
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm capitalize">{entry.pokemonName}</div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <TeamIcon teamName={team?.name || 'Unknown'} teamIndex={teamIndex >= 0 ? teamIndex : 0} size="sm" />
+                              <span>{team?.name || 'Unknown'}</span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-lg font-bold">{entry.totalKos}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {entry.matchesPlayed > 0
+                                ? `${(entry.totalKos / entry.matchesPlayed).toFixed(1)}/match`
+                                : 'KOs'
+                              }
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Graveyard - Dead Pokemon */}
+            {deadPokemon.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Skull className="h-5 w-5 text-muted-foreground" />
+                    Graveyard
+                  </CardTitle>
+                  <CardDescription>Pokemon eliminated from the league</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {deadPokemon.map((entry) => {
+                      const team = league.teams.find(t => t.id === entry.teamId)
+                      const colors = teamColorMap.get(entry.teamId)
+                      return (
+                        <div
+                          key={entry.pickId}
+                          className={`flex items-center gap-2 p-2 border rounded-md opacity-60 border-l-[3px] ${colors?.border || ''}`}
+                        >
+                          <Skull className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium capitalize truncate">{entry.pokemonName}</div>
+                            <div className="text-xs text-muted-foreground truncate">{team?.name || 'Unknown'}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
+
+          {/* Playoffs Tab */}
+          {playoffTournament && (
+            <TabsContent value="playoffs" className="space-y-4">
+              <PlayoffBracket tournament={playoffTournament} />
+            </TabsContent>
+          )}
 
           {/* Teams & Pokemon Tab */}
           <TabsContent value="teams" className="space-y-4">
@@ -641,7 +979,7 @@ export default function LeaguePage() {
                                 const target = e.target as HTMLImageElement
                                 if (!target.dataset.fallback) {
                                   target.dataset.fallback = '1'
-                                  target.src = getPokemonSpriteUrl(pick.pokemonId)
+                                  target.src = getPokemonAnimatedBackupUrl(pick.pokemonId)
                                 }
                               }}
                             />
@@ -681,6 +1019,18 @@ export default function LeaguePage() {
             }}
           />
         )}
+
+        {/* Start Playoffs Modal */}
+        <StartPlayoffsModal
+          open={showStartPlayoffs}
+          onOpenChange={setShowStartPlayoffs}
+          leagueId={leagueId}
+          leagueName={league.name}
+          standings={standings}
+          onPlayoffsStarted={(json) => {
+            setPlayoffTournament(importTournament(json))
+          }}
+        />
 
         {/* Match Recorder Modal */}
         {selectedMatch && leagueSettings && (

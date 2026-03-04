@@ -245,7 +245,7 @@ export default function DraftConfirmationModal({
               "flex-1 h-10 sm:h-11 md:h-12 text-sm sm:text-base font-bold shadow-lg transition-all duration-200",
               isOverBudget
                 ? "bg-slate-400 hover:bg-slate-400 cursor-not-allowed opacity-60"
-                : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white hover:shadow-xl hover:scale-[1.02]"
+                : "brand-gradient-bg text-white hover:brightness-110 hover:shadow-xl hover:scale-[1.02]"
             )}
           >
             <Crown className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />

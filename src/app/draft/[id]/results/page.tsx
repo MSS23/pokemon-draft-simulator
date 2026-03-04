@@ -16,7 +16,7 @@ import { CreateLeagueModal } from '@/components/league/CreateLeagueModal'
 import { notify } from '@/lib/notifications'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import Link from 'next/link'
-import { getPokemonAnimatedUrl, getPokemonSpriteUrl, formatPokemonName } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('DraftResultsPage')
@@ -164,7 +164,7 @@ export default function DraftResultsPage() {
       <div className="container mx-auto px-4 py-6">
         {/* Breadcrumb Navigation */}
         <div className="mb-4">
-          <nav className="flex items-center text-sm text-slate-600 dark:text-slate-400">
+          <nav className="flex items-center text-sm text-muted-foreground">
             <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
               <Home className="h-4 w-4" />
             </Link>
@@ -173,7 +173,7 @@ export default function DraftResultsPage() {
               Draft History
             </Link>
             <ChevronRight className="h-4 w-4 mx-2" />
-            <span className="text-slate-900 dark:text-white font-medium">
+            <span className="text-foreground font-medium">
               {draftState.draft.name || 'Draft Results'}
             </span>
           </nav>
@@ -194,7 +194,7 @@ export default function DraftResultsPage() {
           <div className="absolute top-0 right-0">
             <ThemeToggle />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-2">
+          <h1 className="text-3xl font-bold brand-gradient-text mb-2">
             Draft Results: {roomCode}
           </h1>
           <Badge variant="secondary" className="text-green-700 bg-green-100 border-green-300">
@@ -276,14 +276,14 @@ export default function DraftResultsPage() {
                           const target = e.target as HTMLImageElement
                           if (!target.dataset.fallback) {
                             target.dataset.fallback = '1'
-                            target.src = getPokemonSpriteUrl(pick.pokemon_id)
+                            target.src = getPokemonAnimatedBackupUrl(pick.pokemon_id)
                           }
                         }}
                       />
                       <span className="text-xs font-semibold text-center truncate w-full">
                         {formatPokemonName(pick.pokemon_name)}
                       </span>
-                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                      <Badge variant="secondary" size="sm" className="h-4">
                         {pick.cost} pts
                       </Badge>
                     </div>

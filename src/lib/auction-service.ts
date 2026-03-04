@@ -66,6 +66,42 @@ class AuctionService {
 
       const draftUuid = draftState.draft.id
 
+      // Server-side budget validation - prevent bids exceeding budget
+      const team = draftState.teams.find(t => t.id === teamId)
+      if (!team) {
+        throw new Error('Team not found in draft')
+      }
+
+      // Re-fetch team budget from DB to prevent stale client data
+      const { data: freshTeam, error: teamError } = await supabase
+        .from('teams')
+        .select('budget_remaining')
+        .eq('id', teamId)
+        .single()
+
+      if (teamError || !freshTeam) {
+        throw new Error('Failed to verify team budget')
+      }
+
+      if (bidAmount > freshTeam.budget_remaining) {
+        throw new Error(`Bid of ${bidAmount} exceeds your remaining budget of ${freshTeam.budget_remaining}`)
+      }
+
+      // Validate auction hasn't expired
+      const { data: auction, error: auctionFetchError } = await supabase
+        .from('auctions')
+        .select('auction_end')
+        .eq('id', auctionId)
+        .single()
+
+      if (auctionFetchError || !auction) {
+        throw new Error('Auction not found')
+      }
+
+      if (auction.auction_end && new Date() > new Date(auction.auction_end)) {
+        throw new Error('Auction has expired')
+      }
+
       // First, record the bid in history
       const { error: historyError } = await supabase
         .from('bid_history')
@@ -113,6 +149,50 @@ class AuctionService {
       log.error('Error placing bid:', error)
       throw error
     }
+  }
+
+  /**
+   * Record a bid in the history table only (no auction update)
+   * Use this when DraftService.placeBid handles the auction update
+   */
+  async recordBidHistory(params: PlaceBidParams): Promise<void> {
+    if (!supabase) {
+      throw new Error('Supabase not available')
+    }
+
+    const { auctionId, teamId, teamName, bidAmount, draftId } = params
+
+    // Get draft UUID from room code
+    const { DraftService } = await import('./draft-service')
+    const draftState = await DraftService.getDraftState(draftId)
+    if (!draftState) {
+      throw new Error('Draft not found')
+    }
+
+    const { error: historyError } = await supabase
+      .from('bid_history')
+      .insert({
+        auction_id: auctionId,
+        draft_id: draftState.draft.id,
+        team_id: teamId,
+        team_name: teamName,
+        bid_amount: bidAmount,
+      })
+
+    if (historyError) {
+      log.error('Error recording bid history:', historyError)
+      throw new Error('Failed to record bid history')
+    }
+
+    // Update local cache
+    this.addBidToCache(auctionId, {
+      id: `temp-${Date.now()}`,
+      auctionId,
+      teamId,
+      teamName,
+      bidAmount,
+      timestamp: new Date().toISOString(),
+    })
   }
 
   /**
@@ -375,6 +455,7 @@ export const auctionService = AuctionService.getInstance()
 // Convenience exports
 export const {
   placeBid,
+  recordBidHistory,
   getBidHistory,
   subscribeToBidHistory,
   subscribeToAuctionUpdates,

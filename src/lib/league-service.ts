@@ -765,6 +765,46 @@ export class LeagueService {
   }
 
   /**
+   * Get the sibling conference league (e.g. Conference B when viewing Conference A)
+   * Returns null if this is a single league (not split into conferences)
+   */
+  static async getSiblingConference(leagueId: string): Promise<(League & { teams: Team[] }) | null> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // First get this league to find its draft_id and type
+    const currentLeague = await this.getLeague(leagueId)
+    if (!currentLeague) return null
+
+    // Only split conferences have siblings
+    if (currentLeague.leagueType === 'single') return null
+
+    const siblingType = currentLeague.leagueType === 'split_conference_a'
+      ? 'split_conference_b'
+      : 'split_conference_a'
+
+    const { data: rawSibling } = await supabase
+      .from('leagues')
+      .select(`
+        *,
+        league_teams(
+          team:teams(*)
+        )
+      `)
+      .eq('draft_id', currentLeague.draftId)
+      .eq('league_type', siblingType)
+      .single()
+
+    if (!rawSibling) return null
+
+    const sibling = rawSibling as unknown as LeagueWithTeams
+
+    return {
+      ...mapLeagueRow(sibling),
+      teams: sibling.league_teams.map((lt: { team: TeamRow }) => lt.team as unknown as Team)
+    }
+  }
+
+  /**
    * Get league with Pokemon status for all teams
    */
   static async getLeagueWithPokemonStatus(
@@ -917,6 +957,35 @@ export class LeagueService {
     if (error) {
       throw new Error(`Failed to update league settings: ${error.message}`)
     }
+  }
+
+  /**
+   * Save playoff bracket state to league settings JSONB
+   */
+  static async savePlayoffState(leagueId: string, playoffData: unknown): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const currentSettings = await this.getLeagueSettings(leagueId)
+
+    const { error } = await supabase
+      .from('leagues')
+      .update({
+        settings: { ...currentSettings, playoff: playoffData },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', leagueId)
+
+    if (error) {
+      throw new Error(`Failed to save playoff state: ${error.message}`)
+    }
+  }
+
+  /**
+   * Get playoff bracket state from league settings
+   */
+  static async getPlayoffState(leagueId: string): Promise<unknown | null> {
+    const settings = await this.getLeagueSettings(leagueId)
+    return (settings as Record<string, unknown>).playoff ?? null
   }
 
   /**
@@ -1313,6 +1382,24 @@ export class LeagueService {
       if (error) {
         log.error(`Failed to update standing for team ${t.teamId}:`, error)
       }
+    }
+  }
+
+  /**
+   * Recalculate standings from scratch using server-side RPC.
+   * Falls back to client-side recalculation if RPC is not available.
+   */
+  static async recalculateStandings(leagueId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any).rpc('recalculate_league_standings', {
+      p_league_id: leagueId,
+    })
+
+    if (error) {
+      log.warn('RPC recalculate_league_standings not available, falling back to client-side:', error)
+      await this.updateStandings(leagueId)
     }
   }
 

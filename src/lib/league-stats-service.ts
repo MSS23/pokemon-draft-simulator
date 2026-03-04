@@ -153,6 +153,26 @@ export interface AdvancedTeamStats {
 }
 
 export class LeagueStatsService {
+  // In-memory TTL cache to prevent N+1 queries on rankings/stats pages (30s TTL)
+  private static cache = new Map<string, { data: unknown; expires: number }>()
+
+  private static getCache<T>(key: string): T | undefined {
+    const entry = this.cache.get(key)
+    if (entry && Date.now() < entry.expires) return entry.data as T
+    this.cache.delete(key)
+    return undefined
+  }
+
+  private static setCache(key: string, data: unknown, ttlMs: number = 30000): void {
+    this.cache.set(key, { data, expires: Date.now() + ttlMs })
+    if (this.cache.size > 200) {
+      const now = Date.now()
+      for (const [k, v] of this.cache) {
+        if (now >= v.expires) this.cache.delete(k)
+      }
+    }
+  }
+
   /**
    * Get detailed statistics for a specific Pokemon
    */
@@ -445,6 +465,9 @@ export class LeagueStatsService {
    * Get team form indicator (last 5 matches)
    */
   static async getTeamForm(teamId: string): Promise<TeamFormIndicator | null> {
+    const cached = this.getCache<TeamFormIndicator>(`form:${teamId}`)
+    if (cached) return cached
+
     if (!supabase) {
       throw new Error('Supabase not available')
     }
@@ -541,7 +564,7 @@ export class LeagueStatsService {
         }
       }
 
-      return {
+      const result: TeamFormIndicator = {
         teamId,
         teamName: team.name,
         form,
@@ -559,6 +582,8 @@ export class LeagueStatsService {
         last5PointsFor: pointsFor,
         last5PointsAgainst: pointsAgainst
       }
+      this.setCache(`form:${teamId}`, result)
+      return result
     } catch (error) {
       log.error('Error fetching team form:', error)
       throw error
@@ -569,6 +594,9 @@ export class LeagueStatsService {
    * Get advanced statistics for a team
    */
   static async getAdvancedTeamStats(teamId: string): Promise<AdvancedTeamStats | null> {
+    const cached = this.getCache<AdvancedTeamStats>(`stats:${teamId}`)
+    if (cached) return cached
+
     if (!supabase) {
       throw new Error('Supabase not available')
     }
@@ -656,7 +684,7 @@ export class LeagueStatsService {
       const pythagoreanExpectation = totalPointsFor > 0 || totalPointsAgainst > 0 ?
         Math.pow(totalPointsFor, 2) / (Math.pow(totalPointsFor, 2) + Math.pow(totalPointsAgainst, 2)) : 0
 
-      return {
+      const result = {
         teamId,
         teamName: team.name,
         wins,
@@ -670,7 +698,7 @@ export class LeagueStatsService {
         offensiveRating,
         totalPointsAgainst,
         avgPointsAgainst,
-        totalKOsTaken: 0,  // Would need opponent KO query
+        totalKOsTaken: 0,
         avgKOsTaken: 0,
         defensiveRating,
         pointDifferential,
@@ -680,7 +708,9 @@ export class LeagueStatsService {
         faintedPokemon,
         deadPokemon,
         healthyRosterPercentage: (activePokemon / totalPokemon) * 100
-      }
+      } as AdvancedTeamStats
+      this.setCache(`stats:${teamId}`, result)
+      return result
     } catch (error) {
       log.error('Error fetching advanced team stats:', error)
       throw error

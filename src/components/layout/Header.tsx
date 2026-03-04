@@ -35,10 +35,13 @@ export function Header() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <Link href="/" className="flex items-center gap-2 mr-auto group">
-            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center group-hover:opacity-90 transition-opacity">
-              <span className="text-primary-foreground font-bold text-sm">P</span>
+            <div className="h-7 w-7 rounded-full overflow-hidden border-2 border-foreground/80 group-hover:border-primary transition-colors relative">
+              <div className="absolute inset-0 top-0 h-1/2 bg-primary" />
+              <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-gray-200" />
+              <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-foreground/80 -translate-y-1/2" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-2 w-2 rounded-full border-2 border-foreground/80 bg-background" />
             </div>
-            <span className="font-semibold text-base hidden sm:inline">Poke Draft</span>
+            <span className="font-semibold text-base hidden sm:inline text-primary">Poke Draft</span>
           </Link>
 
           <div className="flex items-center gap-1.5">

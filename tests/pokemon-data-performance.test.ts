@@ -12,7 +12,6 @@
 import 'fake-indexeddb/auto'
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { PokemonDataManager } from '@/lib/pokemon-data-manager'
 import { PokemonCacheDB, type CachedPokemon } from '@/lib/pokemon-cache-db'
 import { PokemonSearchIndex } from '@/lib/pokemon-search-index'
 import { FormatValidator, type FormatRules } from '@/lib/format-validator'
@@ -178,7 +177,7 @@ describe('Pokemon Data Performance Tests', () => {
       const pokemon = Array.from({ length: 100 }, (_, i) => generateMockPokemon(i + 1))
 
       const start = performance.now()
-      const filtered = PokemonSearchIndex.filter(pokemon, {
+      const _filtered = PokemonSearchIndex.filter(pokemon, {
         types: ['fire'],
         minBST: 300,
         maxBST: 500,

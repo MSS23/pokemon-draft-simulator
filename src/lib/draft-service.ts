@@ -628,8 +628,47 @@ export class DraftService {
     return { draftId }
   }
 
+  // Short-lived cache to deduplicate getDraftState calls within the same request lifecycle.
+  // Multiple service methods (placeBid, getUserTeam, etc.) call getDraftState independently,
+  // causing redundant 5-table join queries. TTL of 2s ensures freshness while eliminating duplicates.
+  private static draftStateCache = new Map<string, { data: DraftState | null; expires: number }>()
+
+  private static getCachedDraftState(key: string): DraftState | null | undefined {
+    const entry = this.draftStateCache.get(key)
+    if (entry && Date.now() < entry.expires) {
+      return entry.data
+    }
+    this.draftStateCache.delete(key)
+    return undefined
+  }
+
+  private static setCachedDraftState(key: string, data: DraftState | null): void {
+    this.draftStateCache.set(key, { data, expires: Date.now() + 2000 })
+    // Prune old entries periodically (keep map from growing)
+    if (this.draftStateCache.size > 50) {
+      const now = Date.now()
+      for (const [k, v] of this.draftStateCache) {
+        if (now >= v.expires) this.draftStateCache.delete(k)
+      }
+    }
+  }
+
+  /** Invalidate cached draft state (call after mutations like makePick, placeBid) */
+  static invalidateDraftStateCache(roomCodeOrDraftId?: string): void {
+    if (roomCodeOrDraftId) {
+      this.draftStateCache.delete(roomCodeOrDraftId.toLowerCase())
+    } else {
+      this.draftStateCache.clear()
+    }
+  }
+
   static async getDraftState(roomCodeOrDraftId: string): Promise<DraftState | null> {
     if (!supabase) return null
+
+    // Check cache first
+    const cacheKey = roomCodeOrDraftId.toLowerCase()
+    const cached = this.getCachedDraftState(cacheKey)
+    if (cached !== undefined) return cached
 
     try {
       // Detect if input is a UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
@@ -657,13 +696,15 @@ export class DraftService {
         return null
       }
 
-      return {
+      const result: DraftState = {
         draft: data,
         teams: ((data as unknown as DraftWithRelations)).teams || [],
         participants: ((data as unknown as DraftWithRelations)).participants || [],
         picks: ((data as unknown as DraftWithRelations)).picks || [],
         auctions: ((data as unknown as DraftWithRelations)).auctions || []
       }
+      this.setCachedDraftState(cacheKey, result)
+      return result
     } catch (err) {
       log.error('Unexpected error in getDraftState:', err)
       return null
@@ -1578,31 +1619,32 @@ export class DraftService {
    */
   static async resumeDraft(draftId: string): Promise<{ success: boolean; url?: string; error?: string }> {
     try {
-      const participation = UserSessionService.getDraftParticipation(draftId)
-      if (!participation) {
-        return { success: false, error: 'No participation record found for this draft' }
-      }
-
-      // Check if draft still exists and is active
+      // Check if draft still exists
       const draftState = await this.getDraftState(draftId)
       if (!draftState) {
         UserSessionService.updateDraftParticipation(draftId, { status: 'abandoned' })
         return { success: false, error: 'Draft room no longer exists' }
       }
 
-      // Update last activity
-      UserSessionService.updateDraftParticipation(draftId, { status: 'active' })
+      const participation = UserSessionService.getDraftParticipation(draftId)
 
-      // Construct the URL with the stored session data
-      const params = new URLSearchParams({
-        userName: participation.displayName,
-        teamName: participation.teamName || '',
-        isHost: participation.isHost.toString()
-      })
+      if (participation) {
+        // Update last activity
+        UserSessionService.updateDraftParticipation(draftId, { status: 'active' })
 
-      const url = `/draft/${draftId}?${params.toString()}`
+        // Construct the URL with the stored session data
+        const params = new URLSearchParams({
+          userName: participation.displayName,
+          teamName: participation.teamName || '',
+          isHost: participation.isHost.toString()
+        })
 
-      return { success: true, url }
+        return { success: true, url: `/draft/${draftId}?${params.toString()}` }
+      }
+
+      // No local participation record — navigate directly to the draft
+      // The draft page will resolve the user's identity from auth/session
+      return { success: true, url: `/draft/${draftId}` }
     } catch (error) {
       log.error('Error resuming draft:', error)
       return { success: false, error: 'Failed to resume draft' }
@@ -1827,38 +1869,13 @@ export class DraftService {
     }
     const internalId = draftState.draft.id
 
-    // Get auction details
-    const { data: auction, error: auctionError } = await supabase
-      .from('auctions')
-      .select('*')
-      .eq('id', auctionId)
-      .eq('draft_id', internalId)
-      .single()
-
-    if (auctionError || !auction) {
-      throw new Error('Auction not found')
-    }
-
-    if (auction.status !== 'active') {
-      throw new Error('Auction is not active')
-    }
-
-    // Check if auction has expired
-    if (new Date() > new Date(auction.auction_end)) {
-      throw new Error('Auction has expired')
-    }
-
-    // Validate bid amount
-    if (bidAmount <= auction.current_bid) {
-      throw new Error(`Bid must be higher than current bid of $${auction.current_bid}`)
-    }
-
-    // Get user's team and validate budget
+    // Get user's team first (doesn't change during auction)
     const userTeamId = await this.getUserTeam(draftId, userId)
     if (!userTeamId) {
       throw new Error('You are not part of this draft')
     }
 
+    // Validate budget
     const { data: team, error: teamError } = await supabase
       .from('teams')
       .select('budget_remaining')
@@ -1873,19 +1890,72 @@ export class DraftService {
       throw new Error(`Bid exceeds your remaining budget of $${team.budget_remaining}`)
     }
 
-    // Update auction with new bid
-    const { error: updateError } = await supabase
-      .from('auctions')
-      .update({
-        current_bid: bidAmount,
-        current_bidder: userTeamId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', auctionId)
+    // Retry loop with optimistic locking to handle concurrent bids from 20+ players
+    const MAX_RETRIES = 3
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      // Read current auction state
+      const { data: auction, error: auctionError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', auctionId)
+        .eq('draft_id', internalId)
+        .single()
 
-    if (updateError) {
-      log.error('Error placing bid:', updateError)
-      throw new Error('Failed to place bid')
+      if (auctionError || !auction) {
+        throw new Error('Auction not found')
+      }
+
+      if (auction.status !== 'active') {
+        throw new Error('Auction is not active')
+      }
+
+      if (new Date() > new Date(auction.auction_end)) {
+        throw new Error('Auction has expired')
+      }
+
+      if (bidAmount <= auction.current_bid) {
+        throw new Error(`Bid must be higher than current bid of $${auction.current_bid}`)
+      }
+
+      // Optimistic lock: only update if current_bid hasn't changed since we read it.
+      // This prevents a lower bid from overwriting a higher concurrent bid.
+      const { data: updated, error: updateError } = await supabase
+        .from('auctions')
+        .update({
+          current_bid: bidAmount,
+          current_bidder: userTeamId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', auctionId)
+        .eq('current_bid', auction.current_bid) // optimistic lock
+        .select()
+
+      if (updateError) {
+        log.error('Error placing bid:', updateError)
+        throw new Error('Failed to place bid')
+      }
+
+      // If no rows updated, another bid landed between our read and write
+      if (!updated || updated.length === 0) {
+        if (attempt < MAX_RETRIES - 1) {
+          log.info(`Bid conflict on attempt ${attempt + 1}, retrying...`)
+          continue // Re-read auction and re-validate
+        }
+        // On final retry failure, re-read to give the user accurate info
+        const { data: latest } = await supabase
+          .from('auctions')
+          .select('current_bid')
+          .eq('id', auctionId)
+          .single()
+
+        if (latest && bidAmount <= latest.current_bid) {
+          throw new Error(`Someone else bid higher! Current bid is now $${latest.current_bid}`)
+        }
+        throw new Error('Bid failed due to high traffic. Please try again.')
+      }
+
+      // Bid succeeded
+      return
     }
   }
 

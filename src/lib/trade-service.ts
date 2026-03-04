@@ -6,6 +6,7 @@
  */
 
 import { supabase } from './supabase'
+import { LeagueService } from './league-service'
 import type {
   Trade,
   TradeApproval,
@@ -37,6 +38,17 @@ export class TradeService {
   ): Promise<Trade> {
     if (!supabase) {
       throw new Error('Supabase client not initialized')
+    }
+
+    // Validate trade deadline
+    try {
+      const settings = await LeagueService.getLeagueSettings(leagueId)
+      if (settings.tradeDeadlineWeek && weekNumber > settings.tradeDeadlineWeek) {
+        throw new Error(`Trade deadline has passed (week ${settings.tradeDeadlineWeek}). No more trades allowed.`)
+      }
+    } catch (err) {
+      // Only re-throw trade deadline errors, not settings fetch failures
+      if (err instanceof Error && err.message.includes('Trade deadline')) throw err
     }
 
     // Validate trade has at least one Pokemon on each side
@@ -109,6 +121,15 @@ export class TradeService {
       throw new Error('Proposing team cannot accept their own trade')
     }
 
+    // Check if commissioner approval is required
+    let requiresApproval = false
+    try {
+      const settings = await LeagueService.getLeagueSettings(trade.league_id)
+      requiresApproval = settings.requireCommissionerApproval || false
+    } catch {
+      // If settings can't be fetched, proceed without commissioner requirement
+    }
+
     // Update trade status to accepted
     const { data, error } = await supabase
       .from('trades')
@@ -124,7 +145,14 @@ export class TradeService {
       throw new Error(`Failed to accept trade: ${error.message}`)
     }
 
-    return this.mapToTrade(data)
+    const acceptedTrade = this.mapToTrade(data)
+
+    // If commissioner approval is NOT required, auto-execute the trade
+    if (!requiresApproval) {
+      await this.executeTrade(tradeId)
+    }
+
+    return acceptedTrade
   }
 
   /**

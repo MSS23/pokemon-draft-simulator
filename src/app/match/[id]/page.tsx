@@ -13,7 +13,7 @@ import type { Match, League, Team, Standing, Pick } from '@/types'
 import { format } from 'date-fns'
 import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
-import { getPokemonAnimatedUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 
 const log = createLogger('MatchPage')
 
@@ -362,7 +362,7 @@ function TeamRoster({ team, isUserTeam, title }: { team: Team & { picks: Pick[] 
                       const target = e.target as HTMLImageElement
                       if (!target.dataset.fallback) {
                         target.dataset.fallback = '1'
-                        target.src = getPokemonSpriteUrl(pick.pokemonId)
+                        target.src = getPokemonAnimatedBackupUrl(pick.pokemonId)
                       }
                     }}
                   />

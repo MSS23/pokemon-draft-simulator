@@ -248,29 +248,29 @@ function JoinDraftForm() {
             <div className="absolute top-0 right-0">
               <ThemeToggle />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 dark:from-blue-400 dark:via-blue-300 dark:to-cyan-400 bg-clip-text text-transparent mb-4">
+            <h1 className="text-4xl font-bold brand-gradient-text mb-4">
               Join Draft Room
             </h1>
-            <p className="text-lg text-slate-700 dark:text-slate-300 mb-6">
+            <p className="text-lg text-muted-foreground mb-6">
               Enter a room code to join an existing Pokémon draft
             </p>
           </div>
 
           <div className="max-w-2xl mx-auto">
-            <Card className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm shadow-xl border-0">
+            <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm shadow-xl border-0">
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl text-slate-800 dark:text-slate-100">
+                <CardTitle className="text-2xl text-foreground">
                   Join Existing Draft
                 </CardTitle>
-                <CardDescription className="text-slate-600 dark:text-slate-400">
+                <CardDescription className="text-muted-foreground">
                   Enter the room code and your details to join the draft
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="space-y-6">
                 {/* Room Code */}
-                <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                  <h3 className="font-semibold text-slate-800 dark:text-slate-200">
+                <div className="space-y-4 p-4 bg-muted rounded-lg">
+                  <h3 className="font-semibold text-foreground">
                     Room Code
                   </h3>
                   <div className="flex gap-2">
@@ -283,7 +283,7 @@ function JoinDraftForm() {
                           e.target.value.toUpperCase(),
                         )
                       }
-                      className="bg-white dark:bg-slate-800 font-mono text-lg text-center"
+                      className="bg-white dark:bg-card font-mono text-lg text-center"
                       maxLength={6}
                       aria-label="Room code"
                       aria-required="true"
@@ -353,8 +353,8 @@ function JoinDraftForm() {
 
                 {/* User Identity */}
                 {draftInfo && (
-                  <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                    <h3 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <div className="space-y-4 p-4 bg-muted rounded-lg">
+                    <h3 className="font-semibold text-foreground flex items-center gap-2">
                       <Users className="h-5 w-5" />
                       Your Identity
                     </h3>
@@ -371,13 +371,13 @@ function JoinDraftForm() {
                             id="userName"
                             value={userDisplayName}
                             disabled
-                            className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                            className="bg-muted text-muted-foreground"
                           />
                           <Badge variant="secondary" className="text-xs">
                             From Profile
                           </Badge>
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-muted-foreground">
                           Your display name from your profile settings
                         </p>
                       </div>
@@ -403,7 +403,7 @@ function JoinDraftForm() {
                             onChange={(e) =>
                               handleInputChange("teamName", e.target.value)
                             }
-                            className="bg-white dark:bg-slate-800"
+                            className="bg-white dark:bg-card"
                             aria-required="true"
                           />
                         )}
@@ -427,7 +427,7 @@ function JoinDraftForm() {
                           onChange={(e) =>
                             handleInputChange("password", e.target.value)
                           }
-                          className="bg-white dark:bg-slate-800 border-red-300 dark:border-red-700"
+                          className="bg-white dark:bg-card border-red-300 dark:border-red-700"
                           aria-required="true"
                         />
                         <p className="text-xs text-red-600 dark:text-red-400">

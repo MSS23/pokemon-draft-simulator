@@ -7,6 +7,7 @@ import { Crown, User } from 'lucide-react'
 import { usePokemonList } from '@/hooks/usePokemon'
 import { Pokemon } from '@/types'
 import { cn } from '@/lib/utils'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 
 interface TeamRosterProps {
   team: {
@@ -56,7 +57,7 @@ const TeamRoster = memo(function TeamRoster({
             )}
             <span className="font-semibold text-sm truncate">{team.name}</span>
             {isUserTeam && (
-              <Badge variant="secondary" className="text-[10px] h-4 px-1 flex-shrink-0">You</Badge>
+              <Badge variant="secondary" size="sm" className="h-4 flex-shrink-0">You</Badge>
             )}
           </div>
           {team.budgetRemaining !== undefined && (
@@ -96,10 +97,17 @@ const TeamRoster = memo(function TeamRoster({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={pokemon.sprite}
+                src={getPokemonAnimatedUrl(pokemon.id, pokemon.name)}
                 alt={pokemon.name}
                 className="w-8 h-8 sm:w-9 sm:h-9 bg-muted rounded-full border border-border hover:border-primary transition-all hover:scale-110"
                 loading="lazy"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  if (!target.dataset.fallback) {
+                    target.dataset.fallback = '1'
+                    target.src = getPokemonAnimatedBackupUrl(pokemon.id)
+                  }
+                }}
               />
             </div>
           ))}

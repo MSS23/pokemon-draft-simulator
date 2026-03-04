@@ -58,16 +58,16 @@ export default function CSVUpload({ onPricingParsed, onClear, className }: CSVUp
 
   return (
     <div className={className}>
-      <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-slate-800 dark:to-slate-700 border-purple-200 dark:border-purple-800">
+      <Card className="p-6 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-muted dark:to-secondary border-purple-200 dark:border-purple-800">
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <h3 className="font-semibold text-foreground flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Custom Pricing (CSV)
               </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Upload a CSV file with custom Pokemon pricing for your draft
               </p>
             </div>
@@ -97,7 +97,7 @@ export default function CSVUpload({ onPricingParsed, onClear, className }: CSVUp
               onClick={triggerFileInput}
               disabled={isProcessing}
               variant="outline"
-              className="w-full bg-white dark:bg-slate-800"
+              className="w-full bg-white dark:bg-card"
             >
               <Upload className="h-4 w-4 mr-2" />
               {isProcessing ? 'Processing...' : fileName || 'Upload CSV File'}
@@ -126,26 +126,26 @@ export default function CSVUpload({ onPricingParsed, onClear, className }: CSVUp
               {/* Stats Display */}
               {result.stats && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div className="bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-600">
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Total</div>
-                    <div className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                  <div className="bg-white dark:bg-card p-2 rounded border border-border">
+                    <div className="text-xs text-muted-foreground">Total</div>
+                    <div className="text-lg font-bold text-foreground">
                       {result.stats.totalPokemon}
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-600">
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Min Cost</div>
+                  <div className="bg-white dark:bg-card p-2 rounded border border-border">
+                    <div className="text-xs text-muted-foreground">Min Cost</div>
                     <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
                       {result.stats.minCost}
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-600">
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Max Cost</div>
+                  <div className="bg-white dark:bg-card p-2 rounded border border-border">
+                    <div className="text-xs text-muted-foreground">Max Cost</div>
                     <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
                       {result.stats.maxCost}
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-600">
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Avg Cost</div>
+                  <div className="bg-white dark:bg-card p-2 rounded border border-border">
+                    <div className="text-xs text-muted-foreground">Avg Cost</div>
                     <div className="text-lg font-bold text-green-600 dark:text-green-400">
                       {result.stats.avgCost}
                     </div>
@@ -187,9 +187,9 @@ export default function CSVUpload({ onPricingParsed, onClear, className }: CSVUp
           )}
 
           {/* Info */}
-          <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
+          <div className="text-xs text-muted-foreground space-y-1">
             <p className="font-medium">Expected CSV format:</p>
-            <code className="block bg-white dark:bg-slate-800 p-2 rounded text-xs border border-slate-200 dark:border-slate-600">
+            <code className="block bg-white dark:bg-card p-2 rounded text-xs border border-border">
               pokemon,cost<br />
               Pikachu,10<br />
               Charizard,25<br />

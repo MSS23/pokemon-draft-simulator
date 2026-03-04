@@ -13,6 +13,7 @@ import { Clock, DollarSign, Gavel, Trophy, AlertCircle, History } from 'lucide-r
 import { cn } from '@/lib/utils'
 import PokemonCard from '@/components/pokemon/PokemonCard'
 import AuctionBidHistory, { BidHistoryEntry } from './AuctionBidHistory'
+import { toast } from 'sonner'
 import { auctionService } from '@/lib/auction-service'
 import { notificationService } from '@/lib/notification-service'
 
@@ -127,18 +128,24 @@ export default function AuctionBiddingInterface({
 
     try {
       setIsPlacingBid(true)
-      
-      // Use auction service to place bid and record history
-      await auctionService.placeBid({
-        auctionId: currentAuction.id,
-        teamId: userTeam.id,
-        teamName: userTeam.name,
-        bidAmount: amount,
-        draftId: draftId,
-      })
 
-      // Also call the original onPlaceBid for compatibility
+      // Use DraftService.placeBid (via onPlaceBid) for the validated auction update
+      // This validates auction status, expiry, and budget server-side
       await onPlaceBid(amount)
+
+      // Record bid in history table (separate from auction update)
+      try {
+        await auctionService.recordBidHistory({
+          auctionId: currentAuction.id,
+          teamId: userTeam.id,
+          teamName: userTeam.name,
+          bidAmount: amount,
+          draftId: draftId,
+        })
+      } catch (historyErr) {
+        // Non-critical - bid succeeded even if history recording fails
+        log.warn('Failed to record bid history:', historyErr)
+      }
 
       // Notify user of successful bid
       notificationService.notifyBidPlaced(
@@ -152,7 +159,16 @@ export default function AuctionBiddingInterface({
       setBidAmount((amount + 1).toString())
     } catch (error) {
       log.error('Error placing bid:', error)
-      // Could add error notification here
+      const msg = error instanceof Error ? error.message : 'Failed to place bid'
+      toast.error(msg)
+
+      // If outbid, auto-update bid input to current_bid + 1 so user can re-bid quickly
+      if (msg.includes('Current bid is now') || msg.includes('higher than current bid')) {
+        const match = msg.match(/\$(\d+)/)
+        if (match) {
+          setBidAmount((parseInt(match[1]) + 1).toString())
+        }
+      }
     } finally {
       setIsPlacingBid(false)
     }
@@ -308,7 +324,7 @@ export default function AuctionBiddingInterface({
                   </Badge>
                 )}
               </div>
-              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400" aria-live="polite" aria-atomic="true">
                 ${currentAuction.current_bid}
               </div>
             </div>
@@ -354,7 +370,7 @@ export default function AuctionBiddingInterface({
 
               {/* Quick bid buttons */}
               <div className="flex gap-1 flex-wrap">
-                {[1, 5, 10].map(increment => {
+                {[1, 5, 10, 20, 50].map(increment => {
                   const quickBid = currentAuction.current_bid + increment
                   const canAfford = userTeam && quickBid <= userTeam.budgetRemaining
 

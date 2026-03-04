@@ -129,7 +129,7 @@ const PokemonCard = ({
       )} />
 
       {/* Card background */}
-      <div className="absolute inset-0 bg-white/85 dark:bg-slate-800/90" />
+      <div className="absolute inset-0 bg-white/85 dark:bg-card/90" />
 
       {/* Pending Action Indicator */}
       {isPending && (
@@ -182,9 +182,10 @@ const PokemonCard = ({
       {showCost && (
         <div className="absolute top-1.5 right-1.5 z-10">
           <Badge
+            size={size === 'sm' ? "sm" : undefined}
             className={cn(
               "font-bold px-1.5 py-0.5 rounded-full shadow-sm",
-              size === 'sm' ? "text-[10px]" : "text-xs",
+              size !== 'sm' && "text-xs",
               pokemon.cost >= 25 ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" :
               pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-400 to-pink-500 text-white" :
               pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-400 to-cyan-500 text-white" :
@@ -202,7 +203,7 @@ const PokemonCard = ({
         {!hasError ? (
           <>
             {isLoading && (
-              <div className="absolute inset-0 m-2 rounded-lg bg-gray-100 dark:bg-slate-700 animate-pulse" />
+              <div className="absolute inset-0 m-2 rounded-lg bg-gray-100 dark:bg-muted animate-pulse" />
             )}
             <Image
               src={imageUrl}
@@ -232,7 +233,7 @@ const PokemonCard = ({
             )}
           </>
         ) : (
-          <div className="w-12 h-12 bg-gray-200 dark:bg-slate-600 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+          <div className="w-12 h-12 bg-gray-200 dark:bg-muted rounded-lg flex items-center justify-center text-gray-400 text-xs">
             ?
           </div>
         )}
@@ -250,9 +251,10 @@ const PokemonCard = ({
           {pokemon.types.map((type) => (
             <Badge
               key={type.name}
+              size={size !== 'sm' ? "sm" : undefined}
               className={cn(
                 "text-white font-medium shadow-sm border-0",
-                size === 'sm' ? "text-[9px] px-1 py-0" : "text-[10px] px-1.5 py-0"
+                size === 'sm' && "text-[9px] px-1 py-0"
               )}
               style={{ backgroundColor: type.color }}
             >

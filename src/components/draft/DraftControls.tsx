@@ -47,6 +47,7 @@ interface DraftControlsProps {
     picks: string[]
   }>
   isHost: boolean
+  isAdmin?: boolean
   isStarting?: boolean
   timeRemaining?: number
   onStartDraft: () => void
@@ -76,6 +77,7 @@ const DraftControls = memo(function DraftControls({
   currentTeam: _currentTeam,
   teams,
   isHost,
+  isAdmin = false,
   isStarting = false,
   timeRemaining = 60,
   onStartDraft,
@@ -207,8 +209,8 @@ const DraftControls = memo(function DraftControls({
   }
 
 
-  if (!isHost) {
-    return null // Only show to hosts
+  if (!isHost && !isAdmin) {
+    return null // Only show to hosts and admins
   }
 
   return (
@@ -217,7 +219,7 @@ const DraftControls = memo(function DraftControls({
         <CardTitle className="text-lg flex items-center gap-2">
           <Crown className="h-5 w-5 text-yellow-600" />
           Draft Controls
-          <Badge variant="secondary" className="text-xs">Host Only</Badge>
+          <Badge variant="secondary" className="text-xs">{isHost ? 'Host' : 'Admin'}</Badge>
         </CardTitle>
       </CardHeader>
 
@@ -398,11 +400,12 @@ const DraftControls = memo(function DraftControls({
               </div>
             </div>
 
-            {/* Danger Zone - Admin Controls */}
+            {/* Danger Zone - Host Only */}
+            {isHost && (
             <div className="space-y-3 pt-3 border-t-2 border-red-200 dark:border-red-800">
               <h4 className="font-medium text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
-                Danger Zone
+                Danger Zone (Host Only)
               </h4>
 
               {/* Reset Draft */}
@@ -438,6 +441,7 @@ const DraftControls = memo(function DraftControls({
                 </div>
               </div>
             </div>
+            )}
 
             {/* Warning */}
             <div className="flex items-start gap-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">

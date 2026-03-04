@@ -104,7 +104,7 @@ export function mockLocalStorage() {
 /**
  * Mock Supabase response
  */
-export function mockSupabaseResponse<T>(data: T, error: any = null) {
+export function mockSupabaseResponse<T>(data: T, error: unknown = null) {
   return {
     data,
     error,
@@ -124,13 +124,14 @@ export function generateTestId(prefix = 'test') {
 /**
  * Assert that a function throws an error with a specific message
  */
-export async function expectToThrow(fn: () => Promise<any>, expectedMessage?: string) {
+export async function expectToThrow(fn: () => Promise<unknown>, expectedMessage?: string) {
   try {
     await fn()
     throw new Error('Expected function to throw')
-  } catch (error: any) {
-    if (expectedMessage && !error.message.includes(expectedMessage)) {
-      throw new Error(`Expected error message to include "${expectedMessage}", got "${error.message}"`)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (expectedMessage && !message.includes(expectedMessage)) {
+      throw new Error(`Expected error message to include "${expectedMessage}", got "${message}"`)
     }
     return error
   }

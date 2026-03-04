@@ -132,13 +132,13 @@ export default function SchedulePage() {
                     <CardTitle className="text-base flex items-center gap-2">
                       Week {week.weekNumber}
                       {status === 'current' && (
-                        <Badge variant="default" className="text-[10px]">Current</Badge>
+                        <Badge variant="default" size="sm">Current</Badge>
                       )}
                       {status === 'completed' && (
-                        <Badge variant="secondary" className="text-[10px]">Completed</Badge>
+                        <Badge variant="secondary" size="sm">Completed</Badge>
                       )}
                       {status === 'partial' && (
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" size="sm">
                           {completedCount}/{week.matches.length} done
                         </Badge>
                       )}

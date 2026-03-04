@@ -162,7 +162,7 @@ export default function DraftSummaryPanel({
                 "h-2 rounded-full transition-all duration-300",
                 draftedCount >= maxTeamSize
                   ? "bg-gradient-to-r from-green-500 to-emerald-600"
-                  : "bg-gradient-to-r from-blue-500 to-cyan-600"
+                  : "brand-gradient-bg"
               )}
               style={{ width: `${Math.min(slotsUsedPercent, 100)}%` }}
             />

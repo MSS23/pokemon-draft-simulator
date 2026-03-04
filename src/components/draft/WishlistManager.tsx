@@ -5,7 +5,6 @@ import { WishlistItem } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import {
   Heart,
@@ -14,10 +13,8 @@ import {
   Crown,
   Clock,
   AlertTriangle,
-  Star,
   ChevronDown,
-  ChevronUp,
-  Zap
+  ChevronUp
 } from 'lucide-react'
 import { useDragAndDrop } from '@/hooks/useDragAndDrop'
 import { useWishlistSync } from '@/hooks/useWishlistSync'
@@ -50,7 +47,7 @@ export default function WishlistManager({
     userWishlist,
     removeFromWishlist,
     reorderWishlist: reorderWishlistItems,
-    isConnected
+    isConnected: _isConnected
   } = useWishlistSync({
     draftId,
     participantId
@@ -64,7 +61,6 @@ export default function WishlistManager({
   })
 
   // Calculate wishlist stats
-  const totalCost = budgetValidation.totalCost
   const availableItems = budgetValidation.affordableItems
   const nextPick = availableItems.length > 0 ? availableItems[0] : null
   const isOverBudget = budgetValidation.isOverBudget
@@ -95,85 +91,100 @@ export default function WishlistManager({
     }
   })
 
+  // Collapsed state - just a clickable bar
   if (isCompact && !isExpanded) {
     return (
-      <Card className={cn(
-        "fixed bottom-4 right-4 w-16 h-16 z-50 cursor-pointer",
-        "bg-gradient-to-br from-purple-500 to-blue-600 text-white",
-        "border-2 border-white/20 shadow-xl hover:shadow-2xl",
-        "transition-all duration-300 hover:scale-105",
-        className
-      )}>
-        <CardContent
-          className="p-0 h-full flex items-center justify-center relative"
-          onClick={() => setIsExpanded(true)}
-        >
-          <Heart className="h-6 w-6" />
-          {userWishlist.length > 0 && (
-            <Badge className="absolute -top-2 -right-2 bg-yellow-500 text-yellow-900 text-xs h-5 w-5 rounded-full p-0 flex items-center justify-center">
-              {userWishlist.length}
-            </Badge>
-          )}
-        </CardContent>
-      </Card>
+      <div
+        className={cn(
+          "bg-card rounded-lg border shadow-sm cursor-pointer hover:bg-muted/50 transition-colors",
+          className
+        )}
+        onClick={() => setIsExpanded(true)}
+      >
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="flex items-center gap-2.5">
+            <Heart className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">Wishlist</span>
+            {userWishlist.length > 0 && (
+              <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                {userWishlist.length}
+              </Badge>
+            )}
+            {nextPick && (
+              <span className="text-xs text-muted-foreground">
+                Next: <span className="font-medium text-foreground capitalize">{nextPick.pokemonName}</span>
+              </span>
+            )}
+          </div>
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </div>
+      </div>
     )
   }
 
   return (
     <Card className={cn(
-      "fixed bottom-4 right-4 w-80 z-50",
-      "bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm",
-      "border-2 border-purple-200 dark:border-purple-700 shadow-2xl",
-      isCompact && "max-h-96",
+      "bg-card border shadow-sm",
       className
     )}>
-      <CardHeader className="pb-3">
+      <CardHeader className="px-4 py-3 pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-bold text-purple-700 dark:text-purple-300 flex items-center gap-2">
-            <Heart className="h-5 w-5" />
-            Draft Wishlist
-          </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <Heart className="h-4 w-4 text-primary" />
+            <CardTitle className="text-sm font-semibold">Wishlist</CardTitle>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {userWishlist.length} items
+            </span>
+            {isOverBudget && (
+              <Badge variant="destructive" size="sm" className="h-4 flex items-center gap-0.5">
+                <AlertTriangle className="h-2.5 w-2.5" />
+                Over budget
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {userWishlist.length > 0 && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground"
+                  onClick={() => {
+                    userWishlist.forEach((item: WishlistItem) => {
+                      if (!item.isAvailable) handleRemoveItem(item.pokemonId)
+                    })
+                  }}
+                  disabled={!userWishlist.some((item: WishlistItem) => !item.isAvailable)}
+                >
+                  Clear Picked
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground"
+                  onClick={() => {
+                    userWishlist.forEach((item: WishlistItem) => handleRemoveItem(item.pokemonId))
+                  }}
+                >
+                  Clear All
+                </Button>
+              </>
+            )}
             {isCompact && (
               <Button
                 variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="h-8 w-8 p-0"
+                size="icon"
+                onClick={() => setIsExpanded(false)}
+                className="h-7 w-7"
               >
-                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                <ChevronUp className="h-4 w-4" />
               </Button>
             )}
           </div>
         </div>
-
-        {/* Wishlist Stats */}
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Badge variant={isConnected ? "default" : "destructive"} className="flex items-center gap-1">
-            <div className={cn("h-2 w-2 rounded-full", isConnected ? "bg-green-500" : "bg-red-500")} />
-            {isConnected ? "Connected" : "Disconnected"}
-          </Badge>
-          <Badge variant="outline" className="flex items-center gap-1">
-            <Star className="h-3 w-3" />
-            {userWishlist.length} items
-          </Badge>
-          <Badge
-            variant={isOverBudget ? "destructive" : "outline"}
-            className="flex items-center gap-1"
-          >
-            {isOverBudget && <AlertTriangle className="h-3 w-3" />}
-            {totalCost}/{budgetValidation.remainingBudget} pts
-          </Badge>
-          {nextPick && (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 flex items-center gap-1">
-              <Zap className="h-3 w-3" />
-              Next: {nextPick.pokemonName}
-            </Badge>
-          )}
-        </div>
       </CardHeader>
 
-      <CardContent className="p-4 pt-0">
+      <CardContent className="px-4 pb-3 pt-0">
         {/* Budget Warnings */}
         {(budgetValidation.warnings.length > 0 || budgetValidation.suggestions.length > 0) && (
           <BudgetWarnings
@@ -182,9 +193,8 @@ export default function WishlistManager({
             totalCost={budgetValidation.totalCost}
             remainingBudget={budgetValidation.remainingBudget}
             budgetEfficiency={budgetValidation.budgetEfficiency}
-            className="mb-4"
+            className="mb-3"
             onApplySuggestion={(suggestion) => {
-              // Handle suggestion application
               if (suggestion.type === 'remove' && suggestion.itemIds) {
                 suggestion.itemIds.forEach(itemId => {
                   const item = userWishlist.find((w: WishlistItem) => w.id === itemId)
@@ -196,71 +206,32 @@ export default function WishlistManager({
         )}
 
         {userWishlist.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <Heart className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm font-medium mb-1">No Pokémon in wishlist</p>
-            <p className="text-xs">Click the ♡ on any Pokémon card to add them</p>
+          <div className="text-center py-4 text-muted-foreground">
+            <p className="text-sm">No Pokémon in wishlist</p>
+            <p className="text-xs mt-0.5">Click the heart on any Pokémon card to add them</p>
           </div>
         ) : (
-          <ScrollArea className="h-64">
-            <div className="space-y-2">
-              {userWishlist.map((item: WishlistItem, index: number) => (
-                <WishlistItemCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  isNext={item.id === nextPick?.id}
-                  isDragging={draggedItem?.id === item.id}
-                  isDragOver={dragOverIndex === index}
-                  onRemove={() => handleRemoveItem(item.pokemonId)}
-                  onToggleAvailability={(available) =>
-                    handleToggleAvailability(item.id, available)
-                  }
-                  onDragStart={(e) => handleDragStart(e, item, index)}
-                  onDragEnd={handleDragEnd}
-                  onDragEnter={(e) => handleDragEnter(e, index)}
-                  onDragLeave={handleDragLeave}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index)}
-                />
-              ))}
-            </div>
-          </ScrollArea>
-        )}
-
-        {/* Quick Actions */}
-        {userWishlist.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 text-xs"
-                onClick={() => {
-                  // Clear unavailable items
-                  userWishlist.forEach((item: WishlistItem) => {
-                    if (!item.isAvailable) {
-                      handleRemoveItem(item.pokemonId)
-                    }
-                  })
-                }}
-                disabled={!userWishlist.some((item: WishlistItem) => !item.isAvailable)}
-              >
-                <X className="h-3 w-3 mr-1" />
-                Clear Picked
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 text-xs"
-                onClick={() => {
-                  // Clear all items
-                  userWishlist.forEach((item: WishlistItem) => handleRemoveItem(item.pokemonId))
-                }}
-              >
-                Clear All
-              </Button>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+            {userWishlist.map((item: WishlistItem, index: number) => (
+              <WishlistItemCard
+                key={item.id}
+                item={item}
+                index={index}
+                isNext={item.id === nextPick?.id}
+                isDragging={draggedItem?.id === item.id}
+                isDragOver={dragOverIndex === index}
+                onRemove={() => handleRemoveItem(item.pokemonId)}
+                onToggleAvailability={(available) =>
+                  handleToggleAvailability(item.id, available)
+                }
+                onDragStart={(e) => handleDragStart(e, item, index)}
+                onDragEnd={handleDragEnd}
+                onDragEnter={(e) => handleDragEnter(e, index)}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, index)}
+              />
+            ))}
           </div>
         )}
       </CardContent>

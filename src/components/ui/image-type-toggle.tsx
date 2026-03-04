@@ -12,7 +12,7 @@ export function ImageTypeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggleImageType}
-      className="relative hover:bg-slate-100 dark:hover:bg-slate-800"
+      className="relative hover:bg-muted"
       title={imageType === 'gif' ? 'Using animated GIFs - Click for static PNGs' : 'Using static PNGs - Click for animated GIFs'}
     >
       {imageType === 'gif' ? (

@@ -255,7 +255,7 @@ export const notify = {
     toast('Player Left', {
       description: `${playerName} left the draft`,
       duration: 2000,
-      icon: <Info className="h-4 w-4 text-slate-500" />
+      icon: <Info className="h-4 w-4 text-muted-foreground" />
     })
   },
 
@@ -310,7 +310,7 @@ export const notify = {
     toast('Removed from Wishlist', {
       description: pokemonName,
       duration: 1500,
-      icon: <Info className="h-4 w-4 text-slate-500" />
+      icon: <Info className="h-4 w-4 text-muted-foreground" />
     })
   },
 

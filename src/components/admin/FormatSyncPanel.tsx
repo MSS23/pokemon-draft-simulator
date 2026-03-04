@@ -88,12 +88,12 @@ export default function FormatSyncPanel() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Sync Status */}
-        <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+        <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
           <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-slate-500" />
+            <Clock className="h-5 w-5 text-muted-foreground" />
             <div>
               <p className="text-sm font-medium">Last Sync</p>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {lastSync
                   ? new Date(lastSync).toLocaleString()
                   : 'Never synced'}
@@ -128,11 +128,11 @@ export default function FormatSyncPanel() {
                 <p className="font-medium text-sm">
                   {syncResult.success ? 'Success!' : 'Error'}
                 </p>
-                <p className="text-sm text-slate-700 dark:text-slate-300">
+                <p className="text-sm text-muted-foreground">
                   {syncResult.message}
                 </p>
                 {syncResult.formatsUpdated !== undefined && (
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {syncResult.formatsUpdated} formats synced
                   </p>
                 )}

@@ -16,7 +16,7 @@ import {
   ChevronUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getPokemonAnimatedUrl, getPokemonSpriteUrl, formatPokemonName } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
 import { TEAM_COLORS, buildTeamColorMap } from '@/utils/team-colors'
 import TournamentSchedule from '@/components/tournament/TournamentSchedule'
 
@@ -80,7 +80,7 @@ function PokemonSprite({ pokemonId, pokemonName, size = 'md' }: {
           const target = e.target as HTMLImageElement
           if (!target.dataset.fallback) {
             target.dataset.fallback = '1'
-            target.src = getPokemonSpriteUrl(pokemonId)
+            target.src = getPokemonAnimatedBackupUrl(pokemonId)
           }
         }}
       />
@@ -345,7 +345,7 @@ export default function DraftResults({
                               <span className="text-xs font-medium">
                                 {formatPokemonName(pick.pokemon_name)}
                               </span>
-                              <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                              <Badge variant="secondary" size="sm" className="h-4 px-1">
                                 {pick.cost}
                               </Badge>
                             </div>
