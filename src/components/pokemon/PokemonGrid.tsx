@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useDeferredValue } from 'react'
 import { Pokemon } from '@/types'
 import PokemonCard from './PokemonCard'
 import { Input } from '@/components/ui/input'
@@ -76,6 +76,7 @@ export default function PokemonGrid({
   showWishlistButton = true,
 }: PokemonGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [costFilter, setCostFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('name')
@@ -127,14 +128,14 @@ export default function PokemonGrid({
 
   // Pre-normalize search query (runs once per query change)
   const normalizedSearchQuery = useMemo(() => {
-    if (!searchQuery) return null
-    const query = searchQuery.toLowerCase().trim()
+    if (!deferredSearchQuery) return null
+    const query = deferredSearchQuery.toLowerCase().trim()
     return {
       original: query,
       normalized: query.replace(/[^a-z0-9]/g, ''),
       noSpaces: query.replace(/\s+/g, '')
     }
-  }, [searchQuery])
+  }, [deferredSearchQuery])
 
   // Extract sort comparator (prevents recreation on every filter)
   const sortComparator = useMemo(() => {
@@ -269,7 +270,7 @@ export default function PokemonGrid({
   )
 
   const gridCols = {
-    sm: 'grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8 2xl:grid-cols-9',
+    sm: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8',
     md: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7',
     lg: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
   }
@@ -308,9 +309,9 @@ export default function PokemonGrid({
                 className="pl-10 h-12 text-base"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
               <Select value={sortValue} onValueChange={handleSortChange}>
-                <SelectTrigger className="h-12 w-[180px]">
+                <SelectTrigger className="h-12 w-full sm:w-[180px]">
                   <SelectValue placeholder="Sort by..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -321,30 +322,32 @@ export default function PokemonGrid({
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => setShowFiltersPanel(!showFiltersPanel)}
-                className="h-12 px-4"
-              >
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-                {(typeFilter !== 'all' || costFilter !== 'all') && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {[typeFilter !== 'all', costFilter !== 'all'].filter(Boolean).length}
-                  </Badge>
-                )}
-              </Button>
-              {hasActiveFilters && (
+              <div className="flex gap-2">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="lg"
-                  onClick={clearAllFilters}
-                  className="h-12 px-3 text-muted-foreground"
+                  onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                  className="h-12 px-3 sm:px-4"
                 >
-                  Clear
+                  <Filter className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Filters</span>
+                  {(typeFilter !== 'all' || costFilter !== 'all') && (
+                    <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs">
+                      {[typeFilter !== 'all', costFilter !== 'all'].filter(Boolean).length}
+                    </Badge>
+                  )}
                 </Button>
-              )}
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    onClick={clearAllFilters}
+                    className="h-12 px-3 text-muted-foreground"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
 

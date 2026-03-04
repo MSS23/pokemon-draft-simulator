@@ -161,7 +161,7 @@ const PokemonCard = ({
             aria-label={isInWishlist ? `Remove ${pokemon.name} from wishlist` : `Add ${pokemon.name} to wishlist`}
             aria-pressed={isInWishlist}
             className={cn(
-              "h-7 w-7 min-w-[44px] min-h-[44px] sm:h-7 sm:w-7 sm:min-w-0 sm:min-h-0 p-0 rounded-full transition-all duration-200",
+              "h-8 w-8 p-0 rounded-full transition-all duration-200",
               "shadow-sm border border-white/20",
               "touch-manipulation active:scale-90",
               isInWishlist

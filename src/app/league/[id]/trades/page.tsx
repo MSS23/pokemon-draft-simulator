@@ -180,11 +180,11 @@ export default function LeagueTradesPage() {
 
         <Tabs defaultValue="pending" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="pending">
-              Pending Trades ({pendingTrades.length})
+            <TabsTrigger value="pending" className="text-xs sm:text-sm">
+              Pending ({pendingTrades.length})
             </TabsTrigger>
-            <TabsTrigger value="history">Trade History</TabsTrigger>
-            <TabsTrigger value="propose">Propose New Trade</TabsTrigger>
+            <TabsTrigger value="history" className="text-xs sm:text-sm">History</TabsTrigger>
+            <TabsTrigger value="propose" className="text-xs sm:text-sm">Propose</TabsTrigger>
           </TabsList>
 
           {/* Pending Trades */}
@@ -215,10 +215,10 @@ export default function LeagueTradesPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-3 gap-4 items-center">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
                       {/* Team A */}
-                      <div className="text-center">
-                        <div className="font-semibold mb-2">{trade.teamAName}</div>
+                      <div className="text-center min-w-0">
+                        <div className="font-semibold mb-2 text-sm sm:text-base truncate">{trade.teamAName}</div>
                         <div className="space-y-1">
                           {trade.teamAGivesPokemon?.map(pick => (
                             <Badge key={pick.id} variant="outline" className="block">

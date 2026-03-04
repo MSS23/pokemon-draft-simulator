@@ -99,7 +99,7 @@ export default function DraftProgress({
   const isTimerWarning = timeRemaining > 0 && timeRemaining <= 30
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-3 bg-card rounded-lg border p-3 sm:p-4 shadow-sm">
       {/* Top bar: stats + timer */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Round */}
@@ -123,7 +123,7 @@ export default function DraftProgress({
           <div className={cn(
             'flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono transition-all',
             isTimerCritical
-              ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
+              ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse shadow-sm shadow-red-200 dark:shadow-red-900/50'
               : isTimerWarning
               ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
               : 'bg-primary/10 text-primary'
@@ -135,23 +135,23 @@ export default function DraftProgress({
 
         {/* Overall progress bar - grows to fill remaining space */}
         <div className="flex-1 min-w-[120px]">
-          <Progress value={draftInfo.overallProgress} className="h-2" />
+          <Progress value={draftInfo.overallProgress} className="h-2.5" />
         </div>
       </div>
 
       {/* Pick order visualization */}
       {draftStatus === 'drafting' && (
-        <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
           {pickOrder.map((team) => (
             <Badge
               key={team.id}
               variant={team.isCurrentPick ? 'default' : 'outline'}
               className={cn(
-                'flex-shrink-0 text-xs px-2.5 py-0.5 transition-all',
+                'flex-shrink-0 text-xs px-3 py-1 transition-all',
                 team.isCurrentPick
-                  ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                  ? 'bg-primary text-primary-foreground shadow-md scale-110 font-semibold'
                   : team.hasPickedThisRound
-                  ? 'bg-muted text-muted-foreground line-through opacity-60'
+                  ? 'bg-muted text-muted-foreground line-through opacity-50'
                   : 'text-foreground'
               )}
             >

@@ -203,8 +203,10 @@ export default function MyDraftsPage() {
     )
   }
 
-  const handleDraftClick = (draftId: string) => {
-    router.push(`/draft/${draftId}`)
+  const handleDraftClick = (draft: DraftWithTeam) => {
+    // Use room code if available (draft page expects room code in URL), fallback to UUID
+    const identifier = draft.roomCode || draft.id
+    router.push(`/draft/${identifier}`)
   }
 
   if (matches.length === 0 && drafts.length === 0) {
@@ -259,9 +261,15 @@ export default function MyDraftsPage() {
               My Drafts
             </h2>
             <div className="grid gap-4">
-              {drafts.map(draft => (
-                <DraftCard key={draft.id} draft={draft} onClick={() => handleDraftClick(draft.id)} />
-              ))}
+              {[...drafts]
+                .sort((a, b) => {
+                  // Active drafts first, then setup, then completed
+                  const statusOrder: Record<string, number> = { active: 0, setup: 1, paused: 2, completed: 3 }
+                  return (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4)
+                })
+                .map(draft => (
+                  <DraftCard key={draft.id} draft={draft} onClick={() => handleDraftClick(draft)} />
+                ))}
             </div>
           </div>
         )}
@@ -451,10 +459,10 @@ function MatchCard({ match, onClick }: { match: MatchWithDetails; onClick: () =>
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
               {/* Your Team */}
-              <div className="text-right">
-                <p className="font-semibold text-slate-900 dark:text-white">
+              <div className="text-right min-w-0">
+                <p className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white truncate">
                   {match.userTeam.name}
                 </p>
                 <p className="text-xs text-slate-500">Your Team</p>

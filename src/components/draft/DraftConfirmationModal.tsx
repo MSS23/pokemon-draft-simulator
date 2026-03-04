@@ -57,7 +57,7 @@ export default function DraftConfirmationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto p-0 border-0 shadow-2xl">
+      <DialogContent className="max-w-md w-[95vw] sm:w-full max-h-[90dvh] overflow-y-auto p-0 border-0 shadow-2xl">
         {/* Modern gradient background */}
         <div className="relative bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
           {/* Header with Pokemon Image */}

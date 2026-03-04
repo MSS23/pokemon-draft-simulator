@@ -158,10 +158,16 @@ export class LeagueService {
       )
       leagues.push(leagueB)
 
-      // Generate schedules for both conferences
+      // Generate intra-conference schedules
       const matchesA = await this.generateSchedule(leagueA.id, conferenceATeams, leagueConfig)
       const matchesB = await this.generateSchedule(leagueB.id, conferenceBTeams, leagueConfig)
       allMatches.push(...matchesA, ...matchesB)
+
+      // Generate 1 cross-conference match per team (stored in Conference A's league)
+      const crossMatches = await this.generateCrossConferenceMatches(
+        leagueA.id, conferenceATeams, conferenceBTeams, leagueConfig
+      )
+      allMatches.push(...crossMatches)
     } else {
       // Create single league
       const league = await this.createSingleLeague(
@@ -241,8 +247,14 @@ export class LeagueService {
   }
 
   /**
-   * Generate randomized round-robin schedule for a league
-   * Ensures each team plays exactly 1 match per week with randomized opponents
+   * Generate a proper round-robin schedule for a league.
+   *
+   * Rules:
+   * - Every team plays each other team at least once
+   * - Each team plays exactly 1 match per week
+   * - If totalWeeks > unique matchups, rematches fill remaining weeks
+   * - 2 teams with 4 weeks = 4 matches (play every week)
+   * - Odd team count: one team gets a bye each week
    */
   private static async generateSchedule(
     leagueId: string,
@@ -256,113 +268,58 @@ export class LeagueService {
   ): Promise<Match[]> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const matches: Omit<Match, 'id' | 'createdAt' | 'updatedAt' | 'completedAt'>[] = []
-    const _teamCount = teams.length
-    const _maxMatchesPerWeek = config.maxMatchesPerWeek || 1
-
-    // Shuffle teams initially for randomization
-    const shuffledTeams = [...teams].sort(() => Math.random() - 0.5)
-
-    // Track which teams have played each other
-    const matchupHistory = new Set<string>()
-    const getMatchupKey = (team1Id: string, team2Id: string) => {
-      return [team1Id, team2Id].sort().join('_')
+    // Build all unique matchup pairs (round-robin)
+    const allPairs: [Team, Team][] = []
+    for (let i = 0; i < teams.length; i++) {
+      for (let j = i + 1; j < teams.length; j++) {
+        allPairs.push([teams[i], teams[j]])
+      }
     }
 
+    // Shuffle pairs for randomization
+    for (let i = allPairs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allPairs[i], allPairs[j]] = [allPairs[j], allPairs[i]]
+    }
+
+    // Use circle method for round-robin scheduling (handles even/odd teams)
+    const roundRobinRounds = this.buildRoundRobinRounds(teams)
+
+    // Fill weeks: first exhaust round-robin rounds, then cycle for rematches
+    const weeklyMatchups: [Team, Team][][] = []
+    for (let week = 0; week < config.totalWeeks; week++) {
+      const roundIndex = week % roundRobinRounds.length
+      weeklyMatchups.push(roundRobinRounds[roundIndex])
+    }
+
+    // Build match records
+    const matches: Omit<Match, 'id' | 'createdAt' | 'updatedAt' | 'completedAt'>[] = []
     let matchNumber = 1
 
-    // Generate matches week by week
-    for (let week = 0; week < config.totalWeeks; week++) {
+    for (let week = 0; week < weeklyMatchups.length; week++) {
       const weekNumber = week + 1
       const weekDate = config.startDate
         ? new Date(config.startDate.getTime() + week * 7 * 24 * 60 * 60 * 1000)
         : null
 
-      // Copy available teams for this week
-      const availableTeams = [...shuffledTeams]
-      const weekMatches: typeof matches = []
-
-      // Pair teams randomly for this week
-      while (availableTeams.length >= 2) {
-        // Try to find a valid pairing
-        let foundMatch = false
-        let attempts = 0
-        const maxAttempts = availableTeams.length * 2
-
-        while (!foundMatch && attempts < maxAttempts) {
-          // Pick two random teams
-          const index1 = Math.floor(Math.random() * availableTeams.length)
-          let index2 = Math.floor(Math.random() * availableTeams.length)
-
-          // Ensure different teams
-          while (index2 === index1) {
-            index2 = Math.floor(Math.random() * availableTeams.length)
-          }
-
-          const team1 = availableTeams[index1]
-          const team2 = availableTeams[index2]
-          const matchupKey = getMatchupKey(team1.id, team2.id)
-
-          // Check if this matchup hasn't occurred yet (if possible)
-          if (!matchupHistory.has(matchupKey) || attempts > maxAttempts / 2) {
-            matchupHistory.add(matchupKey)
-
-            // Randomly decide home/away
-            const isHomeFirst = Math.random() > 0.5
-            const home = isHomeFirst ? team1 : team2
-            const away = isHomeFirst ? team2 : team1
-
-            weekMatches.push({
-              leagueId,
-              weekNumber,
-              matchNumber: matchNumber++,
-              homeTeamId: home.id,
-              awayTeamId: away.id,
-              scheduledDate: weekDate?.toISOString() || null,
-              status: 'scheduled',
-              homeScore: 0,
-              awayScore: 0,
-              winnerTeamId: null,
-              battleFormat: config.matchFormat || 'best_of_3',
-              notes: null
-            })
-
-            // Remove both teams from available pool
-            availableTeams.splice(Math.max(index1, index2), 1)
-            availableTeams.splice(Math.min(index1, index2), 1)
-            foundMatch = true
-          }
-
-          attempts++
-        }
-
-        // If we couldn't find a good match after many attempts, just pair them anyway
-        if (!foundMatch && availableTeams.length >= 2) {
-          const team1 = availableTeams[0]
-          const team2 = availableTeams[1]
-          matchupHistory.add(getMatchupKey(team1.id, team2.id))
-
-          weekMatches.push({
-            leagueId,
-            weekNumber,
-            matchNumber: matchNumber++,
-            homeTeamId: team1.id,
-            awayTeamId: team2.id,
-            scheduledDate: weekDate?.toISOString() || null,
-            status: 'scheduled',
-            homeScore: 0,
-            awayScore: 0,
-            winnerTeamId: null,
-            battleFormat: config.matchFormat || 'best_of_3',
-            notes: null
-          })
-
-          availableTeams.splice(0, 2)
-        }
+      for (const [team1, team2] of weeklyMatchups[week]) {
+        // Randomize home/away
+        const homeFirst = Math.random() > 0.5
+        matches.push({
+          leagueId,
+          weekNumber,
+          matchNumber: matchNumber++,
+          homeTeamId: homeFirst ? team1.id : team2.id,
+          awayTeamId: homeFirst ? team2.id : team1.id,
+          scheduledDate: weekDate?.toISOString() || null,
+          status: 'scheduled',
+          homeScore: 0,
+          awayScore: 0,
+          winnerTeamId: null,
+          battleFormat: config.matchFormat || 'best_of_3',
+          notes: null
+        })
       }
-
-      // Add this week's matches to the schedule
-      matches.push(...weekMatches)
     }
 
     // Insert matches into database
@@ -387,6 +344,130 @@ export class LeagueService {
       .select()
 
     if (error || !insertedMatches) throw new Error('Failed to create schedule')
+
+    return insertedMatches.map((m: MatchRow) => mapMatchRow(m))
+  }
+
+  /**
+   * Circle method for round-robin: produces N-1 rounds (N if odd) where
+   * every team plays exactly once per round and every pair meets exactly once.
+   */
+  private static buildRoundRobinRounds(teams: Team[]): [Team, Team][][] {
+    const list = [...teams]
+    // If odd number of teams, add a dummy "bye" entry
+    const hasBye = list.length % 2 !== 0
+    if (hasBye) {
+      list.push({ id: 'BYE', name: 'BYE', draftId: '', ownerId: '', budgetRemaining: 0, draftOrder: 0, undosRemaining: 0, picks: [] } as Team)
+    }
+
+    const n = list.length
+    const rounds: [Team, Team][][] = []
+
+    // Fix the first team, rotate the rest (circle method)
+    const fixed = list[0]
+    const rotating = list.slice(1)
+
+    for (let round = 0; round < n - 1; round++) {
+      const roundMatches: [Team, Team][] = []
+
+      // First match: fixed vs first in rotating list
+      if (rotating[0].id !== 'BYE' && fixed.id !== 'BYE') {
+        roundMatches.push([fixed, rotating[0]])
+      }
+
+      // Pair remaining: i-th from top with i-th from bottom
+      for (let i = 1; i < n / 2; i++) {
+        const team1 = rotating[i]
+        const team2 = rotating[n - 2 - i]
+        if (team1.id !== 'BYE' && team2.id !== 'BYE') {
+          roundMatches.push([team1, team2])
+        }
+      }
+
+      rounds.push(roundMatches)
+
+      // Rotate: move last element to front
+      rotating.unshift(rotating.pop()!)
+    }
+
+    // Shuffle round order for variety
+    for (let i = rounds.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rounds[i], rounds[j]] = [rounds[j], rounds[i]]
+    }
+
+    return rounds
+  }
+
+  /**
+   * Generate exactly 1 cross-conference match per team.
+   * Each team from Conference A plays 1 team from Conference B.
+   */
+  private static async generateCrossConferenceMatches(
+    leagueId: string,
+    conferenceA: Team[],
+    conferenceB: Team[],
+    config: {
+      totalWeeks: number
+      startDate?: Date
+      matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+    }
+  ): Promise<Match[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Shuffle B so pairings are random
+    const shuffledB = [...conferenceB].sort(() => Math.random() - 0.5)
+
+    const matches: Omit<Match, 'id' | 'createdAt' | 'updatedAt' | 'completedAt'>[] = []
+    const pairCount = Math.min(conferenceA.length, shuffledB.length)
+
+    // Schedule cross-conference matches in the last available weeks
+    const startWeek = config.totalWeeks // append after regular season
+    let matchNumber = 9000 // high offset to avoid collisions
+
+    for (let i = 0; i < pairCount; i++) {
+      const homeFirst = Math.random() > 0.5
+      const weekDate = config.startDate
+        ? new Date(config.startDate.getTime() + (startWeek + Math.floor(i / Math.max(1, Math.floor(pairCount / 2)))) * 7 * 24 * 60 * 60 * 1000)
+        : null
+
+      matches.push({
+        leagueId,
+        weekNumber: startWeek + 1 + Math.floor(i / Math.max(1, Math.floor(pairCount / 2))),
+        matchNumber: matchNumber++,
+        homeTeamId: homeFirst ? conferenceA[i].id : shuffledB[i].id,
+        awayTeamId: homeFirst ? shuffledB[i].id : conferenceA[i].id,
+        scheduledDate: weekDate?.toISOString() || null,
+        status: 'scheduled',
+        homeScore: 0,
+        awayScore: 0,
+        winnerTeamId: null,
+        battleFormat: config.matchFormat || 'best_of_3',
+        notes: 'Cross-conference'
+      })
+    }
+
+    const { data: insertedMatches, error } = await supabase
+      .from('matches')
+      .insert(
+        matches.map(m => ({
+          league_id: m.leagueId,
+          week_number: m.weekNumber,
+          match_number: m.matchNumber,
+          home_team_id: m.homeTeamId,
+          away_team_id: m.awayTeamId,
+          scheduled_date: m.scheduledDate,
+          status: m.status,
+          home_score: m.homeScore,
+          away_score: m.awayScore,
+          winner_team_id: m.winnerTeamId,
+          battle_format: m.battleFormat,
+          notes: m.notes
+        }))
+      )
+      .select()
+
+    if (error || !insertedMatches) throw new Error('Failed to create cross-conference matches')
 
     return insertedMatches.map((m: MatchRow) => mapMatchRow(m))
   }

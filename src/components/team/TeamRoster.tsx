@@ -52,23 +52,23 @@ const TeamRoster = memo(function TeamRoster({
       isCurrentTeam && isUserTeam && 'ring-2 ring-yellow-400 shadow-lg',
       !isCurrentTeam && !isUserTeam && 'shadow-sm'
     )}>
-      <CardContent className="p-3">
+      <CardContent className="p-3 sm:p-4">
         {/* Team header */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
             <PokeballIcon size="sm" color={teamColor.hex} className="flex-shrink-0" />
             {isCurrentTeam && showTurnIndicator && (
-              <Crown className="h-3.5 w-3.5 text-yellow-500 flex-shrink-0" />
+              <Crown className="h-4 w-4 text-yellow-500 flex-shrink-0 animate-pulse" />
             )}
-            <span className="font-semibold text-sm truncate">{team.name}</span>
+            <span className="font-bold text-sm truncate">{team.name}</span>
             {isUserTeam && (
-              <Badge variant="secondary" size="sm" className="h-4 flex-shrink-0">You</Badge>
+              <Badge variant="secondary" size="sm" className="h-4 flex-shrink-0 text-[10px]">You</Badge>
             )}
           </div>
           {team.budgetRemaining !== undefined && (
-            <span className="text-[10px] text-muted-foreground flex-shrink-0">
+            <Badge variant="outline" className="text-[10px] font-mono h-5 px-1.5 flex-shrink-0">
               ${team.budgetRemaining}
-            </span>
+            </Badge>
           )}
         </div>
 
@@ -78,19 +78,19 @@ const TeamRoster = memo(function TeamRoster({
             <User className="h-3 w-3" />
             {team.userName}
           </span>
-          <span>{team.picks.length}/{maxPokemonPerTeam}</span>
+          <span className="font-medium">{team.picks.length}/{maxPokemonPerTeam}</span>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-muted rounded-full h-1 mb-2">
+        <div className="w-full bg-muted rounded-full h-1.5 mb-3">
           <div
-            className="h-1 rounded-full transition-all duration-300"
+            className="h-1.5 rounded-full transition-all duration-500 ease-out"
             style={{ width: `${(team.picks.length / maxPokemonPerTeam) * 100}%`, backgroundColor: teamColor.hex }}
           />
         </div>
 
         {/* Pokemon party */}
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {teamPokemon.map((pokemon) => (
             <div
               key={pokemon.id}
@@ -101,7 +101,7 @@ const TeamRoster = memo(function TeamRoster({
               <img
                 src={getPokemonAnimatedUrl(pokemon.id, pokemon.name)}
                 alt={pokemon.name}
-                className="w-8 h-8 sm:w-9 sm:h-9 bg-muted rounded-full border border-border hover:border-primary transition-all hover:scale-110"
+                className="w-11 h-11 sm:w-12 sm:h-12 bg-muted/50 rounded-lg border border-border hover:border-primary transition-all hover:scale-110 shadow-sm"
                 loading="lazy"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
@@ -116,7 +116,7 @@ const TeamRoster = memo(function TeamRoster({
           {Array.from({ length: Math.max(0, maxPokemonPerTeam - teamPokemon.length) }).map((_, i) => (
             <div
               key={`empty-${i}`}
-              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center opacity-30"
+              className="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center opacity-20"
             >
               <PokeballIcon size="md" color={teamColor.hex} />
             </div>

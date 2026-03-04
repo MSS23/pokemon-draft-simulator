@@ -36,7 +36,7 @@ export function PlayoffBracket({ tournament, className }: PlayoffBracketProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-6 overflow-x-auto pb-4">
+        <div className="flex gap-3 sm:gap-6 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory">
           {tournament.rounds
             .filter(r => r.matches.length > 0)
             .map(round => (
@@ -50,7 +50,7 @@ export function PlayoffBracket({ tournament, className }: PlayoffBracketProps) {
 
 function RoundColumn({ round }: { round: Round }) {
   return (
-    <div className="flex flex-col gap-3 min-w-[200px]">
+    <div className="flex flex-col gap-3 min-w-[160px] sm:min-w-[200px] snap-start">
       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider text-center">
         {round.name}
         {round.bracket && (

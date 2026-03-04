@@ -70,7 +70,7 @@ export default function CreateDraftPage() {
     pokemonPerTeam: "6",
     budgetPerTeam: "100",
     formatId: DEFAULT_FORMAT,
-    isPublic: false,
+    isPublic: true,
     description: "",
     tags: "",
     password: "",

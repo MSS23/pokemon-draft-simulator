@@ -59,7 +59,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   themeColor: "#dc2626",
 };
 
@@ -90,11 +89,11 @@ export default function RootLayout({
               >
                 <ImagePreferenceProvider>
                   <AuthProvider>
-                    <Toaster position="top-right" richColors />
+                    <Toaster position="top-center" richColors />
                     <QueryProvider>
                       <Header />
                       <main className="min-h-[calc(100vh-3rem)]">{children}</main>
-                      <footer className="border-t py-4 text-center text-xs text-muted-foreground">
+                      <footer className="border-t py-4 text-center text-xs text-muted-foreground px-4">
                         <a href="/terms" className="hover:underline">Terms</a>
                         {' · '}
                         <a href="/privacy" className="hover:underline">Privacy</a>

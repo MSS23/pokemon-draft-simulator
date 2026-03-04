@@ -120,9 +120,9 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
           isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full pb-[env(safe-area-inset-bottom)]">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <div className="flex items-center gap-2.5">
               <History className="h-4 w-4 text-primary" />
               <h2 className="text-sm font-semibold tracking-tight">Draft Activity</h2>
@@ -132,20 +132,20 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
                 </span>
               )}
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
-              <X className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-10 w-10">
+              <X className="h-5 w-5" />
             </Button>
           </div>
 
           {/* Filters */}
-          <div className="px-4 py-2 border-b">
-            <div className="flex gap-1">
+          <div className="px-4 py-2.5 border-b">
+            <div className="flex gap-1.5">
               {(['all', 'my-team', 'opponents'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   className={cn(
-                    'flex-1 py-1.5 text-xs font-medium rounded-md transition-colors',
+                    'flex-1 py-2.5 text-xs font-medium rounded-md transition-colors',
                     filter === f
                       ? 'bg-primary text-primary-foreground'
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'

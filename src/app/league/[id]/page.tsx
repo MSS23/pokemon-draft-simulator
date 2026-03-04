@@ -331,14 +331,14 @@ export default function LeaguePage() {
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => router.push('/')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
+        <div className="flex items-center justify-between mb-6 gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <Button variant="outline" size="sm" onClick={() => router.push('/')}>
+              <ArrowLeft className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Back</span>
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold brand-gradient-text">
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-3xl font-bold brand-gradient-text truncate">
                 {league.name}
               </h1>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -417,7 +417,7 @@ export default function LeaguePage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -464,14 +464,14 @@ export default function LeaguePage() {
         </div>
 
         <Tabs defaultValue="fixtures" className="space-y-4">
-          <TabsList className={`grid w-full ${playoffTournament ? 'grid-cols-5' : 'grid-cols-4'}`}>
-            <TabsTrigger value="fixtures">Fixtures</TabsTrigger>
-            <TabsTrigger value="standings">Standings</TabsTrigger>
+          <TabsList className="flex w-full overflow-x-auto">
+            <TabsTrigger value="fixtures" className="flex-1 min-w-0 text-xs sm:text-sm">Fixtures</TabsTrigger>
+            <TabsTrigger value="standings" className="flex-1 min-w-0 text-xs sm:text-sm">Standings</TabsTrigger>
             {playoffTournament && (
-              <TabsTrigger value="playoffs">Playoffs</TabsTrigger>
+              <TabsTrigger value="playoffs" className="flex-1 min-w-0 text-xs sm:text-sm">Playoffs</TabsTrigger>
             )}
-            <TabsTrigger value="kill-leaders">Kill Leaders</TabsTrigger>
-            <TabsTrigger value="teams">Teams</TabsTrigger>
+            <TabsTrigger value="kill-leaders" className="flex-1 min-w-0 text-xs sm:text-sm">Kills</TabsTrigger>
+            <TabsTrigger value="teams" className="flex-1 min-w-0 text-xs sm:text-sm">Teams</TabsTrigger>
           </TabsList>
 
           {/* Fixtures Tab */}

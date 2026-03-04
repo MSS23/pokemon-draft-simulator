@@ -139,10 +139,10 @@ export default function MatchDetailPage() {
           </CardHeader>
           <CardContent>
             {/* Matchup Display */}
-            <div className="grid grid-cols-3 gap-8 items-center my-6">
+            <div className="grid grid-cols-3 gap-2 sm:gap-8 items-center my-4 sm:my-6">
               {/* Home Team */}
               <div className="text-center">
-                <div className={`text-3xl font-bold mb-2 ${isUserHomeTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
+                <div className={`text-lg sm:text-3xl font-bold mb-2 truncate ${isUserHomeTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
                   {match.homeTeam.name}
                 </div>
                 {isUserHomeTeam && (
@@ -160,7 +160,7 @@ export default function MatchDetailPage() {
               <div className="text-center">
                 {match.status === 'completed' ? (
                   <>
-                    <div className="text-5xl font-bold text-slate-900 dark:text-white mb-2">
+                    <div className="text-2xl sm:text-5xl font-bold text-slate-900 dark:text-white mb-2">
                       {match.homeScore} - {match.awayScore}
                     </div>
                     {match.winnerTeamId && (
@@ -171,13 +171,13 @@ export default function MatchDetailPage() {
                     )}
                   </>
                 ) : (
-                  <div className="text-4xl font-semibold text-slate-500">VS</div>
+                  <div className="text-2xl sm:text-4xl font-semibold text-slate-500">VS</div>
                 )}
               </div>
 
               {/* Away Team */}
               <div className="text-center">
-                <div className={`text-3xl font-bold mb-2 ${isUserAwayTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
+                <div className={`text-lg sm:text-3xl font-bold mb-2 truncate ${isUserAwayTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
                   {match.awayTeam.name}
                 </div>
                 {isUserAwayTeam && (

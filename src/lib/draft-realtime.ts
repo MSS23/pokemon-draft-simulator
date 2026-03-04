@@ -342,10 +342,13 @@ export class DraftRealtimeManager {
       return
     }
 
-    const delay = Math.min(
+    const baseDelay = Math.min(
       this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
       this.maxReconnectDelay
     )
+    // Add ±20% random jitter to prevent thundering herd
+    const jitter = baseDelay * 0.4 * (Math.random() - 0.5)
+    const delay = Math.round(baseDelay + jitter)
     this.reconnectAttempts++
 
     log.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`)

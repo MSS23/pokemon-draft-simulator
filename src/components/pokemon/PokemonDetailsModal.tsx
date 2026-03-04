@@ -99,26 +99,26 @@ export default function PokemonDetailsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto bg-white dark:bg-background border-2 border-border">
+      <DialogContent className="max-w-3xl w-[95vw] sm:w-full max-h-[90dvh] overflow-y-auto bg-white dark:bg-background border-2 border-border">
         <DialogHeader className="pb-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <DialogTitle className="text-3xl font-bold text-foreground mb-2">
+          <div className="flex items-start justify-between gap-2 sm:gap-4">
+            <div className="flex-1 min-w-0">
+              <DialogTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2 truncate">
                 {pokemon.name}
               </DialogTitle>
-              <DialogDescription className="text-muted-foreground flex items-center gap-2 text-sm">
-                <span>Pokémon #{pokemon.id.padStart(3, '0')}</span>
+              <DialogDescription className="text-muted-foreground flex items-center gap-2 text-xs sm:text-sm">
+                <span>#{pokemon.id.padStart(3, '0')}</span>
                 {!isDrafted && !isDisabled && (
                   <>
                     <span>•</span>
-                    <span className="text-green-600 dark:text-green-400 font-medium">Available to draft</span>
+                    <span className="text-green-600 dark:text-green-400 font-medium">Available</span>
                   </>
                 )}
               </DialogDescription>
             </div>
             <Badge
               className={cn(
-                "text-xl px-5 py-2.5 font-bold shadow-lg whitespace-nowrap",
+                "text-sm sm:text-xl px-3 sm:px-5 py-1.5 sm:py-2.5 font-bold shadow-lg whitespace-nowrap flex-shrink-0",
                 pokemon.cost >= 25 ? "bg-red-500 hover:bg-red-600" :
                 pokemon.cost >= 20 ? "bg-purple-500 hover:bg-purple-600" :
                 pokemon.cost >= 15 ? "bg-blue-500 hover:bg-blue-600" :
@@ -245,23 +245,25 @@ export default function PokemonDetailsModal({
 
         {/* Action Buttons */}
         {!isDrafted && !isDisabled && onSelect && (
-          <div className="flex justify-end gap-3 pt-6 border-t border-border">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-6 border-t border-border">
             <Button
               variant="outline"
               onClick={onClose}
-              className="px-6"
+              className="h-11 px-6 order-2 sm:order-1"
             >
               Close
             </Button>
             <Button
               onClick={() => onSelect(pokemon)}
               disabled={isAtPickLimit}
-              className="px-6 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
             >
-              {isAtPickLimit
-                ? `Pick Limit Reached (${currentPicks}/${maxPicks})`
-                : `Draft ${pokemon.name}`
-              }
+              <span className="truncate">
+                {isAtPickLimit
+                  ? `Pick Limit (${currentPicks}/${maxPicks})`
+                  : `Draft ${pokemon.name}`
+                }
+              </span>
             </Button>
           </div>
         )}

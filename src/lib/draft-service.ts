@@ -981,20 +981,23 @@ export class DraftService {
       throw new Error('No response from pick function')
     }
 
-    if (!data.success) {
+    // Cast RPC JSONB response to expected shape
+    const result = data as Record<string, unknown>
+
+    if (!result.success) {
       // The atomic function returned an error (validation failed)
-      const errorMessage = data.error || 'Failed to make pick'
-      log.error('Atomic function error:', errorMessage, data)
+      const errorMessage = (result.error as string) || 'Failed to make pick'
+      log.error('Atomic function error:', errorMessage, result)
 
       // Provide user-friendly error messages
       if (errorMessage.includes('Not your turn')) {
         throw new Error('Not your turn! The turn may have changed. Please wait for your turn.')
       }
       if (errorMessage.includes('Insufficient budget')) {
-        throw new Error(`Insufficient budget! You have ${data.budgetRemaining || 0} points but this costs ${data.cost || validatedCost} points.`)
+        throw new Error(`Insufficient budget! You have ${result.budgetRemaining || 0} points but this costs ${result.cost || validatedCost} points.`)
       }
       if (errorMessage.includes('Maximum picks reached')) {
-        throw new Error(`Your team has reached the maximum number of picks (${data.maxPicks || 6}).`)
+        throw new Error(`Your team has reached the maximum number of picks (${result.maxPicks || 6}).`)
       }
       if (errorMessage.includes('already drafted')) {
         throw new Error('This Pokemon has already been drafted by your team.')
@@ -1007,14 +1010,14 @@ export class DraftService {
     }
 
     log.info('Success:', {
-      pickId: data.pickId,
-      newBudget: data.newBudget,
-      nextTurn: data.nextTurn,
-      isComplete: data.isComplete
+      pickId: result.pickId,
+      newBudget: result.newBudget,
+      nextTurn: result.nextTurn,
+      isComplete: result.isComplete
     })
 
     // If draft is complete and league creation is enabled, create the league
-    if (data.isComplete && draftState.draft.settings?.createLeague) {
+    if (result.isComplete && draftState.draft.settings?.createLeague) {
       try {
         await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
       } catch (leagueError) {
@@ -1024,10 +1027,10 @@ export class DraftService {
     }
 
     return {
-      pickId: data.pickId,
-      newBudget: data.newBudget,
-      nextTurn: data.nextTurn,
-      isComplete: data.isComplete
+      pickId: result.pickId as string,
+      newBudget: result.newBudget as number,
+      nextTurn: result.nextTurn as number,
+      isComplete: result.isComplete as boolean
     }
   }
 

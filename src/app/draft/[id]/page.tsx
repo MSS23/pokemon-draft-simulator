@@ -13,7 +13,6 @@ import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 // ConnectionStatus from ui/ConnectionStatus is replaced by DraftConnectionStatusBadge
 import { Copy, Share2, History, Crown, Clock, CheckCircle2 } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
@@ -515,6 +514,12 @@ export default function DraftRoomPage() {
     return 'offline'
   }, [realtimeConnectionStatus.status])
 
+  // Stable no-op callback to prevent infinite re-renders (React #185)
+  // Inline `async () => {}` creates a new reference every render, re-triggering effects
+  const noopAutoSkip = useCallback(async () => {
+    // Timer disabled - no auto-skip
+  }, [])
+
   // Turn notifications with browser notifications
   const { requestBrowserNotificationPermission } = useTurnNotifications({
     isUserTurn: isUserTurn || false,
@@ -524,9 +529,7 @@ export default function DraftRoomPage() {
     warningThreshold: 10,
     isConnected: connectionStatus === 'online',
     currentTurn: draftState?.currentTurn,
-    onAutoSkip: async () => {
-      // Timer disabled - no auto-skip
-    }
+    onAutoSkip: noopAutoSkip
   })
 
   // Load initial draft state
@@ -1435,10 +1438,7 @@ export default function DraftRoomPage() {
       <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
-          <div className="relative text-center mb-6">
-            <div className="absolute top-0 right-0 flex gap-2">
-              <ThemeToggle />
-            </div>
+          <div className="text-center mb-6">
             <h1 className="text-3xl font-bold brand-gradient-text mb-2">
               Draft Room: {roomCode}
             </h1>
@@ -1513,17 +1513,17 @@ export default function DraftRoomPage() {
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-500">
-      <div className="container mx-auto px-4 py-4 max-w-screen-2xl">
+      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 max-w-screen-2xl">
         {/* Header */}
-        <div className="mb-3 flex items-center justify-between gap-2 px-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-lg font-bold font-mono tracking-wider truncate">
+        <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 sm:gap-3 px-1">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <h1 className="text-xl font-bold font-mono tracking-wider truncate">
               {roomCode}
             </h1>
             <Badge
               variant={draftState?.status === 'drafting' ? 'default' : 'secondary'}
               className={cn(
-                'flex-shrink-0',
+                'flex-shrink-0 text-xs',
                 draftState?.status === 'drafting' && 'animate-pulse'
               )}
             >
@@ -1534,24 +1534,24 @@ export default function DraftRoomPage() {
               onReconnect={realtimeReconnect}
             />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Button variant="ghost" size="icon" onClick={copyRoomCode} className="h-8 w-8" title="Copy room code">
-              <Copy className="h-3.5 w-3.5" />
+              <Copy className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" onClick={shareRoom} className="h-8 w-8" title="Share room">
-              <Share2 className="h-3.5 w-3.5" />
+              <Share2 className="h-4 w-4" />
             </Button>
             {draftState && draftState.status === 'drafting' && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 onClick={() => setIsActivitySidebarOpen(true)}
                 className="h-8 w-8 relative"
                 title="Draft activity"
               >
-                <History className="h-3.5 w-3.5" />
+                <History className="h-4 w-4" />
                 {allDraftedIds.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
                     {allDraftedIds.length}
                   </span>
                 )}
@@ -1566,7 +1566,6 @@ export default function DraftRoomPage() {
                 Results
               </Button>
             )}
-            <ThemeToggle />
           </div>
         </div>
 
@@ -1636,7 +1635,7 @@ export default function DraftRoomPage() {
         )}
 
         {/* Team Rosters */}
-        <div className="mb-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-2 sm:gap-3">
+        <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {draftState ? (
             // Show actual teams when draft state is loaded
             (draftState?.teams || []).map((team) => (
@@ -1714,8 +1713,8 @@ export default function DraftRoomPage() {
               onDeleteDraft={handleDeleteDraft}
               onAdvanceTurn={handleAdvanceTurn}
               onSetTimer={handleSetTimer}
-              onEnableProxyPicking={() => {}}
-              onDisableProxyPicking={() => {}}
+              onEnableProxyPicking={noopAutoSkip}
+              onDisableProxyPicking={noopAutoSkip}
               isProxyPickingEnabled={false}
               isShuffling={isShuffling}
               onUndoLastPick={handleUndoLastPick}
@@ -1772,27 +1771,29 @@ export default function DraftRoomPage() {
               </div>
             ) : (
               <div className={cn(
-                'px-3 py-2 rounded-lg border transition-all',
+                'px-4 py-3 rounded-lg border transition-all',
                 isUserTurn
-                  ? 'bg-primary/5 border-primary/30 ring-1 ring-primary/20'
-                  : 'bg-muted/50 border-border'
+                  ? 'bg-primary/5 border-primary/30 ring-2 ring-primary/20 shadow-sm'
+                  : 'bg-muted/30 border-border'
               )}>
                 {selectedPokemon && isUserTurn ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium truncate flex-1">{selectedPokemon.name}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold truncate flex-1">
+                      Draft <span className="text-primary">{selectedPokemon.name}</span>?
+                    </span>
                     <Button
                       onClick={() => handleDraftPokemon(selectedPokemon)}
                       size="sm"
-                      className="px-4 flex-shrink-0"
+                      className="px-6 flex-shrink-0 font-semibold"
                     >
                       Confirm Pick
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center">
+                  <p className="text-sm text-muted-foreground text-center">
                     {!isUserTurn
-                      ? `Waiting for ${currentTeam?.name}...`
-                      : 'Select a Pokémon below'
+                      ? `Waiting for ${currentTeam?.name} to pick...`
+                      : 'Select a Pokémon from the grid below'
                     }
                   </p>
                 )}
@@ -1824,7 +1825,7 @@ export default function DraftRoomPage() {
         )}
 
         {/* Pokemon Grid */}
-        <div className="bg-card rounded-lg shadow-sm border p-3 sm:p-4">
+        <div className="bg-card rounded-lg shadow-sm border p-2 sm:p-4">
           <EnhancedErrorBoundary>
             <PokemonGrid
               pokemon={pokemon?.filter(p => p.isLegal) || []}

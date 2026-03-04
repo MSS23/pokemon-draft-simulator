@@ -213,8 +213,8 @@ const DraftControls = memo(function DraftControls({
             {isHost ? 'Host' : 'Admin'}
           </span>
 
-          {/* Primary actions inline */}
-          <div className="flex items-center gap-1.5 ml-auto">
+          {/* Primary actions - scrollable on mobile */}
+          <div className="flex items-center gap-1.5 ml-auto overflow-x-auto">
             {draftStatus === 'waiting' && (
               <>
                 <Button
@@ -222,18 +222,18 @@ const DraftControls = memo(function DraftControls({
                   disabled={teams.length < 2 || !onShuffleDraftOrder || isShuffling}
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-9 text-xs flex-shrink-0"
                 >
-                  <Shuffle className={cn('h-3 w-3 mr-1', isShuffling && 'animate-spin')} />
-                  Shuffle
+                  <Shuffle className={cn('h-3.5 w-3.5 mr-1', isShuffling && 'animate-spin')} />
+                  <span className="hidden sm:inline">Shuffle</span>
                 </Button>
                 <Button
                   onClick={onStartDraft}
                   disabled={teams.length < 2 || isStarting}
                   size="sm"
-                  className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                  className="h-9 text-xs bg-green-600 hover:bg-green-700 flex-shrink-0"
                 >
-                  <Play className={cn('h-3 w-3 mr-1', isStarting && 'animate-spin')} />
+                  <Play className={cn('h-3.5 w-3.5 mr-1', isStarting && 'animate-spin')} />
                   {isStarting ? 'Starting...' : `Start (${teams.length})`}
                 </Button>
               </>
@@ -242,33 +242,33 @@ const DraftControls = memo(function DraftControls({
             {draftStatus === 'drafting' && (
               <>
                 {onPingCurrentPlayer && (
-                  <Button onClick={onPingCurrentPlayer} variant="outline" size="sm" className="h-7 text-xs">
-                    <Bell className="h-3 w-3 mr-1" />
-                    Ping
+                  <Button onClick={onPingCurrentPlayer} variant="outline" size="sm" className="h-9 text-xs flex-shrink-0">
+                    <Bell className="h-3.5 w-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline">Ping</span>
                   </Button>
                 )}
                 {canUndo && onUndoLastPick && (
-                  <Button onClick={handleUndo} variant="outline" size="sm" className="h-7 text-xs">
-                    <Undo className="h-3 w-3 mr-1" />
-                    Undo
+                  <Button onClick={handleUndo} variant="outline" size="sm" className="h-9 text-xs flex-shrink-0">
+                    <Undo className="h-3.5 w-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline">Undo</span>
                   </Button>
                 )}
-                <Button onClick={handleAdvanceTurn} variant="outline" size="sm" className="h-7 text-xs">
-                  <SkipForward className="h-3 w-3 mr-1" />
-                  Skip
+                <Button onClick={handleAdvanceTurn} variant="outline" size="sm" className="h-9 text-xs flex-shrink-0">
+                  <SkipForward className="h-3.5 w-3.5 sm:mr-1" />
+                  <span className="hidden sm:inline">Skip</span>
                 </Button>
-                <Button onClick={handlePauseDraft} variant="outline" size="sm" className="h-7 text-xs">
-                  <Pause className="h-3 w-3" />
+                <Button onClick={handlePauseDraft} variant="outline" size="sm" className="h-9 w-9 p-0 flex-shrink-0">
+                  <Pause className="h-3.5 w-3.5" />
                 </Button>
-                <Button onClick={handleEndDraft} variant="destructive" size="sm" className="h-7 text-xs">
-                  <Square className="h-3 w-3" />
+                <Button onClick={handleEndDraft} variant="destructive" size="sm" className="h-9 w-9 p-0 flex-shrink-0">
+                  <Square className="h-3.5 w-3.5" />
                 </Button>
               </>
             )}
 
             {draftStatus === 'paused' && (
-              <Button onClick={handleResumeDraft} size="sm" className="h-7 text-xs bg-green-600 hover:bg-green-700">
-                <Play className="h-3 w-3 mr-1" />
+              <Button onClick={handleResumeDraft} size="sm" className="h-9 text-xs bg-green-600 hover:bg-green-700 flex-shrink-0">
+                <Play className="h-3.5 w-3.5 mr-1" />
                 Resume
               </Button>
             )}
@@ -277,9 +277,9 @@ const DraftControls = memo(function DraftControls({
               variant="ghost"
               size="sm"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="h-7 w-7 p-0"
+              className="h-9 w-9 p-0 flex-shrink-0"
             >
-              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
           </div>
         </div>
@@ -294,14 +294,14 @@ const DraftControls = memo(function DraftControls({
                   <Timer className="h-3 w-3" />
                   Turn Timer: {timeRemaining}s
                 </label>
-                <div className="flex gap-1 flex-wrap">
+                <div className="flex gap-1.5 flex-wrap">
                   {[30, 60, 90, 120, 180, 300, 0].map(seconds => (
                     <Button
                       key={seconds}
                       variant={timeRemaining === seconds ? "default" : "outline"}
                       size="sm"
                       onClick={() => handleSetTimer(String(seconds))}
-                      className="h-6 text-xs px-2"
+                      className="h-9 text-xs px-3"
                     >
                       {seconds === 0 ? 'None' : `${seconds}s`}
                     </Button>
@@ -316,9 +316,9 @@ const DraftControls = memo(function DraftControls({
                 onClick={onRequestNotificationPermission}
                 variant="outline"
                 size="sm"
-                className="h-7 text-xs"
+                className="h-9 text-xs"
               >
-                <Bell className="h-3 w-3 mr-1" />
+                <Bell className="h-3.5 w-3.5 mr-1.5" />
                 Enable Notifications
               </Button>
             )}
@@ -332,20 +332,20 @@ const DraftControls = memo(function DraftControls({
                     onClick={handleResetDraft}
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                    className="h-9 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
                     disabled={!onResetDraft}
                   >
-                    <RotateCcw className="h-3 w-3 mr-1" />
+                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
                     Reset
                   </Button>
                   <Button
                     onClick={handleDeleteDraft}
                     variant="destructive"
                     size="sm"
-                    className="h-7 text-xs"
+                    className="h-9 text-xs"
                     disabled={!onDeleteDraft}
                   >
-                    <Trash2 className="h-3 w-3 mr-1" />
+                    <Trash2 className="h-3.5 w-3.5 mr-1" />
                     Delete
                   </Button>
                 </div>

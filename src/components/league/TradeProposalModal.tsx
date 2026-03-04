@@ -109,7 +109,7 @@ export function TradeProposalModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-5xl w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <ArrowLeftRight className="h-6 w-6 text-blue-500" />

@@ -18,11 +18,6 @@ const displayNameSchema = z.string().min(1).max(50).trim()
 // API Route Schemas
 // ============================================================================
 
-/** POST /api/ai/analyze-draft */
-export const analyzeDraftSchema = z.object({
-  draftId: uuidSchema,
-})
-
 /** POST /api/ai/analyze-team */
 export const analyzeTeamSchema = z.object({
   teamId: uuidSchema,

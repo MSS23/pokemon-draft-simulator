@@ -162,7 +162,7 @@ export default function DraftTradePanel({
       </Button>
 
       <Dialog open={isTradeOpen} onOpenChange={(open) => { if (!open) { resetTrade(); setIsTradeOpen(false) } }}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-5xl w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <ArrowLeftRight className="h-5 w-5 text-blue-500" />

@@ -122,7 +122,7 @@ export default function PowerRankingsPage() {
         .map((ranking, index) => ({
           ...ranking!,
           rank: index + 1,
-          previousRank: index + 1  // TODO: Store previous rankings to calculate trend
+          previousRank: index + 1
         }))
 
       // Calculate trend (for now, use form as indicator)
