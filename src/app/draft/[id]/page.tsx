@@ -536,22 +536,8 @@ export default function DraftRoomPage() {
           return
         }
 
-        // Check if draft is private and requires access verification
-        const isPublic = dbState.draft.is_public
-
-        if (!isPublic) {
-          // Private draft - verify access
-          const { hasVerifiedAccess } = await import('@/lib/draft-access')
-
-          if (!hasVerifiedAccess(roomCode)) {
-            // User hasn't verified access - redirect to join page
-            setError('Access denied: You must join this private draft through the proper join flow')
-            router.push(`/join-draft?code=${roomCode.toUpperCase()}`)
-            return
-          }
-        }
-        // Note: Public drafts with passwords allow viewing/spectating
-        // Password verification happens during the join flow for participation
+        // Anyone with the room code can view/spectate the draft
+        // Only verified participants can make picks (enforced in makePick)
 
         setDraftState(transformDraftState(dbState, userId))
         setIsConnected(true)
