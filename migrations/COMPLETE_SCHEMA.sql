@@ -337,15 +337,20 @@ CREATE TABLE IF NOT EXISTS team_pokemon_status (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  pick_id UUID REFERENCES picks(id),
   pokemon_id TEXT NOT NULL,
   pokemon_name TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'healthy' CHECK (status IN ('healthy', 'injured', 'dead')),
+  status TEXT NOT NULL DEFAULT 'alive' CHECK (status IN ('alive', 'healthy', 'injured', 'fainted', 'dead')),
   total_kos INTEGER DEFAULT 0,
-  died_in_match_id UUID REFERENCES matches(id),
-  died_at TIMESTAMPTZ,
+  matches_played INTEGER DEFAULT 0,
+  matches_won INTEGER DEFAULT 0,
+  death_match_id UUID REFERENCES matches(id),
+  death_date TIMESTAMPTZ,
+  death_details JSONB DEFAULT '{}'::jsonb,
+  notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(league_id, team_id, pokemon_id)
+  UNIQUE(pick_id, league_id)
 );
 
 -- Match Pokemon KOs (tracks individual KOs during matches)
@@ -364,27 +369,55 @@ CREATE TABLE IF NOT EXISTS match_pokemon_kos (
 CREATE TABLE IF NOT EXISTS trades (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   league_id UUID NOT NULL REFERENCES leagues(id) ON DELETE CASCADE,
-  offering_team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  receiving_team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
-  offered_pokemon TEXT[] NOT NULL,
-  requested_pokemon TEXT[] NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'cancelled')),
+  week_number INTEGER NOT NULL DEFAULT 1,
+  team_a_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  team_b_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  team_a_gives TEXT[] NOT NULL DEFAULT '{}',
+  team_b_gives TEXT[] NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed', 'accepted', 'rejected', 'completed', 'cancelled')),
+  proposed_by UUID NOT NULL,
+  proposed_at TIMESTAMPTZ DEFAULT NOW(),
+  responded_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
   notes TEXT,
+  commissioner_approved BOOLEAN,
+  commissioner_id TEXT,
+  commissioner_notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Trade approvals (multi-party trade approval workflow)
 CREATE TABLE IF NOT EXISTS trade_approvals (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   trade_id UUID NOT NULL REFERENCES trades(id) ON DELETE CASCADE,
-  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  approver_user_id TEXT NOT NULL,
+  approver_role TEXT NOT NULL DEFAULT 'commissioner' CHECK (approver_role IN ('commissioner', 'admin', 'owner')),
   approved BOOLEAN NOT NULL,
-  notes TEXT,
+  comments TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(trade_id, team_id)
+  UNIQUE(trade_id, approver_user_id)
 );
+
+-- Trade history view (joins trades with team/league names)
+CREATE OR REPLACE VIEW trade_history AS
+SELECT
+  t.id, t.league_id, t.week_number,
+  t.team_a_id, t.team_b_id,
+  t.team_a_gives, t.team_b_gives,
+  t.status, t.proposed_by,
+  t.proposed_at, t.responded_at, t.completed_at,
+  t.notes, t.commissioner_approved, t.commissioner_id, t.commissioner_notes,
+  t.created_at, t.updated_at,
+  COALESCE(ta.name, 'Unknown') AS team_a_name,
+  COALESCE(tb.name, 'Unknown') AS team_b_name,
+  COALESCE(tp.name, 'Unknown') AS proposed_by_name,
+  COALESCE(l.name, 'Unknown') AS league_name
+FROM trades t
+LEFT JOIN teams ta ON ta.id = t.team_a_id
+LEFT JOIN teams tb ON tb.id = t.team_b_id
+LEFT JOIN teams tp ON tp.id = t.proposed_by
+LEFT JOIN leagues l ON l.id = t.league_id;
 
 -- ============================================
 -- INDEXES FOR PERFORMANCE

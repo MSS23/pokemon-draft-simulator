@@ -17,6 +17,28 @@ import type { TradeRow, TradeHistoryViewRow } from '@/types/supabase-helpers'
 
 export class TradeService {
   /**
+   * Broadcast a trade event to all league members via Supabase Realtime
+   */
+  private static async broadcastTradeEvent(
+    leagueId: string,
+    event: string,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    if (!supabase) return
+    try {
+      const channel = supabase.channel(`league-trades:${leagueId}`)
+      await channel.send({
+        type: 'broadcast',
+        event,
+        payload: { ...payload, timestamp: new Date().toISOString() }
+      })
+      await channel.unsubscribe()
+    } catch {
+      // Non-critical — don't fail the trade operation
+    }
+  }
+
+  /**
    * Propose a trade between two teams
    *
    * @param leagueId - League UUID
@@ -83,6 +105,15 @@ export class TradeService {
       throw new Error(`Failed to propose trade: ${error.message}`)
     }
 
+    // Broadcast trade proposed event
+    void this.broadcastTradeEvent(leagueId, 'trade_proposed', {
+      tradeId: data.id,
+      fromTeamId: fromTeamId,
+      toTeamId: toTeamId,
+      fromTeamName: '', // Resolved client-side
+      toTeamName: '',
+    })
+
     return this.mapToTrade(data)
   }
 
@@ -147,6 +178,13 @@ export class TradeService {
 
     const acceptedTrade = this.mapToTrade(data)
 
+    // Broadcast trade accepted event
+    void this.broadcastTradeEvent(trade.league_id, requiresApproval ? 'trade_pending_approval' : 'trade_accepted', {
+      tradeId,
+      acceptedByTeamId: teamId,
+      proposedByTeamId: trade.proposed_by,
+    })
+
     // If commissioner approval is NOT required, auto-execute the trade
     if (!requiresApproval) {
       await this.executeTrade(tradeId)
@@ -206,6 +244,14 @@ export class TradeService {
       throw new Error(`Failed to reject trade: ${error.message}`)
     }
 
+    // Broadcast trade rejected event
+    void this.broadcastTradeEvent(trade.league_id, 'trade_rejected', {
+      tradeId,
+      rejectedByTeamId: teamId,
+      proposedByTeamId: trade.proposed_by,
+      reason,
+    })
+
     return this.mapToTrade(data)
   }
 
@@ -219,6 +265,13 @@ export class TradeService {
       throw new Error('Supabase client not initialized')
     }
 
+    // Fetch trade details for broadcast
+    const { data: trade } = await supabase
+      .from('trade_history')
+      .select('league_id, team_a_id, team_b_id, team_a_name, team_b_name')
+      .eq('id', tradeId)
+      .single()
+
     // Call the database function to execute the trade
     const { error } = await supabase.rpc('execute_trade', {
       trade_uuid: tradeId,
@@ -226,6 +279,17 @@ export class TradeService {
 
     if (error) {
       throw new Error(`Failed to execute trade: ${error.message}`)
+    }
+
+    // Broadcast trade executed event to all league members
+    if (trade) {
+      void this.broadcastTradeEvent(trade.league_id, 'trade_executed', {
+        tradeId,
+        teamAId: trade.team_a_id,
+        teamBId: trade.team_b_id,
+        teamAName: trade.team_a_name,
+        teamBName: trade.team_b_name,
+      })
     }
   }
 
@@ -337,7 +401,7 @@ export class TradeService {
   }
 
   /**
-   * Validate that a trade is legal (no dead Pokemon)
+   * Validate that a trade is legal (no dead or fainted Pokemon)
    *
    * @param leagueId - League UUID
    * @param pickIds - Array of pick IDs being traded
@@ -354,22 +418,27 @@ export class TradeService {
       return { valid: true }
     }
 
-    // Check if any of the Pokemon are dead
+    // Check if any of the Pokemon are dead or fainted
     const { data, error } = await supabase
       .from('team_pokemon_status')
       .select('pick_id, status')
       .eq('league_id', leagueId)
       .in('pick_id', pickIds)
-      .eq('status', 'dead')
+      .in('status', ['dead', 'fainted'])
 
     if (error) {
       throw new Error(`Failed to validate trade: ${error.message}`)
     }
 
     if (data && data.length > 0) {
+      const dead = data.filter(d => d.status === 'dead').length
+      const fainted = data.filter(d => d.status === 'fainted').length
+      const parts: string[] = []
+      if (dead > 0) parts.push(`${dead} dead`)
+      if (fainted > 0) parts.push(`${fainted} fainted`)
       return {
         valid: false,
-        reason: `Cannot trade dead Pokemon (${data.length} dead Pokemon in trade)`,
+        reason: `Cannot trade knocked out Pokemon (${parts.join(', ')})`,
       }
     }
 

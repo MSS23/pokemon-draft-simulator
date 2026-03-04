@@ -166,7 +166,7 @@ export default function SchedulePage() {
                         <div
                           key={match.id}
                           className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                          onClick={() => router.push(`/match/${match.id}`)}
+                          onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <div className={`w-1 h-8 rounded-full ${homeColors.bg}`} />

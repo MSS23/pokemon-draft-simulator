@@ -210,6 +210,13 @@ export class LeagueService {
     if (!supabase) throw new Error('Supabase not configured')
 
     // Create league as active immediately (draft is already completed)
+    // Look up draft host to set as commissioner
+    const { data: draftInfo } = await supabase
+      .from('drafts')
+      .select('host_id')
+      .eq('id', draftId)
+      .single()
+
     const { data: league, error: leagueError } = await supabase
       .from('leagues')
       .insert({
@@ -222,7 +229,8 @@ export class LeagueService {
         settings: {
           matchFormat: config.matchFormat || 'best_of_3',
           pointsPerWin: 3,
-          pointsPerDraw: 1
+          pointsPerDraw: 1,
+          commissionerId: draftInfo?.host_id || null,
         }
       })
       .select()
@@ -1005,7 +1013,41 @@ export class LeagueService {
       enableTrades: s?.enableTrades || false,
       tradeDeadlineWeek: s?.tradeDeadlineWeek ?? undefined,
       requireCommissionerApproval: s?.requireCommissionerApproval || false,
+      commissionerId: s?.commissionerId ?? undefined,
     }
+  }
+
+  /**
+   * Get the commissioner user ID for a league.
+   * Checks settings first, falls back to the draft host_id.
+   */
+  static async getCommissionerId(leagueId: string): Promise<string | null> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Check settings first
+    const settings = await this.getLeagueSettings(leagueId)
+    if (settings.commissionerId) return settings.commissionerId
+
+    // Fallback: look up draft host_id
+    const league = await this.getLeague(leagueId)
+    if (!league) return null
+
+    const { data: draft } = await supabase
+      .from('drafts')
+      .select('host_id')
+      .eq('id', league.draftId)
+      .single()
+
+    return draft?.host_id || null
+  }
+
+  /**
+   * Check if a user is the league commissioner.
+   * Compares against both auth user ID and guest session ID.
+   */
+  static async isLeagueCommissioner(leagueId: string, userId: string): Promise<boolean> {
+    const commissionerId = await this.getCommissionerId(leagueId)
+    return commissionerId === userId
   }
 
   /**

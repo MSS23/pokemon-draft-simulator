@@ -265,9 +265,17 @@ export default function PokemonGrid({
     return result.slice().sort(sortComparator)
   }, [pokemon, normalizedSearchQuery, typeFilter, costFilter, sortComparator, hpRange, attackRange, defenseRange, speedRange, bstRange])
 
-  const availablePokemon = filteredAndSortedPokemon.filter(
-    p => !draftedPokemonIds.includes(p.id)
-  )
+  const availablePokemon = useMemo(() => {
+    const available = filteredAndSortedPokemon.filter(
+      p => !draftedPokemonIds.includes(p.id)
+    )
+    // Pin wishlisted Pokemon to the top of the grid
+    if (wishlistPokemonIds.length === 0) return available
+    const wishlistSet = new Set(wishlistPokemonIds)
+    const wishlisted = available.filter(p => wishlistSet.has(p.id))
+    const rest = available.filter(p => !wishlistSet.has(p.id))
+    return [...wishlisted, ...rest]
+  }, [filteredAndSortedPokemon, draftedPokemonIds, wishlistPokemonIds])
 
   const gridCols = {
     sm: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8',

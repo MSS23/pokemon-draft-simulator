@@ -104,8 +104,10 @@ export function TradeProposalModal({
     }
   }
 
-  const availableFromPicks = fromTeamPicks.filter(p => !p.status || p.status.status !== 'dead')
-  const availableToPicks = toTeamPicks.filter(p => !p.status || p.status.status !== 'dead')
+  const isTradeEligible = (p: (typeof fromTeamPicks)[number]) =>
+    !p.status || (p.status.status !== 'dead' && p.status.status !== 'fainted')
+  const availableFromPicks = fromTeamPicks.filter(isTradeEligible)
+  const availableToPicks = toTeamPicks.filter(isTradeEligible)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

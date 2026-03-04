@@ -745,4 +745,116 @@ export class LeagueStatsService {
       throw error
     }
   }
+
+  /**
+   * Get per-Pokemon stats for the entire league
+   */
+  static async getLeaguePokemonStats(leagueId: string): Promise<LeaguePokemonStat[]> {
+    const cached = this.getCache<LeaguePokemonStat[]>(`league-pokemon-stats:${leagueId}`)
+    if (cached) return cached
+
+    if (!supabase) {
+      throw new Error('Supabase not available')
+    }
+
+    try {
+      // Get all team_pokemon_status entries for this league with pick and team info
+      type StatusWithPick = {
+        pick_id: string
+        team_id: string
+        status: string
+        total_kos: number
+        matches_played: number
+        matches_won: number
+        death_match_id: string | null
+        death_date: string | null
+        picks: { pokemon_id: string; pokemon_name: string; cost: number }
+        teams: { name: string }
+      }
+
+      const { data, error } = await supabase
+        .from('team_pokemon_status')
+        .select('pick_id, team_id, status, total_kos, matches_played, matches_won, death_match_id, death_date, picks!inner(pokemon_id, pokemon_name, cost), teams!inner(name)')
+        .eq('league_id', leagueId)
+
+      if (error) throw error
+
+      const records = (data ?? []) as unknown as StatusWithPick[]
+
+      // Get KO counts (times each Pokemon was KO'd/fainted)
+      // We need match IDs for this league
+      const { data: matchIds } = await supabase
+        .from('matches')
+        .select('id')
+        .eq('league_id', leagueId)
+
+      const leagueMatchIds = (matchIds ?? []).map(m => m.id)
+
+      const deathCounts = new Map<string, number>()
+      if (leagueMatchIds.length > 0) {
+        // Get all KOs in league matches, grouped by pick_id (as victim)
+        const { data: koData } = await supabase
+          .from('match_pokemon_kos')
+          .select('pick_id, ko_count')
+          .in('match_id', leagueMatchIds)
+
+        if (koData) {
+          for (const ko of koData) {
+            deathCounts.set(ko.pick_id, (deathCounts.get(ko.pick_id) || 0) + ko.ko_count)
+          }
+        }
+      }
+
+      const stats: LeaguePokemonStat[] = records.map(record => {
+        const matchesPlayed = record.matches_played || 0
+        const matchesWon = record.matches_won || 0
+        const totalKOs = record.total_kos || 0
+        const totalDeaths = deathCounts.get(record.pick_id) || 0
+
+        return {
+          pickId: record.pick_id,
+          pokemonId: record.picks.pokemon_id,
+          pokemonName: record.picks.pokemon_name,
+          teamId: record.team_id,
+          teamName: record.teams.name,
+          cost: record.picks.cost || 0,
+          status: record.status as 'alive' | 'fainted' | 'dead',
+          matchesPlayed,
+          matchesWon,
+          matchesLost: matchesPlayed - matchesWon,
+          winRate: matchesPlayed > 0 ? matchesWon / matchesPlayed : 0,
+          totalKOs,
+          kosPerMatch: matchesPlayed > 0 ? totalKOs / matchesPlayed : 0,
+          totalDeaths,
+          kdRatio: totalDeaths > 0 ? totalKOs / totalDeaths : totalKOs,
+          deathDate: record.death_date,
+        }
+      })
+
+      this.setCache(`league-pokemon-stats:${leagueId}`, stats)
+      return stats
+    } catch (error) {
+      log.error('Error fetching league Pokemon stats:', error)
+      throw error
+    }
+  }
+}
+
+export interface LeaguePokemonStat {
+  pickId: string
+  pokemonId: string
+  pokemonName: string
+  teamId: string
+  teamName: string
+  cost: number
+  status: 'alive' | 'fainted' | 'dead'
+  matchesPlayed: number
+  matchesWon: number
+  matchesLost: number
+  winRate: number
+  totalKOs: number
+  kosPerMatch: number
+  totalDeaths: number
+  kdRatio: number
+  deathDate: string | null
 }

@@ -270,7 +270,7 @@ export default function DraftResultsPage() {
                       <img
                         src={getPokemonAnimatedUrl(pick.pokemon_id, pick.pokemon_name)}
                         alt={pick.pokemon_name}
-                        className="w-16 h-16 pixelated"
+                        className="w-16 h-16 drop-shadow-md"
                         loading="lazy"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement
@@ -280,7 +280,7 @@ export default function DraftResultsPage() {
                           }
                         }}
                       />
-                      <span className="text-xs font-semibold text-center truncate w-full">
+                      <span className="text-xs font-semibold text-center truncate w-full capitalize">
                         {formatPokemonName(pick.pokemon_name)}
                       </span>
                       <Badge variant="secondary" size="sm" className="h-4">

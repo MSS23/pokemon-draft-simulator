@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useDraftStore } from '@/stores/draftStore'
+import { selectTeams, selectPicks } from '@/stores/selectors'
 import { Pokemon } from '@/types'
 
 export interface TeamStats {
@@ -26,8 +27,8 @@ export interface DraftStats {
  * Hook to compute comprehensive draft statistics
  */
 export function useDraftStats(pokemon: Pokemon[]): DraftStats {
-  const teams = useDraftStore(state => state.teamIds.map(id => state.teamsById[id]))
-  const picks = useDraftStore(state => state.pickIds.map(id => state.picksById[id]))
+  const teams = useDraftStore(selectTeams)
+  const picks = useDraftStore(selectPicks)
   const draft = useDraftStore(state => state.draft)
   const picksByTeamId = useDraftStore(state => state.picksByTeamId)
 

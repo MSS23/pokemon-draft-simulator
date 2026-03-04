@@ -1059,6 +1059,19 @@ export default function DraftRoomPage() {
         pickCost
       )
 
+      // Immediately refresh local state so the pick appears for the drafter
+      // (realtime subscription may be delayed or miss self-events)
+      try {
+        const freshState = await DraftService.getDraftState(roomCode.toLowerCase())
+        if (freshState) {
+          startTransition(() => {
+            setDraftState(transformDraftState(freshState, userId))
+          })
+        }
+      } catch (refreshErr) {
+        log.warn('Failed to refresh state after pick:', refreshErr)
+      }
+
       // Show success notification
       const teamName = targetTeam.name
 

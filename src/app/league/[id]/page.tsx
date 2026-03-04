@@ -27,14 +27,16 @@ import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { TeamIcon } from '@/components/league/TeamIcon'
 import { importTournament, type Tournament } from '@/lib/tournament-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays, Skull, Crosshair } from 'lucide-react'
+import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays, Skull, Crosshair, BarChart3, ShieldCheck, UserPlus, Megaphone, Lock } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
 import type { PickRow } from '@/types/supabase-helpers'
+import { CommissionerService, type Announcement } from '@/lib/commissioner-service'
 import { createLogger } from '@/lib/logger'
 import { buildTeamColorMap } from '@/utils/team-colors'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { UserSessionService } from '@/lib/user-session'
 
 const log = createLogger('LeaguePage')
 
@@ -55,7 +57,8 @@ export default function LeaguePage() {
   const [viewingWeek, setViewingWeek] = useState<number | null>(null)
   const [copiedInvite, setCopiedInvite] = useState(false)
   const [draftRoomCode, setDraftRoomCode] = useState<string | null>(null)
-  const [draftHostId, setDraftHostId] = useState<string | null>(null)
+  const [_draftHostId, setDraftHostId] = useState<string | null>(null)
+  const [isCommissioner, setIsCommissioner] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -72,7 +75,34 @@ export default function LeaguePage() {
   }>>([])
   const [playoffTournament, setPlayoffTournament] = useState<Tournament | null>(null)
   const [showStartPlayoffs, setShowStartPlayoffs] = useState(false)
+  const [pendingTradeCount, setPendingTradeCount] = useState(0)
+  const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const { user } = useAuth()
+
+  // Determine commissioner status from auth user or guest session
+  useEffect(() => {
+    const checkCommissioner = async () => {
+      // Try auth user first, then guest session
+      let userId = user?.id
+      if (!userId) {
+        try {
+          const session = await UserSessionService.getOrCreateSession()
+          userId = session.userId
+        } catch {
+          return
+        }
+      }
+      if (!userId) return
+
+      try {
+        const result = await LeagueService.isLeagueCommissioner(leagueId, userId)
+        setIsCommissioner(result)
+      } catch {
+        setIsCommissioner(false)
+      }
+    }
+    void checkCommissioner()
+  }, [user?.id, leagueId])
 
   const loadLeagueData = useCallback(async () => {
     try {
@@ -123,6 +153,12 @@ export default function LeaguePage() {
           setSiblingFixtures(sibFixtures)
         }
       }
+
+      // Load announcements
+      try {
+        const anns = await CommissionerService.getAnnouncements(leagueId)
+        setAnnouncements(anns)
+      } catch { /* ignore */ }
 
       // Load KO leaderboard and dead pokemon
       try {
@@ -213,6 +249,38 @@ export default function LeaguePage() {
   useEffect(() => {
     loadLeagueData()
   }, [loadLeagueData])
+
+  // Fetch pending trade count and subscribe for real-time updates
+  useEffect(() => {
+    if (!supabase || !leagueSettings?.enableTrades) return
+
+    const fetchPendingCount = async () => {
+      try {
+        const { count } = await supabase
+          .from('trades')
+          .select('*', { count: 'exact', head: true })
+          .eq('league_id', leagueId)
+          .eq('status', 'proposed')
+        setPendingTradeCount(count || 0)
+      } catch {
+        // Non-critical
+      }
+    }
+
+    void fetchPendingCount()
+
+    const channel = supabase
+      .channel(`league-trades-badge:${leagueId}`)
+      .on('broadcast', { event: 'trade_proposed' }, () => void fetchPendingCount())
+      .on('broadcast', { event: 'trade_accepted' }, () => void fetchPendingCount())
+      .on('broadcast', { event: 'trade_rejected' }, () => void fetchPendingCount())
+      .on('broadcast', { event: 'trade_executed' }, () => void fetchPendingCount())
+      .subscribe()
+
+    return () => {
+      void channel.unsubscribe()
+    }
+  }, [leagueId, leagueSettings?.enableTrades])
 
   const handleAdvanceWeek = async () => {
     try {
@@ -381,9 +449,33 @@ export default function LeaguePage() {
               variant="outline"
               size="sm"
               onClick={() => router.push(`/league/${leagueId}/trades`)}
+              className="relative"
             >
               <Repeat className="h-4 w-4 mr-2" />
               Trade Center
+              {pendingTradeCount > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 min-w-5 px-1 text-xs">
+                  {pendingTradeCount}
+                </Badge>
+              )}
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/league/${leagueId}/stats`)}
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Stats
+          </Button>
+          {leagueSettings.enableWaivers !== false && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/league/${leagueId}/free-agents`)}
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Free Agents
             </Button>
           )}
           <Button
@@ -394,7 +486,17 @@ export default function LeaguePage() {
             {copiedInvite ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
             {copiedInvite ? 'Copied!' : 'Share Link'}
           </Button>
-          {user && draftHostId === user.id && !playoffTournament && (
+          {isCommissioner && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push(`/league/${leagueId}/admin`)}
+            >
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Commissioner
+            </Button>
+          )}
+          {isCommissioner && !playoffTournament && (
             <Button
               variant="outline"
               size="sm"
@@ -404,7 +506,7 @@ export default function LeaguePage() {
               Start Playoffs
             </Button>
           )}
-          {user && draftHostId === user.id && (
+          {isCommissioner && (
             <Button
               variant="outline"
               size="sm"
@@ -415,6 +517,21 @@ export default function LeaguePage() {
             </Button>
           )}
         </div>
+
+        {/* Announcements */}
+        {announcements.filter(a => a.pinned).length > 0 && (
+          <div className="mb-4 space-y-2">
+            {announcements.filter(a => a.pinned).map(ann => (
+              <div key={ann.id} className="flex items-start gap-3 p-3 rounded-lg border border-blue-500/30 bg-blue-500/5">
+                <Megaphone className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                <div>
+                  <div className="font-medium text-sm">{ann.title}</div>
+                  {ann.body && <p className="text-xs text-muted-foreground mt-0.5">{ann.body}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-6">
@@ -520,7 +637,7 @@ export default function LeaguePage() {
                       )}
                     </CardDescription>
                   </div>
-                  {canAdvance && league.currentWeek < league.totalWeeks && (
+                  {isCommissioner && canAdvance && league.currentWeek < league.totalWeeks && (
                     <Button
                       onClick={handleAdvanceWeek}
                       disabled={isAdvancing}
@@ -537,7 +654,7 @@ export default function LeaguePage() {
                       )}
                     </Button>
                   )}
-                  {league.currentWeek === league.totalWeeks && canAdvance && (
+                  {isCommissioner && league.currentWeek === league.totalWeeks && canAdvance && (
                     <Button
                       onClick={handleAdvanceWeek}
                       disabled={isAdvancing}
@@ -567,7 +684,11 @@ export default function LeaguePage() {
                   </p>
                 ) : (
                   weekFixtures.map(match => (
-                    <Card key={match.id} className="border-2">
+                    <Card
+                      key={match.id}
+                      className="border-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
+                    >
                       <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
@@ -615,10 +736,16 @@ export default function LeaguePage() {
                             )}
                           </div>
 
-                          {match.status === 'scheduled' && (
-                            <Button size="sm" onClick={() => handleRecordMatch(match)}>
+                          {match.status === 'scheduled' && currentViewWeek === league.currentWeek && (
+                            <Button size="sm" onClick={(e) => { e.stopPropagation(); handleRecordMatch(match) }}>
                               Record Result
                             </Button>
+                          )}
+                          {match.status === 'scheduled' && currentViewWeek !== league.currentWeek && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              <Lock className="h-3 w-3 mr-1" />
+                              {currentViewWeek > league.currentWeek ? 'Future week' : 'Past week'}
+                            </Badge>
                           )}
 
                           {match.status === 'completed' && match.winnerTeamId && (

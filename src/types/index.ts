@@ -368,6 +368,10 @@ export interface ExtendedLeagueSettings extends LeagueSettings {
   tradeDeadlineWeek?: number // Week after which trades are locked
   requireCommissionerApproval?: boolean // Trades need approval
   maxMatchesPerWeek?: number // Limit matches per team per week (default: 1)
+  commissionerId?: string // User ID of league commissioner (draft host)
+  enableWaivers?: boolean // Allow free agent claims
+  maxWaiverClaimsPerSeason?: number // Max claims per team (default: 3)
+  waiverPriority?: 'fcfs' | 'inverse_standings' // Claim priority system
 }
 
 // Trade with team details (for UI)
@@ -385,6 +389,22 @@ export interface MatchWithKOs extends Match {
   pokemonKOs: MatchPokemonKO[]
   homeTeamDeaths: number // Count of permanent deaths for home team
   awayTeamDeaths: number
+}
+
+// Waiver Wire
+export interface WaiverClaim {
+  id: string
+  leagueId: string
+  teamId: string
+  claimedPokemonId: string
+  claimedPokemonName: string
+  droppedPickId: string | null
+  status: 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled'
+  waiverPriority: number | null
+  claimedAt: string
+  processedAt: string | null
+  notes: string | null
+  createdAt: string
 }
 
 // Team with Pokemon status (for league roster view)

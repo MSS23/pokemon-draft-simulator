@@ -323,8 +323,8 @@ const DraftControls = memo(function DraftControls({
               </Button>
             )}
 
-            {/* Danger Zone - Host Only */}
-            {isHost && (
+            {/* Danger Zone - Host & Admin */}
+            {(isHost || isAdmin) && (
               <div className="pt-2 border-t border-destructive/20 space-y-2">
                 <span className="text-xs font-medium text-destructive">Danger Zone</span>
                 <div className="flex gap-1.5 flex-wrap">

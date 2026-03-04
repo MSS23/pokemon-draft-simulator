@@ -1312,7 +1312,7 @@ export class DraftService {
           draftId,
           deletedBy: userId,
           deletedAt: new Date().toISOString(),
-          message: 'This draft has been deleted by the host'
+          message: 'This draft has been deleted'
         }
       })
 

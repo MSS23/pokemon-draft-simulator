@@ -63,10 +63,23 @@ export default function MatchDetailPage() {
           .eq('team_id', matchData.awayTeam.id)
           .order('pick_order', { ascending: true })
 
+        const mapPicks = (rows: typeof homePicks): Pick[] =>
+          (rows || []).map(p => ({
+            id: p.id,
+            draftId: p.draft_id,
+            teamId: p.team_id,
+            pokemonId: p.pokemon_id,
+            pokemonName: p.pokemon_name,
+            cost: p.cost,
+            pickOrder: p.pick_order,
+            round: p.round,
+            createdAt: p.created_at,
+          }))
+
         setMatch({
           ...matchData,
-          homeTeam: { ...matchData.homeTeam, picks: (homePicks || []) as unknown as Pick[] },
-          awayTeam: { ...matchData.awayTeam, picks: (awayPicks || []) as unknown as Pick[] }
+          homeTeam: { ...matchData.homeTeam, picks: mapPicks(homePicks) },
+          awayTeam: { ...matchData.awayTeam, picks: mapPicks(awayPicks) }
         })
 
         // Load league standings and submission status
