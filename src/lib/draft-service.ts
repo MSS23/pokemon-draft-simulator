@@ -458,9 +458,14 @@ export class DraftService {
       }
     }
 
-    // Check for duplicate team name only (username is globally unique now)
+    // Check for duplicate team name
     if (existingTeams.some((team: TeamRow) => team.name.toLowerCase() === teamName.toLowerCase())) {
       throw new Error(`Team name "${teamName}" is already taken in this draft. Please choose a different team name.`)
+    }
+
+    // Check for duplicate display name (username) in this draft
+    if (existingParticipants.some((p: ParticipantRow) => p.display_name?.toLowerCase() === displayName.toLowerCase())) {
+      throw new Error(`Username "${displayName}" is already in this draft. Please update your display name in your profile before joining.`)
     }
 
     // Get next draft order

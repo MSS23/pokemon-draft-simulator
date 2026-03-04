@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ImageTypeToggle } from '@/components/ui/image-type-toggle'
 // ConnectionStatus from ui/ConnectionStatus is replaced by DraftConnectionStatusBadge
-import { Copy, Share2, History } from 'lucide-react'
+import { Copy, Share2, History, Users, Clock, CheckCircle2 } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
 import { useAuth } from '@/contexts/AuthContext'
@@ -100,6 +100,8 @@ const AIDraftAssistant = dynamic(() =>
   ssr: false,
   loading: () => <div className="h-96 bg-muted rounded-lg animate-pulse" />
 })
+
+const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager'), { ssr: false })
 
 interface DraftUIState {
   roomCode: string
@@ -1557,6 +1559,107 @@ export default function DraftRoomPage() {
           </div>
         </div>
 
+        {/* Waiting Lobby - Show when draft hasn't started */}
+        {draftState?.status === 'waiting' && (
+          <div className="mb-6">
+            <Card className="border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/20">
+              <CardContent className="pt-6">
+                <div className="text-center space-y-4">
+                  <div className="flex items-center justify-center gap-2 text-blue-600 dark:text-blue-400">
+                    <Clock className="h-6 w-6 animate-pulse" />
+                    <h2 className="text-xl font-bold">Waiting for Players</h2>
+                  </div>
+
+                  {/* Progress indicator */}
+                  <div className="max-w-md mx-auto">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Teams joined</span>
+                      <span className="font-semibold">
+                        {draftState.teams.length} / {draftState.draftSettings.maxTeams}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-cyan-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${(draftState.teams.length / draftState.draftSettings.maxTeams) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Joined teams list */}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {draftState.teams.map((team, idx) => (
+                      <Badge
+                        key={team.id}
+                        variant="secondary"
+                        className="text-sm py-1 px-3 flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                        <span className="font-medium">{team.name}</span>
+                        <span className="text-muted-foreground">({team.userName})</span>
+                        {idx === 0 && (
+                          <Badge variant="outline" className="ml-1 text-[10px] px-1 py-0">Host</Badge>
+                        )}
+                      </Badge>
+                    ))}
+                    {/* Empty slots */}
+                    {Array.from({ length: draftState.draftSettings.maxTeams - draftState.teams.length }).map((_, i) => (
+                      <Badge
+                        key={`empty-${i}`}
+                        variant="outline"
+                        className="text-sm py-1 px-3 border-dashed text-muted-foreground"
+                      >
+                        <Users className="h-3.5 w-3.5 mr-1.5" />
+                        Waiting...
+                      </Badge>
+                    ))}
+                  </div>
+
+                  {/* Room code share prompt */}
+                  <div className="text-sm text-muted-foreground">
+                    Share room code <span className="font-mono font-bold text-foreground">{roomCode}</span> with other players to join
+                  </div>
+
+                  {/* Host start button (prominent when teams are filled) */}
+                  {isHost && draftState.teams.length >= draftState.draftSettings.maxTeams && (
+                    <div className="pt-2">
+                      <Button
+                        onClick={startDraft}
+                        disabled={isStarting}
+                        size="lg"
+                        className="bg-green-600 hover:bg-green-700 text-lg px-8 py-6 animate-pulse"
+                      >
+                        {isStarting ? 'Starting...' : `Start Draft (${draftState.teams.length} Teams Ready!)`}
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Non-host message */}
+                  {!isHost && (
+                    <p className="text-sm text-muted-foreground italic">
+                      The host will start the draft once all players have joined.
+                    </p>
+                  )}
+
+                  {/* Host: not enough teams yet */}
+                  {isHost && draftState.teams.length < 2 && (
+                    <p className="text-sm text-orange-600 dark:text-orange-400">
+                      Need at least 2 teams to start the draft.
+                    </p>
+                  )}
+
+                  {/* Host: can start early */}
+                  {isHost && draftState.teams.length >= 2 && draftState.teams.length < draftState.draftSettings.maxTeams && (
+                    <p className="text-sm text-muted-foreground">
+                      You can start early with {draftState.teams.length} teams, or wait for all {draftState.draftSettings.maxTeams} to join.
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Draft Progress and Team Status */}
         {draftState?.status === 'drafting' && (
           <div className="mb-4">
@@ -1814,19 +1917,14 @@ export default function DraftRoomPage() {
         {/* Wishlist Manager - Fixed Position */}
         {!isSpectator && draftState?.userTeamId && userId && (
           <EnhancedErrorBoundary>
-            {(() => {
-              const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager'), { ssr: false })
-              return (
-                <WishlistManager
-                  draftId={roomCode.toLowerCase()}
-                  participantId={userId}
-                  userTeam={userTeam}
-                  currentBudget={userTeam?.budgetRemaining || 100}
-                  usedBudget={(userTeam?.picks.length || 0) * 10}
-                  isCompact={true}
-                />
-              )
-            })()}
+            <WishlistManager
+              draftId={roomCode.toLowerCase()}
+              participantId={userId}
+              userTeam={userTeam}
+              currentBudget={userTeam?.budgetRemaining || 100}
+              usedBudget={(userTeam?.picks.length || 0) * 10}
+              isCompact={true}
+            />
           </EnhancedErrorBoundary>
         )}
 

@@ -66,11 +66,12 @@ function debounce<T extends (...args: any[]) => void>(
 }
 
 const getEstimatedCardHeight = (cardSize: 'sm' | 'md' | 'lg'): number => {
+  // Must match CARD_HEIGHTS in PokemonCard: sm=200px, md=260px, lg=340px
   switch (cardSize) {
-    case 'sm': return 220
-    case 'md': return 300
-    case 'lg': return 380
-    default: return 300
+    case 'sm': return 200
+    case 'md': return 260
+    case 'lg': return 340
+    default: return 260
   }
 }
 
@@ -128,7 +129,7 @@ export default function VirtualizedPokemonGrid({
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => estimatedCardHeight + 24, // Card height + gap
+    estimateSize: () => estimatedCardHeight + 12, // Card height + gap
     overscan: 3, // Render 3 extra rows above and below viewport
   })
 
@@ -166,9 +167,7 @@ export default function VirtualizedPokemonGrid({
               }}
             >
               <div className={cn(
-                'grid gap-4 sm:gap-4 md:gap-5 lg:gap-6',
-                'auto-rows-fr',
-                'items-stretch',
+                'grid gap-3',
                 gridCols[cardSize]
               )}>
                 {rowPokemon.map((p) => (

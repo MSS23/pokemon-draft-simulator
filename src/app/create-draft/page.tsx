@@ -459,10 +459,11 @@ export default function CreateDraftPage() {
                           <SelectValue placeholder="Select number of teams" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="2">2 Teams</SelectItem>
-                          <SelectItem value="4">4 Teams</SelectItem>
-                          <SelectItem value="6">6 Teams</SelectItem>
-                          <SelectItem value="8">8 Teams</SelectItem>
+                          {Array.from({ length: 19 }, (_, i) => i + 2).map((n) => (
+                            <SelectItem key={n} value={String(n)}>
+                              {n} Teams
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

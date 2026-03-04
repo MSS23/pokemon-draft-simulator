@@ -3,7 +3,6 @@
 import React from 'react'
 import Image from 'next/image'
 import { Pokemon } from '@/types'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getPokemonCardClass, getPokemonRarityClass, isPokemonShiny } from '@/utils/pokemon'
@@ -28,18 +27,18 @@ interface PokemonCardProps {
   className?: string
 }
 
-/**
- * PokemonCard Component - Optimized with React.memo
- *
- * Performance optimizations:
- * 1. React.memo with custom comparison to prevent unnecessary re-renders
- * 2. Only re-renders when pokemon.id or display props change
- * 3. Callback props (onViewDetails, onAddToWishlist, onRemoveFromWishlist) are ignored in comparison
- *    - Assumes parent provides stable callbacks via useCallback
- * 4. Memoized internal calculations and handlers
- *
- * Expected render reduction: 70-90% in typical draft scenarios
- */
+const CARD_HEIGHTS = {
+  sm: 'h-[200px]',
+  md: 'h-[260px]',
+  lg: 'h-[340px]'
+} as const
+
+const IMAGE_SIZES = {
+  sm: 80,
+  md: 96,
+  lg: 128
+} as const
+
 const PokemonCard = ({
   pokemon,
   onViewDetails,
@@ -55,16 +54,13 @@ const PokemonCard = ({
   size = 'md',
   className,
 }: PokemonCardProps) => {
-  // Check for pending actions
   const { getPendingActionStatus } = usePendingActionFeedback()
   const pendingPick = getPendingActionStatus('pick', pokemon.id.toString())
   const pendingBid = getPendingActionStatus('bid', pokemon.id.toString())
   const pendingNominate = getPendingActionStatus('nominate', pokemon.id.toString())
-  
   const isPending = !!(pendingPick || pendingBid || pendingNominate)
   const pendingAction = pendingPick || pendingBid || pendingNominate
 
-  // Use centralized image handling hook
   const {
     imageUrl,
     isLoading,
@@ -78,26 +74,8 @@ const PokemonCard = ({
     preferOfficialArt: false
   })
 
-  const sizeClasses = {
-    sm: 'w-full h-full min-h-[200px]',
-    md: 'w-full h-full min-h-[280px]',
-    lg: 'w-full h-full min-h-[360px]'
-  }
-
-  const imageSizes = {
-    sm: 96,   // Increased from 56 to 96
-    md: 120,  // Increased from 80 to 120
-    lg: 144   // Increased from 96 to 144
-  }
-
-  // Image click handler for switching modes
-  const handleImageClick = () => {
-    toggleImageMode()
-  }
-
-  // Wishlist toggle handler
   const handleWishlistToggle = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent triggering card click
+    e.stopPropagation()
     if (isInWishlist) {
       onRemoveFromWishlist?.(pokemon)
     } else {
@@ -105,39 +83,33 @@ const PokemonCard = ({
     }
   }
 
-  // Keyboard handler for card interaction
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (isDisabled || isDrafted) return
-
-    // Enter or Space to view details
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onViewDetails?.(pokemon)
     }
   }
 
-  // ARIA label for card
   const cardAriaLabel = `${pokemon.name}, ${pokemon.cost} points${isDrafted ? ', drafted' : ''}${isUnaffordable ? ', unaffordable' : ''}${isInWishlist ? ', in wishlist' : ''}`
 
   return (
-    <Card
+    <div
       role="article"
       tabIndex={!isDisabled && !isDrafted ? 0 : -1}
       aria-label={cardAriaLabel}
       onKeyDown={handleKeyDown}
+      onClick={() => !isDisabled && !isDrafted && onViewDetails?.(pokemon)}
       className={cn(
-        sizeClasses[size],
-        'relative group',
-        'border-2 border-gray-300 dark:border-gray-600 rounded-xl overflow-hidden',
-        'bg-gradient-to-br from-white via-gray-50 to-gray-100',
-        'dark:from-slate-800 dark:via-slate-700 dark:to-slate-800',
-        'pokemon-entrance pokemon-hover',
-        'transition-all duration-300 ease-out',
-        'hover:scale-[1.02] hover:shadow-xl hover:shadow-gray-200/50 dark:hover:shadow-slate-900/50',
-        'active:scale-[0.98]', // Better touch feedback on mobile
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2',
-        'focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400 focus-within:ring-offset-2',
-        'touch-manipulation', // Improves mobile touch response
+        'relative group rounded-xl overflow-hidden',
+        CARD_HEIGHTS[size],
+        'flex flex-col',
+        'border border-gray-200 dark:border-gray-700',
+        'transition-all duration-200 ease-out',
+        'hover:shadow-lg hover:scale-[1.02]',
+        'active:scale-[0.98]',
+        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+        'touch-manipulation',
         isPokemonShiny(pokemon) && getPokemonRarityClass(pokemon.cost),
         isPokemonShiny(pokemon) && 'pokemon-sparkle',
         isDrafted && 'opacity-60 grayscale',
@@ -148,229 +120,180 @@ const PokemonCard = ({
         pendingAction?.status === 'failed' && 'ring-4 ring-red-400 ring-opacity-80',
         className
       )}
-      onClick={() => !isDisabled && !isDrafted && onViewDetails?.(pokemon)}
     >
-      {/* TCG-style border gradient */}
+      {/* Type-tinted background */}
       <div className={cn(
-        'absolute inset-0 rounded-xl',
+        'absolute inset-0',
         getPokemonCardClass(pokemon),
-        'opacity-20'
+        'opacity-15 dark:opacity-20'
       )} />
 
-      {/* Inner card content */}
-      <CardContent className="relative p-3 h-full flex flex-col bg-white/90 backdrop-blur-sm rounded-lg m-1">
-        {/* TCG-style header */}
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex-1 pr-2 min-w-0">
-            <h3 className={cn(
-              "font-bold text-gray-900 leading-tight truncate",
-              size === 'sm' ? "text-xs" : size === 'md' ? "text-sm" : "text-base"
-            )}>
-              {pokemon.name}
-            </h3>
+      {/* Card background */}
+      <div className="absolute inset-0 bg-white/85 dark:bg-slate-800/90" />
+
+      {/* Pending Action Indicator */}
+      {isPending && (
+        <div className="absolute top-2 left-2 z-10">
+          <div className={cn(
+            "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shadow-lg",
+            pendingAction?.status === 'pending' && "bg-yellow-100 text-yellow-800 border border-yellow-300",
+            pendingAction?.status === 'failed' && "bg-red-100 text-red-800 border border-red-300"
+          )}>
+            {pendingAction?.status === 'pending' && <Clock className="h-3 w-3 animate-spin" />}
+            {pendingAction?.status === 'failed' && <AlertCircle className="h-3 w-3" />}
+            <span>
+              {pendingPick && 'Picking...'}
+              {pendingBid && 'Bidding...'}
+              {pendingNominate && 'Nominating...'}
+              {pendingAction?.status === 'failed' && 'Failed'}
+            </span>
           </div>
-          {showCost && (
-            <div className="flex flex-col items-end flex-shrink-0">
-              <Badge
-                className={cn(
-                  "font-bold px-2 py-1 rounded-full shadow-sm whitespace-nowrap",
-                  size === 'sm' ? "text-[10px]" : "text-xs",
-                  pokemon.cost >= 25 ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" :
-                  pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-400 to-pink-500 text-white" :
-                  pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-400 to-cyan-500 text-white" :
-                  pokemon.cost >= 10 ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white" :
-                  "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
-                )}
-              >
-                {pokemon.cost}
-              </Badge>
-              <span className="text-[10px] text-gray-500 mt-1">pts</span>
-            </div>
-          )}
         </div>
+      )}
 
-        {/* Pending Action Indicator */}
-        {isPending && (
-          <div className="absolute top-2 left-2 z-10">
-            <div className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium shadow-lg",
-              pendingAction?.status === 'pending' && "bg-yellow-100 text-yellow-800 border border-yellow-300",
-              pendingAction?.status === 'failed' && "bg-red-100 text-red-800 border border-red-300"
-            )}>
-              {pendingAction?.status === 'pending' && <Clock className="h-3 w-3 animate-spin" />}
-              {pendingAction?.status === 'failed' && <AlertCircle className="h-3 w-3" />}
-              <span>
-                {pendingPick && 'Picking...'}
-                {pendingBid && 'Bidding...'}
-                {pendingNominate && 'Nominating...'}
-                {pendingAction?.status === 'failed' && 'Failed'}
-              </span>
-            </div>
-          </div>
-        )}
+      {/* Wishlist Button */}
+      {showWishlistButton && !isDrafted && !isDisabled && (
+        <div className="absolute top-1.5 left-1.5 z-10">
+          <Button
+            variant={isInWishlist ? "default" : "ghost"}
+            size="sm"
+            onClick={handleWishlistToggle}
+            aria-label={isInWishlist ? `Remove ${pokemon.name} from wishlist` : `Add ${pokemon.name} to wishlist`}
+            aria-pressed={isInWishlist}
+            className={cn(
+              "h-7 w-7 min-w-[44px] min-h-[44px] sm:h-7 sm:w-7 sm:min-w-0 sm:min-h-0 p-0 rounded-full transition-all duration-200",
+              "shadow-sm border border-white/20",
+              "touch-manipulation active:scale-90",
+              isInWishlist
+                ? "bg-gradient-to-r from-pink-500 to-red-500 text-white hover:from-pink-600 hover:to-red-600"
+                : "bg-white/80 text-gray-500 hover:bg-white hover:text-pink-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            )}
+            title={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          >
+            <Heart className={cn("h-3.5 w-3.5", isInWishlist && "fill-current")} />
+            <span className="sr-only">
+              {isInWishlist ? `Remove ${pokemon.name} from wishlist` : `Add ${pokemon.name} to wishlist`}
+            </span>
+          </Button>
+        </div>
+      )}
 
-        {/* Wishlist Button */}
-        {showWishlistButton && !isDrafted && !isDisabled && (
-          <div className="absolute top-2 left-2 z-10">
-            <Button
-              variant={isInWishlist ? "default" : "ghost"}
-              size="sm"
-              onClick={handleWishlistToggle}
-              aria-label={isInWishlist ? `Remove ${pokemon.name} from wishlist` : `Add ${pokemon.name} to wishlist`}
-              aria-pressed={isInWishlist}
+      {/* Cost Badge */}
+      {showCost && (
+        <div className="absolute top-1.5 right-1.5 z-10">
+          <Badge
+            className={cn(
+              "font-bold px-1.5 py-0.5 rounded-full shadow-sm",
+              size === 'sm' ? "text-[10px]" : "text-xs",
+              pokemon.cost >= 25 ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" :
+              pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-400 to-pink-500 text-white" :
+              pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-400 to-cyan-500 text-white" :
+              pokemon.cost >= 10 ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white" :
+              "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
+            )}
+          >
+            {pokemon.cost}
+          </Badge>
+        </div>
+      )}
+
+      {/* Image area */}
+      <div className="relative flex-1 flex items-center justify-center p-2">
+        {!hasError ? (
+          <>
+            {isLoading && (
+              <div className="absolute inset-0 m-2 rounded-lg bg-gray-100 dark:bg-slate-700 animate-pulse" />
+            )}
+            <Image
+              src={imageUrl}
+              alt={pokemon.name}
+              width={IMAGE_SIZES[size]}
+              height={IMAGE_SIZES[size]}
               className={cn(
-                "h-8 w-8 min-w-[44px] min-h-[44px] sm:h-8 sm:w-8 sm:min-w-0 sm:min-h-0 p-0 rounded-full transition-all duration-300",
-                "shadow-lg border border-white/20 backdrop-blur-sm",
-                "touch-manipulation active:scale-90", // Better mobile interaction
-                isInWishlist
-                  ? "bg-gradient-to-r from-pink-500 to-red-500 text-white hover:from-pink-600 hover:to-red-600"
-                  : "bg-white/80 text-gray-600 hover:bg-white hover:text-pink-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                "relative z-[1] cursor-pointer transition-all duration-200 hover:scale-110",
+                "drop-shadow-md",
+                isLoading ? "opacity-0" : "opacity-100"
               )}
-              title={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
-            >
-              <Heart className={cn("h-4 w-4", isInWishlist && "fill-current")} />
-              <span className="sr-only">
-                {isInWishlist ? `Remove ${pokemon.name} from wishlist` : `Add ${pokemon.name} to wishlist`}
-              </span>
-            </Button>
-          </div>
-        )}
-
-        {/* Quick Draft Indicator */}
-        {!isDrafted && !isDisabled && (
-          <div className="absolute top-2 right-2 opacity-0 sm:group-hover:opacity-100 transition-all duration-300 ease-out transform translate-y-1 sm:group-hover:translate-y-0 z-10 hidden sm:block">
-            <Badge className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs px-3 py-1.5 shadow-lg border border-white/20 backdrop-blur-sm">
-              <span className="flex items-center gap-1">
-                <span>Click to Draft</span>
-                <span className="text-blue-200">✨</span>
-              </span>
-            </Badge>
-          </div>
-        )}
-
-        {/* Pokemon Image - TCG Style */}
-        <div className="flex-1 flex items-center justify-center mb-3 relative">
-          <div className="relative bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-2 border border-gray-200">
-            {!hasError ? (
-              <>
-                {isLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-lg transition-opacity duration-200">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500/30 border-t-blue-500"></div>
-                      <div className="text-xs text-gray-500 font-medium animate-pulse">Loading...</div>
-                    </div>
-                  </div>
-                )}
-                <Image
-                  src={imageUrl}
-                  alt={pokemon.name}
-                  width={imageSizes[size]}
-                  height={imageSizes[size]}
-                  className={cn(
-                    "cursor-pointer transition-all duration-300 hover:scale-110 rounded-md",
-                    "drop-shadow-lg",
-                    isLoading && "opacity-0",
-                    !isLoading && "opacity-100"
-                  )}
-                  style={{
-                    width: 'auto',
-                    height: 'auto',
-                    maxWidth: `${imageSizes[size]}px`,
-                    maxHeight: `${imageSizes[size]}px`
-                  }}
-                  onClick={handleImageClick}
-                  onError={handleImageError}
-                  onLoad={handleImageLoad}
-                  unoptimized // Allow GIFs to animate
-                />
-                {/* Sparkle effect for shiny Pokemon */}
-                {isPokemonShiny(pokemon) && !isLoading && (
-                  <div className="absolute -top-1 -right-1 text-yellow-400 animate-pulse">
-                    ✨
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500 text-xs">
-                No Image
+              style={{
+                width: 'auto',
+                height: 'auto',
+                maxWidth: `${IMAGE_SIZES[size]}px`,
+                maxHeight: `${IMAGE_SIZES[size]}px`
+              }}
+              onClick={(e) => { e.stopPropagation(); toggleImageMode() }}
+              onError={handleImageError}
+              onLoad={handleImageLoad}
+              unoptimized
+            />
+            {isPokemonShiny(pokemon) && !isLoading && (
+              <div className="absolute top-1 right-1 text-yellow-400 animate-pulse z-[2]">
+                ✨
               </div>
             )}
+          </>
+        ) : (
+          <div className="w-12 h-12 bg-gray-200 dark:bg-slate-600 rounded-lg flex items-center justify-center text-gray-400 text-xs">
+            ?
           </div>
-        </div>
+        )}
+      </div>
 
-        {/* Types - TCG Style */}
-        <div className="flex gap-1 mb-2 justify-center flex-wrap">
-          {pokemon.types.map((type, index) => (
+      {/* Bottom info: name + types */}
+      <div className="relative z-[1] px-2.5 pb-2 space-y-1">
+        <h3 className={cn(
+          "font-semibold text-gray-900 dark:text-gray-100 leading-tight truncate",
+          size === 'sm' ? "text-xs" : "text-sm"
+        )}>
+          {pokemon.name}
+        </h3>
+        <div className="flex gap-1 flex-wrap">
+          {pokemon.types.map((type) => (
             <Badge
               key={type.name}
               className={cn(
-                "text-white font-semibold tracking-wide shadow-lg border border-white/30",
-                "transition-all duration-300 hover:scale-110 hover:shadow-xl",
-                size === 'sm' ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5"
+                "text-white font-medium shadow-sm border-0",
+                size === 'sm' ? "text-[9px] px-1 py-0" : "text-[10px] px-1.5 py-0"
               )}
-              style={{
-                backgroundColor: type.color,
-                boxShadow: `0 2px 8px ${type.color}40`,
-                animationDelay: `${index * 0.1}s`
-              }}
+              style={{ backgroundColor: type.color }}
             >
-              {size === 'sm' ? type.name.slice(0, 3).toUpperCase() : type.name.toUpperCase()}
+              {type.name.toUpperCase()}
             </Badge>
           ))}
         </div>
+      </div>
 
-
-        {/* Drafted indicator - TCG Style */}
-        {isDrafted && (
-          <div className="absolute inset-0 bg-gradient-to-br from-gray-900/80 to-black/80 flex items-center justify-center rounded-xl backdrop-blur-sm">
-            <div className="text-center">
-              <Badge
-                variant="destructive"
-                className="font-bold text-sm px-4 py-2 bg-red-600 border border-red-500 shadow-lg"
-              >
-                DRAFTED
-              </Badge>
-              <div className="text-white text-xs mt-2 font-medium">
-                Unavailable
-              </div>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Drafted overlay */}
+      {isDrafted && (
+        <div className="absolute inset-0 bg-gray-900/70 flex items-center justify-center rounded-xl z-10">
+          <Badge
+            variant="destructive"
+            className="font-bold text-xs px-3 py-1.5 bg-red-600 border border-red-500 shadow-lg"
+          >
+            DRAFTED
+          </Badge>
+        </div>
+      )}
+    </div>
   )
 }
 
-// Custom comparison function for React.memo
-// Only re-render if pokemon.id or display props change
-// Callback props are assumed to be stable (wrapped in useCallback by parent)
 const arePropsEqual = (
   prevProps: Readonly<PokemonCardProps>,
   nextProps: Readonly<PokemonCardProps>
 ): boolean => {
-  // Pokemon identity check (most important)
   if (prevProps.pokemon.id !== nextProps.pokemon.id) return false
-
-  // Display state checks
   if (prevProps.isDrafted !== nextProps.isDrafted) return false
   if (prevProps.isDisabled !== nextProps.isDisabled) return false
   if (prevProps.isInWishlist !== nextProps.isInWishlist) return false
   if (prevProps.isUnaffordable !== nextProps.isUnaffordable) return false
-
-  // Display option checks
   if (prevProps.showCost !== nextProps.showCost) return false
   if (prevProps.showStats !== nextProps.showStats) return false
   if (prevProps.showWishlistButton !== nextProps.showWishlistButton) return false
   if (prevProps.size !== nextProps.size) return false
   if (prevProps.className !== nextProps.className) return false
-
-  // Ignore callback props - assume they are stable via useCallback
-  // onViewDetails, onAddToWishlist, onRemoveFromWishlist
-
   return true
 }
 
-// Export memoized component with displayName for debugging
 const MemoizedPokemonCard = React.memo(PokemonCard, arePropsEqual)
 MemoizedPokemonCard.displayName = 'PokemonCard'
 

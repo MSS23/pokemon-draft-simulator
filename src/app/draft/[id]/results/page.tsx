@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ArrowLeft, Home, Trophy, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Home, Trophy, ChevronRight } from 'lucide-react'
+import DraftTradePanel from '@/components/draft/DraftTradePanel'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
+import { useAuth } from '@/contexts/AuthContext'
 import { LeagueService } from '@/lib/league-service'
 import DraftResults from '@/components/draft/DraftResults'
 import { CreateLeagueModal } from '@/components/league/CreateLeagueModal'
@@ -29,6 +31,7 @@ export default function DraftResultsPage() {
   const [existingLeagueId, setExistingLeagueId] = useState<string | null>(null)
   const [isLeagueModalOpen, setIsLeagueModalOpen] = useState(false)
   const [isCheckingLeague, setIsCheckingLeague] = useState(false)
+  const { user: authUser } = useAuth()
 
   useEffect(() => {
     const loadDraftState = async () => {
@@ -110,6 +113,20 @@ export default function DraftResultsPage() {
       </div>
     )
   }
+
+  const reloadDraftState = async () => {
+    if (!roomCode) return
+    try {
+      const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
+      if (dbState) setDraftState(dbState)
+    } catch (err) {
+      log.error('Failed to reload:', err)
+    }
+  }
+
+  // Find user's team
+  const userParticipant = draftState.participants.find(p => p.user_id === authUser?.id)
+  const userTeamId = userParticipant?.team_id || null
 
   // Transform data for the results component
   const teams = draftState.teams.map(team => {
@@ -215,6 +232,40 @@ export default function DraftResultsPage() {
                   Create League
                 </Button>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Post-Draft Trading */}
+        {userTeamId && (
+          <Card className="mb-6 border border-blue-200 dark:border-blue-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <ArrowLeftRight className="h-5 w-5 text-blue-500" />
+                Post-Draft Trading
+              </CardTitle>
+              <CardDescription>
+                Trade Pokemon with other teams. Both sides must offer equal total cost, and teams must keep at least {draftState.draft.settings?.pokemonPerTeam || 6} Pokemon.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DraftTradePanel
+                draftId={draftState.draft.id}
+                teams={teams.map(team => ({
+                  ...team,
+                  picks: picks
+                    .filter(p => p.team_id === team.id)
+                    .map(p => ({
+                      id: p.id,
+                      pokemonId: p.pokemon_id,
+                      pokemonName: p.pokemon_name,
+                      cost: p.cost,
+                    }))
+                }))}
+                userTeamId={userTeamId}
+                minPokemonPerTeam={draftState.draft.settings?.pokemonPerTeam || 6}
+                onTradeComplete={reloadDraftState}
+              />
             </CardContent>
           </Card>
         )}
