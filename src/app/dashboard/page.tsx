@@ -17,6 +17,7 @@ import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { getPokemonAnimatedUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('Dashboard')
@@ -62,6 +63,8 @@ interface UpcomingMatch {
   userTeamName: string
   opponentTeamId: string
   opponentTeamName: string
+  userTeamPicks: { pokemonId: string; pokemonName: string }[]
+  opponentTeamPicks: { pokemonId: string; pokemonName: string }[]
 }
 
 interface LeagueStanding {
@@ -318,6 +321,28 @@ export default function DashboardPage() {
     </Card>
   )
 
+  const PokemonGifRow = ({ picks, maxShow = 6 }: { picks: { pokemonId: string; pokemonName: string }[]; maxShow?: number }) => (
+    <div className="flex items-center justify-center gap-0.5">
+      {picks.slice(0, maxShow).map((p) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={p.pokemonId}
+          src={getPokemonAnimatedUrl(p.pokemonId, p.pokemonName)}
+          alt={p.pokemonName}
+          className="w-8 h-8 pixelated"
+          loading="lazy"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            if (!target.dataset.fallback) {
+              target.dataset.fallback = '1'
+              target.src = getPokemonSpriteUrl(p.pokemonId)
+            }
+          }}
+        />
+      ))}
+    </div>
+  )
+
   const MatchupCard = ({ matchup }: { matchup: UpcomingMatch }) => {
     const isHome = matchup.match.homeTeamId === matchup.userTeamId
     const userScore = isHome ? matchup.match.homeScore : matchup.match.awayScore
@@ -342,26 +367,26 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center justify-center gap-4">
-            <div className="text-right flex-1">
+            <div className="flex-1 text-right space-y-1">
               <p className="text-sm font-semibold truncate">{matchup.userTeamName}</p>
-              <p className="text-[10px] text-muted-foreground">You</p>
+              <PokemonGifRow picks={matchup.userTeamPicks} />
             </div>
 
             {matchup.match.status === 'completed' ? (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-muted/50">
+              <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-muted/50 shrink-0">
                 <span className="text-lg font-bold tabular-nums">{userScore}</span>
                 <span className="text-xs text-muted-foreground">-</span>
                 <span className="text-lg font-bold tabular-nums">{opponentScore}</span>
               </div>
             ) : (
-              <div className="px-3 py-1.5">
+              <div className="px-3 py-1.5 shrink-0">
                 <Swords className="h-5 w-5 text-muted-foreground" />
               </div>
             )}
 
-            <div className="text-left flex-1">
+            <div className="flex-1 text-left space-y-1">
               <p className="text-sm font-semibold truncate">{matchup.opponentTeamName}</p>
-              <p className="text-[10px] text-muted-foreground">Opponent</p>
+              <PokemonGifRow picks={matchup.opponentTeamPicks} />
             </div>
           </div>
 

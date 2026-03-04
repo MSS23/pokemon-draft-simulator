@@ -1025,6 +1025,8 @@ export class LeagueService {
     userTeamName: string
     opponentTeamId: string
     opponentTeamName: string
+    userTeamPicks: { pokemonId: string; pokemonName: string }[]
+    opponentTeamPicks: { pokemonId: string; pokemonName: string }[]
   }[]> {
     if (!supabase) throw new Error('Supabase not configured')
 
@@ -1062,6 +1064,8 @@ export class LeagueService {
       userTeamName: string
       opponentTeamId: string
       opponentTeamName: string
+      userTeamPicks: { pokemonId: string; pokemonName: string }[]
+      opponentTeamPicks: { pokemonId: string; pokemonName: string }[]
     }[] = []
 
     for (const lt of activeLeagueTeams) {
@@ -1077,6 +1081,12 @@ export class LeagueService {
         const userTeam = isHome ? match.homeTeam : match.awayTeam
         const opponentTeam = isHome ? match.awayTeam : match.homeTeam
 
+        // Fetch picks for both teams
+        const [userPicksRes, opponentPicksRes] = await Promise.all([
+          supabase.from('picks').select('pokemon_id, pokemon_name').eq('team_id', lt.team_id).order('pick_order'),
+          supabase.from('picks').select('pokemon_id, pokemon_name').eq('team_id', opponentTeam.id).order('pick_order'),
+        ])
+
         results.push({
           league,
           match,
@@ -1084,6 +1094,8 @@ export class LeagueService {
           userTeamName: userTeam.name,
           opponentTeamId: opponentTeam.id,
           opponentTeamName: opponentTeam.name,
+          userTeamPicks: (userPicksRes.data ?? []).map(p => ({ pokemonId: p.pokemon_id, pokemonName: p.pokemon_name })),
+          opponentTeamPicks: (opponentPicksRes.data ?? []).map(p => ({ pokemonId: p.pokemon_id, pokemonName: p.pokemon_name })),
         })
       }
     }

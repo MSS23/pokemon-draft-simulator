@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ArrowLeft, ArrowLeftRight, Home, Trophy, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, Home, Trophy, ChevronRight, Shield } from 'lucide-react'
 import DraftTradePanel from '@/components/draft/DraftTradePanel'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { useAuth } from '@/contexts/AuthContext'
@@ -16,6 +16,7 @@ import { CreateLeagueModal } from '@/components/league/CreateLeagueModal'
 import { notify } from '@/lib/notifications'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import Link from 'next/link'
+import { getPokemonAnimatedUrl, getPokemonSpriteUrl, formatPokemonName } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('DraftResultsPage')
@@ -124,9 +125,10 @@ export default function DraftResultsPage() {
     }
   }
 
-  // Find user's team
+  // Find user's team and check if host
   const userParticipant = draftState.participants.find(p => p.user_id === authUser?.id)
   const userTeamId = userParticipant?.team_id || null
+  const isHost = authUser?.id === draftState.draft.host_id
 
   // Transform data for the results component
   const teams = draftState.teams.map(team => {
@@ -200,8 +202,8 @@ export default function DraftResultsPage() {
           </Badge>
         </div>
 
-        {/* League Creation Section */}
-        {!isCheckingLeague && (
+        {/* League Section - View for everyone, Create for host only */}
+        {!isCheckingLeague && (existingLeagueId || isHost) && (
           <Card className="mb-6 border-2 border-yellow-500/50 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -235,6 +237,62 @@ export default function DraftResultsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Your Team Roster */}
+        {userTeamId && (() => {
+          const userTeam = teams.find(t => t.id === userTeamId)
+          const userPicks = picks
+            .filter(p => p.team_id === userTeamId)
+            .sort((a, b) => a.pick_order - b.pick_order)
+          const totalCost = userPicks.reduce((sum, p) => sum + p.cost, 0)
+
+          if (!userTeam || userPicks.length === 0) return null
+
+          return (
+            <Card className="mb-6 border-2 border-blue-500/30 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Shield className="h-5 w-5 text-blue-500" />
+                  Your Team &mdash; {userTeam.name}
+                </CardTitle>
+                <CardDescription>
+                  {userPicks.length} Pokemon &middot; {totalCost} pts spent &middot; {userTeam.budgetRemaining ?? 0} pts remaining
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                  {userPicks.map((pick) => (
+                    <div
+                      key={pick.id}
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-lg bg-white/60 dark:bg-white/5 border border-blue-200/50 dark:border-blue-800/30"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getPokemonAnimatedUrl(pick.pokemon_id, pick.pokemon_name)}
+                        alt={pick.pokemon_name}
+                        className="w-16 h-16 pixelated"
+                        loading="lazy"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          if (!target.dataset.fallback) {
+                            target.dataset.fallback = '1'
+                            target.src = getPokemonSpriteUrl(pick.pokemon_id)
+                          }
+                        }}
+                      />
+                      <span className="text-xs font-semibold text-center truncate w-full">
+                        {formatPokemonName(pick.pokemon_name)}
+                      </span>
+                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                        {pick.cost} pts
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })()}
 
         {/* Post-Draft Trading */}
         {userTeamId && (
