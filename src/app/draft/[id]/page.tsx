@@ -50,6 +50,7 @@ import DraftProgress from '@/components/team/DraftProgress'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
 import { createLogger } from '@/lib/logger'
+import { useDraftStore } from '@/stores/draftStore'
 
 const log = createLogger('DraftPage')
 
@@ -94,6 +95,8 @@ const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNot
 })
 
 const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager'), { ssr: false })
+
+const DraftOrderReveal = dynamic(() => import('@/components/draft/DraftOrderReveal'), { ssr: false })
 
 interface DraftUIState {
   roomCode: string
@@ -205,10 +208,21 @@ export default function DraftRoomPage() {
   // Proxy picking removed - feature not implemented on backend
   const [isShuffling, setIsShuffling] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
+  const [showOrderReveal, setShowOrderReveal] = useState(false)
+  const prevStatusRef = useRef<string | null>(null)
 
   // Real draft state from Supabase
   const [draftState, setDraftState] = useState<DraftUIState | null>(null)
   const [, startTransition] = useTransition()
+
+  // Show draft order reveal when transitioning to drafting
+  useEffect(() => {
+    const currentStatus = draftState?.status
+    if (prevStatusRef.current === 'waiting' && currentStatus === 'drafting') {
+      setShowOrderReveal(true)
+    }
+    prevStatusRef.current = currentStatus || null
+  }, [draftState?.status])
 
   // Auction-specific state
   const [currentAuction, setCurrentAuction] = useState<{
@@ -498,7 +512,18 @@ export default function DraftRoomPage() {
       }
     },
     onDraftDeleted: () => {
-      notify.error('Draft Deleted', 'This draft has been deleted by the host', { duration: 6000 })
+      notify.error('Draft Deleted', 'This draft has been deleted. Redirecting...', { duration: 6000 })
+      // Send native browser notification so participants see it even if tab is backgrounded
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          new Notification('Draft Deleted', {
+            body: `Draft room ${roomCode} has been deleted.`,
+            icon: '/icons/icon-192x192.png',
+            tag: 'draft-deleted',
+            requireInteraction: true
+          })
+        } catch { /* native notification not supported */ }
+      }
       if (userId) {
         UserSessionService.removeDraftParticipation(roomCode.toLowerCase())
       }
@@ -776,8 +801,15 @@ export default function DraftRoomPage() {
 
   // Derived state - memoized to prevent unnecessary recalculations
   const allDraftedIds = useMemo(() => {
-    return draftState?.teams.flatMap(team => team.picks) || []
+    if (!draftState?.teams) return EMPTY_ARRAY
+    return draftState.teams.flatMap(team => team.picks)
   }, [draftState?.teams])
+
+  // Memoize legal pokemon list to prevent new array on every render
+  const legalPokemon = useMemo(() => {
+    if (!pokemon) return EMPTY_ARRAY
+    return pokemon.filter(p => p.isLegal)
+  }, [pokemon])
 
   // Calculate current nominating team for auction drafts
   const currentNominatingTeam = useMemo(() => {
@@ -902,12 +934,17 @@ export default function DraftRoomPage() {
     }
   }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef])
 
-  // Get wishlist Pokemon IDs for the current user
+  // Get wishlist Pokemon IDs from Zustand store (populated by WishlistManager's useWishlistSync)
+  const storeWishlistItemsById = useDraftStore(state => state.wishlistItemsById)
+  const storeWishlistByParticipant = useDraftStore(state => state.wishlistItemsByParticipantId)
   const wishlistPokemonIds = useMemo(() => {
-    // This will be populated by the wishlist real-time sync
-    // For now, return empty array - will be populated by WishlistManager component
-    return []
-  }, [])
+    if (!userId) return EMPTY_ARRAY
+    const itemIds = storeWishlistByParticipant[userId] || []
+    return itemIds
+      .map(id => storeWishlistItemsById[id])
+      .filter(item => item && item.isAvailable)
+      .map(item => item.pokemonId)
+  }, [userId, storeWishlistByParticipant, storeWishlistItemsById])
 
   /**
    * OPTIMIZED SIDEBAR ACTIVITIES - Performance enhancement:
@@ -1569,6 +1606,15 @@ export default function DraftRoomPage() {
           </div>
         </div>
 
+        {/* Draft Order Reveal */}
+        {showOrderReveal && draftState && (
+          <DraftOrderReveal
+            teams={draftState.teams}
+            userTeamId={draftState.userTeamId}
+            onComplete={() => setShowOrderReveal(false)}
+          />
+        )}
+
         {/* Waiting Lobby */}
         {draftState?.status === 'waiting' && (
           <div className="mb-4 rounded-lg border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/10 p-4">
@@ -1828,11 +1874,11 @@ export default function DraftRoomPage() {
         <div className="bg-card rounded-lg shadow-sm border p-2 sm:p-4">
           <EnhancedErrorBoundary>
             <PokemonGrid
-              pokemon={pokemon?.filter(p => p.isLegal) || []}
+              pokemon={legalPokemon}
               onViewDetails={handleViewDetails}
               onAddToWishlist={handleAddToWishlist}
               onRemoveFromWishlist={handleRemoveFromWishlist}
-              draftedPokemonIds={draftState ? allDraftedIds : []}
+              draftedPokemonIds={allDraftedIds}
               wishlistPokemonIds={wishlistPokemonIds}
               isLoading={pokemonLoading}
               cardSize="md"
