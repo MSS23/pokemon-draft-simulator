@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { useDraftStore } from '@/stores/draftStore'
 import { selectUserWishlist } from '@/stores/selectors'
 import { WishlistService } from '@/lib/wishlist-service'
@@ -8,6 +8,10 @@ import { RealtimeChannel } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('UseWishlistSync')
+
+// Stable empty array reference to prevent infinite re-renders
+const EMPTY_WISHLIST: WishlistItem[] = []
+const EMPTY_SELECTOR = () => EMPTY_WISHLIST
 
 interface UseWishlistSyncOptions {
   draftId: string
@@ -23,7 +27,12 @@ export function useWishlistSync({
   const setWishlistItems = useDraftStore(state => state.setWishlistItems)
   const wishlistItemsById = useDraftStore(state => state.wishlistItemsById)
   const wishlistItemsByParticipantId = useDraftStore(state => state.wishlistItemsByParticipantId)
-  const userWishlist = useDraftStore(participantId ? selectUserWishlist(participantId) : () => [])
+  // Memoize selector to prevent creating new function references on every render
+  const wishlistSelector = useMemo(
+    () => participantId ? selectUserWishlist(participantId) : EMPTY_SELECTOR,
+    [participantId]
+  )
+  const userWishlist = useDraftStore(wishlistSelector)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const lastSyncRef = useRef<number>(0)
 
