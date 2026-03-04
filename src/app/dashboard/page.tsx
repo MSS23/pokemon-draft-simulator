@@ -133,9 +133,16 @@ export default function DashboardPage() {
   const handleDeleteLeague = async (leagueId: string) => {
     if (!user) return
     try {
+      // Find the draft associated with this league before deleting
+      const leagueDraftId = leagueStandings.find(s => s.league.id === leagueId)?.league.draftId
       await LeagueService.deleteLeague(leagueId, user.id)
       setLeagueStandings(prev => prev.filter(s => s.league.id !== leagueId))
-      notify.success('League Deleted', 'The league has been removed.')
+      setUpcomingMatches(prev => prev.filter(m => m.league.id !== leagueId))
+      // Also remove the associated draft from the dashboard
+      if (leagueDraftId) {
+        setDrafts(prev => prev.filter(d => d.draft_id !== leagueDraftId))
+      }
+      notify.success('League Deleted', 'The league and its draft have been removed.')
     } catch (err) {
       notify.error('Failed to Delete', err instanceof Error ? err.message : 'Could not delete league')
     } finally {

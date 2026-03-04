@@ -1589,6 +1589,7 @@ export class LeagueService {
       throw new Error('Only the league admin can delete this league')
     }
 
+    // Delete the league first (references draft_id)
     const { error } = await supabase
       .from('leagues')
       .delete()
@@ -1596,6 +1597,16 @@ export class LeagueService {
 
     if (error) {
       throw new Error(`Failed to delete league: ${error.message}`)
+    }
+
+    // Also delete the associated draft so it no longer appears on the dashboard
+    const { error: draftErr } = await supabase
+      .from('drafts')
+      .delete()
+      .eq('id', league.draft_id)
+
+    if (draftErr) {
+      log.warn('League deleted but failed to delete associated draft:', draftErr)
     }
   }
 }
