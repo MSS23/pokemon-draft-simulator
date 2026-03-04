@@ -130,14 +130,13 @@ export const notify = {
   pickMade: (pokemonName: string, teamName: string, isUserPick: boolean) => {
     if (isUserPick) {
       toast.success('Pick Confirmed!', {
-        description: `You successfully drafted ${pokemonName}`,
-        duration: 3000,
+        description: `You drafted ${pokemonName}`,
+        duration: 2500,
         icon: <Trophy className="h-4 w-4 text-yellow-500" />
       })
     } else {
-      toast(`${teamName} picked`, {
-        description: pokemonName,
-        duration: 2000,
+      toast(`${teamName} picked ${pokemonName}`, {
+        duration: 1500,
         icon: <CheckCircle className="h-4 w-4 text-blue-500" />
       })
     }
@@ -299,7 +298,7 @@ export const notify = {
   wishlistAdded: (pokemonName: string) => {
     toast.success('Added to Wishlist', {
       description: pokemonName,
-      duration: 2000,
+      duration: 1500,
       icon: <CheckCircle className="h-4 w-4 text-green-500" />
     })
   },
@@ -310,7 +309,7 @@ export const notify = {
   wishlistRemoved: (pokemonName: string) => {
     toast('Removed from Wishlist', {
       description: pokemonName,
-      duration: 2000,
+      duration: 1500,
       icon: <Info className="h-4 w-4 text-slate-500" />
     })
   },

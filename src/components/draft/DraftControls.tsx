@@ -64,6 +64,7 @@ interface DraftControlsProps {
   isShuffling?: boolean
   onUndoLastPick?: () => void
   onRequestNotificationPermission?: () => void
+  onPingCurrentPlayer?: () => void
   canUndo?: boolean
   notificationsEnabled?: boolean
 }
@@ -92,6 +93,7 @@ const DraftControls = memo(function DraftControls({
   isShuffling = false,
   onUndoLastPick,
   onRequestNotificationPermission,
+  onPingCurrentPlayer,
   canUndo = false,
   notificationsEnabled = false
 }: DraftControlsProps) {
@@ -246,6 +248,17 @@ const DraftControls = memo(function DraftControls({
 
           {draftStatus === 'drafting' && (
             <>
+              {onPingCurrentPlayer && (
+                <Button
+                  onClick={onPingCurrentPlayer}
+                  variant="outline"
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-600 dark:text-amber-400"
+                >
+                  <Bell className="h-4 w-4 mr-2" />
+                  Ping Player
+                </Button>
+              )}
+
               <Button
                 onClick={handlePauseDraft}
                 variant="outline"

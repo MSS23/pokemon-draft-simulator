@@ -1,10 +1,10 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Activity, ArrowRight, Clock, RotateCcw } from 'lucide-react'
+import { Clock, RotateCcw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface DraftProgressProps {
   currentTurn: number
@@ -87,136 +87,79 @@ export default function DraftProgress({
 
   const pickOrder = getPickOrderVisualization()
 
+  // Format timer display
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    if (mins > 0) return `${mins}:${secs.toString().padStart(2, '0')}`
+    return `${secs}s`
+  }
+
+  const isTimerCritical = timeRemaining > 0 && timeRemaining <= 10
+  const isTimerWarning = timeRemaining > 0 && timeRemaining <= 30
+
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Activity className="h-5 w-5" />
-          Draft Progress
+    <div className="w-full space-y-3">
+      {/* Top bar: stats + timer */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        {/* Round */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-lg">
+          <span className="text-xs text-muted-foreground">Round</span>
+          <span className="text-sm font-bold">{draftInfo.currentRound}</span>
           {draftInfo.isReverseRound && (
-            <Badge variant="outline" className="text-xs">
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Snake Round
-            </Badge>
+            <RotateCcw className="h-3 w-3 text-muted-foreground" />
           )}
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Current Pick Info */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="text-center p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-            <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-              {draftInfo.currentRound}
-            </div>
-            <div className="text-xs text-blue-600 dark:text-blue-400">Round</div>
-          </div>
-          <div className="text-center p-3 bg-purple-50 dark:bg-purple-950 rounded-lg">
-            <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
-              {draftInfo.currentPick}
-            </div>
-            <div className="text-xs text-purple-600 dark:text-purple-400">Overall Pick</div>
-          </div>
-          <div className="text-center p-3 bg-green-50 dark:bg-green-950 rounded-lg">
-            <div className="text-xl font-bold text-green-600 dark:text-green-400">
-              {draftInfo.pickInRound}
-            </div>
-            <div className="text-xs text-green-600 dark:text-green-400">Pick in Round</div>
-          </div>
-          <div className={`text-center p-3 rounded-lg transition-all ${
-            timeRemaining <= 10 && timeRemaining > 0
-              ? 'bg-red-100 dark:bg-red-950 animate-pulse'
-              : timeRemaining > 0
-              ? 'bg-orange-50 dark:bg-orange-950'
-              : 'bg-gray-50 dark:bg-gray-800'
-          }`}>
-            <div className={`text-xl font-bold font-mono ${
-              timeRemaining <= 10 && timeRemaining > 0
-                ? 'text-red-600 dark:text-red-400'
-                : timeRemaining > 0
-                ? 'text-orange-600 dark:text-orange-400'
-                : 'text-gray-600 dark:text-gray-400'
-            }`}>
-              {timeRemaining > 0 ? `${timeRemaining}s` : '--'}
-            </div>
-            <div className={`text-xs flex items-center justify-center gap-1 ${
-              timeRemaining <= 10 && timeRemaining > 0
-                ? 'text-red-600 dark:text-red-400'
-                : timeRemaining > 0
-                ? 'text-orange-600 dark:text-orange-400'
-                : 'text-gray-600 dark:text-gray-400'
-            }`}>
-              <Clock className="h-3 w-3" />
-              Time Left
-            </div>
-          </div>
         </div>
 
-        {/* Round Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Round {draftInfo.currentRound} Progress</span>
-            <span className="text-xs text-gray-600 dark:text-gray-400">
-              {draftInfo.pickInRound} / {totalTeams} picks
-            </span>
-          </div>
-          <Progress value={draftInfo.roundProgress} className="h-2" />
+        {/* Pick */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-muted rounded-lg">
+          <span className="text-xs text-muted-foreground">Pick</span>
+          <span className="text-sm font-bold">{draftInfo.currentPick}</span>
+          <span className="text-xs text-muted-foreground">/ {draftInfo.maxPossiblePicks}</span>
         </div>
 
-        {/* Overall Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Overall Draft Progress</span>
-            <span className="text-xs text-gray-600 dark:text-gray-400">
-              {draftInfo.totalPicks} / {draftInfo.maxPossiblePicks} picks
-            </span>
+        {/* Timer - prominent when active */}
+        {timeRemaining > 0 && (
+          <div className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono transition-all',
+            isTimerCritical
+              ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
+              : isTimerWarning
+              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+              : 'bg-primary/10 text-primary'
+          )}>
+            <Clock className={cn('h-3.5 w-3.5', isTimerCritical && 'animate-bounce')} />
+            <span className="text-sm font-bold">{formatTime(timeRemaining)}</span>
           </div>
+        )}
+
+        {/* Overall progress bar - grows to fill remaining space */}
+        <div className="flex-1 min-w-[120px]">
           <Progress value={draftInfo.overallProgress} className="h-2" />
         </div>
+      </div>
 
-        {/* Pick Order Visualization */}
-        {draftStatus === 'drafting' && (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Current Round Pick Order</span>
-              {draftInfo.isReverseRound && (
-                <ArrowRight className="h-4 w-4 text-gray-400 rotate-180" />
+      {/* Pick order visualization */}
+      {draftStatus === 'drafting' && (
+        <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+          {pickOrder.map((team) => (
+            <Badge
+              key={team.id}
+              variant={team.isCurrentPick ? 'default' : 'outline'}
+              className={cn(
+                'flex-shrink-0 text-xs px-2.5 py-0.5 transition-all',
+                team.isCurrentPick
+                  ? 'bg-primary text-primary-foreground shadow-md scale-105'
+                  : team.hasPickedThisRound
+                  ? 'bg-muted text-muted-foreground line-through opacity-60'
+                  : 'text-foreground'
               )}
-              {!draftInfo.isReverseRound && (
-                <ArrowRight className="h-4 w-4 text-gray-400" />
-              )}
-            </div>
-            <div className="flex gap-1 overflow-x-auto pb-2">
-              {pickOrder.map((team) => (
-                <div
-                  key={team.id}
-                  className={`
-                    flex-shrink-0 px-2 py-1 rounded text-xs font-medium min-w-0 text-center
-                    ${team.isCurrentPick
-                      ? 'bg-yellow-500 text-white shadow-lg scale-105'
-                      : team.hasPickedThisRound
-                      ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                      : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                    }
-                  `}
-                  style={{ minWidth: '60px' }}
-                >
-                  <div className="truncate">#{team.draftOrder}</div>
-                  <div className="truncate">{team.name}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Snake Draft Explanation */}
-        {draftStatus === 'drafting' && (
-          <div className="text-xs text-gray-600 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-            <strong>Snake Draft:</strong> Pick order reverses each round.
-            Round 1: 1→2→3→4, Round 2: 4→3→2→1, Round 3: 1→2→3→4...
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            >
+              {team.name}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

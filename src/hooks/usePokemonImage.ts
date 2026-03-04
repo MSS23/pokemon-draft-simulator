@@ -46,7 +46,7 @@ export function usePokemonImage({
   const [showOfficialArt, setShowOfficialArt] = useState(preferOfficialArt)
 
   // Get image URL based on current state and global preference
-  // Priority: fast static sprites first, then artwork, animated GIF last
+  // Priority: animated GIF first, then static sprite fallback, then artwork
   const getImageUrl = useCallback(() => {
     if (showOfficialArt) {
       switch (fallbackAttempt) {
@@ -59,16 +59,16 @@ export function usePokemonImage({
       }
     }
 
-    // Default: static sprite first (fast, reliable), then artwork, then animated
+    // Default: animated GIF first, then static sprite, then artwork
     switch (fallbackAttempt) {
       case 0:
-        return getPokemonSpriteUrl(pokemonId)
-      case 1:
-        return getOfficialArtworkUrl(pokemonId)
-      case 2:
         return getBestPokemonImageUrl(pokemonId, pokemonName)
-      default:
+      case 1:
         return getPokemonAnimatedBackupUrl(pokemonId)
+      case 2:
+        return getPokemonSpriteUrl(pokemonId)
+      default:
+        return getOfficialArtworkUrl(pokemonId)
     }
   }, [pokemonId, pokemonName, showOfficialArt, fallbackAttempt])
 

@@ -21,6 +21,7 @@ import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-servi
 import { UserSessionService } from '@/lib/user-session'
 import { useAuth } from '@/contexts/AuthContext'
 import { notify } from '@/lib/notifications'
+import { cn } from '@/lib/utils'
 import { DraftRoomLoading, TeamStatusSkeleton } from '@/components/ui/loading-states'
 import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 import { useTurnNotifications } from '@/hooks/useTurnNotifications'
@@ -37,7 +38,6 @@ import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
  * - DraftProgress: Always visible during active draft
  *
  * HEAVY (Lazy Load - Reduce initial bundle):
- * - AIDraftAssistant: Heavy AI logic, only for active drafts
  * - AuctionBiddingInterface: Auction-specific, only for auction drafts
  * - DraftResults: Only needed at completion
  * - DraftControls: Only for hosts, can lazy load
@@ -93,12 +93,6 @@ const SpectatorMode = dynamic(() => import('@/components/draft/SpectatorMode'), 
 
 const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNotifications'), {
   ssr: false
-})
-
-const AIDraftAssistant = dynamic(() =>
-  import('@/components/draft/AIDraftAssistant').then(mod => ({ default: mod.AIDraftAssistant })), {
-  ssr: false,
-  loading: () => <div className="h-96 bg-muted rounded-lg animate-pulse" />
 })
 
 const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager'), { ssr: false })
@@ -225,8 +219,33 @@ export default function DraftRoomPage() {
   } | null>(null)
   const [auctionTimeRemaining, setAuctionTimeRemaining] = useState(0)
 
-  // Pick timer state - disabled
-  const pickTimeRemaining = 0
+  // Pick timer state - countdown based on turn_started_at and timeLimit
+  const [pickTimeRemaining, setPickTimeRemaining] = useState(0)
+
+  // Pick timer countdown effect
+  useEffect(() => {
+    const turnStartedAt = draftState?.draft?.turn_started_at
+    const timeLimit = draftState?.draftSettings?.timeLimit || 0
+    const isDrafting = draftState?.status === 'drafting'
+
+    if (!isDrafting || !turnStartedAt || timeLimit <= 0) {
+      setPickTimeRemaining(0)
+      return
+    }
+
+    const calculateRemaining = () => {
+      const elapsed = Math.floor((Date.now() - new Date(turnStartedAt).getTime()) / 1000)
+      return Math.max(0, timeLimit - elapsed)
+    }
+
+    setPickTimeRemaining(calculateRemaining())
+
+    const interval = setInterval(() => {
+      setPickTimeRemaining(calculateRemaining())
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [draftState?.draft?.turn_started_at, draftState?.draftSettings?.timeLimit, draftState?.status])
 
   // Draft start transition detection (to increase debounce during critical transition)
   const [, setIsDraftStarting] = useState(false)
@@ -693,34 +712,27 @@ export default function DraftRoomPage() {
         const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
         const pickedPokemon = pokemon.find(p => p.id === latestPickId)
         if (pickedPokemon) {
-          notify.success(
-            `${pickingTeam.name} drafted ${pickedPokemon.name}!`,
-            `${pickingTeam.userName} selected ${pickedPokemon.name}`,
-            { duration: 4000 }
-          )
+          notify.pickMade(pickedPokemon.name, pickingTeam.name, false)
         }
       }
     }
 
     // Check for turn change notifications (snake draft only)
-    if (!isAuctionDraft && draftState.currentTeam !== prevState.currentTeam) {
+    // Use currentTurn (not currentTeam) to handle snake draft reversals where same team picks twice
+    if (!isAuctionDraft && draftState.currentTurn !== prevState.currentTurn) {
       if (draftState.currentTurn !== lastNotifiedTurnRef.current) {
         const now = Date.now()
-        const MIN_NOTIFICATION_INTERVAL = 2000
+        const MIN_NOTIFICATION_INTERVAL = 1500
         const timeSinceLastNotification = now - lastTurnNotificationTime.current
 
         if (timeSinceLastNotification >= MIN_NOTIFICATION_INTERVAL || lastTurnNotificationTime.current === 0) {
           lastNotifiedTurnRef.current = draftState.currentTurn
           lastTurnNotificationTime.current = now
 
-          const team = draftState.teams.find(t => t.id === draftState.currentTeam)
-          if (team) {
-            if (draftState.userTeamId === draftState.currentTeam) {
-              notify.success("It's Your Turn!", "Select a Pokémon to draft", { duration: 5000 })
-            } else {
-              notify.info(`${team.name}'s Turn`, `Waiting for ${team.userName} to pick`, { duration: 3000 })
-            }
+          if (draftState.userTeamId === draftState.currentTeam) {
+            notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
           }
+          // Removed opponent turn notifications - too spammy, pick notifications suffice
         }
       }
     }
@@ -945,54 +957,6 @@ export default function DraftRoomPage() {
 
     return activities.sort((a, b) => b.timestamp - a.timestamp)
   }, [pokemon, draftState?.teams])
-
-  // Memoize AI Assistant props to prevent infinite re-renders
-  const aiCurrentTeam = useMemo(() => {
-    if (!userTeam || !pokemon) return []
-    return userTeam.picks
-      .map(id => pokemon.find(p => p.id === id))
-      .filter(Boolean) as Pokemon[]
-  }, [userTeam, pokemon])
-
-  const aiOpponentTeams = useMemo(() => {
-    if (!draftState?.teams || !draftState.userTeamId || !pokemon || !roomCode) return []
-    return draftState.teams
-      .filter(t => t.id !== draftState.userTeamId)
-      .map(t => ({
-        id: t.id,
-        draftId: roomCode.toLowerCase(),
-        name: t.name,
-        ownerId: null,
-        budgetRemaining: t.budgetRemaining,
-        draftOrder: t.draftOrder,
-        undosRemaining: 0,
-        picks: t.picks.map(pokemonId => ({
-          id: pokemonId,
-          draftId: roomCode.toLowerCase(),
-          teamId: t.id,
-          pokemonId,
-          pokemonName: pokemon.find(p => p.id === pokemonId)?.name || 'Unknown',
-          cost: pokemon.find(p => p.id === pokemonId)?.cost || 0,
-          pickOrder: 0,
-          round: 1,
-          createdAt: `pick-${t.id}-${pokemonId}` // Stable ID to prevent re-renders
-        }))
-      }))
-  }, [draftState?.teams, draftState?.userTeamId, pokemon, roomCode])
-
-  // Memoize AI Assistant format and callback props to prevent infinite re-renders
-  const aiFormat = useMemo(() => ({
-    id: formatId,
-    name: formatId
-  } as unknown as import('@/types').Format), [formatId])
-
-  const handleAISelectPokemon = useCallback((pokemon: Pokemon) => {
-    setSelectedPokemon(pokemon)
-    // Auto-scroll to selection area
-    if (!isAuctionDraft && isUserTurn) {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }, [isAuctionDraft, isUserTurn])
 
   // Handler to show confirmation modal before drafting
   const handleInitiateDraft = useCallback((pokemon: Pokemon) => {
@@ -1264,6 +1228,59 @@ export default function DraftRoomPage() {
 
   // Proxy picking handlers removed - feature not implemented
 
+  // Ping current player (host-only)
+  const lastPingTimeRef = useRef(0)
+  const handlePingCurrentPlayer = useCallback(async () => {
+    const now = Date.now()
+    if (now - lastPingTimeRef.current < 5000) {
+      notify.warning('Slow Down', 'Please wait a few seconds between pings')
+      return
+    }
+    lastPingTimeRef.current = now
+
+    try {
+      const { supabase } = await import('@/lib/supabase')
+      if (!supabase) return
+
+      await supabase.channel(`ping:${roomCode.toLowerCase()}`).send({
+        type: 'broadcast',
+        event: 'ping_player',
+        payload: { from: userId, timestamp: now }
+      })
+
+      const team = draftState?.teams.find(t => t.id === draftState?.currentTeam)
+      notify.info('Ping Sent', `Notified ${team?.userName || 'current player'}`)
+    } catch (err) {
+      log.error('Error pinging player:', err)
+    }
+  }, [roomCode, userId, draftState?.teams, draftState?.currentTeam])
+
+  // Listen for incoming pings (non-host players)
+  useEffect(() => {
+    if (!roomCode || isHost) return
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let channel: any = null
+
+    const setup = async () => {
+      const { supabase } = await import('@/lib/supabase')
+      if (!supabase) return
+
+      channel = supabase.channel(`ping:${roomCode.toLowerCase()}`)
+      channel.on('broadcast', { event: 'ping_player' }, () => {
+        // Only notify if it's this user's turn
+        if (draftStateRef.current?.userTeamId === draftStateRef.current?.currentTeam) {
+          notify.yourTurn()
+        }
+      }).subscribe()
+    }
+
+    setup()
+    return () => {
+      if (channel) channel.unsubscribe()
+    }
+  }, [roomCode, isHost])
+
   // Auction-specific handlers
   const handleNominatePokemon = useCallback(async (pokemon: Pokemon, startingBid: number, duration: number) => {
     try {
@@ -1496,44 +1513,42 @@ export default function DraftRoomPage() {
     <div className="min-h-screen bg-background transition-colors duration-500">
       <div className="container mx-auto px-4 py-4 max-w-screen-2xl">
         {/* Header */}
-        <div className="mb-6 bg-card rounded-lg shadow-sm border p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold mb-1">
+        <div className="mb-4 bg-card rounded-lg shadow-sm border px-4 py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg sm:text-xl font-bold font-mono tracking-wider">
                 {roomCode}
               </h1>
-              <div className="flex items-center gap-2">
-                <Badge variant={draftState?.status === 'waiting' ? 'secondary' : draftState?.status === 'drafting' ? 'default' : 'outline'}>
-                  {draftState?.status === 'waiting' ? 'Waiting' : draftState?.status === 'drafting' ? 'In Progress' : 'Completed'}
-                </Badge>
-                {connectionStatus === 'reconnecting' && (
-                  <Badge variant="destructive" className="animate-pulse">Reconnecting</Badge>
-                )}
-                {connectionStatus === 'offline' && (
-                  <Badge variant="destructive">Offline</Badge>
-                )}
-              </div>
+              <Badge variant={draftState?.status === 'waiting' ? 'secondary' : draftState?.status === 'drafting' ? 'default' : 'outline'}>
+                {draftState?.status === 'waiting' ? 'Waiting' : draftState?.status === 'drafting' ? 'Live' : 'Done'}
+              </Badge>
+              {connectionStatus === 'reconnecting' && (
+                <Badge variant="destructive" className="animate-pulse text-xs">Reconnecting</Badge>
+              )}
+              {connectionStatus === 'offline' && (
+                <Badge variant="destructive" className="text-xs">Offline</Badge>
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={copyRoomCode}>
-                <Copy className="h-4 w-4 mr-1" />
-                Copy
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Button variant="ghost" size="sm" onClick={copyRoomCode} className="h-8 px-2.5">
+                <Copy className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Copy</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={shareRoom}>
-                <Share2 className="h-4 w-4 mr-1" />
-                Share
+              <Button variant="ghost" size="sm" onClick={shareRoom} className="h-8 px-2.5">
+                <Share2 className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Share</span>
               </Button>
               {draftState && draftState.status === 'drafting' && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setIsActivitySidebarOpen(true)}
-                  className="relative"
+                  className="h-8 px-2.5"
                 >
-                  <History className="h-4 w-4 mr-1" />
-                  Activity
+                  <History className="h-3.5 w-3.5 mr-1" />
+                  <span className="hidden sm:inline">Activity</span>
                   {allDraftedIds.length > 0 && (
-                    <Badge variant="default" className="ml-2 h-5 px-1.5 text-xs">
+                    <Badge variant="default" className="ml-1.5 h-4 px-1 text-[10px]">
                       {allDraftedIds.length}
                     </Badge>
                   )}
@@ -1544,6 +1559,7 @@ export default function DraftRoomPage() {
                   variant="default"
                   size="sm"
                   onClick={() => router.push(`/draft/${roomCode}/results`)}
+                  className="h-8"
                 >
                   Results
                 </Button>
@@ -1551,7 +1567,6 @@ export default function DraftRoomPage() {
               <DraftConnectionStatusBadge
                 status={realtimeConnectionStatus}
                 onReconnect={realtimeReconnect}
-                className="mr-2"
               />
               <ImageTypeToggle />
               <ThemeToggle />
@@ -1668,14 +1683,14 @@ export default function DraftRoomPage() {
               totalTeams={draftState?.teams?.length || 0}
               maxRounds={draftState?.draftSettings?.pokemonPerTeam}
               draftStatus={draftState?.status}
-              timeRemaining={0}
+              timeRemaining={pickTimeRemaining}
               teams={draftState?.teams || []}
             />
           </div>
         )}
 
         {/* Team Rosters */}
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="mb-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-2 sm:gap-3">
           {draftState ? (
             // Show actual teams when draft state is loaded
             (draftState?.teams || []).map((team) => (
@@ -1742,7 +1757,7 @@ export default function DraftRoomPage() {
               currentTeam={draftState?.currentTeam}
               teams={draftState?.teams || []}
               isHost={isHost}
-              timeRemaining={0}
+              timeRemaining={pickTimeRemaining}
               onStartDraft={startDraft}
               onShuffleDraftOrder={handleShuffleDraftOrder}
               onPauseDraft={handlePauseDraft}
@@ -1758,6 +1773,7 @@ export default function DraftRoomPage() {
               isShuffling={isShuffling}
               onUndoLastPick={handleUndoLastPick}
               onRequestNotificationPermission={handleRequestNotificationPermission}
+              onPingCurrentPlayer={handlePingCurrentPlayer}
               canUndo={draftState?.teams?.some(team => team.picks.length > 0) || false}
               notificationsEnabled={typeof window !== 'undefined' && Notification.permission === 'granted'}
             />
@@ -1809,24 +1825,34 @@ export default function DraftRoomPage() {
               </div>
             ) : (
               // Snake Draft Controls
-              <div className="p-4 bg-card rounded-lg shadow">
-                <h3 className="font-semibold mb-3">Your Selection</h3>
-                <div className="flex gap-3 flex-wrap">
-                  {selectedPokemon && isUserTurn ? (
+              <div className={cn(
+                'px-4 py-3 rounded-lg border transition-all',
+                isUserTurn
+                  ? 'bg-primary/5 border-primary/30 shadow-md'
+                  : 'bg-card border-border shadow-sm'
+              )}>
+                {selectedPokemon && isUserTurn ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground mb-0.5">Selected</p>
+                      <p className="font-semibold">{selectedPokemon.name}</p>
+                    </div>
                     <Button
                       onClick={() => handleDraftPokemon(selectedPokemon)}
+                      size="lg"
+                      className="px-6"
                     >
-                      Draft {selectedPokemon.name}
+                      Confirm Pick
                     </Button>
-                  ) : (
-                    <p className="text-muted-foreground">
-                      {!isUserTurn
-                        ? `Waiting for ${currentTeam?.name} to pick...`
-                        : 'Select a Pokémon to draft'
-                      }
-                    </p>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-1">
+                    {!isUserTurn
+                      ? `Waiting for ${currentTeam?.name} to pick...`
+                      : 'Tap a Pokémon below to select it'
+                    }
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -1847,24 +1873,6 @@ export default function DraftRoomPage() {
                 </p>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* AI Draft Assistant - Show during active draft for user's team */}
-        {draftState && draftState.status === 'drafting' && draftState.userTeamId && !isSpectator && formatId && (
-          <div className="mb-6">
-            <EnhancedErrorBoundary>
-              <AIDraftAssistant
-                availablePokemon={availablePokemon}
-                currentTeam={aiCurrentTeam}
-                opponentTeams={aiOpponentTeams}
-                remainingBudget={userTeam?.budgetRemaining || 0}
-                remainingPicks={(draftState.draftSettings.pokemonPerTeam || 6) - (userTeam?.picks.length || 0)}
-                format={aiFormat}
-                onSelectPokemon={handleAISelectPokemon}
-                isYourTurn={isUserTurn}
-              />
-            </EnhancedErrorBoundary>
           </div>
         )}
 

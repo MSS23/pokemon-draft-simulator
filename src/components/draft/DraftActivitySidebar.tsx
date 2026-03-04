@@ -3,9 +3,8 @@
 import { useState, useMemo, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { X, History, Clock, Trophy } from 'lucide-react'
+import { X, History, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Pokemon } from '@/types'
 
@@ -29,16 +28,18 @@ interface DraftActivitySidebarProps {
   currentUserTeamId?: string | null
 }
 
-/**
- * DraftActivitySidebar - Optimized with Map lookup and React.memo
- *
- * Performance optimization:
- * - Replace O(n) pokemon.find() with O(1) Map lookup
- * - Memoized to prevent unnecessary re-renders
- * - Significant improvement when rendering 50+ activities
- *
- * Expected improvement: 60-80% faster rendering for activity list
- */
+// Consistent team colors - assigned by index
+const TEAM_COLORS = [
+  { bg: 'bg-blue-500/10', border: 'border-l-blue-500', text: 'text-blue-600 dark:text-blue-400', badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300' },
+  { bg: 'bg-rose-500/10', border: 'border-l-rose-500', text: 'text-rose-600 dark:text-rose-400', badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300' },
+  { bg: 'bg-emerald-500/10', border: 'border-l-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' },
+  { bg: 'bg-amber-500/10', border: 'border-l-amber-500', text: 'text-amber-600 dark:text-amber-400', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' },
+  { bg: 'bg-purple-500/10', border: 'border-l-purple-500', text: 'text-purple-600 dark:text-purple-400', badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300' },
+  { bg: 'bg-cyan-500/10', border: 'border-l-cyan-500', text: 'text-cyan-600 dark:text-cyan-400', badge: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300' },
+  { bg: 'bg-orange-500/10', border: 'border-l-orange-500', text: 'text-orange-600 dark:text-orange-400', badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300' },
+  { bg: 'bg-pink-500/10', border: 'border-l-pink-500', text: 'text-pink-600 dark:text-pink-400', badge: 'bg-pink-100 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300' },
+]
+
 const DraftActivitySidebar = memo(function DraftActivitySidebar({
   isOpen,
   onClose,
@@ -48,43 +49,39 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
 }: DraftActivitySidebarProps) {
   const [filter, setFilter] = useState<'all' | 'my-team' | 'opponents'>('all')
 
-  // Create Pokemon Map for O(1) lookup instead of O(n) find()
+  // Create Pokemon Map for O(1) lookup
   const pokemonMap = useMemo(() => {
     const map = new Map<string, Pokemon>()
     pokemon.forEach(p => map.set(p.id, p))
     return map
   }, [pokemon])
 
-  const filteredActivities = activities.filter(activity => {
-    if (filter === 'all') return true
-    if (filter === 'my-team') return activity.teamId === currentUserTeamId
-    if (filter === 'opponents') return activity.teamId !== currentUserTeamId
-    return true
-  })
+  // Build stable team-to-color mapping
+  const teamColorMap = useMemo(() => {
+    const map = new Map<string, typeof TEAM_COLORS[0]>()
+    const uniqueTeamIds = [...new Set(activities.map(a => a.teamId))]
+    uniqueTeamIds.forEach((teamId, idx) => {
+      map.set(teamId, TEAM_COLORS[idx % TEAM_COLORS.length])
+    })
+    return map
+  }, [activities])
 
-  const getPokemonData = (pokemonId: string) => {
-    return pokemonMap.get(pokemonId)
-  }
-
-  const getRelativeTime = (timestamp: number) => {
-    const now = Date.now()
-    const diff = now - timestamp
-    const seconds = Math.floor(diff / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-
-    if (seconds < 60) return 'Just now'
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    return 'Earlier'
-  }
+  const filteredActivities = useMemo(() =>
+    activities.filter(activity => {
+      if (filter === 'all') return true
+      if (filter === 'my-team') return activity.teamId === currentUserTeamId
+      if (filter === 'opponents') return activity.teamId !== currentUserTeamId
+      return true
+    }),
+    [activities, filter, currentUserTeamId]
+  )
 
   return (
     <>
       {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
           onClick={onClose}
         />
       )}
@@ -92,179 +89,131 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed top-0 right-0 h-full w-full sm:w-96 bg-white dark:bg-slate-900 shadow-2xl z-50 transition-transform duration-300 ease-in-out',
+          'fixed top-0 right-0 h-full w-full sm:w-[380px] bg-background border-l shadow-2xl z-50 transition-transform duration-300 ease-in-out',
           isOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between px-4 py-3 border-b">
             <div className="flex items-center gap-2">
-              <History className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-                Draft Activity
-              </h2>
+              <History className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold">Draft Activity</h2>
+              {activities.length > 0 && (
+                <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                  {activities.length}
+                </Badge>
+              )}
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
               <X className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Filters */}
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-            <div className="flex gap-2">
-              <Button
-                variant={filter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('all')}
-                className="flex-1"
-              >
-                All Picks
-              </Button>
-              {currentUserTeamId && (
-                <>
-                  <Button
-                    variant={filter === 'my-team' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFilter('my-team')}
-                    className="flex-1"
-                  >
-                    My Team
-                  </Button>
-                  <Button
-                    variant={filter === 'opponents' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setFilter('opponents')}
-                    className="flex-1"
-                  >
-                    Opponents
-                  </Button>
-                </>
-              )}
+          <div className="px-4 py-2 border-b">
+            <div className="flex gap-1.5">
+              {(['all', 'my-team', 'opponents'] as const).map(f => (
+                <Button
+                  key={f}
+                  variant={filter === f ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setFilter(f)}
+                  className={cn('flex-1 h-7 text-xs', filter !== f && 'text-muted-foreground')}
+                >
+                  {f === 'all' ? 'All' : f === 'my-team' ? 'My Team' : 'Opponents'}
+                </Button>
+              ))}
             </div>
           </div>
 
           {/* Activity List */}
-          <ScrollArea className="flex-1 p-4">
-            {filteredActivities.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <Trophy className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-3" />
-                <p className="text-slate-500 dark:text-slate-400">
-                  No draft activity yet
-                </p>
-                <p className="text-sm text-slate-400 dark:text-slate-600 mt-1">
-                  Picks will appear here as they happen
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredActivities.map((activity) => {
-                  const pokemonData = getPokemonData(activity.pokemonId)
-                  const isUserTeam = activity.teamId === currentUserTeamId
+          <ScrollArea className="flex-1">
+            <div className="p-3">
+              {filteredActivities.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center">
+                  <Trophy className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm text-muted-foreground">No picks yet</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {filteredActivities.map((activity) => {
+                    const pokemonData = pokemonMap.get(activity.pokemonId)
+                    const isUserTeam = activity.teamId === currentUserTeamId
+                    const colors = teamColorMap.get(activity.teamId) || TEAM_COLORS[0]
 
-                  return (
-                    <Card
-                      key={activity.id}
-                      className={cn(
-                        'transition-all duration-200 hover:shadow-md',
-                        isUserTeam && 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/10'
-                      )}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
-                          {/* Pokemon Image */}
-                          {pokemonData && (
-                            <div className="flex-shrink-0">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
-                                alt={pokemonData.name}
-                                className="w-12 h-12 pixelated"
-                              />
-                            </div>
-                          )}
+                    return (
+                      <div
+                        key={activity.id}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2 rounded-lg border-l-[3px] transition-colors',
+                          colors.border,
+                          isUserTeam ? colors.bg : 'hover:bg-muted/50'
+                        )}
+                      >
+                        {/* Pokemon sprite */}
+                        {pokemonData && (
+                          <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
+                              alt={pokemonData.name}
+                              className="w-10 h-10 pixelated"
+                              loading="lazy"
+                            />
+                          </div>
+                        )}
 
-                          {/* Activity Details */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                                  {activity.pokemonName}
-                                </h3>
-                                <p className="text-sm text-slate-600 dark:text-slate-400 truncate">
-                                  {activity.teamName}
-                                </p>
-                              </div>
-                              <Badge variant="outline" className="flex-shrink-0 text-xs">
-                                Pick #{activity.pickNumber}
+                        {/* Pick info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-sm truncate">
+                              {activity.pokemonName}
+                            </span>
+                            {pokemonData?.types?.map(type => (
+                              <Badge key={type.name} variant="outline" className="text-[10px] h-4 px-1 hidden sm:inline-flex">
+                                {type.name}
                               </Badge>
-                            </div>
-
-                            <div className="flex items-center gap-2 mt-2 text-xs text-slate-500 dark:text-slate-500">
-                              <Clock className="h-3 w-3" />
-                              <span>{getRelativeTime(activity.timestamp)}</span>
-                              <span className="text-slate-300 dark:text-slate-700">•</span>
-                              <span>Round {activity.round}</span>
-                            </div>
-
-                            {/* Pokemon Types */}
-                            {pokemonData && pokemonData.types && (
-                              <div className="flex gap-1 mt-2">
-                                {pokemonData.types.map((type) => (
-                                  <Badge
-                                    key={type.name}
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {type.name}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={cn('text-xs font-medium', colors.text)}>
+                              {activity.teamName}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                              R{activity.round} · #{activity.pickNumber}
+                            </span>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </ScrollArea>
 
           {/* Footer Stats */}
           {activities.length > 0 && (
-            <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-              <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="px-4 py-3 border-t bg-muted/30">
+              <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                    {activities.length}
-                  </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Total Picks
-                  </div>
+                  <div className="text-lg font-bold">{activities.length}</div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Picks</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  <div className="text-lg font-bold">
                     {Math.max(...activities.map(a => a.round))}
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Current Round
-                  </div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Round</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  <div className="text-lg font-bold">
                     {currentUserTeamId
                       ? activities.filter(a => a.teamId === currentUserTeamId).length
                       : '-'}
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Your Picks
-                  </div>
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Yours</div>
                 </div>
               </div>
             </div>
