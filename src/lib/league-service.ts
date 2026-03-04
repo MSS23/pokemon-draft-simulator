@@ -305,11 +305,12 @@ export class LeagueService {
     // Use circle method for round-robin scheduling (handles even/odd teams)
     const roundRobinRounds = this.buildRoundRobinRounds(teams)
 
-    // Fill weeks: first exhaust round-robin rounds, then cycle for rematches
+    // Fill weeks from round-robin rounds; cap at available rounds to avoid
+    // duplicate matchups. If totalWeeks > rounds, we only schedule unique rounds.
+    const weeksToSchedule = Math.min(config.totalWeeks, roundRobinRounds.length)
     const weeklyMatchups: [Team, Team][][] = []
-    for (let week = 0; week < config.totalWeeks; week++) {
-      const roundIndex = week % roundRobinRounds.length
-      weeklyMatchups.push(roundRobinRounds[roundIndex])
+    for (let week = 0; week < weeksToSchedule; week++) {
+      weeklyMatchups.push(roundRobinRounds[week])
     }
 
     // Build match records
@@ -965,11 +966,19 @@ export class LeagueService {
     // Cast to access joined relations since Supabase Relationships config is empty
     const matches = rawMatches as unknown as MatchWithTeams[]
 
-    return matches.map((m: MatchWithTeams) => ({
-      ...mapMatchRow(m),
-      homeTeam: m.home_team as unknown as Team,
-      awayTeam: m.away_team as unknown as Team,
-    }))
+    // Deduplicate by match id (safety net for any duplicate rows in DB)
+    const seen = new Set<string>()
+    return matches
+      .filter((m: MatchWithTeams) => {
+        if (seen.has(m.id)) return false
+        seen.add(m.id)
+        return true
+      })
+      .map((m: MatchWithTeams) => ({
+        ...mapMatchRow(m),
+        homeTeam: m.home_team as unknown as Team,
+        awayTeam: m.away_team as unknown as Team,
+      }))
   }
 
   /**
@@ -1271,12 +1280,18 @@ export class LeagueService {
       opponentTeamPicks: { pokemonId: string; pokemonName: string }[]
     }[] = []
 
+    const seenMatchIds = new Set<string>()
+
     for (const lt of activeLeagueTeams) {
       const league = mapLeagueRow(lt.leagues)
       const weekFixtures = await this.getWeekFixtures(league.id, league.currentWeek)
 
       // Find matches involving this user's team
       for (const match of weekFixtures) {
+        // Deduplicate — same match can appear if user owns multiple teams (shouldn't happen)
+        if (seenMatchIds.has(match.id)) continue
+        seenMatchIds.add(match.id)
+
         const isHome = match.homeTeamId === lt.team_id
         const isAway = match.awayTeamId === lt.team_id
         if (!isHome && !isAway) continue

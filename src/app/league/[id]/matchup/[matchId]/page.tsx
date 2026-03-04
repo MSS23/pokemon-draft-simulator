@@ -52,18 +52,43 @@ const TYPE_EFFECTIVENESS: Record<string, Record<string, number>> = {
   fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 },
 }
 
-function getTypeCoverage(picks: Pick[], pokemonTypes: Map<string, string[]>): Set<string> {
-  const covered = new Set<string>()
+function getTypeCoverage(picks: Pick[], pokemonTypes: Map<string, string[]>): Map<string, number> {
+  const coverage = new Map<string, number>()
   for (const pick of picks) {
     const types = pokemonTypes.get(pick.pokemonId) || []
     for (const atkType of types) {
       const chart = TYPE_EFFECTIVENESS[atkType] || {}
       for (const [defType, mult] of Object.entries(chart)) {
-        if (mult >= 2) covered.add(defType)
+        const existing = coverage.get(defType)
+        // Keep the best (highest) multiplier for SE, or worst (lowest) for NVE
+        if (mult >= 2) {
+          if (!existing || mult > existing) coverage.set(defType, mult)
+        } else if (mult < 1 && (!existing || existing < 1)) {
+          // Only store NVE/immune if no SE coverage exists for this type
+          if (!existing || mult < existing) coverage.set(defType, mult)
+        }
       }
     }
   }
-  return covered
+  return coverage
+}
+
+function formatMultiplier(mult: number): string {
+  if (mult === 0) return 'x0'
+  if (mult === 0.25) return 'x\u00BC'
+  if (mult === 0.5) return 'x\u00BD'
+  if (mult === 2) return 'x2'
+  if (mult === 4) return 'x4'
+  return `x${mult}`
+}
+
+function getMultiplierColor(mult: number): string {
+  if (mult >= 4) return 'text-green-400 font-bold'
+  if (mult >= 2) return 'text-green-500 font-bold'
+  if (mult === 0) return 'text-gray-400'
+  if (mult <= 0.25) return 'text-red-400'
+  if (mult <= 0.5) return 'text-orange-400'
+  return 'text-muted-foreground'
 }
 
 export default function MatchupPreviewPage() {
@@ -436,7 +461,7 @@ export default function MatchupPreviewPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Zap className="h-4 w-4" />
-              Type Coverage (Super Effective)
+              Type Coverage
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -455,14 +480,18 @@ export default function MatchupPreviewPage() {
                   </div>
                   <div className="text-center py-0.5">
                     {homeCoverage.has(type) ? (
-                      <span className="text-green-500 font-bold text-xs">SE</span>
+                      <span className={`text-xs ${getMultiplierColor(homeCoverage.get(type)!)}`}>
+                        {formatMultiplier(homeCoverage.get(type)!)}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </div>
                   <div className="text-center py-0.5">
                     {awayCoverage.has(type) ? (
-                      <span className="text-green-500 font-bold text-xs">SE</span>
+                      <span className={`text-xs ${getMultiplierColor(awayCoverage.get(type)!)}`}>
+                        {formatMultiplier(awayCoverage.get(type)!)}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
@@ -473,11 +502,11 @@ export default function MatchupPreviewPage() {
             <div className="flex justify-between mt-3 pt-3 border-t text-sm">
               <div>
                 <span className="font-medium">{match.homeTeam.name}:</span>{' '}
-                <span className="text-muted-foreground">{homeCoverage.size}/{ALL_TYPES.length} types covered</span>
+                <span className="text-muted-foreground">{[...homeCoverage.values()].filter(m => m >= 2).length}/{ALL_TYPES.length} types SE</span>
               </div>
               <div>
                 <span className="font-medium">{match.awayTeam.name}:</span>{' '}
-                <span className="text-muted-foreground">{awayCoverage.size}/{ALL_TYPES.length} types covered</span>
+                <span className="text-muted-foreground">{[...awayCoverage.values()].filter(m => m >= 2).length}/{ALL_TYPES.length} types SE</span>
               </div>
             </div>
           </CardContent>
