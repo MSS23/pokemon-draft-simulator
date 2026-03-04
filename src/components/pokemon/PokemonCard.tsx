@@ -9,7 +9,7 @@ import { getPokemonCardClass, getPokemonRarityClass, isPokemonShiny } from '@/ut
 import { cn } from '@/lib/utils'
 import { usePendingActionFeedback } from '@/hooks/useOptimisticUpdates'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
-import { Clock, AlertCircle, Heart, Zap } from 'lucide-react'
+import { Clock, AlertCircle, Heart, Zap, Lock } from 'lucide-react'
 
 interface PokemonCardProps {
   pokemon: Pokemon
@@ -21,6 +21,7 @@ interface PokemonCardProps {
   isDisabled?: boolean
   isInWishlist?: boolean
   isUnaffordable?: boolean
+  isUnsafe?: boolean
   showCost?: boolean
   showStats?: boolean
   showWishlistButton?: boolean
@@ -51,6 +52,7 @@ const PokemonCard = ({
   isDisabled = false,
   isInWishlist = false,
   isUnaffordable = false,
+  isUnsafe = false,
   showCost = true,
   showStats: _showStats = true,
   showWishlistButton = true,
@@ -100,7 +102,7 @@ const PokemonCard = ({
     }
   }
 
-  const cardAriaLabel = `${pokemon.name}, ${pokemon.cost} points${isDrafted ? ', drafted' : ''}${isUnaffordable ? ', unaffordable' : ''}${isInWishlist ? ', in wishlist' : ''}`
+  const cardAriaLabel = `${pokemon.name}, ${pokemon.cost} points${isDrafted ? ', drafted' : ''}${isUnaffordable ? ', unaffordable' : ''}${isUnsafe ? ', would bust budget' : ''}${isInWishlist ? ', in wishlist' : ''}`
 
   return (
     <div
@@ -124,6 +126,7 @@ const PokemonCard = ({
         isDrafted && 'opacity-60 grayscale',
         isDisabled && 'opacity-40 cursor-not-allowed',
         isUnaffordable && 'opacity-75 border-orange-300 dark:border-orange-600',
+        isUnsafe && !isUnaffordable && 'opacity-75 border-red-400 dark:border-red-500',
         !isDisabled && !isDrafted && 'cursor-pointer',
         isPending && 'ring-4 ring-yellow-400 ring-opacity-80 animate-pulse',
         pendingAction?.status === 'failed' && 'ring-4 ring-red-400 ring-opacity-80',
@@ -207,6 +210,16 @@ const PokemonCard = ({
         </div>
       )}
 
+      {/* Unsafe Pick Warning */}
+      {isUnsafe && !isUnaffordable && !isDrafted && (
+        <div className="absolute bottom-1.5 left-1.5 z-10" title="Picking this would leave you unable to fill your team">
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 border border-red-300 dark:bg-red-900/60 dark:text-red-300 dark:border-red-600 shadow-sm">
+            <Lock className="h-3 w-3" />
+            <span className="hidden sm:inline">Budget lock</span>
+          </div>
+        </div>
+      )}
+
       {/* Image area */}
       <div className="relative flex-1 flex items-center justify-center p-2">
         {!hasError ? (
@@ -274,7 +287,7 @@ const PokemonCard = ({
       </div>
 
       {/* Quick Draft Button */}
-      {showQuickDraft && !isDrafted && !isDisabled && !isUnaffordable && (
+      {showQuickDraft && !isDrafted && !isDisabled && !isUnaffordable && !isUnsafe && (
         <div className="absolute bottom-1.5 right-1.5 z-10">
           <Button
             variant="default"
@@ -319,6 +332,7 @@ const arePropsEqual = (
   if (prevProps.isDisabled !== nextProps.isDisabled) return false
   if (prevProps.isInWishlist !== nextProps.isInWishlist) return false
   if (prevProps.isUnaffordable !== nextProps.isUnaffordable) return false
+  if (prevProps.isUnsafe !== nextProps.isUnsafe) return false
   if (prevProps.showCost !== nextProps.showCost) return false
   if (prevProps.showStats !== nextProps.showStats) return false
   if (prevProps.showWishlistButton !== nextProps.showWishlistButton) return false

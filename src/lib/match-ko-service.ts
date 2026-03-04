@@ -14,7 +14,7 @@ import type {
   TeamPokemonStatus,
   Pick
 } from '@/types'
-import type { MatchPokemonKORow, TeamPokemonStatusRow } from '@/types/supabase-helpers'
+import type { TeamPokemonStatusRow } from '@/types/supabase-helpers'
 
 export class MatchKOService {
   /**
@@ -193,17 +193,17 @@ export class MatchKOService {
       throw new Error(`Failed to get match KOs: ${error.message}`)
     }
 
-    return (data ?? []).map((ko: MatchPokemonKORow) => ({
-      id: ko.id,
-      matchId: ko.match_id,
-      gameNumber: ko.game_number,
-      pokemonId: ko.pokemon_id,
-      pickId: ko.pick_id,
-      koCount: ko.ko_count,
-      isDeath: ko.is_death,
-      koDetails: ko.ko_details,
-      createdAt: ko.created_at,
-      updatedAt: ko.updated_at,
+    return (data ?? []).map((ko: Record<string, unknown>) => ({
+      id: ko.id as string,
+      matchId: ko.match_id as string,
+      gameNumber: ko.game_number as number,
+      pokemonId: ko.pokemon_id as string,
+      pickId: (ko.pick_id as string) || '',
+      koCount: (ko.ko_count as number) || 1,
+      isDeath: (ko.is_death as boolean) || false,
+      koDetails: (ko.ko_details as Record<string, unknown>) || null,
+      createdAt: ko.created_at as string,
+      updatedAt: (ko.updated_at as string) || ko.created_at as string,
     }))
   }
 
@@ -225,6 +225,8 @@ export class MatchKOService {
 
     const statusRecords = picks.map(pick => ({
       pick_id: pick.id,
+      pokemon_id: pick.pokemonId,
+      pokemon_name: pick.pokemonName,
       team_id: teamId,
       league_id: leagueId,
       status: 'alive' as const,
@@ -463,37 +465,22 @@ export class MatchKOService {
 
     const matchIds = matches.map(m => m.id)
 
-    // Get all KO records for those matches, grouped by the Pokemon that was KO'd
-    // In match_pokemon_kos, the pick_id refers to the Pokemon that got the KO (the killer)
-    // Deaths are tracked via the team_pokemon_status table with status='dead'
-    // For faint counts, we look at KO records where the Pokemon was the victim
-    // Since the schema tracks KOs (kills), we need to look at opponent KO records
-    // Actually, let's query match_pokemon_kos and sum ko_count per pick_id
-    // These represent times this Pokemon scored KOs, not times it fainted
-
-    // For death/faint tracking, query team_pokemon_status for dead pokemon
-    // and count KO events against each pokemon from match_pokemon_kos
-    // The ko_details may have opponent info but it's not structured
-
-    // Simpler approach: count from team_pokemon_status where status is 'dead'
-    // and also look at match_pokemon_kos grouped by opponent
-
-    // Since we don't have a clean "faints received" column, use the is_death flag
-    // in match_pokemon_kos to count deaths
-    const { data: koRecords, error: koError } = await supabase
+    // Query match_pokemon_kos for all league matches.
+    // pick_id = the Pokemon that was KO'd/fainted, ko_count = number of faints.
+    const { data: koData, error: koError } = await supabase
       .from('match_pokemon_kos')
-      .select('pick_id, ko_count, is_death')
+      .select('pick_id, ko_count')
       .in('match_id', matchIds)
-      .eq('is_death', true)
 
     if (koError) {
       throw new Error(`Failed to get death counts: ${koError.message}`)
     }
 
     const deathMap = new Map<string, number>()
-    for (const record of koRecords ?? []) {
-      const current = deathMap.get(record.pick_id) || 0
-      deathMap.set(record.pick_id, current + (record.ko_count || 1))
+    for (const ko of koData ?? []) {
+      if (ko.pick_id) {
+        deathMap.set(ko.pick_id, (deathMap.get(ko.pick_id) || 0) + (ko.ko_count || 1))
+      }
     }
 
     return deathMap

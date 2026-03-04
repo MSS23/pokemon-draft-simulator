@@ -336,61 +336,6 @@ export const notify = {
     })
   },
 
-  // ==========================================
-  // TRADE NOTIFICATIONS
-  // ==========================================
-
-  tradeProposed: (fromTeam: string, toTeam: string, options?: NotificationOptions) => {
-    toast('Trade Proposed', {
-      description: `${fromTeam} proposed a trade to ${toTeam}`,
-      duration: options?.duration || 5000,
-      icon: <Info className="h-4 w-4 text-blue-500" />,
-      action: options?.action
-    })
-  },
-
-  tradeReceived: (fromTeam: string, options?: NotificationOptions) => {
-    toast('Trade Offer Received!', {
-      description: `${fromTeam} wants to trade with you. Review the offer.`,
-      duration: options?.duration || 8000,
-      icon: <Zap className="h-5 w-5 text-yellow-500 animate-pulse" />,
-      className: 'border-2 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
-      action: options?.action
-    })
-  },
-
-  tradeAccepted: (teamName: string) => {
-    toast.success('Trade Accepted', {
-      description: `${teamName} accepted the trade`,
-      duration: 4000,
-      icon: <CheckCircle className="h-4 w-4 text-green-500" />
-    })
-  },
-
-  tradeRejected: (teamName: string, reason?: string) => {
-    toast('Trade Rejected', {
-      description: reason ? `${teamName}: ${reason}` : `${teamName} declined the trade`,
-      duration: 4000,
-      icon: <XCircle className="h-4 w-4 text-red-500" />
-    })
-  },
-
-  tradeExecuted: (teamAName: string, teamBName: string) => {
-    toast.success('Trade Completed!', {
-      description: `${teamAName} and ${teamBName} completed a trade`,
-      duration: 5000,
-      icon: <Trophy className="h-5 w-5 text-yellow-500" />
-    })
-  },
-
-  tradePendingApproval: () => {
-    toast.info('Trade Awaiting Approval', {
-      description: 'A trade requires commissioner approval before execution',
-      duration: 5000,
-      icon: <Clock className="h-4 w-4 text-orange-500" />
-    })
-  },
-
   /**
    * Notify sync error
    */

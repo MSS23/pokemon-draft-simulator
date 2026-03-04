@@ -1016,15 +1016,10 @@ export class DraftService {
       isComplete: result.isComplete
     })
 
-    // If draft is complete and league creation is enabled, create the league
-    if (result.isComplete && draftState.draft.settings?.createLeague) {
-      try {
-        await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
-      } catch (leagueError) {
-        log.error('Error creating league:', leagueError)
-        // Don't fail the pick if league creation fails
-      }
-    }
+    // Invalidate cache so the next getDraftState fetches fresh data
+    this.invalidateDraftStateCache(draftId)
+
+    // League creation is handled on the results page so the host can configure settings first
 
     return {
       pickId: result.pickId as string,
@@ -1780,7 +1775,6 @@ export class DraftService {
       for (const league of leagues) {
         await LeagueService.initializeLeaguePokemonStatus(league.id)
         await LeagueService.updateLeagueSettings(league.id, {
-          enableTrades: true,
           matchFormat: 'best_of_3',
         })
       }
@@ -2235,15 +2229,7 @@ export class DraftService {
         log.error('Error completing auction draft:', error)
       }
 
-      // Create league if enabled
-      if (draftState.draft.settings?.createLeague) {
-        try {
-          await this.createLeagueForCompletedDraft(draftId, draftState.draft.settings)
-        } catch (leagueError) {
-          log.error('Error creating league for auction draft:', leagueError)
-          // Don't fail the auction completion if league creation fails
-        }
-      }
+      // League creation is handled on the results page so the host can configure settings first
     }
 
     // Update current turn/round for auction drafts

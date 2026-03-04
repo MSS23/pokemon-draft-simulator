@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
-import { Search, Filter, SortAsc, SortDesc } from 'lucide-react'
+import { Search, Filter, SortAsc, SortDesc, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
@@ -36,6 +36,8 @@ interface PokemonGridProps {
   showWishlistButton?: boolean
   showQuickDraft?: boolean
   budgetRemaining?: number
+  maxAffordableCost?: number
+  remainingSlots?: number
 }
 
 type SortOption = 'name' | 'cost' | 'total' | 'hp' | 'attack' | 'defense' | 'specialAttack' | 'specialDefense' | 'speed'
@@ -80,6 +82,8 @@ export default function PokemonGrid({
   showWishlistButton = true,
   showQuickDraft = false,
   budgetRemaining,
+  maxAffordableCost,
+  remainingSlots,
 }: PokemonGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -520,6 +524,24 @@ export default function PokemonGrid({
         )}
       </div>
 
+      {/* Budget Feasibility Warning */}
+      {maxAffordableCost !== undefined && remainingSlots !== undefined && remainingSlots > 0 && budgetRemaining !== undefined && maxAffordableCost < budgetRemaining && (
+        <div className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-lg text-sm border",
+          maxAffordableCost <= 0
+            ? "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/50 dark:border-red-800 dark:text-red-300"
+            : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-300"
+        )}>
+          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+          <span>
+            {maxAffordableCost <= 0
+              ? `Budget locked — you can't afford to fill your remaining ${remainingSlots} slots`
+              : `Budget tight — pick Pokemon costing ${maxAffordableCost} or less to fill your remaining ${remainingSlots} slots`
+            }
+          </span>
+        </div>
+      )}
+
       {/* Pokemon Grid - Virtualized for large lists */}
       {availablePokemon.length > 100 ? (
         <VirtualizedPokemonGrid
@@ -536,6 +558,7 @@ export default function PokemonGrid({
           showWishlistButton={showWishlistButton}
           showQuickDraft={showQuickDraft}
           budgetRemaining={budgetRemaining}
+          maxAffordableCost={maxAffordableCost}
         />
       ) : (
         <div className={cn(
@@ -554,6 +577,7 @@ export default function PokemonGrid({
               isDrafted={draftedPokemonIds.includes(p.id)}
               isInWishlist={wishlistPokemonIds.includes(p.id)}
               isUnaffordable={budgetRemaining !== undefined && p.cost > budgetRemaining}
+              isUnsafe={maxAffordableCost !== undefined && p.cost > maxAffordableCost && (budgetRemaining === undefined || p.cost <= budgetRemaining)}
               showCost={showCost}
               showStats={showStats}
               showWishlistButton={showWishlistButton}

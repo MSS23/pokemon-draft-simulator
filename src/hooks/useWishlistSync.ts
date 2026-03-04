@@ -35,9 +35,12 @@ export function useWishlistSync({
   const userWishlist = useDraftStore(wishlistSelector)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const lastSyncRef = useRef<number>(0)
+  const draftUuidRef = useRef<string | null>(null)
 
   // Helper function to get draft UUID from room code
   const getDraftUuid = async (roomCode: string): Promise<string | null> => {
+    // Return cached UUID if available
+    if (draftUuidRef.current) return draftUuidRef.current
     if (!supabase) return null
 
     const { data, error } = await supabase
@@ -55,8 +58,10 @@ export function useWishlistSync({
       return null
     }
 
-    // Type assertion needed due to Supabase type inference limitations
-    return (data as { id: string }).id
+    // Cache and return
+    const uuid = (data as { id: string }).id
+    draftUuidRef.current = uuid
+    return uuid
   }
 
   // Initialize wishlist data
@@ -67,28 +72,18 @@ export function useWishlistSync({
       try {
         // Load all wishlist items for the draft
         if (!supabase) return
-        
-        // First get the actual draft UUID from room code
-        const { data: draftData, error: draftError } = await supabase
-          .from('drafts')
-          .select('id')
-          .eq('room_code', draftId)
-          .single()
 
-        if (draftError) {
-          log.error('Error loading draft:', draftError)
-          return
-        }
-
-        if (!draftData) {
-          log.error('Draft not found')
+        // Resolve room code to UUID
+        const draftUuid = await getDraftUuid(draftId)
+        if (!draftUuid) {
+          log.error('Draft not found for room code:', draftId)
           return
         }
 
         const { data, error } = await supabase
           .from('wishlist_items')
           .select('*')
-          .eq('draft_id', (draftData as { id: string }).id)
+          .eq('draft_id', draftUuid)
           .order('participant_id, priority')
 
         if (error) {
@@ -154,10 +149,12 @@ export function useWishlistSync({
             try {
               // Refetch all wishlist items to ensure consistency
               if (!supabase) return
+              const uuid = draftUuidRef.current || await getDraftUuid(draftId)
+              if (!uuid) return
               const { data, error } = await supabase
                 .from('wishlist_items')
                 .select('*')
-                .eq('draft_id', draftId)
+                .eq('draft_id', uuid)
                 .order('participant_id, priority')
 
               if (error) {

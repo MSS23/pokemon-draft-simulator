@@ -103,6 +103,18 @@ export class LeagueService {
   ): Promise<{ leagues: League[]; matches: Match[] }> {
     if (!supabase) throw new Error('Supabase not configured')
 
+    // Guard: prevent duplicate leagues for the same draft
+    const { data: existingLeague } = await supabase
+      .from('leagues')
+      .select('id')
+      .eq('draft_id', draftId)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingLeague) {
+      throw new Error('A league already exists for this draft')
+    }
+
     // Fetch draft and teams — join query returns nested data not typed by Supabase Relationships
     const { data: rawDraft } = await supabase
       .from('drafts')
@@ -961,33 +973,6 @@ export class LeagueService {
   }
 
   /**
-   * Check if trading is allowed for the current week
-   */
-  static async canTradeThisWeek(
-    leagueId: string,
-    currentWeek: number
-  ): Promise<boolean> {
-    const settings = await this.getLeagueSettings(leagueId)
-
-    // Trading disabled if league setting is off
-    if (!settings.enableTrades) {
-      return false
-    }
-
-    // Trading disabled after trade deadline
-    if (settings.tradeDeadlineWeek && currentWeek >= settings.tradeDeadlineWeek) {
-      return false
-    }
-
-    // Check if there are any matches in progress this week
-    const weekMatches = await this.getWeekFixtures(leagueId, currentWeek)
-    const hasMatchesInProgress = weekMatches.some(m => m.status === 'in_progress')
-
-    // Trading not allowed during matches
-    return !hasMatchesInProgress
-  }
-
-  /**
    * Get league settings with extended options
    */
   static async getLeagueSettings(leagueId: string): Promise<ExtendedLeagueSettings> {
@@ -1010,10 +995,11 @@ export class LeagueService {
       matchFormat: s?.matchFormat || 'best_of_3',
       pointsPerWin: s?.pointsPerWin || 3,
       pointsPerDraw: s?.pointsPerDraw || 1,
+      commissionerId: s?.commissionerId ?? undefined,
+      freeAgentPicksAllowed: s?.freeAgentPicksAllowed ?? 3,
       enableTrades: s?.enableTrades || false,
       tradeDeadlineWeek: s?.tradeDeadlineWeek ?? undefined,
       requireCommissionerApproval: s?.requireCommissionerApproval || false,
-      commissionerId: s?.commissionerId ?? undefined,
     }
   }
 
@@ -1573,5 +1559,43 @@ export class LeagueService {
   static async canAdvanceWeek(leagueId: string, currentWeek: number): Promise<boolean> {
     const weekFixtures = await this.getWeekFixtures(leagueId, currentWeek)
     return weekFixtures.length > 0 && weekFixtures.every(m => m.status === 'completed')
+  }
+
+  /**
+   * Delete a league and all associated data (matches, standings, etc.)
+   * Only the draft host (league admin) can delete a league.
+   */
+  static async deleteLeague(leagueId: string, userId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Verify league exists and user is admin (draft host)
+    const { data: league, error: fetchErr } = await supabase
+      .from('leagues')
+      .select('id, draft_id')
+      .eq('id', leagueId)
+      .single()
+
+    if (fetchErr || !league) {
+      throw new Error('League not found')
+    }
+
+    const { data: draft } = await supabase
+      .from('drafts')
+      .select('host_id')
+      .eq('id', league.draft_id)
+      .single()
+
+    if (!draft || draft.host_id !== userId) {
+      throw new Error('Only the league admin can delete this league')
+    }
+
+    const { error } = await supabase
+      .from('leagues')
+      .delete()
+      .eq('id', leagueId)
+
+    if (error) {
+      throw new Error(`Failed to delete league: ${error.message}`)
+    }
   }
 }

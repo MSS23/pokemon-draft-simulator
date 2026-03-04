@@ -27,7 +27,7 @@ import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { TeamIcon } from '@/components/league/TeamIcon'
 import { importTournament, type Tournament } from '@/lib/tournament-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays, Skull, Crosshair, BarChart3, ShieldCheck, UserPlus, Megaphone, Lock } from 'lucide-react'
+import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays, Skull, Crosshair, BarChart3, ShieldCheck, UserPlus, Megaphone, Lock } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
 import type { PickRow } from '@/types/supabase-helpers'
 import { CommissionerService, type Announcement } from '@/lib/commissioner-service'
@@ -75,7 +75,6 @@ export default function LeaguePage() {
   }>>([])
   const [playoffTournament, setPlayoffTournament] = useState<Tournament | null>(null)
   const [showStartPlayoffs, setShowStartPlayoffs] = useState(false)
-  const [pendingTradeCount, setPendingTradeCount] = useState(0)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const { user } = useAuth()
 
@@ -250,38 +249,6 @@ export default function LeaguePage() {
     loadLeagueData()
   }, [loadLeagueData])
 
-  // Fetch pending trade count and subscribe for real-time updates
-  useEffect(() => {
-    if (!supabase || !leagueSettings?.enableTrades) return
-
-    const fetchPendingCount = async () => {
-      try {
-        const { count } = await supabase
-          .from('trades')
-          .select('*', { count: 'exact', head: true })
-          .eq('league_id', leagueId)
-          .eq('status', 'proposed')
-        setPendingTradeCount(count || 0)
-      } catch {
-        // Non-critical
-      }
-    }
-
-    void fetchPendingCount()
-
-    const channel = supabase
-      .channel(`league-trades-badge:${leagueId}`)
-      .on('broadcast', { event: 'trade_proposed' }, () => void fetchPendingCount())
-      .on('broadcast', { event: 'trade_accepted' }, () => void fetchPendingCount())
-      .on('broadcast', { event: 'trade_rejected' }, () => void fetchPendingCount())
-      .on('broadcast', { event: 'trade_executed' }, () => void fetchPendingCount())
-      .subscribe()
-
-    return () => {
-      void channel.unsubscribe()
-    }
-  }, [leagueId, leagueSettings?.enableTrades])
-
   const handleAdvanceWeek = async () => {
     try {
       setIsAdvancing(true)
@@ -414,12 +381,6 @@ export default function LeaguePage() {
                 {draftRoomCode && (
                   <Badge variant="outline" className="font-mono">{draftRoomCode}</Badge>
                 )}
-                {leagueSettings.enableTrades && (
-                  <Badge variant="outline" className="flex items-center gap-1">
-                    <Repeat className="h-3 w-3" />
-                    Trading
-                  </Badge>
-                )}
               </div>
             </div>
           </div>
@@ -444,22 +405,6 @@ export default function LeaguePage() {
             <TrendingUp className="h-4 w-4 mr-2" />
             Power Rankings
           </Button>
-          {leagueSettings.enableTrades && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/league/${leagueId}/trades`)}
-              className="relative"
-            >
-              <Repeat className="h-4 w-4 mr-2" />
-              Trade Center
-              {pendingTradeCount > 0 && (
-                <Badge variant="destructive" className="ml-2 h-5 min-w-5 px-1 text-xs">
-                  {pendingTradeCount}
-                </Badge>
-              )}
-            </Button>
-          )}
           <Button
             variant="outline"
             size="sm"

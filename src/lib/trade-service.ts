@@ -1,100 +1,105 @@
-/**
- * Trade Service
- *
- * Handles Pokemon trading between teams in a league, including proposal,
- * acceptance/rejection, commissioner approval, and trade execution.
- */
+import { supabase } from '@/lib/supabase'
+import { createLogger } from '@/lib/logger'
 
-import { supabase } from './supabase'
-import { LeagueService } from './league-service'
-import type {
-  Trade,
-  TradeApproval,
-  TradeWithDetails,
-  Pick,
-} from '@/types'
-import type { TradeRow, TradeHistoryViewRow } from '@/types/supabase-helpers'
+const log = createLogger('TradeService')
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseAny = any
+
+export interface TradeWithDetails {
+  id: string
+  league_id: string
+  week_number: number
+  team_a_id: string
+  team_b_id: string
+  team_a_gives: string[]
+  team_b_gives: string[]
+  status: string
+  proposed_by: string
+  proposed_at: string
+  responded_at: string | null
+  completed_at: string | null
+  notes: string | null
+  commissioner_approved: boolean | null
+  commissioner_id: string | null
+  commissioner_notes: string | null
+  teamAName?: string
+  teamBName?: string
+  teamAPickNames?: Record<string, string>
+  teamBPickNames?: Record<string, string>
+}
 
 export class TradeService {
   /**
-   * Broadcast a trade event to all league members via Supabase Realtime
+   * Get all trades for a league, with team names resolved
    */
-  private static async broadcastTradeEvent(
-    leagueId: string,
-    event: string,
-    payload: Record<string, unknown>
-  ): Promise<void> {
-    if (!supabase) return
-    try {
-      const channel = supabase.channel(`league-trades:${leagueId}`)
-      await channel.send({
-        type: 'broadcast',
-        event,
-        payload: { ...payload, timestamp: new Date().toISOString() }
-      })
-      await channel.unsubscribe()
-    } catch {
-      // Non-critical — don't fail the trade operation
+  static async getLeagueTrades(leagueId: string): Promise<TradeWithDetails[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data, error } = await (supabase as SupabaseAny)
+      .from('trades')
+      .select('*')
+      .eq('league_id', leagueId)
+      .order('proposed_at', { ascending: false })
+
+    if (error) {
+      log.error('Failed to fetch trades:', error)
+      throw new Error('Failed to fetch trades: ' + error.message)
     }
+
+    if (!data || data.length === 0) return []
+
+    // Resolve team names
+    const teamIds = new Set<string>()
+    for (const t of data) {
+      teamIds.add(t.team_a_id)
+      teamIds.add(t.team_b_id)
+    }
+
+    const { data: teams } = await supabase
+      .from('teams')
+      .select('id, name')
+      .in('id', Array.from(teamIds))
+
+    const teamMap = new Map<string, string>()
+    if (teams) {
+      for (const t of teams) {
+        teamMap.set(t.id, t.name)
+      }
+    }
+
+    return (data as TradeWithDetails[]).map(t => ({
+      ...t,
+      teamAName: teamMap.get(t.team_a_id) || 'Unknown',
+      teamBName: teamMap.get(t.team_b_id) || 'Unknown',
+    }))
   }
 
   /**
-   * Propose a trade between two teams
-   *
-   * @param leagueId - League UUID
-   * @param weekNumber - Week when trade is proposed (trades happen between weeks)
-   * @param fromTeamId - Team initiating the trade
-   * @param toTeamId - Team receiving the proposal
-   * @param fromPicks - Pick IDs that fromTeam is offering
-   * @param toPicks - Pick IDs that toTeam is offering
-   * @param notes - Optional trade notes/comments
+   * Propose a new trade
    */
   static async proposeTrade(
     leagueId: string,
+    teamAId: string,
+    teamBId: string,
+    teamAGives: string[],
+    teamBGives: string[],
+    proposedBy: string,
     weekNumber: number,
-    fromTeamId: string,
-    toTeamId: string,
-    fromPicks: string[],
-    toPicks: string[],
     notes?: string
-  ): Promise<Trade> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
+  ): Promise<TradeWithDetails> {
+    if (!supabase) throw new Error('Supabase not configured')
 
-    // Validate trade deadline
-    try {
-      const settings = await LeagueService.getLeagueSettings(leagueId)
-      if (settings.tradeDeadlineWeek && weekNumber > settings.tradeDeadlineWeek) {
-        throw new Error(`Trade deadline has passed (week ${settings.tradeDeadlineWeek}). No more trades allowed.`)
-      }
-    } catch (err) {
-      // Only re-throw trade deadline errors, not settings fetch failures
-      if (err instanceof Error && err.message.includes('Trade deadline')) throw err
-    }
-
-    // Validate trade has at least one Pokemon on each side
-    if (fromPicks.length === 0 && toPicks.length === 0) {
-      throw new Error('Trade must include at least one Pokemon')
-    }
-
-    // Validate Pokemon are eligible for trade
-    const validation = await this.validateTrade(leagueId, [...fromPicks, ...toPicks])
-    if (!validation.valid) {
-      throw new Error(validation.reason || 'Trade validation failed')
-    }
-
-    // Insert trade proposal
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as SupabaseAny)
       .from('trades')
       .insert({
         league_id: leagueId,
+        team_a_id: teamAId,
+        team_b_id: teamBId,
+        team_a_gives: teamAGives,
+        team_b_gives: teamBGives,
+        proposed_by: proposedBy,
         week_number: weekNumber,
-        team_a_id: fromTeamId,
-        team_b_id: toTeamId,
-        team_a_gives: fromPicks,
-        team_b_gives: toPicks,
-        proposed_by: fromTeamId,
         status: 'proposed',
         notes: notes || null,
       })
@@ -102,422 +107,181 @@ export class TradeService {
       .single()
 
     if (error) {
-      throw new Error(`Failed to propose trade: ${error.message}`)
+      log.error('Failed to propose trade:', error)
+      throw new Error('Failed to propose trade: ' + error.message)
     }
 
-    // Broadcast trade proposed event
-    void this.broadcastTradeEvent(leagueId, 'trade_proposed', {
-      tradeId: data.id,
-      fromTeamId: fromTeamId,
-      toTeamId: toTeamId,
-      fromTeamName: '', // Resolved client-side
-      toTeamName: '',
-    })
+    // Broadcast to league channel
+    this.broadcastTradeUpdate(leagueId, 'proposed', data.id)
 
-    return this.mapToTrade(data)
+    return data as TradeWithDetails
   }
 
   /**
-   * Accept a trade proposal
-   *
-   * @param tradeId - Trade UUID
-   * @param teamId - Team accepting the trade (must be the non-proposing team)
+   * Accept or reject a trade (called by the receiving team)
    */
-  static async acceptTrade(tradeId: string, teamId: string): Promise<Trade> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
+  static async respondToTrade(
+    tradeId: string,
+    accepted: boolean,
+    requireCommissionerApproval = false
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
 
-    // Get trade to verify the accepting team is correct
-    const { data: trade, error: fetchError } = await supabase
-      .from('trades')
-      .select('*')
-      .eq('id', tradeId)
-      .single()
+    const newStatus = accepted
+      ? (requireCommissionerApproval ? 'accepted' : 'accepted')
+      : 'rejected'
 
-    if (fetchError || !trade) {
-      throw new Error(`Failed to find trade: ${fetchError?.message || 'Not found'}`)
-    }
-
-    // Verify this team is part of the trade and is not the proposer
-    const isTeamA = trade.team_a_id === teamId
-    const isTeamB = trade.team_b_id === teamId
-    const isProposer = trade.proposed_by === teamId
-
-    if (!isTeamA && !isTeamB) {
-      throw new Error('Team is not part of this trade')
-    }
-
-    if (isProposer) {
-      throw new Error('Proposing team cannot accept their own trade')
-    }
-
-    // Check if commissioner approval is required
-    let requiresApproval = false
-    try {
-      const settings = await LeagueService.getLeagueSettings(trade.league_id)
-      requiresApproval = settings.requireCommissionerApproval || false
-    } catch {
-      // If settings can't be fetched, proceed without commissioner requirement
-    }
-
-    // Update trade status to accepted
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as SupabaseAny)
       .from('trades')
       .update({
-        status: 'accepted',
+        status: newStatus,
         responded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', tradeId)
-      .select()
+      .select('league_id')
       .single()
 
     if (error) {
-      throw new Error(`Failed to accept trade: ${error.message}`)
+      log.error('Failed to respond to trade:', error)
+      throw new Error('Failed to respond to trade: ' + error.message)
     }
 
-    const acceptedTrade = this.mapToTrade(data)
-
-    // Broadcast trade accepted event
-    void this.broadcastTradeEvent(trade.league_id, requiresApproval ? 'trade_pending_approval' : 'trade_accepted', {
-      tradeId,
-      acceptedByTeamId: teamId,
-      proposedByTeamId: trade.proposed_by,
-    })
-
-    // If commissioner approval is NOT required, auto-execute the trade
-    if (!requiresApproval) {
+    // If accepted and no commissioner approval needed, execute immediately
+    if (accepted && !requireCommissionerApproval) {
       await this.executeTrade(tradeId)
     }
 
-    return acceptedTrade
+    this.broadcastTradeUpdate(data.league_id, accepted ? 'accepted' : 'rejected', tradeId)
   }
 
   /**
-   * Reject a trade proposal
-   *
-   * @param tradeId - Trade UUID
-   * @param teamId - Team rejecting the trade
-   * @param reason - Optional rejection reason
-   */
-  static async rejectTrade(
-    tradeId: string,
-    teamId: string,
-    reason?: string
-  ): Promise<Trade> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
-
-    // Get trade to verify the rejecting team is correct
-    const { data: trade, error: fetchError } = await supabase
-      .from('trades')
-      .select('*')
-      .eq('id', tradeId)
-      .single()
-
-    if (fetchError || !trade) {
-      throw new Error(`Failed to find trade: ${fetchError?.message || 'Not found'}`)
-    }
-
-    // Verify this team is part of the trade
-    const isTeamA = trade.team_a_id === teamId
-    const isTeamB = trade.team_b_id === teamId
-
-    if (!isTeamA && !isTeamB) {
-      throw new Error('Team is not part of this trade')
-    }
-
-    // Update trade status to rejected
-    const { data, error } = await supabase
-      .from('trades')
-      .update({
-        status: 'rejected',
-        responded_at: new Date().toISOString(),
-        notes: reason ? `${trade.notes || ''}\n\nRejection reason: ${reason}`.trim() : trade.notes,
-      })
-      .eq('id', tradeId)
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to reject trade: ${error.message}`)
-    }
-
-    // Broadcast trade rejected event
-    void this.broadcastTradeEvent(trade.league_id, 'trade_rejected', {
-      tradeId,
-      rejectedByTeamId: teamId,
-      proposedByTeamId: trade.proposed_by,
-      reason,
-    })
-
-    return this.mapToTrade(data)
-  }
-
-  /**
-   * Execute an accepted trade (swap Pokemon ownership)
-   *
-   * @param tradeId - Trade UUID
+   * Execute a trade (swap picks between teams)
    */
   static async executeTrade(tradeId: string): Promise<void> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
+    if (!supabase) throw new Error('Supabase not configured')
 
-    // Fetch trade details for broadcast
-    const { data: trade } = await supabase
-      .from('trade_history')
-      .select('league_id, team_a_id, team_b_id, team_a_name, team_b_name')
-      .eq('id', tradeId)
-      .single()
+    try {
+      // Try the RPC function first (atomic)
+      const { error: rpcError } = await (supabase as SupabaseAny)
+        .rpc('execute_trade', { trade_uuid: tradeId })
 
-    // Call the database function to execute the trade
-    const { error } = await supabase.rpc('execute_trade', {
-      trade_uuid: tradeId,
-    })
+      if (rpcError) {
+        log.warn('RPC execute_trade failed, falling back to manual swap:', rpcError)
+        await this.executeTradeManually(tradeId)
+        return
+      }
 
-    if (error) {
-      throw new Error(`Failed to execute trade: ${error.message}`)
-    }
+      // Fetch league_id for broadcast
+      const { data: trade } = await (supabase as SupabaseAny)
+        .from('trades')
+        .select('league_id')
+        .eq('id', tradeId)
+        .single()
 
-    // Broadcast trade executed event to all league members
-    if (trade) {
-      void this.broadcastTradeEvent(trade.league_id, 'trade_executed', {
-        tradeId,
-        teamAId: trade.team_a_id,
-        teamBId: trade.team_b_id,
-        teamAName: trade.team_a_name,
-        teamBName: trade.team_b_name,
-      })
+      if (trade) {
+        this.broadcastTradeUpdate(trade.league_id, 'completed', tradeId)
+      }
+    } catch (err) {
+      log.error('Failed to execute trade:', err)
+      throw new Error('Failed to execute trade')
     }
   }
 
   /**
-   * Cancel a pending trade (can only be done by the proposing team)
-   *
-   * @param tradeId - Trade UUID
-   * @param teamId - Team canceling the trade (must be proposer)
+   * Manual fallback for trade execution if RPC not available
    */
-  static async cancelTrade(tradeId: string, teamId: string): Promise<Trade> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
+  private static async executeTradeManually(tradeId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
 
-    // Get trade to verify the canceling team is the proposer
-    const { data: trade, error: fetchError } = await supabase
+    const { data: trade, error } = await (supabase as SupabaseAny)
       .from('trades')
       .select('*')
       .eq('id', tradeId)
       .single()
 
-    if (fetchError || !trade) {
-      throw new Error(`Failed to find trade: ${fetchError?.message || 'Not found'}`)
+    if (error || !trade) {
+      throw new Error('Trade not found')
     }
 
-    // Verify this team proposed the trade
-    if (trade.proposed_by !== teamId) {
-      throw new Error('Only the proposing team can cancel a trade')
+    if (trade.status !== 'accepted') {
+      throw new Error(`Trade must be accepted to execute (current: ${trade.status})`)
     }
 
-    // Can only cancel if status is 'proposed'
-    if (trade.status !== 'proposed') {
-      throw new Error(`Cannot cancel trade with status: ${trade.status}`)
-    }
+    // Swap team A's picks to team B
+    for (const pickId of (trade.team_a_gives || [])) {
+      const { error: swapErr } = await supabase
+        .from('picks')
+        .update({ team_id: trade.team_b_id })
+        .eq('id', pickId)
+        .eq('team_id', trade.team_a_id)
 
-    // Update trade status to cancelled
-    const { data, error } = await supabase
-      .from('trades')
-      .update({
-        status: 'cancelled',
-      })
-      .eq('id', tradeId)
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to cancel trade: ${error.message}`)
-    }
-
-    return this.mapToTrade(data)
-  }
-
-  /**
-   * Get pending trades for a specific team
-   *
-   * @param teamId - Team UUID
-   */
-  static async getPendingTrades(teamId: string): Promise<TradeWithDetails[]> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
-
-    const { data, error } = await supabase
-      .from('trade_history')
-      .select('*')
-      .or(`team_a_id.eq.${teamId},team_b_id.eq.${teamId}`)
-      .eq('status', 'proposed')
-      .order('proposed_at', { ascending: false })
-
-    if (error) {
-      throw new Error(`Failed to get pending trades: ${error.message}`)
-    }
-
-    return data.map(this.mapToTradeWithDetails)
-  }
-
-  /**
-   * Get trade history for a league
-   *
-   * @param leagueId - League UUID
-   * @param includeRejected - Whether to include rejected/cancelled trades
-   */
-  static async getTradeHistory(
-    leagueId: string,
-    includeRejected: boolean = false
-  ): Promise<TradeWithDetails[]> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
-
-    let query = supabase
-      .from('trade_history')
-      .select('*')
-      .eq('league_id', leagueId)
-
-    if (!includeRejected) {
-      query = query.in('status', ['proposed', 'accepted', 'completed'])
-    }
-
-    const { data, error } = await query
-      .order('completed_at', { ascending: false, nullsFirst: false })
-      .order('proposed_at', { ascending: false })
-
-    if (error) {
-      throw new Error(`Failed to get trade history: ${error.message}`)
-    }
-
-    return data.map(this.mapToTradeWithDetails)
-  }
-
-  /**
-   * Validate that a trade is legal (no dead or fainted Pokemon)
-   *
-   * @param leagueId - League UUID
-   * @param pickIds - Array of pick IDs being traded
-   */
-  static async validateTrade(
-    leagueId: string,
-    pickIds: string[]
-  ): Promise<{ valid: boolean; reason?: string }> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
-
-    if (pickIds.length === 0) {
-      return { valid: true }
-    }
-
-    // Check if any of the Pokemon are dead or fainted
-    const { data, error } = await supabase
-      .from('team_pokemon_status')
-      .select('pick_id, status')
-      .eq('league_id', leagueId)
-      .in('pick_id', pickIds)
-      .in('status', ['dead', 'fainted'])
-
-    if (error) {
-      throw new Error(`Failed to validate trade: ${error.message}`)
-    }
-
-    if (data && data.length > 0) {
-      const dead = data.filter(d => d.status === 'dead').length
-      const fainted = data.filter(d => d.status === 'fainted').length
-      const parts: string[] = []
-      if (dead > 0) parts.push(`${dead} dead`)
-      if (fainted > 0) parts.push(`${fainted} fainted`)
-      return {
-        valid: false,
-        reason: `Cannot trade knocked out Pokemon (${parts.join(', ')})`,
+      if (swapErr) {
+        log.error(`Failed to swap pick ${pickId} from A to B:`, swapErr)
+        throw new Error(`Failed to swap pick ${pickId}`)
       }
     }
 
-    return { valid: true }
-  }
+    // Swap team B's picks to team A
+    for (const pickId of (trade.team_b_gives || [])) {
+      const { error: swapErr } = await supabase
+        .from('picks')
+        .update({ team_id: trade.team_a_id })
+        .eq('id', pickId)
+        .eq('team_id', trade.team_b_id)
 
-  /**
-   * Commissioner approve/reject a trade
-   *
-   * @param tradeId - Trade UUID
-   * @param userId - User ID of commissioner
-   * @param approved - True to approve, false to reject
-   * @param comments - Optional approval/rejection comments
-   */
-  static async approveTrade(
-    tradeId: string,
-    userId: string,
-    approved: boolean,
-    comments?: string
-  ): Promise<TradeApproval> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
+      if (swapErr) {
+        log.error(`Failed to swap pick ${pickId} from B to A:`, swapErr)
+        throw new Error(`Failed to swap pick ${pickId}`)
+      }
     }
 
-    // Insert approval record
-    const { data, error } = await supabase
-      .from('trade_approvals')
-      .insert({
-        trade_id: tradeId,
-        approver_user_id: userId,
-        approver_role: 'commissioner',
-        approved,
-        comments: comments || null,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      throw new Error(`Failed to record trade approval: ${error.message}`)
-    }
-
-    // Update trade record with commissioner approval
-    const { error: updateError } = await supabase
+    // Mark completed
+    await (supabase as SupabaseAny)
       .from('trades')
       .update({
-        commissioner_approved: approved,
-        commissioner_id: userId,
-        commissioner_notes: comments || null,
-        status: approved ? 'accepted' : 'rejected',
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', tradeId)
 
-    if (updateError) {
-      throw new Error(`Failed to update trade status: ${updateError.message}`)
-    }
-
-    return {
-      id: data.id,
-      tradeId: data.trade_id,
-      approverUserId: data.approver_user_id,
-      approverRole: data.approver_role,
-      approved: data.approved,
-      comments: data.comments,
-      createdAt: data.created_at,
-    }
+    this.broadcastTradeUpdate(trade.league_id, 'completed', tradeId)
   }
 
   /**
-   * Get trades that need commissioner approval
-   *
-   * @param leagueId - League UUID
+   * Cancel a trade (only proposer can cancel)
    */
-  static async getTradesPendingApproval(leagueId: string): Promise<TradeWithDetails[]> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
+  static async cancelTrade(tradeId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data, error } = await (supabase as SupabaseAny)
+      .from('trades')
+      .update({
+        status: 'cancelled',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', tradeId)
+      .eq('status', 'proposed')
+      .select('league_id')
+      .single()
+
+    if (error) {
+      log.error('Failed to cancel trade:', error)
+      throw new Error('Failed to cancel trade: ' + error.message)
     }
 
-    const { data, error } = await supabase
-      .from('trade_history')
+    this.broadcastTradeUpdate(data.league_id, 'cancelled', tradeId)
+  }
+
+  /**
+   * Get trades pending commissioner approval
+   */
+  static async getTradesPendingApproval(leagueId: string): Promise<TradeWithDetails[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data, error } = await (supabase as SupabaseAny)
+      .from('trades')
       .select('*')
       .eq('league_id', leagueId)
       .eq('status', 'accepted')
@@ -525,118 +289,83 @@ export class TradeService {
       .order('proposed_at', { ascending: false })
 
     if (error) {
-      throw new Error(`Failed to get trades pending approval: ${error.message}`)
+      log.error('Failed to fetch pending trades:', error)
+      throw new Error('Failed to fetch pending trades: ' + error.message)
     }
 
-    return data.map(this.mapToTradeWithDetails)
+    return (data || []) as TradeWithDetails[]
   }
 
   /**
-   * Get trade details with Pokemon information
-   *
-   * @param tradeId - Trade UUID
+   * Commissioner approves or rejects a trade
    */
-  static async getTradeWithPokemon(tradeId: string): Promise<TradeWithDetails> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
+  static async approveTrade(
+    tradeId: string,
+    commissionerId: string,
+    approved: boolean,
+    notes?: string
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
 
-    const { data, error } = await supabase
-      .from('trade_history')
-      .select('*')
+    const { error } = await (supabase as SupabaseAny)
+      .from('trades')
+      .update({
+        commissioner_approved: approved,
+        commissioner_id: commissionerId,
+        commissioner_notes: notes || null,
+        status: approved ? 'completed' : 'rejected',
+        completed_at: approved ? new Date().toISOString() : null,
+        responded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', tradeId)
-      .single()
 
     if (error) {
-      throw new Error(`Failed to get trade: ${error.message}`)
+      log.error('Failed to process trade:', error)
+      throw new Error('Failed to process trade: ' + error.message)
     }
 
-    const trade = this.mapToTradeWithDetails(data)
+    // If approved, execute the pick swap
+    if (approved) {
+      // Re-set status to 'accepted' temporarily for execute_trade function
+      await (supabase as SupabaseAny)
+        .from('trades')
+        .update({ status: 'accepted' })
+        .eq('id', tradeId)
 
-    // Fetch Pokemon details for team A's picks
-    if (trade.teamAGives.length > 0) {
-      const { data: teamAPicks, error: teamAError } = await supabase
-        .from('picks')
-        .select('*')
-        .in('id', trade.teamAGives)
-
-      if (!teamAError && teamAPicks) {
-        trade.teamAGivesPokemon = teamAPicks as unknown as Pick[]
-      }
+      await this.executeTrade(tradeId)
     }
 
-    // Fetch Pokemon details for team B's picks
-    if (trade.teamBGives.length > 0) {
-      const { data: teamBPicks, error: teamBError } = await supabase
-        .from('picks')
-        .select('*')
-        .in('id', trade.teamBGives)
+    const { error: approvalError } = await (supabase as SupabaseAny)
+      .from('trade_approvals')
+      .insert({
+        trade_id: tradeId,
+        approver_user_id: commissionerId,
+        approver_role: 'commissioner',
+        approved,
+        comments: notes || null,
+      })
 
-      if (!teamBError && teamBPicks) {
-        trade.teamBGivesPokemon = teamBPicks as unknown as Pick[]
-      }
-    }
-
-    return trade
-  }
-
-  /**
-   * Map database record to Trade type
-   *
-   * @private
-   */
-  private static mapToTrade(data: TradeRow): Trade {
-    return {
-      id: data.id,
-      leagueId: data.league_id,
-      weekNumber: data.week_number,
-      teamAId: data.team_a_id,
-      teamBId: data.team_b_id,
-      teamAGives: data.team_a_gives || [],
-      teamBGives: data.team_b_gives || [],
-      status: data.status,
-      proposedBy: data.proposed_by,
-      proposedAt: data.proposed_at,
-      respondedAt: data.responded_at,
-      completedAt: data.completed_at,
-      notes: data.notes,
-      commissionerApproved: data.commissioner_approved,
-      commissionerId: data.commissioner_id,
-      commissionerNotes: data.commissioner_notes,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
+    if (approvalError) {
+      log.warn('Failed to record trade approval:', approvalError)
     }
   }
 
   /**
-   * Map trade_history view to TradeWithDetails type
-   *
-   * @private
+   * Broadcast trade update via Supabase channel
    */
-  private static mapToTradeWithDetails(data: TradeHistoryViewRow): TradeWithDetails {
-    return {
-      id: data.id,
-      leagueId: data.league_id,
-      weekNumber: data.week_number,
-      teamAId: data.team_a_id,
-      teamBId: data.team_b_id,
-      teamAGives: data.team_a_gives || [],
-      teamBGives: data.team_b_gives || [],
-      status: data.status as Trade['status'],
-      proposedBy: data.proposed_by,
-      proposedAt: data.proposed_at,
-      respondedAt: data.responded_at,
-      completedAt: data.completed_at,
-      notes: data.notes,
-      commissionerApproved: data.commissioner_approved,
-      commissionerId: data.commissioner_id,
-      commissionerNotes: data.commissioner_notes,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-      teamAName: data.team_a_name,
-      teamBName: data.team_b_name,
-      proposedByName: data.proposed_by_name,
-      leagueName: data.league_name,
+  private static broadcastTradeUpdate(leagueId: string, event: string, tradeId: string): void {
+    if (!supabase) return
+
+    try {
+      const channel = supabase.channel(`league-trades:${leagueId}`)
+      channel.send({
+        type: 'broadcast',
+        event: 'trade_update',
+        payload: { event, tradeId, leagueId },
+      })
+    } catch (err) {
+      log.warn('Failed to broadcast trade update:', err)
     }
   }
 }

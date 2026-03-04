@@ -21,6 +21,7 @@ interface VirtualizedPokemonGridProps {
   showWishlistButton?: boolean
   showQuickDraft?: boolean
   budgetRemaining?: number
+  maxAffordableCost?: number
 }
 
 /**
@@ -103,6 +104,7 @@ export default function VirtualizedPokemonGrid({
   showWishlistButton = true,
   showQuickDraft = false,
   budgetRemaining,
+  maxAffordableCost,
 }: VirtualizedPokemonGridProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -187,6 +189,7 @@ export default function VirtualizedPokemonGrid({
                     isDrafted={draftedPokemonIds.includes(p.id)}
                     isInWishlist={wishlistPokemonIds.includes(p.id)}
                     isUnaffordable={budgetRemaining !== undefined && p.cost > budgetRemaining}
+                    isUnsafe={maxAffordableCost !== undefined && p.cost > maxAffordableCost && (budgetRemaining === undefined || p.cost <= budgetRemaining)}
                     showCost={showCost}
                     showStats={showStats}
                     showWishlistButton={showWishlistButton}

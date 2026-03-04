@@ -65,6 +65,7 @@ interface DraftControlsProps {
   onPingCurrentPlayer?: () => void
   canUndo?: boolean
   notificationsEnabled?: boolean
+  maxPokemonPerTeam?: number
 }
 
 const DraftControls = memo(function DraftControls({
@@ -94,7 +95,8 @@ const DraftControls = memo(function DraftControls({
   onRequestNotificationPermission,
   onPingCurrentPlayer,
   canUndo = false,
-  notificationsEnabled = false
+  notificationsEnabled = false,
+  maxPokemonPerTeam = 6
 }: DraftControlsProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{
@@ -118,6 +120,16 @@ const DraftControls = memo(function DraftControls({
   }
 
   const handleEndDraft = () => {
+    const teamsNotFilled = teams.filter(t => t.picks.length < maxPokemonPerTeam)
+    if (teamsNotFilled.length > 0) {
+      const names = teamsNotFilled.map(t => t.name).join(', ')
+      notify.error(
+        'Cannot End Draft',
+        `All teams must fill their roster (${maxPokemonPerTeam} Pokémon). Missing: ${names}`
+      )
+      return
+    }
+
     setConfirmAction({
       title: 'End Draft',
       description: 'Are you sure you want to end this draft? This action cannot be undone.',

@@ -8,13 +8,13 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
 import { CommissionerService, type Announcement } from '@/lib/commissioner-service'
-import { TradeService } from '@/lib/trade-service'
+import { TradeService, type TradeWithDetails } from '@/lib/trade-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import {
   ArrowLeft, Swords, Repeat, Megaphone, Trophy, AlertTriangle,
   Check, X, Pin, PinOff, Trash2, Edit2, SkipForward
 } from 'lucide-react'
-import type { League, Team, Standing, TradeWithDetails } from '@/types'
+import type { League, Team, Standing } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
 import { createLogger } from '@/lib/logger'
@@ -66,7 +66,7 @@ export default function CommissionerPage() {
         LeagueService.getLeague(leagueId),
         CommissionerService.getAllMatches(leagueId),
         LeagueService.getStandings(leagueId),
-        TradeService.getTradesPendingApproval(leagueId).catch(() => []),
+        TradeService.getTradesPendingApproval(leagueId).catch((): TradeWithDetails[] => []),
         CommissionerService.getAnnouncements(leagueId).catch(() => []),
       ])
 
@@ -197,12 +197,7 @@ export default function CommissionerPage() {
         <Tabs defaultValue="matches" className="space-y-4">
           <TabsList className="flex w-full overflow-x-auto">
             <TabsTrigger value="matches" className="flex-1 text-xs sm:text-sm">Matches</TabsTrigger>
-            <TabsTrigger value="trades" className="flex-1 text-xs sm:text-sm">
-              Trades
-              {pendingTrades.length > 0 && (
-                <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-xs">{pendingTrades.length}</Badge>
-              )}
-            </TabsTrigger>
+            <TabsTrigger value="trades" className="flex-1 text-xs sm:text-sm">Trades{pendingTrades.length > 0 && <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-xs">{pendingTrades.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="announcements" className="flex-1 text-xs sm:text-sm">Announcements</TabsTrigger>
             <TabsTrigger value="standings" className="flex-1 text-xs sm:text-sm">Standings</TabsTrigger>
             <TabsTrigger value="week" className="flex-1 text-xs sm:text-sm">Week</TabsTrigger>
@@ -303,10 +298,7 @@ export default function CommissionerPage() {
           <TabsContent value="trades" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Repeat className="h-5 w-5" />
-                  Trade Approval Queue
-                </CardTitle>
+                <CardTitle className="flex items-center gap-2"><Repeat className="h-5 w-5" />Trade Approval Queue</CardTitle>
                 <CardDescription>Review and approve/reject pending trades</CardDescription>
               </CardHeader>
               <CardContent>
@@ -317,38 +309,17 @@ export default function CommissionerPage() {
                     {pendingTrades.map(trade => (
                       <Card key={trade.id} className="border-yellow-500/50">
                         <CardContent className="pt-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="text-sm">
-                              <span className="font-medium">{trade.teamAName}</span>
-                              <span className="text-muted-foreground mx-2">&harr;</span>
-                              <span className="font-medium">{trade.teamBName}</span>
-                            </div>
-                            <Badge variant="outline">Week {trade.weekNumber}</Badge>
+                          <div className="text-sm mb-3">
+                            <span className="font-medium">{trade.teamAName || 'Team A'}</span>
+                            <span className="text-muted-foreground mx-2">&harr;</span>
+                            <span className="font-medium">{trade.teamBName || 'Team B'}</span>
                           </div>
-
-                          <div className="grid grid-cols-2 gap-4 mb-3">
-                            <div>
-                              <div className="text-xs text-muted-foreground mb-1">{trade.teamAName} sends:</div>
-                              {trade.teamAGivesPokemon?.map(p => (
-                                <div key={p.id} className="text-sm capitalize">{p.pokemonName}</div>
-                              ))}
-                            </div>
-                            <div>
-                              <div className="text-xs text-muted-foreground mb-1">{trade.teamBName} sends:</div>
-                              {trade.teamBGivesPokemon?.map(p => (
-                                <div key={p.id} className="text-sm capitalize">{p.pokemonName}</div>
-                              ))}
-                            </div>
-                          </div>
-
                           <div className="flex gap-2">
                             <Button size="sm" onClick={() => handleApproveTrade(trade.id, true)}>
-                              <Check className="h-3 w-3 mr-1" />
-                              Approve
+                              <Check className="h-3 w-3 mr-1" />Approve
                             </Button>
                             <Button size="sm" variant="destructive" onClick={() => handleApproveTrade(trade.id, false)}>
-                              <X className="h-3 w-3 mr-1" />
-                              Reject
+                              <X className="h-3 w-3 mr-1" />Reject
                             </Button>
                           </div>
                         </CardContent>

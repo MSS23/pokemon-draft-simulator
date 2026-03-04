@@ -61,9 +61,13 @@ export class WaiverService {
     pokemonId: string,
     pokemonName: string,
     pokemonCost: number,
-    dropPickId?: string
+    dropPickId: string
   ): Promise<WaiverClaim> {
     if (!supabase) throw new Error('Supabase not available')
+
+    if (!dropPickId) {
+      throw new Error('You must drop a Pokemon to claim a free agent')
+    }
 
     // Validate team budget
     const { data: team } = await supabase
@@ -74,33 +78,34 @@ export class WaiverService {
 
     if (!team) throw new Error('Team not found')
 
-    let netCost = pokemonCost
-    let dropRefund = 0
+    // Calculate refund from dropped Pokemon
+    const { data: dropPick } = await supabase
+      .from('picks')
+      .select('cost')
+      .eq('id', dropPickId)
+      .single()
 
-    // If dropping a Pokemon, calculate refund
-    if (dropPickId) {
-      const { data: dropPick } = await supabase
-        .from('picks')
-        .select('cost')
-        .eq('id', dropPickId)
-        .single()
+    if (!dropPick) throw new Error('Drop pick not found')
 
-      if (dropPick) {
-        dropRefund = dropPick.cost || 0
-        netCost = pokemonCost - dropRefund
-      }
+    const dropRefund = dropPick.cost || 0
+    const netCost = pokemonCost - dropRefund
+
+    if (netCost > 0 && (team.budget_remaining || 0) < netCost) {
+      throw new Error(`Insufficient budget. Need ${netCost} pts extra (${pokemonCost} claim - ${dropRefund} refund), have ${team.budget_remaining || 0} pts`)
     }
 
-    if ((team.budget_remaining || 0) < netCost) {
-      throw new Error(`Insufficient budget. Need ${netCost} points (cost ${pokemonCost} - refund ${dropRefund}), have ${team.budget_remaining || 0}`)
+    // Check if first game has been played — locks free agent claims
+    const firstGamePlayed = await this.hasFirstGameBeenPlayed(leagueId)
+    if (firstGamePlayed) {
+      throw new Error('Free agent claims are locked once the first match has been played')
     }
 
     // Check claim limits
     const settings = await this.getWaiverSettings(leagueId)
-    const maxClaims = settings.maxWaiverClaimsPerSeason || 3
+    const maxClaims = settings.freeAgentPicksAllowed ?? settings.maxWaiverClaimsPerSeason ?? 3
     const existingClaims = await this.getTeamClaimsThisSeason(teamId, leagueId)
     if (existingClaims >= maxClaims) {
-      throw new Error(`Claim limit reached (${maxClaims} per season)`)
+      throw new Error(`Free agent pick limit reached (${maxClaims} allowed before first game)`)
     }
 
     // Insert claim record (table not in generated types yet)
@@ -279,9 +284,26 @@ export class WaiverService {
   /**
    * Get waiver settings from league
    */
+  /**
+   * Check if any match in this league has been played (completed or in_progress)
+   */
+  static async hasFirstGameBeenPlayed(leagueId: string): Promise<boolean> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const { count, error } = await supabase
+      .from('matches')
+      .select('id', { count: 'exact', head: true })
+      .eq('league_id', leagueId)
+      .in('status', ['completed', 'in_progress'])
+
+    if (error) throw new Error(`Failed to check match status: ${error.message}`)
+    return (count ?? 0) > 0
+  }
+
   private static async getWaiverSettings(leagueId: string): Promise<{
     enableWaivers: boolean
     maxWaiverClaimsPerSeason: number
+    freeAgentPicksAllowed: number | undefined
     waiverPriority: 'fcfs' | 'inverse_standings'
   }> {
     if (!supabase) throw new Error('Supabase not available')
@@ -297,6 +319,7 @@ export class WaiverService {
     return {
       enableWaivers: (settings.enableWaivers as boolean) ?? true,
       maxWaiverClaimsPerSeason: (settings.maxWaiverClaimsPerSeason as number) ?? 3,
+      freeAgentPicksAllowed: settings.freeAgentPicksAllowed as number | undefined,
       waiverPriority: (settings.waiverPriority as 'fcfs' | 'inverse_standings') ?? 'fcfs',
     }
   }

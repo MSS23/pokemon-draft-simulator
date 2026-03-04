@@ -331,57 +331,17 @@ export interface TeamPokemonStatus {
   updatedAt: string
 }
 
-export interface Trade {
-  id: string
-  leagueId: string
-  weekNumber: number
-  teamAId: string
-  teamBId: string
-  teamAGives: string[] // Array of pick IDs
-  teamBGives: string[] // Array of pick IDs
-  status: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
-  proposedBy: string
-  proposedAt: string
-  respondedAt?: string | null
-  completedAt?: string | null
-  notes?: string | null
-  commissionerApproved?: boolean | null
-  commissionerId?: string | null
-  commissionerNotes?: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-export interface TradeApproval {
-  id: string
-  tradeId: string
-  approverUserId: string
-  approverRole?: 'commissioner' | 'admin' | 'owner'
-  approved: boolean
-  comments?: string | null
-  createdAt: string
-}
-
 // Extended League Settings with new features
 export interface ExtendedLeagueSettings extends LeagueSettings {
-  enableTrades?: boolean // Allow Pokemon trading between teams
-  tradeDeadlineWeek?: number // Week after which trades are locked
-  requireCommissionerApproval?: boolean // Trades need approval
   maxMatchesPerWeek?: number // Limit matches per team per week (default: 1)
   commissionerId?: string // User ID of league commissioner (draft host)
   enableWaivers?: boolean // Allow free agent claims
   maxWaiverClaimsPerSeason?: number // Max claims per team (default: 3)
   waiverPriority?: 'fcfs' | 'inverse_standings' // Claim priority system
-}
-
-// Trade with team details (for UI)
-export interface TradeWithDetails extends Trade {
-  teamAName: string
-  teamBName: string
-  proposedByName: string
-  leagueName: string
-  teamAGivesPokemon?: Pick[] // Full pick objects for Pokemon being traded
-  teamBGivesPokemon?: Pick[]
+  freeAgentPicksAllowed?: number // Max free agent picks allowed post-draft (before first game)
+  enableTrades?: boolean // Allow trades between teams
+  tradeDeadlineWeek?: number // Week after which trades are disabled
+  requireCommissionerApproval?: boolean // Require commissioner to approve trades
 }
 
 // Match with Pokemon KO stats (for detailed view)

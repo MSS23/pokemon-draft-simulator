@@ -6,8 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { ArrowLeft, ArrowLeftRight, Home, Trophy, ChevronRight, Shield } from 'lucide-react'
-import DraftTradePanel from '@/components/draft/DraftTradePanel'
+import { ArrowLeft, Home, Trophy, ChevronRight, Shield } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { LeagueService } from '@/lib/league-service'
@@ -32,6 +31,7 @@ export default function DraftResultsPage() {
   const [existingLeagueId, setExistingLeagueId] = useState<string | null>(null)
   const [isLeagueModalOpen, setIsLeagueModalOpen] = useState(false)
   const [isCheckingLeague, setIsCheckingLeague] = useState(false)
+  const [hasAutoOpenedModal, setHasAutoOpenedModal] = useState(false)
   const { user: authUser } = useAuth()
 
   useEffect(() => {
@@ -77,6 +77,20 @@ export default function DraftResultsPage() {
     loadDraftState()
   }, [roomCode])
 
+  // Auto-open league settings modal for the host when no league exists yet
+  useEffect(() => {
+    if (
+      !hasAutoOpenedModal &&
+      !isCheckingLeague &&
+      !existingLeagueId &&
+      draftState &&
+      authUser?.id === draftState.draft.host_id
+    ) {
+      setIsLeagueModalOpen(true)
+      setHasAutoOpenedModal(true)
+    }
+  }, [hasAutoOpenedModal, isCheckingLeague, existingLeagueId, draftState, authUser?.id])
+
   const handleLeagueSuccess = (leagueId: string) => {
     notify.success('League Created!', 'Your league has been created successfully')
     setExistingLeagueId(leagueId)
@@ -115,7 +129,7 @@ export default function DraftResultsPage() {
     )
   }
 
-  const reloadDraftState = async () => {
+  const _reloadDraftState = async () => {
     if (!roomCode) return
     try {
       const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
@@ -213,7 +227,7 @@ export default function DraftResultsPage() {
               <CardDescription>
                 {existingLeagueId
                   ? 'A league has been created from this draft. View standings, fixtures, and match results.'
-                  : 'Start a competitive league season with weekly fixtures, standings, and Pokemon battles.'}
+                  : 'Configure your league settings to start a competitive season with weekly fixtures, standings, and Pokemon battles.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -231,7 +245,7 @@ export default function DraftResultsPage() {
                   className="w-full"
                 >
                   <Trophy className="mr-2 h-4 w-4" />
-                  Create League
+                  Set Up League
                 </Button>
               )}
             </CardContent>
@@ -293,40 +307,6 @@ export default function DraftResultsPage() {
             </Card>
           )
         })()}
-
-        {/* Post-Draft Trading */}
-        {userTeamId && (
-          <Card className="mb-6 border border-blue-200 dark:border-blue-800">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ArrowLeftRight className="h-5 w-5 text-blue-500" />
-                Post-Draft Trading
-              </CardTitle>
-              <CardDescription>
-                Trade Pokemon with other teams. Both sides must offer equal total cost, and teams must keep at least {draftState.draft.settings?.pokemonPerTeam || 6} Pokemon.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DraftTradePanel
-                draftId={draftState.draft.id}
-                teams={teams.map(team => ({
-                  ...team,
-                  picks: picks
-                    .filter(p => p.team_id === team.id)
-                    .map(p => ({
-                      id: p.id,
-                      pokemonId: p.pokemon_id,
-                      pokemonName: p.pokemon_name,
-                      cost: p.cost,
-                    }))
-                }))}
-                userTeamId={userTeamId}
-                minPokemonPerTeam={draftState.draft.settings?.pokemonPerTeam || 6}
-                onTradeComplete={reloadDraftState}
-              />
-            </CardContent>
-          </Card>
-        )}
 
         <DraftResults
           draftName={draftState.draft.name}

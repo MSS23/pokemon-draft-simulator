@@ -857,6 +857,8 @@ export type Database = {
         Row: {
           id: string
           pick_id: string
+          pokemon_id: string
+          pokemon_name: string
           team_id: string
           league_id: string
           status: 'alive' | 'fainted' | 'dead'
@@ -873,6 +875,8 @@ export type Database = {
         Insert: {
           id?: string
           pick_id: string
+          pokemon_id: string
+          pokemon_name: string
           team_id: string
           league_id: string
           status?: 'alive' | 'fainted' | 'dead'
@@ -889,6 +893,8 @@ export type Database = {
         Update: {
           id?: string
           pick_id?: string
+          pokemon_id?: string
+          pokemon_name?: string
           team_id?: string
           league_id?: string
           status?: 'alive' | 'fainted' | 'dead'

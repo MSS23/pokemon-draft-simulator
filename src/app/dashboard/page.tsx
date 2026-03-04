@@ -12,7 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays, Trash2 } from 'lucide-react'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { notify } from '@/lib/notifications'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
@@ -126,6 +128,20 @@ export default function DashboardPage() {
   const [leagueStandings, setLeagueStandings] = useState<LeagueStanding[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null)
+
+  const handleDeleteLeague = async (leagueId: string) => {
+    if (!user) return
+    try {
+      await LeagueService.deleteLeague(leagueId, user.id)
+      setLeagueStandings(prev => prev.filter(s => s.league.id !== leagueId))
+      notify.success('League Deleted', 'The league has been removed.')
+    } catch (err) {
+      notify.error('Failed to Delete', err instanceof Error ? err.message : 'Could not delete league')
+    } finally {
+      setDeletingLeagueId(null)
+    }
+  }
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
 
   useEffect(() => {
@@ -401,7 +417,9 @@ export default function DashboardPage() {
               }}
             >
               <CalendarDays className="h-3 w-3" />
-              Full Schedule
+              {matchup.match.scheduledDate
+                ? new Date(matchup.match.scheduledDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                : 'Full Schedule'}
             </button>
             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
               View opponent&apos;s team <ChevronRight className="h-3 w-3" />
@@ -523,7 +541,17 @@ export default function DashboardPage() {
                             {standing.userTeamName}
                           </p>
                         </div>
-                        {getStatusBadge(standing.league.status)}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {getStatusBadge(standing.league.status)}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); setDeletingLeagueId(standing.league.id) }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-center">
                         <div>
@@ -561,6 +589,26 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
+
+        <AlertDialog open={!!deletingLeagueId} onOpenChange={() => setDeletingLeagueId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete League?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the league and all its matches, standings, and trade history. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => deletingLeagueId && handleDeleteLeague(deletingLeagueId)}
+              >
+                Delete League
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Empty state for leagues */}
         {leagueStandings.length === 0 && upcomingMatches.length === 0 && drafts.some(d => d.status === 'completed') && (

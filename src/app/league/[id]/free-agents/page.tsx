@@ -10,7 +10,7 @@ import { LeagueService } from '@/lib/league-service'
 import { WaiverService } from '@/lib/waiver-service'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Search, UserPlus, History, Coins } from 'lucide-react'
+import { ArrowLeft, Search, UserPlus, History, Coins, Lock } from 'lucide-react'
 import type { League, Team, Pick, WaiverClaim } from '@/types'
 import type { Pokemon } from '@/types'
 import { buildTeamColorMap } from '@/utils/team-colors'
@@ -44,6 +44,7 @@ export default function FreeAgentsPage() {
   const [selectedPokemon, setSelectedPokemon] = useState<Pokemon | null>(null)
   const [dropPickId, setDropPickId] = useState<string | null>(null)
   const [isClaiming, setIsClaiming] = useState(false)
+  const [isLocked, setIsLocked] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   const deferredSearch = useDeferredValue(searchQuery)
@@ -107,9 +108,13 @@ export default function FreeAgentsPage() {
           }
         }
 
+        // Check if free agent claims are locked (first game played)
+        const locked = await WaiverService.hasFirstGameBeenPlayed(leagueId)
+        setIsLocked(locked)
+
         // Load waiver settings
         const settings = await LeagueService.getLeagueSettings(leagueId)
-        setMaxClaims(settings.maxWaiverClaimsPerSeason || 3)
+        setMaxClaims(settings.freeAgentPicksAllowed ?? settings.maxWaiverClaimsPerSeason ?? 3)
 
         // Load waiver history
         try {
@@ -142,8 +147,22 @@ export default function FreeAgentsPage() {
     )
   }, [availablePokemon, deferredSearch])
 
+  // Compute net cost and whether the swap is affordable
+  const dropPick = useMemo(() => {
+    if (!dropPickId) return null
+    return userTeamPicks.find(p => p.id === dropPickId) || null
+  }, [dropPickId, userTeamPicks])
+
+  const netCost = selectedPokemon && dropPick
+    ? selectedPokemon.cost - dropPick.cost
+    : selectedPokemon?.cost ?? 0
+
+  const canAffordSwap = dropPick
+    ? netCost <= 0 || userBudget >= netCost
+    : false
+
   const handleClaim = useCallback(async () => {
-    if (!selectedPokemon || !userTeamId || !draftId) return
+    if (!selectedPokemon || !userTeamId || !draftId || !dropPickId) return
     setIsClaiming(true)
 
     try {
@@ -153,7 +172,7 @@ export default function FreeAgentsPage() {
         selectedPokemon.id,
         selectedPokemon.name,
         selectedPokemon.cost,
-        dropPickId || undefined
+        dropPickId
       )
 
       notify.success('Pokemon Claimed!', `${selectedPokemon.name} has been added to your roster.`)
@@ -189,7 +208,7 @@ export default function FreeAgentsPage() {
   if (isLoading) return <LoadingScreen title="Loading Free Agents..." description="Scanning available Pokemon." />
   if (!league) return null
 
-  const canClaim = userTeamId && claimsUsed < maxClaims
+  const canClaim = userTeamId && claimsUsed < maxClaims && !isLocked
 
   return (
     <div className="min-h-screen bg-background">
@@ -253,7 +272,7 @@ export default function FreeAgentsPage() {
                     <UserPlus className="h-4 w-4" />
                     Claim {selectedPokemon.name}
                   </CardTitle>
-                  <CardDescription>Cost: {selectedPokemon.cost} pts | Your budget: {userBudget} pts</CardDescription>
+                  <CardDescription>{selectedPokemon.cost} pts | Budget: {userBudget} pts remaining</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4 mb-4">
@@ -284,42 +303,51 @@ export default function FreeAgentsPage() {
                     </div>
                   </div>
 
-                  {/* Drop selection */}
-                  {userTeamPicks.length > 0 && (
-                    <div className="mb-4">
-                      <label className="text-sm font-medium mb-2 block">
-                        Drop a Pokemon (optional, required if at roster limit):
-                      </label>
-                      <select
-                        value={dropPickId || ''}
-                        onChange={e => setDropPickId(e.target.value || null)}
-                        className="w-full px-3 py-2 border rounded-md bg-background text-sm"
-                      >
-                        <option value="">Don&apos;t drop anyone</option>
-                        {userTeamPicks.map(pick => (
-                          <option key={pick.id} value={pick.id}>
-                            {pick.pokemonName} ({pick.cost} pts refund)
-                          </option>
-                        ))}
-                      </select>
-                      {dropPickId && (() => {
-                        const dropPick = userTeamPicks.find(p => p.id === dropPickId)
-                        const netCost = selectedPokemon.cost - (dropPick?.cost || 0)
-                        return (
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Net cost: {netCost > 0 ? `${netCost} pts` : `+${Math.abs(netCost)} pts refund`}
+                  {/* Drop selection (required) */}
+                  <div className="mb-4">
+                    <label className="text-sm font-medium mb-2 block">
+                      Drop a Pokemon to swap (required):
+                    </label>
+                    {userTeamPicks.length === 0 ? (
+                      <p className="text-xs text-red-500">No Pokemon on your roster to drop.</p>
+                    ) : (
+                      <>
+                        <select
+                          value={dropPickId || ''}
+                          onChange={e => setDropPickId(e.target.value || null)}
+                          className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                        >
+                          <option value="">Select a Pokemon to drop...</option>
+                          {userTeamPicks.map(pick => (
+                            <option key={pick.id} value={pick.id}>
+                              {pick.pokemonName} ({pick.cost} pts)
+                            </option>
+                          ))}
+                        </select>
+                        {dropPick && (
+                          <div className={`text-xs mt-1.5 px-2 py-1 rounded ${
+                            netCost <= 0
+                              ? 'text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-950/40'
+                              : canAffordSwap
+                                ? 'text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/40'
+                                : 'text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-950/40'
+                          }`}>
+                            {netCost === 0 && `Even swap (both ${selectedPokemon.cost} pts)`}
+                            {netCost < 0 && `+${Math.abs(netCost)} pts refund (drop ${dropPick.cost} → pick up ${selectedPokemon.cost})`}
+                            {netCost > 0 && canAffordSwap && `Costs ${netCost} extra pts from budget (drop ${dropPick.cost} → pick up ${selectedPokemon.cost})`}
+                            {netCost > 0 && !canAffordSwap && `Can't afford: need ${netCost} pts but only have ${userBudget} pts`}
                           </div>
-                        )
-                      })()}
-                    </div>
-                  )}
+                        )}
+                      </>
+                    )}
+                  </div>
 
                   <div className="flex gap-2">
                     <Button
                       onClick={handleClaim}
-                      disabled={!canClaim || isClaiming}
+                      disabled={!canClaim || isClaiming || !dropPickId || !canAffordSwap}
                     >
-                      {isClaiming ? 'Claiming...' : `Claim ${selectedPokemon.name}`}
+                      {isClaiming ? 'Claiming...' : `Swap for ${selectedPokemon.name}`}
                     </Button>
                     <Button variant="outline" onClick={() => { setSelectedPokemon(null); setDropPickId(null) }}>
                       Cancel
@@ -327,8 +355,14 @@ export default function FreeAgentsPage() {
                   </div>
 
                   {!canClaim && (
-                    <p className="text-xs text-red-500 mt-2">
-                      {!userTeamId ? 'You are not part of this league.' : `Claim limit reached (${maxClaims} per season).`}
+                    <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+                      <Lock className="h-3 w-3" />
+                      {!userTeamId ? 'You are not part of this league.' : isLocked ? 'Free agent claims are locked — a match has already been played.' : `Free agent pick limit reached (${maxClaims} allowed).`}
+                    </p>
+                  )}
+                  {!dropPickId && userTeamPicks.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Select a Pokemon to drop — free agent claims require a like-for-like swap.
                     </p>
                   )}
                 </CardContent>

@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -40,7 +39,7 @@ export function LeagueSettingsModal({
   onClose,
   leagueId,
   currentSettings,
-  totalWeeks,
+  totalWeeks: _totalWeeks,
   onSave,
 }: LeagueSettingsModalProps) {
   const [settings, setSettings] = useState<ExtendedLeagueSettings>({ ...currentSettings })
@@ -91,48 +90,6 @@ export function LeagueSettingsModal({
             </Select>
           </div>
 
-          {/* Trading */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Enable Trading</Label>
-              <p className="text-xs text-muted-foreground">
-                Allow teams to trade Pokemon between each other
-              </p>
-            </div>
-            <Switch
-              checked={settings.enableTrades}
-              onCheckedChange={(checked) => setSettings(s => ({ ...s, enableTrades: checked }))}
-            />
-          </div>
-
-          {/* Trade Deadline */}
-          {settings.enableTrades && (
-            <div className="space-y-2">
-              <Label>Trade Deadline</Label>
-              <Select
-                value={settings.tradeDeadlineWeek?.toString() || 'none'}
-                onValueChange={(v) => setSettings(s => ({
-                  ...s,
-                  tradeDeadlineWeek: v === 'none' ? undefined : parseInt(v),
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="No deadline" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No deadline</SelectItem>
-                  {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(week => (
-                    <SelectItem key={week} value={week.toString()}>
-                      After Week {week}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Trading will be locked after this week
-              </p>
-            </div>
-          )}
         </div>
 
         <DialogFooter>

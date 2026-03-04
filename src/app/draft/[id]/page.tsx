@@ -26,6 +26,7 @@ import { useTurnNotifications } from '@/hooks/useTurnNotifications'
 import { useLatest } from '@/hooks/useLatest'
 import { useDraftRealtime } from '@/hooks/useDraftRealtime'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
+import { getMaxAffordableCost, isPickSafe } from '@/utils/budget-feasibility'
 
 /**
  * OPTIMIZED DYNAMIC IMPORTS - Strategic code splitting:
@@ -326,18 +327,16 @@ export default function DraftRoomPage() {
   // Store previous transformed state to prevent unnecessary re-renders
   const prevTransformedStateRef = useRef<{ dbStateHash: string, uiState: DraftUIState } | null>(null)
 
-  const transformDraftState = useCallback((dbState: DBDraftState, userId: string): DraftUIState => {
-    // Create a hash of the database state to detect changes
-    // Only transform if database state actually changed
-    const dbStateHash = JSON.stringify({
-      updated_at: dbState.draft.updated_at,
-      current_turn: dbState.draft.current_turn,
-      status: dbState.draft.status,
-      pick_ids: dbState.picks.map(p => p.id).sort(),
-      teams_budgets: dbState.teams.map(t => ({ id: t.id, budget: t.budget_remaining }))
-    })
+  const transformDraftState = useCallback((dbState: DBDraftState, currentUserId: string): DraftUIState => {
+    // Build a hash of ONLY the fields that affect the UI.
+    // Exclude updated_at and last_seen — they change on every heartbeat
+    // and would cause infinite re-renders if included.
+    const pickIds = dbState.picks.map(p => p.id).sort().join(',')
+    const teamBudgets = dbState.teams.map(t => `${t.id}:${t.budget_remaining}:${t.draft_order}`).sort().join(',')
+    const participantList = dbState.participants.map(p => `${p.user_id}:${p.team_id}:${p.display_name}`).sort().join(',')
+    const dbStateHash = `${dbState.draft.current_turn}|${dbState.draft.status}|${pickIds}|${teamBudgets}|${participantList}|${dbState.draft.turn_started_at || ''}`
 
-    // Return cached state if database hasn't changed
+    // Return cached state if nothing meaningful changed
     if (prevTransformedStateRef.current?.dbStateHash === dbStateHash) {
       return prevTransformedStateRef.current.uiState
     }
@@ -360,7 +359,7 @@ export default function DraftRoomPage() {
     }).sort((a, b) => a.draftOrder - b.draftOrder)
 
     // Find user's team ID
-    const userParticipant = dbState.participants.find(p => p.user_id === userId)
+    const userParticipant = dbState.participants.find(p => p.user_id === currentUserId)
     const userTeamId = userParticipant?.team_id || null
 
     // Calculate current team based on turn using proper snake draft logic
@@ -368,29 +367,20 @@ export default function DraftRoomPage() {
     const totalTeams = teams.length
     const maxRounds = dbState.draft.settings?.maxPokemonPerTeam || 10
 
-    // Use same logic as store selector for consistency
     let currentTeamId = ''
     if (totalTeams > 0 && currentTurn) {
-      // Generate snake draft order
       const draftOrder: number[] = []
       for (let round = 0; round < maxRounds; round++) {
         if (round % 2 === 0) {
-          // Normal order (1, 2, 3, 4...)
-          for (let i = 1; i <= totalTeams; i++) {
-            draftOrder.push(i)
-          }
+          for (let i = 1; i <= totalTeams; i++) draftOrder.push(i)
         } else {
-          // Reverse order (4, 3, 2, 1...)
-          for (let i = totalTeams; i >= 1; i--) {
-            draftOrder.push(i)
-          }
+          for (let i = totalTeams; i >= 1; i--) draftOrder.push(i)
         }
       }
-
       if (currentTurn <= draftOrder.length) {
         const currentTeamOrder = draftOrder[currentTurn - 1]
-        const currentTeam = teams.find(team => team.draftOrder === currentTeamOrder)
-        currentTeamId = currentTeam?.id || ''
+        const team = teams.find(t => t.draftOrder === currentTeamOrder)
+        currentTeamId = team?.id || ''
       }
     }
 
@@ -431,9 +421,7 @@ export default function DraftRoomPage() {
       }
     }
 
-    // Cache the transformed state with its hash
     prevTransformedStateRef.current = { dbStateHash, uiState }
-
     return uiState
   }, [roomCode])
 
@@ -483,6 +471,10 @@ export default function DraftRoomPage() {
   }, [draftState?.participants])
 
 
+  // Suppress realtime refreshes while a pick is in flight to prevent stale data
+  // from overwriting the optimistic update or the manual refresh result
+  const pickInFlightRef = useRef(false)
+
   // Unified real-time system - single source of truth for connection & events
   const {
     connectionStatus: realtimeConnectionStatus,
@@ -492,8 +484,13 @@ export default function DraftRoomPage() {
     refreshDebounce: 300,
     onRefreshNeeded: async () => {
       if (!roomCode) return
+      // Skip realtime-triggered refreshes while a pick is in flight to prevent
+      // stale data from overwriting the optimistic update or manual refresh
+      if (pickInFlightRef.current) {
+        log.info('Skipping realtime refresh — pick in flight')
+        return
+      }
       try {
-        // Invalidate cache so we get fresh data from Supabase
         DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
         const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
         if (dbState) {
@@ -582,7 +579,8 @@ export default function DraftRoomPage() {
         // Anyone with the room code can view/spectate the draft
         // Only verified participants can make picks (enforced in makePick)
 
-        setDraftState(transformDraftState(dbState, userId))
+        const newState = transformDraftState(dbState, userId)
+        setDraftState(prev => prev === newState ? prev : newState)
         setIsConnected(true)
       } catch (err) {
         if (!mounted || abortController.signal.aborted) return
@@ -857,6 +855,32 @@ export default function DraftRoomPage() {
     return pokemon?.filter(p => p.isLegal && !allDraftedIds.includes(p.id)) || []
   }, [pokemon, allDraftedIds])
 
+  // Budget feasibility guard: compute max affordable cost for current user
+  const budgetFeasibility = useMemo(() => {
+    if (!userTeam || !draftState?.draftSettings) return null
+    const maxPokemon = draftState.draftSettings.pokemonPerTeam || 6
+    const remainingSlots = maxPokemon - (userTeam.picks.length || 0)
+    if (remainingSlots <= 0) return null
+
+    // Get sorted costs of available (undrafted, legal) Pokemon
+    const availableCosts = _availablePokemon
+      .map(p => p.cost)
+      .sort((a, b) => a - b)
+
+    if (availableCosts.length === 0) return null
+
+    const maxAffordable = getMaxAffordableCost(
+      userTeam.budgetRemaining,
+      remainingSlots,
+      availableCosts
+    )
+
+    return {
+      maxAffordableCost: maxAffordable,
+      remainingSlots,
+    }
+  }, [userTeam, _availablePokemon, draftState?.draftSettings])
+
   /**
    * STABLE CALLBACKS - Using useRef pattern to avoid dependency changes
    * This prevents 100+ PokemonCard re-renders when state changes
@@ -891,15 +915,34 @@ export default function DraftRoomPage() {
 
     if (!currentDraftState?.userTeamId || !currentUserId || currentIsSpectator) return
 
-    const { WishlistService } = await import('@/lib/wishlist-service')
-
     const participant = currentDraftState.teams.find(t => t.id === currentDraftState.userTeamId)
     if (!participant) {
       currentNotify.warning('Cannot Add to Wishlist', 'You must be part of a team to use wishlist')
       return
     }
 
+    // Optimistic update: add to store immediately
+    const optimisticId = `optimistic-${Date.now()}`
+    const existingItems = useDraftStore.getState().wishlistItemsByParticipantId[currentUserId] || []
+    const maxPriority = existingItems.reduce((max, id) => {
+      const item = useDraftStore.getState().wishlistItemsById[id]
+      return item ? Math.max(max, item.priority) : max
+    }, 0)
+    useDraftStore.getState().addWishlistItem({
+      id: optimisticId,
+      draftId: roomCode.toLowerCase(),
+      participantId: currentUserId,
+      pokemonId: pokemon.id,
+      pokemonName: pokemon.name,
+      priority: maxPriority + 1,
+      isAvailable: true,
+      cost: pokemon.cost,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    })
+
     try {
+      const { WishlistService } = await import('@/lib/wishlist-service')
       await WishlistService.addToWishlist(
         roomCode.toLowerCase(),
         currentUserId,
@@ -907,6 +950,8 @@ export default function DraftRoomPage() {
       )
       currentNotify.success('Added to Wishlist', `${pokemon.name} added to your wishlist`, { duration: 2000 })
     } catch (error) {
+      // Revert optimistic update
+      useDraftStore.getState().removeWishlistItem(optimisticId)
       log.error('Error adding to wishlist:', error)
       currentNotify.error('Failed to Add', 'Could not add Pokémon to wishlist')
     }
@@ -921,9 +966,20 @@ export default function DraftRoomPage() {
 
     if (!currentDraftState?.userTeamId || !currentUserId || currentIsSpectator) return
 
-    const { WishlistService } = await import('@/lib/wishlist-service')
+    // Optimistic update: remove from store immediately
+    const itemIds = useDraftStore.getState().wishlistItemsByParticipantId[currentUserId] || []
+    const itemToRemove = itemIds.find(id => {
+      const item = useDraftStore.getState().wishlistItemsById[id]
+      return item && item.pokemonId === pokemon.id
+    })
+    let removedItem: import('@/types').WishlistItem | null = null
+    if (itemToRemove) {
+      removedItem = useDraftStore.getState().wishlistItemsById[itemToRemove] || null
+      useDraftStore.getState().removeWishlistItem(itemToRemove)
+    }
 
     try {
+      const { WishlistService } = await import('@/lib/wishlist-service')
       await WishlistService.removeFromWishlist(
         roomCode.toLowerCase(),
         currentUserId,
@@ -931,6 +987,10 @@ export default function DraftRoomPage() {
       )
       currentNotify.success('Removed from Wishlist', `${pokemon.name} removed from your wishlist`, { duration: 2000 })
     } catch (error) {
+      // Revert optimistic update
+      if (removedItem) {
+        useDraftStore.getState().addWishlistItem(removedItem)
+      }
       log.error('Error removing from wishlist:', error)
       currentNotify.error('Failed to Remove', 'Could not remove Pokémon from wishlist')
     }
@@ -1005,17 +1065,34 @@ export default function DraftRoomPage() {
 
   // Handler to show confirmation modal before drafting
   const handleInitiateDraft = useCallback((pokemon: Pokemon) => {
+    // Budget feasibility guard: block picks that would make team impossible to fill
+    if (budgetFeasibility && !isPickSafe(
+      pokemon.cost,
+      userTeam?.budgetRemaining ?? 0,
+      budgetFeasibility.remainingSlots,
+      _availablePokemon.map(p => p.cost).sort((a, b) => a - b)
+    )) {
+      const minReserve = (userTeam?.budgetRemaining ?? 0) - budgetFeasibility.maxAffordableCost
+      notify.error(
+        'Pick Blocked',
+        `${pokemon.name} (${pokemon.cost} pts) would leave you unable to fill your remaining ${budgetFeasibility.remainingSlots} slots. Max you can spend: ${budgetFeasibility.maxAffordableCost} pts (need ${minReserve} reserved).`,
+        { duration: 6000 }
+      )
+      return
+    }
+
     setConfirmationPokemon(pokemon)
     setIsConfirmationOpen(true)
     setIsDetailsOpen(false) // Close details modal when showing confirmation
-  }, [])
+  }, [budgetFeasibility, userTeam?.budgetRemaining, _availablePokemon])
+
+  const [isDrafting, setIsDrafting] = useState(false)
 
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn)
     const canDraft = isUserTurn && draftState?.status === 'drafting'
     if (!canDraft) {
       log.info('Cannot draft:', { isUserTurn, isHost, status: draftState?.status })
-      // Show user-friendly error message
       if (draftState?.status !== 'drafting') {
         notify.warning('Draft Not Active', 'The draft is not currently active')
       } else if (!isUserTurn) {
@@ -1024,30 +1101,60 @@ export default function DraftRoomPage() {
       return
     }
 
-    // Double-check database status before attempting pick (defensive validation)
-    try {
-      const freshDraftState = await DraftService.getDraftState(roomCode.toLowerCase())
-      if (!freshDraftState || freshDraftState.draft.status !== 'active') {
-        notify.error('Draft Not Active', 'The draft is not currently active. Please wait.')
-        return
-      }
-    } catch (error) {
-      log.error('Error validating draft status:', error)
-      notify.error('Connection Error', 'Could not validate draft status. Please try again.')
-      return
-    }
+    // Prevent double-picks while one is in flight
+    if (isDrafting) return
+    setIsDrafting(true)
+    pickInFlightRef.current = true
 
-    // Draft for user's own team
     const targetTeam = userTeam
     const targetUserId = userId
-    if (!targetTeam) return
+    if (!targetTeam) { setIsDrafting(false); pickInFlightRef.current = false; return }
 
-    // Mark Pokemon as drafted in all wishlists
-    const { WishlistService } = await import('@/lib/wishlist-service')
-    await WishlistService.markPokemonDrafted(roomCode.toLowerCase(), pokemon.id)
+    // Optimistic update: immediately add pick to local state so UI feels instant
+    // Also advance the turn so the UI shows the next team's turn
+    const previousState = draftState
+    if (draftState) {
+      const optimisticTeams = draftState.teams.map(t =>
+        t.id === targetTeam.id
+          ? { ...t, picks: [...t.picks, pokemon.id], budgetRemaining: t.budgetRemaining - (pokemon.cost || 1) }
+          : t
+      )
+      const nextTurn = draftState.currentTurn + 1
+
+      // Derive next team from snake draft order (same logic as transformDraftState)
+      let nextTeamId = draftState.currentTeam
+      const totalTeams = draftState.teams.length
+      const maxRounds = draftState.draftSettings?.pokemonPerTeam || 10
+      if (totalTeams > 0) {
+        const draftOrder: number[] = []
+        for (let round = 0; round < maxRounds; round++) {
+          if (round % 2 === 0) {
+            for (let i = 1; i <= totalTeams; i++) draftOrder.push(i)
+          } else {
+            for (let i = totalTeams; i >= 1; i--) draftOrder.push(i)
+          }
+        }
+        if (nextTurn <= draftOrder.length) {
+          const nextTeamOrder = draftOrder[nextTurn - 1]
+          const nextTeam = draftState.teams.find(t => t.draftOrder === nextTeamOrder)
+          nextTeamId = nextTeam?.id || nextTeamId
+        }
+      }
+
+      setDraftState({
+        ...draftState,
+        teams: optimisticTeams,
+        currentTurn: nextTurn,
+        currentTeam: nextTeamId
+      })
+    }
+
+    // Mark Pokemon as drafted in wishlists (fire-and-forget)
+    import('@/lib/wishlist-service').then(({ WishlistService }) => {
+      WishlistService.markPokemonDrafted(roomCode.toLowerCase(), pokemon.id)
+    }).catch(() => {})
 
     try {
-      // Validate cost data
       const pickCost = pokemon.cost || 1
       if (!pokemon.cost) {
         log.warn(`Pokemon "${pokemon.name}" (id: ${pokemon.id}) has no cost data. Using minimum cost of 1.`)
@@ -1061,25 +1168,22 @@ export default function DraftRoomPage() {
         pickCost
       )
 
-      // Immediately refresh local state so the pick appears for the drafter
-      // (realtime subscription may be delayed or miss self-events)
+      // Refresh with confirmed server data (high priority - no startTransition)
       try {
+        DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
         const freshState = await DraftService.getDraftState(roomCode.toLowerCase())
         if (freshState) {
-          startTransition(() => {
-            setDraftState(transformDraftState(freshState, userId))
-          })
+          setDraftState(transformDraftState(freshState, userId))
         }
       } catch (refreshErr) {
         log.warn('Failed to refresh state after pick:', refreshErr)
       }
-
-      // Show success notification
-      const teamName = targetTeam.name
+      // Safe to allow realtime refreshes now — server state is committed
+      pickInFlightRef.current = false
 
       notify.success(
         `${pokemon.name} Drafted!`,
-        `Successfully added ${pokemon.name} to ${teamName}`,
+        `Successfully added ${pokemon.name} to ${targetTeam.name}`,
         { duration: 3000 }
       )
 
@@ -1088,18 +1192,22 @@ export default function DraftRoomPage() {
     } catch (err) {
       log.error('Error making pick:', err)
 
-      // Provide specific error messages based on error type
-      const errorMessage = err instanceof Error ? err.message : 'Failed to make pick'
+      // Revert optimistic update on error
+      if (previousState) {
+        setDraftState(previousState)
+      }
 
-      // Create a unique key for this specific error to prevent duplicate notifications
+      const errorMessage = err instanceof Error ? err.message : 'Failed to make pick'
       const errorKey = `pick-error-${errorMessage.substring(0, 50)}`
 
       if (!shouldShowNotification(errorKey, 3000)) {
-        return // Skip duplicate notification
+        setIsDrafting(false)
+        return
       }
 
-      // Auto-refresh state on pick errors so the device gets the latest state
+      // Refresh state to get latest from server
       try {
+        DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
         const freshState = await DraftService.getDraftState(roomCode.toLowerCase())
         if (freshState) {
           setDraftState(transformDraftState(freshState, userId))
@@ -1129,8 +1237,13 @@ export default function DraftRoomPage() {
       } else {
         notify.error('Draft Failed', errorMessage, { duration: 5000 })
       }
+    } finally {
+      setIsDrafting(false)
+      // If pickInFlightRef wasn't already cleared by the success path,
+      // clear it now (e.g. on error after revert)
+      pickInFlightRef.current = false
     }
-  }, [isUserTurn, isHost, draftState?.status, currentTeam, userTeam, userId, roomCode, shouldShowNotification, transformDraftState])
+  }, [isUserTurn, isHost, draftState, currentTeam, userTeam, userId, roomCode, shouldShowNotification, transformDraftState, isDrafting])
 
   const copyRoomCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode)
@@ -1247,7 +1360,8 @@ export default function DraftRoomPage() {
       // Immediately refresh the draft state to show the new order
       const updatedState = await DraftService.getDraftState(roomCode.toLowerCase())
       if (updatedState) {
-        setDraftState(transformDraftState(updatedState, userId))
+        const newState = transformDraftState(updatedState, userId)
+        setDraftState(prev => prev === newState ? prev : newState)
       }
 
       notify.success('Draft Order Shuffled!', 'Team draft order has been randomized. Check the Draft Order section.')
@@ -1784,6 +1898,7 @@ export default function DraftRoomPage() {
               onPingCurrentPlayer={handlePingCurrentPlayer}
               canUndo={draftState?.teams?.some(team => team.picks.length > 0) || false}
               notificationsEnabled={typeof window !== 'undefined' && Notification.permission === 'granted'}
+              maxPokemonPerTeam={draftState?.draftSettings?.pokemonPerTeam || 6}
             />
           </div>
         )}
@@ -1905,6 +2020,8 @@ export default function DraftRoomPage() {
               showWishlistButton={!isSpectator && !!draftState?.userTeamId}
               showQuickDraft={isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft && !isSpectator}
               budgetRemaining={userTeam?.budgetRemaining}
+              maxAffordableCost={budgetFeasibility?.maxAffordableCost}
+              remainingSlots={budgetFeasibility?.remainingSlots}
             />
           </EnhancedErrorBoundary>
         </div>
@@ -1926,10 +2043,11 @@ export default function DraftRoomPage() {
           pokemon={confirmationPokemon}
           isOpen={isConfirmationOpen}
           onClose={() => setIsConfirmationOpen(false)}
-          onConfirm={(pokemon) => {
+          onConfirm={async (pokemon) => {
+            await handleDraftPokemon(pokemon)
             setIsConfirmationOpen(false)
-            handleDraftPokemon(pokemon)
           }}
+          isLoading={isDrafting}
           currentBudget={userTeam?.budgetRemaining || 100}
           draftedCount={userTeam?.picks.length || 0}
           maxDrafts={draftState?.draftSettings?.pokemonPerTeam || 6}

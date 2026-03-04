@@ -7,12 +7,10 @@
  * - League name
  * - Number of weeks (6-20)
  * - Match format (best of 1/3/5)
- * - Trade system toggle
- * - Trade deadline week
- * - Commissioner approval requirement
+ * - Free agent picks configuration
  */
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +19,7 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LeagueService } from '@/lib/league-service'
 import { createLogger } from '@/lib/logger'
-import { Loader2, Trophy, Users, Calendar, Swords, Repeat, Shield } from 'lucide-react'
+import { Loader2, Trophy, Users, Calendar, Swords, UserPlus } from 'lucide-react'
 
 const log = createLogger('CreateLeagueModal')
 
@@ -46,15 +44,17 @@ export function CreateLeagueModal({
   const [totalWeeks, setTotalWeeks] = useState(10)
   const [matchFormat, setMatchFormat] = useState<'best_of_1' | 'best_of_3' | 'best_of_5'>('best_of_3')
   const [splitConferences, setSplitConferences] = useState(false)
-  const [enableTrades, setEnableTrades] = useState(true)
-  const [tradeDeadlineWeek, setTradeDeadlineWeek] = useState<number | null>(8)
-  const [requireCommissionerApproval, setRequireCommissionerApproval] = useState(false)
+  const [freeAgentPicksAllowed, setFreeAgentPicksAllowed] = useState(3)
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const createInFlightRef = useRef(false)
 
   const canSplitConferences = teamCount >= 4
 
   const handleCreate = async () => {
+    // Ref guard prevents double-submission (state updates are async)
+    if (createInFlightRef.current) return
+    createInFlightRef.current = true
     setError(null)
     setIsCreating(true)
 
@@ -72,10 +72,8 @@ export function CreateLeagueModal({
 
       // Update league settings with extended options
       await LeagueService.updateLeagueSettings(leagueId, {
-        enableTrades,
-        tradeDeadlineWeek: enableTrades ? (tradeDeadlineWeek ?? undefined) : undefined,
-        requireCommissionerApproval: enableTrades ? requireCommissionerApproval : false,
         matchFormat,
+        freeAgentPicksAllowed,
       })
 
       // Initialize Pokemon status for all teams
@@ -88,6 +86,7 @@ export function CreateLeagueModal({
       setError(err instanceof Error ? err.message : 'Failed to create league')
     } finally {
       setIsCreating(false)
+      createInFlightRef.current = false
     }
   }
 
@@ -181,72 +180,28 @@ export function CreateLeagueModal({
             </div>
           )}
 
-          {/* Trading System */}
-          <div className="space-y-4 p-4 border rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <Label htmlFor="enable-trades" className="flex items-center gap-2">
-                  <Repeat className="h-4 w-4" />
-                  Enable Trading
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Allow Pokemon trades between teams during the season
-                </p>
-              </div>
-              <Switch
-                id="enable-trades"
-                checked={enableTrades}
-                onCheckedChange={setEnableTrades}
-              />
-            </div>
-
-            {enableTrades && (
-              <>
-                {/* Trade Deadline */}
-                <div className="space-y-2 pl-6">
-                  <Label htmlFor="trade-deadline" className="text-sm">
-                    Trade Deadline
-                  </Label>
-                  <Select
-                    value={tradeDeadlineWeek ? String(tradeDeadlineWeek) : 'none'}
-                    onValueChange={(v) => setTradeDeadlineWeek(v === 'none' ? null : Number(v))}
-                  >
-                    <SelectTrigger id="trade-deadline" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No deadline</SelectItem>
-                      {Array.from({ length: totalWeeks - 2 }, (_, i) => i + 2).map((week) => (
-                        <SelectItem key={week} value={String(week)}>
-                          Week {week}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Trades locked after this week
-                  </p>
-                </div>
-
-                {/* Commissioner Approval */}
-                <div className="flex items-center justify-between pl-6">
-                  <div className="space-y-1">
-                    <Label htmlFor="commissioner-approval" className="text-sm flex items-center gap-2">
-                      <Shield className="h-3 w-3" />
-                      Require Commissioner Approval
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                      Trades must be approved by league commissioner
-                    </p>
-                  </div>
-                  <Switch
-                    id="commissioner-approval"
-                    checked={requireCommissionerApproval}
-                    onCheckedChange={setRequireCommissionerApproval}
-                  />
-                </div>
-              </>
-            )}
+          {/* Free Agent Picks */}
+          <div className="space-y-2">
+            <Label htmlFor="free-agent-picks" className="flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Free Agent Picks Allowed
+            </Label>
+            <Select value={String(freeAgentPicksAllowed)} onValueChange={(v) => setFreeAgentPicksAllowed(Number(v))}>
+              <SelectTrigger id="free-agent-picks">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">None</SelectItem>
+                <SelectItem value="1">1 pick</SelectItem>
+                <SelectItem value="2">2 picks</SelectItem>
+                <SelectItem value="3">3 picks</SelectItem>
+                <SelectItem value="5">5 picks</SelectItem>
+                <SelectItem value="10">10 picks</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground">
+              Teams can claim free agents from the pool after the draft but before the first game is played. Once the first match starts, free agent claims are locked.
+            </p>
           </div>
 
           {error && (

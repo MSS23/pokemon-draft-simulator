@@ -13,17 +13,18 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Sparkles, Zap, Crown, AlertTriangle } from 'lucide-react'
+import { Sparkles, Zap, Crown, AlertTriangle, Loader2 } from 'lucide-react'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
 
 interface DraftConfirmationModalProps {
   pokemon: Pokemon | null
   isOpen: boolean
   onClose: () => void
-  onConfirm: (pokemon: Pokemon) => void
+  onConfirm: (pokemon: Pokemon) => void | Promise<void>
   currentBudget?: number
   draftedCount?: number
   maxDrafts?: number
+  isLoading?: boolean
 }
 
 export default function DraftConfirmationModal({
@@ -34,6 +35,7 @@ export default function DraftConfirmationModal({
   currentBudget = 100,
   draftedCount = 0,
   maxDrafts = 6,
+  isLoading = false,
 }: DraftConfirmationModalProps) {
   const {
     imageUrl,
@@ -234,22 +236,27 @@ export default function DraftConfirmationModal({
           <Button
             variant="outline"
             onClick={onClose}
+            disabled={isLoading}
             className="flex-1 h-10 sm:h-11 md:h-12 text-sm sm:text-base font-semibold border-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </Button>
           <Button
             onClick={() => onConfirm(pokemon)}
-            disabled={isOverBudget}
+            disabled={isOverBudget || isLoading}
             className={cn(
               "flex-1 h-10 sm:h-11 md:h-12 text-sm sm:text-base font-bold shadow-lg transition-all duration-200",
-              isOverBudget
+              isOverBudget || isLoading
                 ? "bg-slate-400 hover:bg-slate-400 cursor-not-allowed opacity-60"
                 : "brand-gradient-bg text-white hover:brightness-110 hover:shadow-xl hover:scale-[1.02]"
             )}
           >
-            <Crown className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
-            <span className="truncate">{isOverBudget ? "Over Budget" : `Draft ${pokemon.name}`}</span>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 animate-spin" />
+            ) : (
+              <Crown className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+            )}
+            <span className="truncate">{isLoading ? "Drafting..." : isOverBudget ? "Over Budget" : `Draft ${pokemon.name}`}</span>
           </Button>
         </div>
       </DialogContent>
