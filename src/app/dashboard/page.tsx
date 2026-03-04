@@ -5,16 +5,21 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/supabase'
 import type { DraftSettings } from '@/types/supabase-helpers'
+import type { League, Match, Team } from '@/types'
+import { LeagueService } from '@/lib/league-service'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Clock, Zap } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('Dashboard')
 
 type DraftRow = Database['public']['Tables']['drafts']['Row']
 
@@ -48,6 +53,25 @@ interface DraftSummary {
   draft_order: number
   picks_made: number
   progress_percent: number
+}
+
+interface UpcomingMatch {
+  league: League
+  match: Match & { homeTeam: Team; awayTeam: Team }
+  userTeamId: string
+  userTeamName: string
+  opponentTeamId: string
+  opponentTeamName: string
+}
+
+interface LeagueStanding {
+  league: League
+  userTeamId: string
+  userTeamName: string
+  wins: number
+  losses: number
+  draws: number
+  rank: number | null
 }
 
 function buildDraftSummaries(
@@ -94,6 +118,8 @@ export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState<DraftSummary[]>([])
+  const [upcomingMatches, setUpcomingMatches] = useState<UpcomingMatch[]>([])
+  const [leagueStandings, setLeagueStandings] = useState<LeagueStanding[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
@@ -153,6 +179,19 @@ export default function DashboardPage() {
 
         setFetchError(null)
         setDrafts(buildDraftSummaries(teams, pickCounts, user.id))
+
+        // Load league data in parallel
+        try {
+          const [matches, standings] = await Promise.all([
+            LeagueService.getUpcomingMatches(user.id),
+            LeagueService.getUserLeagueStandings(user.id),
+          ])
+          setUpcomingMatches(matches)
+          setLeagueStandings(standings)
+        } catch (err) {
+          log.error('Failed to load league data:', err)
+          // Non-fatal: leagues section just won't show
+        }
       } catch {
         setFetchError('An unexpected error occurred. Please try again.')
         setDrafts([])
@@ -205,6 +244,11 @@ export default function DashboardPage() {
   const activeDrafts = drafts.filter(d => d.status === 'active' || d.status === 'setup')
   const completedDrafts = drafts.filter(d => d.status === 'completed')
 
+  // Aggregate league W-L across all leagues
+  const totalWins = leagueStandings.reduce((sum, s) => sum + s.wins, 0)
+  const totalLosses = leagueStandings.reduce((sum, s) => sum + s.losses, 0)
+  const activeLeagueCount = leagueStandings.filter(s => s.league.status === 'active').length
+
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
       setup: { label: 'Setup', variant: 'outline' },
@@ -213,6 +257,17 @@ export default function DashboardPage() {
       paused: { label: 'Paused', variant: 'outline' }
     }
     const c = config[status] || config.setup
+    return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>
+  }
+
+  const getMatchStatusBadge = (status: string) => {
+    const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+      scheduled: { label: 'Scheduled', variant: 'outline' },
+      in_progress: { label: 'Live', variant: 'default' },
+      completed: { label: 'Done', variant: 'secondary' },
+      cancelled: { label: 'Cancelled', variant: 'outline' },
+    }
+    const c = config[status] || config.scheduled
     return <Badge variant={c.variant} className="text-[10px]">{c.label}</Badge>
   }
 
@@ -263,6 +318,63 @@ export default function DashboardPage() {
     </Card>
   )
 
+  const MatchupCard = ({ matchup }: { matchup: UpcomingMatch }) => {
+    const isHome = matchup.match.homeTeamId === matchup.userTeamId
+    const userScore = isHome ? matchup.match.homeScore : matchup.match.awayScore
+    const opponentScore = isHome ? matchup.match.awayScore : matchup.match.homeScore
+
+    return (
+      <Card
+        className="hover:border-primary/30 transition-colors cursor-pointer"
+        onClick={() => router.push(`/league/${matchup.league.id}/team/${matchup.opponentTeamId}`)}
+      >
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground truncate">
+              {matchup.league.name}
+            </p>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">
+                Week {matchup.league.currentWeek}/{matchup.league.totalWeeks}
+              </Badge>
+              {getMatchStatusBadge(matchup.match.status)}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-4">
+            <div className="text-right flex-1">
+              <p className="text-sm font-semibold truncate">{matchup.userTeamName}</p>
+              <p className="text-[10px] text-muted-foreground">You</p>
+            </div>
+
+            {matchup.match.status === 'completed' ? (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-muted/50">
+                <span className="text-lg font-bold tabular-nums">{userScore}</span>
+                <span className="text-xs text-muted-foreground">-</span>
+                <span className="text-lg font-bold tabular-nums">{opponentScore}</span>
+              </div>
+            ) : (
+              <div className="px-3 py-1.5">
+                <Swords className="h-5 w-5 text-muted-foreground" />
+              </div>
+            )}
+
+            <div className="text-left flex-1">
+              <p className="text-sm font-semibold truncate">{matchup.opponentTeamName}</p>
+              <p className="text-[10px] text-muted-foreground">Opponent</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center">
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              View opponent&apos;s team <ChevronRight className="h-3 w-3" />
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <SidebarLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -270,7 +382,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold">Welcome back, {displayName}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage your drafts and track progress.
+            Manage your drafts and leagues.
           </p>
         </div>
 
@@ -286,7 +398,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-xs text-muted-foreground">Total Drafts</p>
                 <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
               <p className="text-2xl font-bold">{drafts.length}</p>
@@ -295,7 +407,7 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-muted-foreground">Active</p>
+                <p className="text-xs text-muted-foreground">Active Drafts</p>
                 <Zap className="h-3.5 w-3.5 text-green-500" />
               </div>
               <p className="text-2xl font-bold">{activeDrafts.length}</p>
@@ -304,22 +416,118 @@ export default function DashboardPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-muted-foreground">Completed</p>
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Active Leagues</p>
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold">{completedDrafts.length}</p>
+              <p className="text-2xl font-bold">{activeLeagueCount}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-muted-foreground">Win Rate</p>
+                <p className="text-xs text-muted-foreground">League W-L</p>
                 <Users className="h-3.5 w-3.5 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold">{drafts.length > 0 ? `${Math.round((completedDrafts.length / drafts.length) * 100)}%` : '-'}</p>
+              <p className="text-2xl font-bold">
+                {totalWins + totalLosses > 0 ? `${totalWins}-${totalLosses}` : '-'}
+              </p>
             </CardContent>
           </Card>
         </div>
+
+        {/* This Week's Matches */}
+        {upcomingMatches.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Swords className="h-4 w-4" />
+                  This Week&apos;s Matches
+                </CardTitle>
+                <Badge variant="secondary" className="text-[10px]">
+                  {upcomingMatches.length} {upcomingMatches.length === 1 ? 'match' : 'matches'}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {upcomingMatches.map(matchup => (
+                  <MatchupCard key={matchup.match.id} matchup={matchup} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* My Leagues */}
+        {leagueStandings.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  My Leagues
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {leagueStandings.map(standing => (
+                  <Card
+                    key={standing.league.id}
+                    className="hover:border-primary/30 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/league/${standing.league.id}`)}
+                  >
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{standing.league.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {standing.userTeamName}
+                          </p>
+                        </div>
+                        {getStatusBadge(standing.league.status)}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Record</p>
+                          <p className="text-sm font-semibold">
+                            {standing.wins}-{standing.losses}{standing.draws > 0 ? `-${standing.draws}` : ''}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Week</p>
+                          <p className="text-sm font-semibold">
+                            {standing.league.currentWeek}/{standing.league.totalWeeks}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Rank</p>
+                          <p className="text-sm font-semibold">
+                            {standing.rank ? `#${standing.rank}` : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Empty state for leagues */}
+        {leagueStandings.length === 0 && upcomingMatches.length === 0 && drafts.some(d => d.status === 'completed') && (
+          <Card>
+            <CardContent className="py-8 text-center space-y-2">
+              <Shield className="h-8 w-8 mx-auto text-muted-foreground/50" />
+              <p className="text-sm font-medium">No leagues yet</p>
+              <p className="text-xs text-muted-foreground">
+                Complete a draft and create a league to start battling.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Drafts */}
         <Card>

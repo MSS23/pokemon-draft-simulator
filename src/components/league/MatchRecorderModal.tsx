@@ -8,6 +8,7 @@
  * - Pokemon selector (which Pokemon were used)
  * - KO counter per Pokemon
  * - Death confirmation for Nuzlocke mode
+ * - Dual-confirmation: both teams submit independently
  */
 
 import { useState, useEffect } from 'react'
@@ -23,7 +24,7 @@ import { MatchKOService } from '@/lib/match-ko-service'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('MatchRecorderModal')
-import { Loader2, Trophy, Skull, AlertTriangle, Plus, Minus } from 'lucide-react'
+import { Loader2, Trophy, Skull, AlertTriangle, Plus, Minus, Clock, CheckCircle2, XCircle } from 'lucide-react'
 import type { Match, Team, Pick, ExtendedLeagueSettings } from '@/types'
 
 interface MatchRecorderModalProps {
@@ -34,6 +35,7 @@ interface MatchRecorderModalProps {
   awayTeamPicks: Pick[]
   leagueSettings: ExtendedLeagueSettings
   onSuccess: () => void
+  currentUserTeamId?: string | null
 }
 
 interface GameResult {
@@ -59,6 +61,7 @@ export function MatchRecorderModal({
   awayTeamPicks,
   leagueSettings,
   onSuccess,
+  currentUserTeamId,
 }: MatchRecorderModalProps) {
   const [currentStep, setCurrentStep] = useState<'games' | 'kos' | 'confirm'>('games')
   const [games, setGames] = useState<GameResult[]>([])
@@ -66,11 +69,14 @@ export function MatchRecorderModal({
   const [awayKOs, setAwayKOs] = useState<PokemonKO[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [submissionResult, setSubmissionResult] = useState<'pending' | 'confirmed' | 'disputed' | null>(null)
 
   const gamesRequired = match.battleFormat === 'best_of_1' ? 1 : match.battleFormat === 'best_of_3' ? 2 : 3
 
+  const isUserInMatch = currentUserTeamId === match.homeTeamId || currentUserTeamId === match.awayTeamId
+  const userSide = currentUserTeamId === match.homeTeamId ? 'home' : currentUserTeamId === match.awayTeamId ? 'away' : null
+
   useEffect(() => {
-    // Initialize games array
     if (games.length === 0) {
       const initialGames: GameResult[] = []
       for (let i = 0; i < gamesRequired; i++) {
@@ -158,54 +164,81 @@ export function MatchRecorderModal({
       const homeScore = games.filter(g => g.winnerTeamId === match.homeTeamId).length
       const awayScore = games.filter(g => g.winnerTeamId === match.awayTeamId).length
 
-      // Update match result
-      await LeagueService.updateMatchResult(match.id, {
-        homeScore,
-        awayScore,
-        winnerTeamId: matchWinner,
-        status: 'completed',
-      })
+      if (isUserInMatch && currentUserTeamId) {
+        // Dual-confirmation: submit from this team's perspective
+        const result = await LeagueService.submitMatchResult(match.id, currentUserTeamId, {
+          homeScore,
+          awayScore,
+          winnerTeamId: matchWinner,
+        })
 
-      // Record all KOs for home team
-      for (const ko of homeKOs) {
-        for (const game of games) {
-          await MatchKOService.recordPokemonKO(
-            match.id,
-            game.gameNumber,
-            ko.pickId,
-            ko.koCount,
-            ko.isDeath
-          )
+        setSubmissionResult(result.status)
+
+        // If confirmed (both teams agreed), also record KOs
+        if (result.status === 'confirmed') {
+          await recordKOs(homeScore, awayScore, matchWinner)
+          onSuccess()
         }
-      }
 
-      // Record all KOs for away team
-      for (const ko of awayKOs) {
-        for (const game of games) {
-          await MatchKOService.recordPokemonKO(
-            match.id,
-            game.gameNumber,
-            ko.pickId,
-            ko.koCount,
-            ko.isDeath
-          )
+        // If pending, just close - they'll see the status on the fixture
+        if (result.status === 'pending') {
+          // Don't close immediately - show the pending state
+          return
         }
-      }
 
-      // Update Pokemon match stats
-      const allPicks = [...homeTeamPicks, ...awayTeamPicks]
-      for (const pick of allPicks) {
-        const wasOnWinningTeam = pick.teamId === matchWinner
-        await MatchKOService.updatePokemonMatchStats(pick.id, wasOnWinningTeam)
+        if (result.status === 'disputed') {
+          // Show dispute state
+          return
+        }
+      } else {
+        // No user team context (admin/spectator) - direct update
+        await LeagueService.updateMatchResult(match.id, {
+          homeScore,
+          awayScore,
+          winnerTeamId: matchWinner,
+          status: 'completed',
+        })
+        await recordKOs(homeScore, awayScore, matchWinner)
+        onSuccess()
+        onClose()
       }
-
-      onSuccess()
-      onClose()
     } catch (err) {
       log.error('Failed to record match:', err)
       setError(err instanceof Error ? err.message : 'Failed to record match')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const recordKOs = async (homeScore: number, awayScore: number, matchWinner: string | null) => {
+    for (const ko of homeKOs) {
+      for (const game of games) {
+        await MatchKOService.recordPokemonKO(
+          match.id,
+          game.gameNumber,
+          ko.pickId,
+          ko.koCount,
+          ko.isDeath
+        )
+      }
+    }
+
+    for (const ko of awayKOs) {
+      for (const game of games) {
+        await MatchKOService.recordPokemonKO(
+          match.id,
+          game.gameNumber,
+          ko.pickId,
+          ko.koCount,
+          ko.isDeath
+        )
+      }
+    }
+
+    const allPicks = [...homeTeamPicks, ...awayTeamPicks]
+    for (const pick of allPicks) {
+      const wasOnWinningTeam = pick.teamId === matchWinner
+      await MatchKOService.updatePokemonMatchStats(pick.id, wasOnWinningTeam)
     }
   }
 
@@ -222,12 +255,53 @@ export function MatchRecorderModal({
           </DialogTitle>
           <DialogDescription>
             {match.homeTeam.name} vs {match.awayTeam.name} - Week {match.weekNumber}
+            {userSide && (
+              <Badge variant="secondary" className="ml-2">
+                You are {userSide === 'home' ? match.homeTeam.name : match.awayTeam.name}
+              </Badge>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
+          {/* Submission Result State */}
+          {submissionResult && (
+            <div className="py-4 space-y-4">
+              {submissionResult === 'pending' && (
+                <Alert>
+                  <Clock className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Result submitted!</strong> Waiting for your opponent to submit their result.
+                    Once both teams submit matching results, the match will be automatically confirmed.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {submissionResult === 'confirmed' && (
+                <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <AlertDescription>
+                    <strong>Match confirmed!</strong> Both teams submitted matching results.
+                    The match has been recorded.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {submissionResult === 'disputed' && (
+                <Alert variant="destructive">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Results disputed!</strong> Your submission doesn&apos;t match your opponent&apos;s.
+                    Please coordinate with your opponent to resolve the discrepancy.
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Button onClick={onClose} className="w-full">
+                {submissionResult === 'confirmed' ? 'Done' : 'Close'}
+              </Button>
+            </div>
+          )}
+
           {/* Step 1: Game Results */}
-          {currentStep === 'games' && (
+          {!submissionResult && currentStep === 'games' && (
             <div className="space-y-4 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Game Results</h3>
@@ -279,7 +353,7 @@ export function MatchRecorderModal({
           )}
 
           {/* Step 2: Pokemon KOs */}
-          {currentStep === 'kos' && (
+          {!submissionResult && currentStep === 'kos' && (
             <div className="space-y-4 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Pokemon Knockouts</h3>
@@ -422,9 +496,19 @@ export function MatchRecorderModal({
           )}
 
           {/* Step 3: Confirmation */}
-          {currentStep === 'confirm' && (
+          {!submissionResult && currentStep === 'confirm' && (
             <div className="space-y-4 py-4">
               <h3 className="text-lg font-semibold">Confirm Match Result</h3>
+
+              {isUserInMatch && (
+                <Alert>
+                  <Clock className="h-4 w-4" />
+                  <AlertDescription>
+                    Your opponent will also need to submit their result. If both results match,
+                    the match will be automatically confirmed.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <Card>
                 <CardHeader>
@@ -498,51 +582,55 @@ export function MatchRecorderModal({
           )}
         </ScrollArea>
 
-        <DialogFooter className="border-t pt-4">
-          <div className="flex items-center justify-between w-full">
-            <div>
-              {currentStep !== 'games' && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (currentStep === 'kos') setCurrentStep('games')
-                    if (currentStep === 'confirm') setCurrentStep('kos')
-                  }}
-                  disabled={isSubmitting}
-                >
-                  Back
+        {!submissionResult && (
+          <DialogFooter className="border-t pt-4">
+            <div className="flex items-center justify-between w-full">
+              <div>
+                {currentStep !== 'games' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (currentStep === 'kos') setCurrentStep('games')
+                      if (currentStep === 'confirm') setCurrentStep('kos')
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Back
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+                  Cancel
                 </Button>
-              )}
+                {currentStep === 'games' && (
+                  <Button onClick={() => setCurrentStep('kos')} disabled={!canProceedToKOs}>
+                    Next: Pokemon KOs
+                  </Button>
+                )}
+                {currentStep === 'kos' && (
+                  <Button onClick={() => setCurrentStep('confirm')}>
+                    Next: Confirm
+                  </Button>
+                )}
+                {currentStep === 'confirm' && (
+                  <Button onClick={handleSubmit} disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : isUserInMatch ? (
+                      'Submit My Result'
+                    ) : (
+                      'Submit Result'
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
-                Cancel
-              </Button>
-              {currentStep === 'games' && (
-                <Button onClick={() => setCurrentStep('kos')} disabled={!canProceedToKOs}>
-                  Next: Pokemon KOs
-                </Button>
-              )}
-              {currentStep === 'kos' && (
-                <Button onClick={() => setCurrentStep('confirm')}>
-                  Next: Confirm
-                </Button>
-              )}
-              {currentStep === 'confirm' && (
-                <Button onClick={handleSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Result'
-                  )}
-                </Button>
-              )}
-            </div>
-          </div>
-        </DialogFooter>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   )

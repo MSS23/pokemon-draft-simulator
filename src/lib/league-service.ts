@@ -512,7 +512,7 @@ export class LeagueService {
   }
 
   /**
-   * Update match result
+   * Update match result (direct update, used internally)
    */
   static async updateMatchResult(
     matchId: string,
@@ -538,6 +538,142 @@ export class LeagueService {
       .eq('id', matchId)
 
     if (error) throw new Error('Failed to update match result')
+  }
+
+  /**
+   * Submit match result from one team's perspective (dual-confirmation flow).
+   * When both teams submit matching results, the match is auto-confirmed.
+   * If results conflict, the match is flagged as disputed.
+   */
+  static async submitMatchResult(
+    matchId: string,
+    submittingTeamId: string,
+    result: {
+      homeScore: number
+      awayScore: number
+      winnerTeamId: string | null
+    }
+  ): Promise<{ status: 'pending' | 'confirmed' | 'disputed' }> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Fetch current match
+    const { data: match } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('id', matchId)
+      .single()
+
+    if (!match) throw new Error('Match not found')
+
+    const isHome = submittingTeamId === match.home_team_id
+    const isAway = submittingTeamId === match.away_team_id
+    if (!isHome && !isAway) throw new Error('Team is not part of this match')
+
+    // Read existing notes as submission state
+    const notes = match.notes ? JSON.parse(match.notes) : {}
+    const submissions = notes.submissions || {}
+
+    // Store this team's submission
+    const side = isHome ? 'home' : 'away'
+    submissions[side] = {
+      homeScore: result.homeScore,
+      awayScore: result.awayScore,
+      winnerTeamId: result.winnerTeamId,
+      submittedAt: new Date().toISOString(),
+    }
+
+    const otherSide = isHome ? 'away' : 'home'
+
+    // Check if the other team has already submitted
+    if (submissions[otherSide]) {
+      const otherResult = submissions[otherSide]
+      const resultsMatch =
+        otherResult.homeScore === result.homeScore &&
+        otherResult.awayScore === result.awayScore &&
+        otherResult.winnerTeamId === result.winnerTeamId
+
+      if (resultsMatch) {
+        // Both agree - auto-confirm match
+        await this.updateMatchResult(matchId, {
+          homeScore: result.homeScore,
+          awayScore: result.awayScore,
+          winnerTeamId: result.winnerTeamId,
+          status: 'completed',
+        })
+
+        // Update notes with confirmed status
+        const { error } = await supabase
+          .from('matches')
+          .update({
+            notes: JSON.stringify({ ...notes, submissions, confirmationStatus: 'confirmed' }),
+          })
+          .eq('id', matchId)
+        if (error) log.error('Failed to update match notes:', error)
+
+        return { status: 'confirmed' }
+      } else {
+        // Results conflict - flag as disputed
+        const { error } = await supabase
+          .from('matches')
+          .update({
+            notes: JSON.stringify({ ...notes, submissions, confirmationStatus: 'disputed' }),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', matchId)
+        if (error) log.error('Failed to update match notes:', error)
+
+        return { status: 'disputed' }
+      }
+    }
+
+    // Only one submission so far - save and wait for other team
+    const { error } = await supabase
+      .from('matches')
+      .update({
+        notes: JSON.stringify({ ...notes, submissions, confirmationStatus: 'pending' }),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', matchId)
+    if (error) throw new Error('Failed to save submission')
+
+    return { status: 'pending' }
+  }
+
+  /**
+   * Get match submission status (which teams have submitted, any disputes)
+   */
+  static async getMatchSubmissionStatus(matchId: string): Promise<{
+    homeSubmitted: boolean
+    awaySubmitted: boolean
+    confirmationStatus: 'none' | 'pending' | 'confirmed' | 'disputed'
+    homeSubmission?: { homeScore: number; awayScore: number; winnerTeamId: string | null }
+    awaySubmission?: { homeScore: number; awayScore: number; winnerTeamId: string | null }
+  }> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data: match } = await supabase
+      .from('matches')
+      .select('notes')
+      .eq('id', matchId)
+      .single()
+
+    if (!match?.notes) {
+      return { homeSubmitted: false, awaySubmitted: false, confirmationStatus: 'none' }
+    }
+
+    try {
+      const notes = JSON.parse(match.notes)
+      const submissions = notes.submissions || {}
+      return {
+        homeSubmitted: !!submissions.home,
+        awaySubmitted: !!submissions.away,
+        confirmationStatus: notes.confirmationStatus || 'none',
+        homeSubmission: submissions.home,
+        awaySubmission: submissions.away,
+      }
+    } catch {
+      return { homeSubmitted: false, awaySubmitted: false, confirmationStatus: 'none' }
+    }
   }
 
   /**
@@ -876,6 +1012,146 @@ export class LeagueService {
         })
         .eq('id', leagueId)
     }
+  }
+
+  /**
+   * Get user's upcoming matches across all active leagues for the current week.
+   * Returns match details with league context and opponent info.
+   */
+  static async getUpcomingMatches(userId: string): Promise<{
+    league: League
+    match: Match & { homeTeam: Team; awayTeam: Team }
+    userTeamId: string
+    userTeamName: string
+    opponentTeamId: string
+    opponentTeamName: string
+  }[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Find all league_teams where the user owns the team, joined with league info
+    type LeagueTeamJoin = LeagueTeamRow & {
+      teams: TeamRow
+      leagues: LeagueRow
+    }
+
+    const { data: rawLeagueTeams } = await supabase
+      .from('league_teams')
+      .select(`
+        *,
+        teams!inner(*),
+        leagues!inner(*)
+      `)
+      .eq('teams.owner_id', userId)
+
+    if (!rawLeagueTeams || rawLeagueTeams.length === 0) return []
+
+    const leagueTeams = rawLeagueTeams as unknown as LeagueTeamJoin[]
+
+    // Filter to active leagues only
+    const activeLeagueTeams = leagueTeams.filter(
+      lt => lt.leagues.status === 'active'
+    )
+
+    if (activeLeagueTeams.length === 0) return []
+
+    // For each active league, fetch this week's fixtures
+    const results: {
+      league: League
+      match: Match & { homeTeam: Team; awayTeam: Team }
+      userTeamId: string
+      userTeamName: string
+      opponentTeamId: string
+      opponentTeamName: string
+    }[] = []
+
+    for (const lt of activeLeagueTeams) {
+      const league = mapLeagueRow(lt.leagues)
+      const weekFixtures = await this.getWeekFixtures(league.id, league.currentWeek)
+
+      // Find matches involving this user's team
+      for (const match of weekFixtures) {
+        const isHome = match.homeTeamId === lt.team_id
+        const isAway = match.awayTeamId === lt.team_id
+        if (!isHome && !isAway) continue
+
+        const userTeam = isHome ? match.homeTeam : match.awayTeam
+        const opponentTeam = isHome ? match.awayTeam : match.homeTeam
+
+        results.push({
+          league,
+          match,
+          userTeamId: lt.team_id,
+          userTeamName: userTeam.name,
+          opponentTeamId: opponentTeam.id,
+          opponentTeamName: opponentTeam.name,
+        })
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * Get user's league standings across all active leagues.
+   */
+  static async getUserLeagueStandings(userId: string): Promise<{
+    league: League
+    userTeamId: string
+    userTeamName: string
+    wins: number
+    losses: number
+    draws: number
+    rank: number | null
+  }[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    type LeagueTeamJoin = LeagueTeamRow & {
+      teams: TeamRow
+      leagues: LeagueRow
+    }
+
+    const { data: rawLeagueTeams } = await supabase
+      .from('league_teams')
+      .select(`
+        *,
+        teams!inner(*),
+        leagues!inner(*)
+      `)
+      .eq('teams.owner_id', userId)
+
+    if (!rawLeagueTeams || rawLeagueTeams.length === 0) return []
+
+    const leagueTeams = rawLeagueTeams as unknown as LeagueTeamJoin[]
+    const activeLeagueTeams = leagueTeams.filter(
+      lt => lt.leagues.status === 'active' || lt.leagues.status === 'completed'
+    )
+
+    const results: {
+      league: League
+      userTeamId: string
+      userTeamName: string
+      wins: number
+      losses: number
+      draws: number
+      rank: number | null
+    }[] = []
+
+    for (const lt of activeLeagueTeams) {
+      const standings = await this.getStandings(lt.leagues.id)
+      const userStanding = standings.find(s => s.teamId === lt.team_id)
+
+      results.push({
+        league: mapLeagueRow(lt.leagues),
+        userTeamId: lt.team_id,
+        userTeamName: lt.teams.name,
+        wins: userStanding?.wins ?? 0,
+        losses: userStanding?.losses ?? 0,
+        draws: userStanding?.draws ?? 0,
+        rank: userStanding?.rank ?? null,
+      })
+    }
+
+    return results
   }
 
   /**

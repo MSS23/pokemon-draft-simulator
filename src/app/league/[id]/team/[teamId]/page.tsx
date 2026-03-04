@@ -24,6 +24,9 @@ import { LeagueStatsService } from '@/lib/league-stats-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { useAuth } from '@/contexts/AuthContext'
+// UserSessionService used for guest ID fallback
+import { getPokemonAnimatedUrl, getPokemonSpriteUrl, formatPokemonName } from '@/utils/pokemon'
 import {
   ArrowLeft,
   TrendingUp,
@@ -35,7 +38,9 @@ import {
   Target,
   Award,
   Activity,
-  Brain
+  Brain,
+  Lock,
+  Eye
 } from 'lucide-react'
 import type {
   AdvancedTeamStats,
@@ -46,11 +51,14 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('LeagueTeamPage')
 
+type ViewerRole = 'owner' | 'opponent' | 'spectator'
+
 export default function TeamDetailPage() {
   const params = useParams()
   const router = useRouter()
   const leagueId = params.id as string
   const teamId = params.teamId as string
+  const { user: authUser } = useAuth()
 
   const [team, setTeam] = useState<Team | null>(null)
   const [picks, setPicks] = useState<Pick[]>([])
@@ -63,6 +71,7 @@ export default function TeamDetailPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [canAnalyzeTeams, setCanAnalyzeTeams] = useState(false)
   const [accessChecked, setAccessChecked] = useState(false)
+  const [viewerRole, setViewerRole] = useState<ViewerRole>('spectator')
 
   const loadTeamData = useCallback(async () => {
     try {
@@ -71,6 +80,9 @@ export default function TeamDetailPage() {
 
       const { supabase } = await import('@/lib/supabase')
       if (!supabase) throw new Error('Supabase not available')
+
+      // Determine viewer identity
+      const userId = authUser?.id || localStorage.getItem('guestUserId')
 
       // Load team
       const { data: teamData, error: teamError } = await supabase
@@ -81,6 +93,32 @@ export default function TeamDetailPage() {
 
       if (teamError) throw teamError
       setTeam(teamData as unknown as Team)
+
+      // Determine viewer role
+      if (userId && (teamData as unknown as Team).ownerId === userId) {
+        setViewerRole('owner')
+      } else if (userId) {
+        // Check if user owns another team in this league
+        const { data: leagueTeams } = await supabase
+          .from('league_teams')
+          .select('team_id')
+          .eq('league_id', leagueId)
+
+        if (leagueTeams) {
+          const leagueTeamIds = leagueTeams.map(lt => lt.team_id)
+          const { data: userTeams } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('owner_id', userId)
+            .in('id', leagueTeamIds)
+
+          if (userTeams && userTeams.length > 0) {
+            setViewerRole('opponent')
+          } else {
+            setViewerRole('spectator')
+          }
+        }
+      }
 
       // Load picks
       const { data: picksData } = await supabase
@@ -109,7 +147,7 @@ export default function TeamDetailPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [teamId, leagueId])
+  }, [teamId, leagueId, authUser?.id])
 
   useEffect(() => {
     loadTeamData()
@@ -297,7 +335,20 @@ export default function TeamDetailPage() {
           </Card>
         )}
 
-        {/* AI Analysis Section */}
+        {/* Privacy indicator */}
+        {viewerRole !== 'owner' && (
+          <Alert className="mb-6">
+            <Eye className="h-4 w-4" />
+            <AlertDescription>
+              Viewing as {viewerRole === 'opponent' ? 'an opponent' : 'a spectator'}.
+              {viewerRole === 'spectator' && ' Some data like draft costs and detailed KO stats are hidden.'}
+              {viewerRole === 'opponent' && ' AI analysis and weakness data are hidden.'}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* AI Analysis Section - Owner only */}
+        {viewerRole === 'owner' && (
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -413,12 +464,27 @@ export default function TeamDetailPage() {
             </CardContent>
           )}
         </Card>
+        )}
+
+        {/* Restricted content placeholder for non-owners */}
+        {viewerRole !== 'owner' && (
+          <Card className="mb-6 border-dashed">
+            <CardContent className="py-8 text-center">
+              <Lock className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+              <p className="text-sm text-muted-foreground">
+                AI analysis and weakness data are private to the team owner.
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Detailed Stats Tabs */}
         <Tabs defaultValue="roster" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${viewerRole === 'owner' ? 'grid-cols-2' : 'grid-cols-1'}`}>
             <TabsTrigger value="roster">Roster</TabsTrigger>
-            <TabsTrigger value="stats">Advanced Stats</TabsTrigger>
+            {viewerRole === 'owner' && (
+              <TabsTrigger value="stats">Advanced Stats</TabsTrigger>
+            )}
           </TabsList>
 
           {/* Roster Tab */}
@@ -435,12 +501,36 @@ export default function TeamDetailPage() {
                   {picks.map(pick => (
                     <Card key={pick.id} className="overflow-hidden">
                       <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold">{pick.pokemonName}</span>
-                          <Badge variant="outline">Cost: {pick.cost}</Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Round {pick.round} • Pick #{pick.pickOrder}
+                        <div className="flex items-center gap-3">
+                          {/* Animated sprite */}
+                          <div className="flex-shrink-0 w-14 h-14 flex items-center justify-center">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
+                              alt={pick.pokemonName}
+                              className="w-14 h-14 pixelated"
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                if (!target.dataset.fallback) {
+                                  target.dataset.fallback = '1'
+                                  target.src = getPokemonSpriteUrl(pick.pokemonId)
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-sm">{formatPokemonName(pick.pokemonName)}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              Round {pick.round} • Pick #{pick.pickOrder}
+                            </div>
+                            {/* Show cost only to owner and opponents, not spectators */}
+                            {viewerRole !== 'spectator' && (
+                              <Badge variant="outline" className="mt-1 text-[10px]">
+                                {pick.cost} pts
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

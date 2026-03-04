@@ -479,7 +479,10 @@ export default function DraftRoomPage() {
     },
     onStatusChange: (newStatus) => {
       if (newStatus === 'completed') {
-        notify.success('Draft Complete!', 'All picks have been made.')
+        notify.success('Draft Complete!', 'Redirecting to results...', { duration: 3000 })
+        setTimeout(() => {
+          router.push(`/draft/${roomCode}/results`)
+        }, 3000)
       }
     },
     onDraftDeleted: () => {
@@ -813,7 +816,7 @@ export default function DraftRoomPage() {
     }
   }, [currentNominatingTeam])
 
-  const availablePokemon = useMemo(() => {
+  const _availablePokemon = useMemo(() => {
     return pokemon?.filter(p => p.isLegal && !allDraftedIds.includes(p.id)) || []
   }, [pokemon, allDraftedIds])
 

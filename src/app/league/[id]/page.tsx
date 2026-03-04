@@ -25,6 +25,7 @@ import { ArrowLeft, Trophy, Calendar, TrendingUp, Skull, Swords, Users, Repeat, 
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
 import type { PickRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
+import { buildTeamColorMap } from '@/utils/team-colors'
 
 const log = createLogger('LeaguePage')
 
@@ -165,6 +166,7 @@ export default function LeaguePage() {
   }
 
   const totalDeadPokemon = teamsWithStatus.reduce((sum, team) => sum + team.deadPokemon, 0)
+  const teamColorMap = buildTeamColorMap(league.teams.map(t => t.id))
 
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
@@ -450,10 +452,12 @@ export default function LeaguePage() {
                     </p>
                   ) : (
                     <div className="space-y-2">
-                      {standings.map((standing, index) => (
+                      {standings.map((standing, index) => {
+                        const colors = teamColorMap.get(standing.teamId)
+                        return (
                         <div
                           key={standing.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                          className={`flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border-l-[3px] ${colors?.border || ''}`}
                           onClick={() => router.push(`/league/${leagueId}/team/${standing.teamId}`)}
                         >
                           <div className="flex items-center gap-3">
@@ -480,7 +484,8 @@ export default function LeaguePage() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </div>
