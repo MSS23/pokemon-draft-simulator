@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 interface VirtualizedPokemonGridProps {
   pokemon: Pokemon[]
   onViewDetails?: (pokemon: Pokemon) => void
+  onQuickDraft?: (pokemon: Pokemon) => void
   onAddToWishlist?: (pokemon: Pokemon) => void
   onRemoveFromWishlist?: (pokemon: Pokemon) => void
   draftedPokemonIds?: string[]
@@ -18,6 +19,8 @@ interface VirtualizedPokemonGridProps {
   showCost?: boolean
   showStats?: boolean
   showWishlistButton?: boolean
+  showQuickDraft?: boolean
+  budgetRemaining?: number
 }
 
 /**
@@ -88,6 +91,7 @@ const getEstimatedCardHeight = (cardSize: 'sm' | 'md' | 'lg'): number => {
 export default function VirtualizedPokemonGrid({
   pokemon,
   onViewDetails,
+  onQuickDraft,
   onAddToWishlist,
   onRemoveFromWishlist,
   draftedPokemonIds = [],
@@ -97,6 +101,8 @@ export default function VirtualizedPokemonGrid({
   showCost = true,
   showStats = true,
   showWishlistButton = true,
+  showQuickDraft = false,
+  budgetRemaining,
 }: VirtualizedPokemonGridProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -175,13 +181,16 @@ export default function VirtualizedPokemonGrid({
                     key={p.id}
                     pokemon={p}
                     onViewDetails={onViewDetails}
+                    onQuickDraft={onQuickDraft}
                     onAddToWishlist={onAddToWishlist}
                     onRemoveFromWishlist={onRemoveFromWishlist}
                     isDrafted={draftedPokemonIds.includes(p.id)}
                     isInWishlist={wishlistPokemonIds.includes(p.id)}
+                    isUnaffordable={budgetRemaining !== undefined && p.cost > budgetRemaining}
                     showCost={showCost}
                     showStats={showStats}
                     showWishlistButton={showWishlistButton}
+                    showQuickDraft={showQuickDraft}
                     size={cardSize}
                   />
                 ))}

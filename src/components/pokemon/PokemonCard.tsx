@@ -9,11 +9,12 @@ import { getPokemonCardClass, getPokemonRarityClass, isPokemonShiny } from '@/ut
 import { cn } from '@/lib/utils'
 import { usePendingActionFeedback } from '@/hooks/useOptimisticUpdates'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
-import { Clock, AlertCircle, Heart } from 'lucide-react'
+import { Clock, AlertCircle, Heart, Zap } from 'lucide-react'
 
 interface PokemonCardProps {
   pokemon: Pokemon
   onViewDetails?: (pokemon: Pokemon) => void
+  onQuickDraft?: (pokemon: Pokemon) => void
   onAddToWishlist?: (pokemon: Pokemon) => void
   onRemoveFromWishlist?: (pokemon: Pokemon) => void
   isDrafted?: boolean
@@ -23,6 +24,7 @@ interface PokemonCardProps {
   showCost?: boolean
   showStats?: boolean
   showWishlistButton?: boolean
+  showQuickDraft?: boolean
   size?: 'sm' | 'md' | 'lg'
   className?: string
 }
@@ -42,6 +44,7 @@ const IMAGE_SIZES = {
 const PokemonCard = ({
   pokemon,
   onViewDetails,
+  onQuickDraft,
   onAddToWishlist,
   onRemoveFromWishlist,
   isDrafted = false,
@@ -51,6 +54,7 @@ const PokemonCard = ({
   showCost = true,
   showStats: _showStats = true,
   showWishlistButton = true,
+  showQuickDraft = false,
   size = 'md',
   className,
 }: PokemonCardProps) => {
@@ -81,6 +85,11 @@ const PokemonCard = ({
     } else {
       onAddToWishlist?.(pokemon)
     }
+  }
+
+  const handleQuickDraft = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onQuickDraft?.(pokemon)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -264,6 +273,28 @@ const PokemonCard = ({
         </div>
       </div>
 
+      {/* Quick Draft Button */}
+      {showQuickDraft && !isDrafted && !isDisabled && !isUnaffordable && (
+        <div className="absolute bottom-1.5 right-1.5 z-10">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleQuickDraft}
+            aria-label={`Quick draft ${pokemon.name}`}
+            className={cn(
+              "h-8 w-8 p-0 rounded-full transition-all duration-200",
+              "shadow-md border border-white/20",
+              "touch-manipulation active:scale-90",
+              "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700",
+              "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            )}
+            title={`Draft ${pokemon.name}`}
+          >
+            <Zap className="h-3.5 w-3.5 fill-current" />
+          </Button>
+        </div>
+      )}
+
       {/* Drafted overlay */}
       {isDrafted && (
         <div className="absolute inset-0 bg-gray-900/70 flex items-center justify-center rounded-xl z-10">
@@ -291,6 +322,7 @@ const arePropsEqual = (
   if (prevProps.showCost !== nextProps.showCost) return false
   if (prevProps.showStats !== nextProps.showStats) return false
   if (prevProps.showWishlistButton !== nextProps.showWishlistButton) return false
+  if (prevProps.showQuickDraft !== nextProps.showQuickDraft) return false
   if (prevProps.size !== nextProps.size) return false
   if (prevProps.className !== nextProps.className) return false
   return true

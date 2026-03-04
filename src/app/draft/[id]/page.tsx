@@ -333,7 +333,7 @@ export default function DraftRoomPage() {
       updated_at: dbState.draft.updated_at,
       current_turn: dbState.draft.current_turn,
       status: dbState.draft.status,
-      picks_count: dbState.picks.length,
+      pick_ids: dbState.picks.map(p => p.id).sort(),
       teams_budgets: dbState.teams.map(t => ({ id: t.id, budget: t.budget_remaining }))
     })
 
@@ -493,6 +493,8 @@ export default function DraftRoomPage() {
     onRefreshNeeded: async () => {
       if (!roomCode) return
       try {
+        // Invalidate cache so we get fresh data from Supabase
+        DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
         const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
         if (dbState) {
           startTransition(() => {
@@ -1156,8 +1158,9 @@ export default function DraftRoomPage() {
     setIsStarting(true)
     try {
       await DraftService.startDraft(roomCode.toLowerCase())
-      // Don't show success immediately - wait for subscription to confirm status change
-      log.info('Start request sent, waiting for subscription confirmation...')
+      // Show draft order reveal immediately for the host
+      setShowOrderReveal(true)
+      log.info('Start request sent, showing order reveal for host...')
 
       // Reset isStarting after a delay to allow status transition to complete
       // The transition useEffect will handle the final state stabilization
@@ -1889,6 +1892,7 @@ export default function DraftRoomPage() {
             <PokemonGrid
               pokemon={legalPokemon}
               onViewDetails={handleViewDetails}
+              onQuickDraft={isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft ? handleInitiateDraft : undefined}
               onAddToWishlist={handleAddToWishlist}
               onRemoveFromWishlist={handleRemoveFromWishlist}
               draftedPokemonIds={allDraftedIds}
@@ -1899,6 +1903,8 @@ export default function DraftRoomPage() {
               showCost={true}
               showStats={true}
               showWishlistButton={!isSpectator && !!draftState?.userTeamId}
+              showQuickDraft={isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft && !isSpectator}
+              budgetRemaining={userTeam?.budgetRemaining}
             />
           </EnhancedErrorBoundary>
         </div>

@@ -22,6 +22,7 @@ import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
 interface PokemonGridProps {
   pokemon: Pokemon[]
   onViewDetails?: (pokemon: Pokemon) => void
+  onQuickDraft?: (pokemon: Pokemon) => void
   onAddToWishlist?: (pokemon: Pokemon) => void
   onRemoveFromWishlist?: (pokemon: Pokemon) => void
   draftedPokemonIds?: string[]
@@ -33,6 +34,8 @@ interface PokemonGridProps {
   showCost?: boolean
   showStats?: boolean
   showWishlistButton?: boolean
+  showQuickDraft?: boolean
+  budgetRemaining?: number
 }
 
 type SortOption = 'name' | 'cost' | 'total' | 'hp' | 'attack' | 'defense' | 'specialAttack' | 'specialDefense' | 'speed'
@@ -63,6 +66,7 @@ const SORT_OPTIONS: { value: string; label: string; sort: SortOption; direction:
 export default function PokemonGrid({
   pokemon,
   onViewDetails,
+  onQuickDraft,
   onAddToWishlist,
   onRemoveFromWishlist,
   draftedPokemonIds = [],
@@ -74,6 +78,8 @@ export default function PokemonGrid({
   showCost = true,
   showStats = true,
   showWishlistButton = true,
+  showQuickDraft = false,
+  budgetRemaining,
 }: PokemonGridProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
@@ -519,6 +525,7 @@ export default function PokemonGrid({
         <VirtualizedPokemonGrid
           pokemon={availablePokemon}
           onViewDetails={onViewDetails}
+          onQuickDraft={onQuickDraft}
           onAddToWishlist={onAddToWishlist}
           onRemoveFromWishlist={onRemoveFromWishlist}
           draftedPokemonIds={draftedPokemonIds}
@@ -527,6 +534,8 @@ export default function PokemonGrid({
           showCost={showCost}
           showStats={showStats}
           showWishlistButton={showWishlistButton}
+          showQuickDraft={showQuickDraft}
+          budgetRemaining={budgetRemaining}
         />
       ) : (
         <div className={cn(
@@ -539,13 +548,16 @@ export default function PokemonGrid({
               key={p.id}
               pokemon={p}
               onViewDetails={onViewDetails}
+              onQuickDraft={onQuickDraft}
               onAddToWishlist={onAddToWishlist}
               onRemoveFromWishlist={onRemoveFromWishlist}
               isDrafted={draftedPokemonIds.includes(p.id)}
               isInWishlist={wishlistPokemonIds.includes(p.id)}
+              isUnaffordable={budgetRemaining !== undefined && p.cost > budgetRemaining}
               showCost={showCost}
               showStats={showStats}
               showWishlistButton={showWishlistButton}
+              showQuickDraft={showQuickDraft}
               size={cardSize}
             />
           ))}
