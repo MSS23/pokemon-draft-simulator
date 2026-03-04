@@ -118,12 +118,8 @@ export default function CreateDraftPage() {
 
       const newData = { ...prev, [field]: value };
 
-      // If switching to snake draft, enforce league creation and minimum 6 Pokemon
+      // If switching to snake draft, enforce minimum 6 Pokemon
       if (field === "draftType" && value === "snake") {
-        // Force league creation for snake drafts
-        newData.createLeague = true;
-
-        // Ensure minimum 6 Pokemon per team
         if (parseInt(prev.pokemonPerTeam) < 6) {
           newData.pokemonPerTeam = "6";
         }
@@ -927,103 +923,69 @@ export default function CreateDraftPage() {
                 <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
                   <h3 className="font-semibold text-foreground flex items-center gap-2">
                     <Trophy className="h-5 w-5 text-primary" />
-                    Post-Draft League
+                    League Season
                   </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Once the draft completes, your league season begins with a round-robin schedule, standings, and match recording.
+                  </p>
                   <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <input
-                        type="checkbox"
-                        id="createLeague"
-                        checked={formData.createLeague}
-                        onChange={(e) =>
-                          handleInputChange("createLeague", e.target.checked)
-                        }
-                        disabled={formData.draftType === "snake"}
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Label
-                            htmlFor="createLeague"
-                            className="text-sm font-medium cursor-pointer"
-                          >
-                            Create league after draft
-                          </Label>
-                          {formData.draftType === "snake" && (
-                            <Badge variant="secondary" className="text-xs">
-                              Required for Snake
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formData.draftType === "snake"
-                            ? "Snake drafts automatically create a league with 1 match per team per week"
-                            : "Automatically generate a competitive league schedule with standings when the draft completes"}
-                        </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label
+                          htmlFor="leagueWeeks"
+                          className="text-sm font-medium"
+                        >
+                          Season Length (Weeks)
+                        </Label>
+                        <Select
+                          value={formData.leagueWeeks}
+                          onValueChange={(value) =>
+                            handleInputChange("leagueWeeks", value)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select season length" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="3">3 weeks</SelectItem>
+                            <SelectItem value="4">4 weeks</SelectItem>
+                            <SelectItem value="6">6 weeks</SelectItem>
+                            <SelectItem value="8">8 weeks</SelectItem>
+                            <SelectItem value="10">10 weeks</SelectItem>
+                            <SelectItem value="12">12 weeks</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 
-                    {formData.createLeague && (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="leagueWeeks"
-                              className="text-sm font-medium"
-                            >
-                              League Duration (Weeks)
-                            </Label>
-                            <Select
-                              value={formData.leagueWeeks}
-                              onValueChange={(value) =>
-                                handleInputChange("leagueWeeks", value)
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select league duration" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="3">3 weeks</SelectItem>
-                                <SelectItem value="4">4 weeks</SelectItem>
-                                <SelectItem value="6">6 weeks</SelectItem>
-                                <SelectItem value="8">8 weeks</SelectItem>
-                                <SelectItem value="10">10 weeks</SelectItem>
-                                <SelectItem value="12">12 weeks</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 p-3 bg-card rounded-lg border">
-                          <input
-                            type="checkbox"
-                            id="splitIntoConferences"
-                            checked={formData.splitIntoConferences}
-                            onChange={(e) =>
-                              handleInputChange(
-                                "splitIntoConferences",
-                                e.target.checked,
-                              )
-                            }
-                            disabled={parseInt(formData.maxTeams) < 4}
-                            className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50"
-                          />
-                          <div className="flex-1">
-                            <Label
-                              htmlFor="splitIntoConferences"
-                              className="text-sm font-medium cursor-pointer"
-                            >
-                              Split into 2 conferences
-                            </Label>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {parseInt(formData.maxTeams) < 4
-                                ? "Requires at least 4 teams"
-                                : "Creates separate Conference A and Conference B with their own standings and schedules"}
-                            </p>
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    <div className="flex items-start gap-3 p-3 bg-card rounded-lg border">
+                      <input
+                        type="checkbox"
+                        id="splitIntoConferences"
+                        checked={formData.splitIntoConferences}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "splitIntoConferences",
+                            e.target.checked,
+                          )
+                        }
+                        disabled={parseInt(formData.maxTeams) < 4}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:opacity-50"
+                      />
+                      <div className="flex-1">
+                        <Label
+                          htmlFor="splitIntoConferences"
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          Split into 2 conferences
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {parseInt(formData.maxTeams) < 4
+                            ? "Requires at least 4 teams"
+                            : "Creates separate Conference A and Conference B with their own standings and schedules"}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
