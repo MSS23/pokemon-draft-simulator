@@ -22,7 +22,7 @@ import { MatchRecorderModal } from '@/components/league/MatchRecorderModal'
 import { LeagueSettingsModal } from '@/components/league/LeagueSettingsModal'
 import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, Calendar, TrendingUp, Skull, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Repeat, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
 import type { PickRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
@@ -245,7 +245,6 @@ export default function LeaguePage() {
     )
   }
 
-  const totalDeadPokemon = teamsWithStatus.reduce((sum, team) => sum + team.deadPokemon, 0)
   const teamColorMap = buildTeamColorMap(league.teams.map(t => t.id))
 
   return (
@@ -266,12 +265,6 @@ export default function LeaguePage() {
                 <Badge variant="secondary">Week {league.currentWeek} of {league.totalWeeks}</Badge>
                 {draftRoomCode && (
                   <Badge variant="outline" className="font-mono">{draftRoomCode}</Badge>
-                )}
-                {leagueSettings.enableNuzlocke && (
-                  <Badge variant="destructive" className="flex items-center gap-1">
-                    <Skull className="h-3 w-3" />
-                    Nuzlocke
-                  </Badge>
                 )}
                 {leagueSettings.enableTrades && (
                   <Badge variant="outline" className="flex items-center gap-1">
@@ -378,21 +371,6 @@ export default function LeaguePage() {
             </CardContent>
           </Card>
 
-          {leagueSettings.enableNuzlocke && (
-            <Card className="border-red-200 dark:border-red-800">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Skull className="h-4 w-4 text-red-500" />
-                  Deaths
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                  {totalDeadPokemon}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         <Tabs defaultValue="fixtures" className="space-y-4">
@@ -633,12 +611,6 @@ export default function LeaguePage() {
                     <span>{team.name}</span>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{team.pokemonStatuses.length} Pokemon</Badge>
-                      {leagueSettings.enableNuzlocke && team.deadPokemon > 0 && (
-                        <Badge variant="destructive" className="flex items-center gap-1">
-                          <Skull className="h-3 w-3" />
-                          {team.deadPokemon} Dead
-                        </Badge>
-                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -718,7 +690,6 @@ export default function LeaguePage() {
             match={selectedMatch}
             homeTeamPicks={homeTeamPicks}
             awayTeamPicks={awayTeamPicks}
-            leagueSettings={leagueSettings}
             onSuccess={() => {
               setSelectedMatch(null)
               loadLeagueData()

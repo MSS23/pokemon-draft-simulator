@@ -297,7 +297,7 @@ export interface MatchPokemonKO {
   pokemonId: string // Pokemon species ID
   pickId: string
   koCount: number // Times this Pokemon fainted in this game
-  isDeath: boolean // Permanent death (Nuzlocke)
+  isDeath: boolean // Reserved for future use
   koDetails: {
     opponentPokemon?: string
     moveUsed?: string
@@ -364,7 +364,6 @@ export interface TradeApproval {
 
 // Extended League Settings with new features
 export interface ExtendedLeagueSettings extends LeagueSettings {
-  enableNuzlocke?: boolean // Enable permanent Pokemon deaths
   enableTrades?: boolean // Allow Pokemon trading between teams
   tradeDeadlineWeek?: number // Week after which trades are locked
   requireCommissionerApproval?: boolean // Trades need approval

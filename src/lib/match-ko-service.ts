@@ -1,7 +1,7 @@
 /**
  * Match KO Service
  *
- * Handles Pokemon knockout tracking, death recording (Nuzlocke), and status management
+ * Handles Pokemon knockout tracking and status management for VGC draft leagues
  * during league matches.
  */
 
@@ -24,7 +24,7 @@ export class MatchKOService {
    * @param gameNumber - Which game in best-of-X (1, 2, 3, etc.)
    * @param pickId - Pick UUID (identifies the Pokemon on a team)
    * @param koCount - Number of times this Pokemon fainted in this game
-   * @param isDeath - Whether this KO resulted in permanent death (Nuzlocke)
+   * @param isDeath - Reserved for future use
    * @param details - Optional battle details (opponent, move, turn, etc.)
    */
   static async recordPokemonKO(
@@ -100,7 +100,7 @@ export class MatchKOService {
   }
 
   /**
-   * Mark a Pokemon as permanently dead (Nuzlocke rules)
+   * Mark a Pokemon as inactive (removed from roster)
    *
    * @param pickId - Pick UUID
    * @param matchId - Match where Pokemon died
@@ -428,7 +428,7 @@ export class MatchKOService {
   }
 
   /**
-   * Get all dead Pokemon in a league (Nuzlocke memorial)
+   * Get all inactive Pokemon in a league
    *
    * @param leagueId - League UUID
    */

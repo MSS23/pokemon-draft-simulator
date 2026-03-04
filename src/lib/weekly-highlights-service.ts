@@ -371,7 +371,7 @@ export class WeeklyHighlightsService {
         highlights.push(highlight)
       }
 
-      // Check for deaths (Nuzlocke)
+      // Check for Pokemon eliminations
       const { data: rawDeaths } = await supabase
         .from('match_pokemon_kos')
         .select(`

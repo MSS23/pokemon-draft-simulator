@@ -1,13 +1,12 @@
 /**
  * Pokemon Status Badge Component
  *
- * Visual indicator for Pokemon health status in league matches:
- * - Alive (green heart)
- * - Fainted (yellow warning)
- * - Dead (red skull - Nuzlocke)
+ * Visual indicator for Pokemon status in VGC draft league matches:
+ * - Alive (green heart - active roster)
+ * - Fainted (yellow warning - KO'd this match)
  */
 
-import { Heart, AlertTriangle, Skull } from 'lucide-react'
+import { Heart, AlertTriangle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
@@ -41,7 +40,7 @@ export function PokemonStatusBadge({
   const config = {
     alive: {
       icon: Heart,
-      label: 'Alive',
+      label: 'Active',
       className: 'bg-green-100 text-green-700 border-green-300 dark:bg-green-950 dark:text-green-400 dark:border-green-800',
     },
     fainted: {
@@ -50,9 +49,9 @@ export function PokemonStatusBadge({
       className: 'bg-yellow-100 text-yellow-700 border-yellow-300 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-800',
     },
     dead: {
-      icon: Skull,
-      label: 'Dead',
-      className: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
+      icon: AlertTriangle,
+      label: 'Inactive',
+      className: 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-950 dark:text-gray-400 dark:border-gray-800',
     },
   }
 

@@ -881,7 +881,6 @@ export class LeagueService {
       matchFormat: s?.matchFormat || 'best_of_3',
       pointsPerWin: s?.pointsPerWin || 3,
       pointsPerDraw: s?.pointsPerDraw || 1,
-      enableNuzlocke: s?.enableNuzlocke || false,
       enableTrades: s?.enableTrades || false,
       tradeDeadlineWeek: s?.tradeDeadlineWeek ?? undefined,
       requireCommissionerApproval: s?.requireCommissionerApproval || false,

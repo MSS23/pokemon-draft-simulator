@@ -91,20 +91,6 @@ export function LeagueSettingsModal({
             </Select>
           </div>
 
-          {/* Nuzlocke Mode */}
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Nuzlocke Mode</Label>
-              <p className="text-xs text-muted-foreground">
-                Pokemon that faint are permanently eliminated
-              </p>
-            </div>
-            <Switch
-              checked={settings.enableNuzlocke}
-              onCheckedChange={(checked) => setSettings(s => ({ ...s, enableNuzlocke: checked }))}
-            />
-          </div>
-
           {/* Trading */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">

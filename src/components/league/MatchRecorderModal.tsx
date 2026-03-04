@@ -7,7 +7,6 @@
  * - Game-by-game score entry (best of 1/3/5)
  * - Pokemon selector (which Pokemon were used)
  * - KO counter per Pokemon
- * - Death confirmation for Nuzlocke mode
  * - Dual-confirmation: both teams submit independently
  */
 
@@ -24,8 +23,8 @@ import { MatchKOService } from '@/lib/match-ko-service'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('MatchRecorderModal')
-import { Loader2, Trophy, Skull, AlertTriangle, Plus, Minus, Clock, CheckCircle2, XCircle } from 'lucide-react'
-import type { Match, Team, Pick, ExtendedLeagueSettings } from '@/types'
+import { Loader2, Trophy, AlertTriangle, Plus, Minus, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import type { Match, Team, Pick } from '@/types'
 
 interface MatchRecorderModalProps {
   isOpen: boolean
@@ -33,7 +32,6 @@ interface MatchRecorderModalProps {
   match: Match & { homeTeam: Team; awayTeam: Team }
   homeTeamPicks: Pick[]
   awayTeamPicks: Pick[]
-  leagueSettings: ExtendedLeagueSettings
   onSuccess: () => void
   currentUserTeamId?: string | null
 }
@@ -59,7 +57,6 @@ export function MatchRecorderModal({
   match,
   homeTeamPicks,
   awayTeamPicks,
-  leagueSettings,
   onSuccess,
   currentUserTeamId,
 }: MatchRecorderModalProps) {
@@ -142,17 +139,6 @@ export function MatchRecorderModal({
     } else {
       setKOs(kos.filter(ko => ko.pickId !== pickId))
     }
-  }
-
-  const toggleDeath = (teamType: 'home' | 'away', pickId: string) => {
-    const setKOs = teamType === 'home' ? setHomeKOs : setAwayKOs
-    const kos = teamType === 'home' ? homeKOs : awayKOs
-
-    setKOs(kos.map(ko =>
-      ko.pickId === pickId
-        ? { ...ko, isDeath: !ko.isDeath }
-        : ko
-    ))
   }
 
   const handleSubmit = async () => {
@@ -357,16 +343,10 @@ export function MatchRecorderModal({
             <div className="space-y-4 py-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Pokemon Knockouts</h3>
-                {leagueSettings.enableNuzlocke && (
-                  <Badge variant="destructive" className="flex items-center gap-1">
-                    <Skull className="h-3 w-3" />
-                    Nuzlocke Mode
-                  </Badge>
-                )}
               </div>
 
               <p className="text-sm text-muted-foreground">
-                Track which Pokemon fainted during the match. In Nuzlocke mode, mark deaths as permanent.
+                Track which Pokemon were KO&apos;d during the match for scoring.
               </p>
 
               {/* Home Team KOs */}
@@ -399,23 +379,8 @@ export function MatchRecorderModal({
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{ko.pokemonName}</span>
                             <Badge variant="secondary">x{ko.koCount}</Badge>
-                            {ko.isDeath && (
-                              <Badge variant="destructive" className="flex items-center gap-1">
-                                <Skull className="h-3 w-3" />
-                                Death
-                              </Badge>
-                            )}
                           </div>
                           <div className="flex items-center gap-2">
-                            {leagueSettings.enableNuzlocke && (
-                              <Button
-                                variant={ko.isDeath ? 'destructive' : 'ghost'}
-                                size="sm"
-                                onClick={() => toggleDeath('home', ko.pickId)}
-                              >
-                                <Skull className="h-4 w-4" />
-                              </Button>
-                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -461,23 +426,8 @@ export function MatchRecorderModal({
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{ko.pokemonName}</span>
                             <Badge variant="secondary">x{ko.koCount}</Badge>
-                            {ko.isDeath && (
-                              <Badge variant="destructive" className="flex items-center gap-1">
-                                <Skull className="h-3 w-3" />
-                                Death
-                              </Badge>
-                            )}
                           </div>
                           <div className="flex items-center gap-2">
-                            {leagueSettings.enableNuzlocke && (
-                              <Button
-                                variant={ko.isDeath ? 'destructive' : 'ghost'}
-                                size="sm"
-                                onClick={() => toggleDeath('away', ko.pickId)}
-                              >
-                                <Skull className="h-4 w-4" />
-                              </Button>
-                            )}
                             <Button
                               variant="ghost"
                               size="sm"
@@ -544,7 +494,6 @@ export function MatchRecorderModal({
                           {homeKOs.map(ko => (
                             <div key={ko.pickId} className="text-sm py-1">
                               {ko.pokemonName} (x{ko.koCount})
-                              {ko.isDeath && <Skull className="inline h-3 w-3 ml-1 text-red-500" />}
                             </div>
                           ))}
                         </div>
@@ -552,7 +501,6 @@ export function MatchRecorderModal({
                           {awayKOs.map(ko => (
                             <div key={ko.pickId} className="text-sm py-1">
                               {ko.pokemonName} (x{ko.koCount})
-                              {ko.isDeath && <Skull className="inline h-3 w-3 ml-1 text-red-500" />}
                             </div>
                           ))}
                         </div>
@@ -560,15 +508,6 @@ export function MatchRecorderModal({
                     </div>
                   )}
 
-                  {leagueSettings.enableNuzlocke && (homeKOs.some(ko => ko.isDeath) || awayKOs.some(ko => ko.isDeath)) && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        <strong>Warning:</strong> This match includes permanent Pokemon deaths (Nuzlocke mode).
-                        These Pokemon will be permanently removed from their teams.
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </CardContent>
               </Card>
 

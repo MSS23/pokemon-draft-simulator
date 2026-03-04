@@ -44,7 +44,7 @@ export class TradeService {
       throw new Error('Trade must include at least one Pokemon')
     }
 
-    // Validate Pokemon are not dead (Nuzlocke)
+    // Validate Pokemon are eligible for trade
     const validation = await this.validateTrade(leagueId, [...fromPicks, ...toPicks])
     if (!validation.valid) {
       throw new Error(validation.reason || 'Trade validation failed')

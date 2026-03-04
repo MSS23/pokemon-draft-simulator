@@ -7,7 +7,6 @@
  * - League name
  * - Number of weeks (6-20)
  * - Match format (best of 1/3/5)
- * - Nuzlocke mode toggle
  * - Trade system toggle
  * - Trade deadline week
  * - Commissioner approval requirement
@@ -22,7 +21,7 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LeagueService } from '@/lib/league-service'
 import { createLogger } from '@/lib/logger'
-import { Loader2, Trophy, Users, Calendar, Swords, Repeat, Shield, Skull } from 'lucide-react'
+import { Loader2, Trophy, Users, Calendar, Swords, Repeat, Shield } from 'lucide-react'
 
 const log = createLogger('CreateLeagueModal')
 
@@ -47,7 +46,6 @@ export function CreateLeagueModal({
   const [totalWeeks, setTotalWeeks] = useState(10)
   const [matchFormat, setMatchFormat] = useState<'best_of_1' | 'best_of_3' | 'best_of_5'>('best_of_3')
   const [splitConferences, setSplitConferences] = useState(false)
-  const [enableNuzlocke, setEnableNuzlocke] = useState(false)
   const [enableTrades, setEnableTrades] = useState(true)
   const [tradeDeadlineWeek, setTradeDeadlineWeek] = useState<number | null>(8)
   const [requireCommissionerApproval, setRequireCommissionerApproval] = useState(false)
@@ -74,7 +72,6 @@ export function CreateLeagueModal({
 
       // Update league settings with extended options
       await LeagueService.updateLeagueSettings(leagueId, {
-        enableNuzlocke,
         enableTrades,
         tradeDeadlineWeek: enableTrades ? (tradeDeadlineWeek ?? undefined) : undefined,
         requireCommissionerApproval: enableTrades ? requireCommissionerApproval : false,
@@ -183,24 +180,6 @@ export function CreateLeagueModal({
               />
             </div>
           )}
-
-          {/* Nuzlocke Mode */}
-          <div className="flex items-center justify-between p-4 border rounded-lg bg-red-50 dark:bg-red-950/20">
-            <div className="space-y-1">
-              <Label htmlFor="enable-nuzlocke" className="flex items-center gap-2">
-                <Skull className="h-4 w-4 text-red-600 dark:text-red-400" />
-                Nuzlocke Mode
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Pokemon that faint in matches are permanently removed (hardcore mode)
-              </p>
-            </div>
-            <Switch
-              id="enable-nuzlocke"
-              checked={enableNuzlocke}
-              onCheckedChange={setEnableNuzlocke}
-            />
-          </div>
 
           {/* Trading System */}
           <div className="space-y-4 p-4 border rounded-lg">
