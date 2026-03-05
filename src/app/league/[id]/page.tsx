@@ -27,7 +27,7 @@ import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { TeamIcon } from '@/components/league/TeamIcon'
 import { importTournament, type Tournament } from '@/lib/tournament-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays, Skull, Crosshair, BarChart3, ShieldCheck, UserPlus, Megaphone, Lock } from 'lucide-react'
+import { ArrowLeft, Trophy, Calendar, TrendingUp, Swords, Users, Loader2, ChevronLeft, ChevronRight, Settings, Copy, Check, CalendarDays, Skull, Crosshair, BarChart3, ShieldCheck, UserPlus, Megaphone, ArrowLeftRight } from 'lucide-react'
 import type { League, Match, Standing, Team, Pick, TeamWithPokemonStatus, ExtendedLeagueSettings } from '@/types'
 import type { PickRow } from '@/types/supabase-helpers'
 import { CommissionerService, type Announcement } from '@/lib/commissioner-service'
@@ -388,78 +388,43 @@ export default function LeaguePage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="flex gap-2 mb-6 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push(`/league/${leagueId}/schedule`)}
-          >
-            <CalendarDays className="h-4 w-4 mr-2" />
-            Schedule
+        <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+          <Button variant="outline" size="sm" onClick={() => router.push(`/league/${leagueId}/schedule`)}>
+            <CalendarDays className="h-4 w-4 mr-1.5" />Schedule
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push(`/league/${leagueId}/rankings`)}
-          >
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Power Rankings
+          <Button variant="outline" size="sm" onClick={() => router.push(`/league/${leagueId}/rankings`)}>
+            <TrendingUp className="h-4 w-4 mr-1.5" />Rankings
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push(`/league/${leagueId}/stats`)}
-          >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Stats
+          <Button variant="outline" size="sm" onClick={() => router.push(`/league/${leagueId}/stats`)}>
+            <BarChart3 className="h-4 w-4 mr-1.5" />Stats
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.push(`/league/${leagueId}/trades`)}>
+            <ArrowLeftRight className="h-4 w-4 mr-1.5" />Trades
           </Button>
           {leagueSettings.enableWaivers !== false && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/league/${leagueId}/free-agents`)}
-            >
-              <UserPlus className="h-4 w-4 mr-2" />
-              Free Agents
+            <Button variant="outline" size="sm" onClick={() => router.push(`/league/${leagueId}/free-agents`)}>
+              <UserPlus className="h-4 w-4 mr-1.5" />Free Agents
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCopyInvite}
-          >
-            {copiedInvite ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-            {copiedInvite ? 'Copied!' : 'Share Link'}
+          <Button variant="outline" size="sm" onClick={handleCopyInvite}>
+            {copiedInvite ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+            {copiedInvite ? 'Copied!' : 'Share'}
           </Button>
           {isCommissioner && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push(`/league/${leagueId}/admin`)}
-            >
-              <ShieldCheck className="h-4 w-4 mr-2" />
-              Commissioner
-            </Button>
-          )}
-          {isCommissioner && !playoffTournament && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowStartPlayoffs(true)}
-            >
-              <Trophy className="h-4 w-4 mr-2" />
-              Start Playoffs
-            </Button>
-          )}
-          {isCommissioner && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSettingsOpen(true)}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              League Settings
-            </Button>
+            <>
+              <div className="w-px h-5 bg-border shrink-0" />
+              <Button variant="outline" size="sm" onClick={() => router.push(`/league/${leagueId}/admin`)}>
+                <ShieldCheck className="h-4 w-4 mr-1.5" />Admin
+              </Button>
+              {!playoffTournament && (
+                <Button variant="outline" size="sm" onClick={() => setShowStartPlayoffs(true)}>
+                  <Trophy className="h-4 w-4 mr-1.5" />Playoffs
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}>
+                <Settings className="h-4 w-4" />
+              </Button>
+            </>
           )}
         </div>
 
@@ -523,6 +488,22 @@ export default function LeaguePage() {
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Format
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-lg font-bold capitalize">
+                {leagueSettings?.matchFormat?.replace(/_/g, ' ') || 'Bo3'}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {league.totalWeeks} week season
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs defaultValue="fixtures" className="space-y-4">
@@ -539,172 +520,87 @@ export default function LeaguePage() {
           {/* Fixtures Tab */}
           <TabsContent value="fixtures" className="space-y-4">
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Week {currentViewWeek} Fixtures
-                      <div className="flex items-center gap-1 ml-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          disabled={currentViewWeek <= 1}
-                          onClick={() => handleChangeWeek(currentViewWeek - 1)}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          disabled={currentViewWeek >= league.totalWeeks}
-                          onClick={() => handleChangeWeek(currentViewWeek + 1)}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {currentViewWeek === league.currentWeek && (
-                        <Badge variant="default" size="sm">Current</Badge>
-                      )}
-                    </CardTitle>
-                    <CardDescription>
-                      {leagueSettings.matchFormat?.replace('_', ' ') || 'Best of 3'} format
-                      {weekFixtures.length > 0 && weekFixtures[0].scheduledDate && (
-                        <span className="ml-2">
-                          • {new Date(weekFixtures[0].scheduledDate).toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric'
-                          })}
-                        </span>
-                      )}
-                    </CardDescription>
-                  </div>
-                  {isCommissioner && canAdvance && league.currentWeek < league.totalWeeks && (
-                    <Button
-                      onClick={handleAdvanceWeek}
-                      disabled={isAdvancing}
-                      size="sm"
-                      className="ml-4"
-                    >
-                      {isAdvancing ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Advancing...
-                        </>
-                      ) : (
-                        `Advance to Week ${league.currentWeek + 1}`
-                      )}
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={currentViewWeek <= 1} onClick={() => handleChangeWeek(currentViewWeek - 1)}>
+                      <ChevronLeft className="h-4 w-4" />
                     </Button>
-                  )}
-                  {isCommissioner && league.currentWeek === league.totalWeeks && canAdvance && (
-                    <Button
-                      onClick={handleAdvanceWeek}
-                      disabled={isAdvancing}
-                      size="sm"
-                      className="ml-4"
-                      variant="default"
-                    >
+                    <CardTitle className="text-base whitespace-nowrap">
+                      Week {currentViewWeek}
+                    </CardTitle>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={currentViewWeek >= league.totalWeeks} onClick={() => handleChangeWeek(currentViewWeek + 1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    {currentViewWeek === league.currentWeek && (
+                      <Badge variant="default" size="sm">Current</Badge>
+                    )}
+                    {weekFixtures.length > 0 && weekFixtures[0].scheduledDate && (
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                        {new Date(weekFixtures[0].scheduledDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                  {isCommissioner && canAdvance && (
+                    <Button onClick={handleAdvanceWeek} disabled={isAdvancing} size="sm" variant={league.currentWeek === league.totalWeeks ? 'default' : 'outline'}>
                       {isAdvancing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : league.currentWeek === league.totalWeeks ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Completing...
+                          <Trophy className="mr-1.5 h-3.5 w-3.5" />
+                          End Season
                         </>
                       ) : (
-                        <>
-                          <Trophy className="mr-2 h-4 w-4" />
-                          Complete Season
-                        </>
+                        `Week ${league.currentWeek + 1}`
                       )}
                     </Button>
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2">
                 {weekFixtures.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4">
                     No fixtures scheduled for this week
                   </p>
                 ) : (
-                  weekFixtures.map(match => (
-                    <Card
-                      key={match.id}
-                      className="border-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
-                    >
-                      <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="text-lg font-semibold">{match.homeTeam.name}</div>
-                            <div className="text-sm text-muted-foreground">Home</div>
-                          </div>
-
-                          <div className="text-center px-4">
-                            {match.status === 'completed' ? (
-                              <div className="text-2xl font-bold">
-                                {match.homeScore} - {match.awayScore}
-                              </div>
-                            ) : (
-                              <div className="text-sm text-muted-foreground">vs</div>
-                            )}
-                          </div>
-
-                          <div className="flex-1 text-right">
-                            <div className="text-lg font-semibold">{match.awayTeam.name}</div>
-                            <div className="text-sm text-muted-foreground">Away</div>
-                          </div>
+                  weekFixtures.map(match => {
+                    const homeColors = teamColorMap.get(match.homeTeamId)
+                    const awayColors = teamColorMap.get(match.awayTeamId)
+                    return (
+                      <div
+                        key={match.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
+                      >
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className={`w-1 h-8 rounded-full shrink-0 ${homeColors?.bg || 'bg-muted'}`} />
+                          <span className="font-medium text-sm truncate">{match.homeTeam.name}</span>
                         </div>
 
-                        <div className="mt-4 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                match.status === 'completed'
-                                  ? 'default'
-                                  : match.status === 'in_progress'
-                                  ? 'secondary'
-                                  : 'outline'
-                              }
-                            >
-                              {match.status.replace('_', ' ')}
-                            </Badge>
-                            {match.scheduledDate && match.status !== 'completed' && (
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(match.scheduledDate).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric'
-                                })}
-                              </span>
-                            )}
-                          </div>
-
-                          {match.status === 'scheduled' && currentViewWeek === league.currentWeek && (
-                            <Button size="sm" onClick={(e) => { e.stopPropagation(); handleRecordMatch(match) }}>
-                              Record Result
+                        <div className="px-3 text-center shrink-0">
+                          {match.status === 'completed' ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg font-bold tabular-nums">{match.homeScore}</span>
+                              <span className="text-xs text-muted-foreground">-</span>
+                              <span className="text-lg font-bold tabular-nums">{match.awayScore}</span>
+                              {match.winnerTeamId && <Trophy className="h-3 w-3 text-yellow-500" />}
+                            </div>
+                          ) : match.status === 'scheduled' && currentViewWeek === league.currentWeek ? (
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleRecordMatch(match) }}>
+                              Record
                             </Button>
-                          )}
-                          {match.status === 'scheduled' && currentViewWeek !== league.currentWeek && (
-                            <Badge variant="outline" className="text-xs text-muted-foreground">
-                              <Lock className="h-3 w-3 mr-1" />
-                              {currentViewWeek > league.currentWeek ? 'Future week' : 'Past week'}
-                            </Badge>
-                          )}
-
-                          {match.status === 'completed' && match.winnerTeamId && (
-                            <Badge variant="default" className="flex items-center gap-1">
-                              <Trophy className="h-3 w-3" />
-                              {match.winnerTeamId === match.homeTeamId
-                                ? match.homeTeam.name
-                                : match.awayTeam.name}
-                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground font-medium">vs</span>
                           )}
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))
+
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0 justify-end">
+                          <span className="font-medium text-sm truncate">{match.awayTeam.name}</span>
+                          <div className={`w-1 h-8 rounded-full shrink-0 ${awayColors?.bg || 'bg-muted'}`} />
+                        </div>
+                      </div>
+                    )
+                  })
                 )}
               </CardContent>
             </Card>

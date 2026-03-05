@@ -1001,11 +1001,13 @@ export default function DraftRoomPage() {
   const storeWishlistByParticipant = useDraftStore(state => state.wishlistItemsByParticipantId)
   const wishlistPokemonIds = useMemo(() => {
     if (!userId) return EMPTY_ARRAY
-    const itemIds = storeWishlistByParticipant[userId] || []
-    return itemIds
+    const itemIds = storeWishlistByParticipant[userId]
+    if (!itemIds || itemIds.length === 0) return EMPTY_ARRAY
+    const ids = itemIds
       .map(id => storeWishlistItemsById[id])
       .filter(item => item && item.isAvailable)
       .map(item => item.pokemonId)
+    return ids.length > 0 ? ids : EMPTY_ARRAY
   }, [userId, storeWishlistByParticipant, storeWishlistItemsById])
 
   /**

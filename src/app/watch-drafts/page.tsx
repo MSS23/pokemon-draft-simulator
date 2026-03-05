@@ -50,7 +50,7 @@ export default function WatchDraftsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<
-    "all" | "setup" | "active" | "completed"
+    "all" | "setup" | "active"
   >("all");
 
   const loadPublicDrafts = async () => {
@@ -76,13 +76,18 @@ export default function WatchDraftsPage() {
   }, [statusFilter]);
 
   useEffect(() => {
+    // Always exclude completed drafts — nothing to watch live
+    const activeDrafts = drafts.filter(
+      (d) => d.status !== "completed" && d.status !== "cancelled",
+    );
+
     if (!searchQuery) {
-      setFilteredDrafts(drafts);
+      setFilteredDrafts(activeDrafts);
       return;
     }
 
     const query = searchQuery.toLowerCase();
-    const filtered = drafts.filter(
+    const filtered = activeDrafts.filter(
       (draft) =>
         draft.name.toLowerCase().includes(query) ||
         draft.roomCode.toLowerCase().includes(query) ||
@@ -105,8 +110,6 @@ export default function WatchDraftsPage() {
         );
       case "active":
         return <Badge className="bg-green-600 text-white">Live</Badge>;
-      case "completed":
-        return <Badge variant="secondary">Completed</Badge>;
       case "paused":
         return (
           <Badge
@@ -191,7 +194,7 @@ export default function WatchDraftsPage() {
 
                   {/* Status Filter */}
                   <div className="flex gap-2">
-                    {(["all", "setup", "active", "completed"] as const).map(
+                    {(["all", "setup", "active"] as const).map(
                       (status) => (
                         <Button
                           key={status}
@@ -205,9 +208,7 @@ export default function WatchDraftsPage() {
                             ? "All"
                             : status === "setup"
                               ? "Waiting"
-                              : status === "active"
-                                ? "Live"
-                                : "Completed"}
+                              : "Live"}
                         </Button>
                       ),
                     )}

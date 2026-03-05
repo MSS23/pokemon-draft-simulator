@@ -27,6 +27,7 @@ export const getTypeColor = (typeName: string): string => {
 }
 
 export const formatPokemonName = (name: string): string => {
+  if (!name) return 'Unknown'
   // Handle special cases like Nidoran♂/♀
   return name
     .split('-')

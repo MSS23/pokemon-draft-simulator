@@ -129,7 +129,17 @@ export default function TeamDetailPage() {
         .eq('team_id', teamId)
         .order('pick_order', { ascending: true })
 
-      setPicks((picksData || []) as unknown as Pick[])
+      setPicks((picksData || []).map(p => ({
+        id: p.id,
+        draftId: p.draft_id,
+        teamId: p.team_id,
+        pokemonId: p.pokemon_id,
+        pokemonName: p.pokemon_name,
+        cost: p.cost,
+        pickOrder: p.pick_order,
+        round: p.round,
+        createdAt: p.created_at,
+      })))
 
       // Load advanced stats
       const statsData = await LeagueStatsService.getAdvancedTeamStats(teamId)

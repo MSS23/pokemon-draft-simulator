@@ -358,11 +358,15 @@ CREATE TABLE IF NOT EXISTS match_pokemon_kos (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
   game_number INTEGER NOT NULL,
+  pick_id UUID REFERENCES picks(id) ON DELETE CASCADE,
   pokemon_id TEXT NOT NULL,
   pokemon_name TEXT NOT NULL,
   team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  ko_count INTEGER NOT NULL DEFAULT 1,
+  is_death BOOLEAN NOT NULL DEFAULT false,
   ko_details JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Trades (Pokemon trading between teams)

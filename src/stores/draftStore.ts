@@ -468,6 +468,16 @@ export const useDraftStore = create<DraftStore>()(
 
       setWishlistItems: (items) => {
         set((state) => {
+          // Bail out if items haven't meaningfully changed (prevents infinite re-render loops)
+          const newHash = items.map(i => `${i.id}:${i.priority}:${i.isAvailable}`).join(',')
+          const oldHash = state.wishlistItemIds
+            .map(id => {
+              const item = state.wishlistItemsById[id]
+              return item ? `${item.id}:${item.priority}:${item.isAvailable}` : ''
+            })
+            .join(',')
+          if (newHash === oldHash) return
+
           const { byId, ids } = normalizeEntities(items)
           state.wishlistItemsById = byId
           state.wishlistItemIds = ids

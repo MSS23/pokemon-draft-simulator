@@ -550,14 +550,16 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {getStatusBadge(standing.league.status)}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                            onClick={(e) => { e.stopPropagation(); setDeletingLeagueId(standing.league.id) }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          {standing.league.settings?.commissionerId === user?.id && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => { e.stopPropagation(); setDeletingLeagueId(standing.league.id) }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-center">
