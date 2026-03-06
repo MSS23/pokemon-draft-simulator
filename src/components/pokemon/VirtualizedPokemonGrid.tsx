@@ -22,6 +22,10 @@ interface VirtualizedPokemonGridProps {
   showQuickDraft?: boolean
   budgetRemaining?: number
   maxAffordableCost?: number
+  draftedByTeamMap?: Record<string, string>
+  remainingTierSlots?: Record<string, number>
+  isTiered?: boolean
+  tierConfig?: { tiers: import('@/types').TierDefinition[] }
 }
 
 /**
@@ -105,6 +109,10 @@ export default function VirtualizedPokemonGrid({
   showQuickDraft = false,
   budgetRemaining,
   maxAffordableCost,
+  draftedByTeamMap = {},
+  remainingTierSlots,
+  isTiered,
+  tierConfig,
 }: VirtualizedPokemonGridProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -188,13 +196,29 @@ export default function VirtualizedPokemonGrid({
                     onRemoveFromWishlist={onRemoveFromWishlist}
                     isDrafted={draftedPokemonIds.includes(p.id)}
                     isInWishlist={wishlistPokemonIds.includes(p.id)}
-                    isUnaffordable={budgetRemaining !== undefined && p.cost > budgetRemaining}
-                    isUnsafe={maxAffordableCost !== undefined && p.cost > maxAffordableCost && (budgetRemaining === undefined || p.cost <= budgetRemaining)}
+                    isUnaffordable={
+                      isTiered && tierConfig && remainingTierSlots
+                        ? (() => {
+                            const tier = tierConfig.tiers
+                              .slice()
+                              .sort((a: { minCost: number }, b: { minCost: number }) => b.minCost - a.minCost)
+                              .find((t: { minCost: number }) => p.cost >= t.minCost)
+                            return !tier || (remainingTierSlots[tier.name] ?? 0) <= 0
+                          })()
+                        : budgetRemaining !== undefined && p.cost > budgetRemaining
+                    }
+                    isUnsafe={
+                      !isTiered &&
+                      maxAffordableCost !== undefined &&
+                      p.cost > maxAffordableCost &&
+                      (budgetRemaining === undefined || p.cost <= budgetRemaining)
+                    }
                     showCost={showCost}
                     showStats={showStats}
                     showWishlistButton={showWishlistButton}
                     showQuickDraft={showQuickDraft}
                     size={cardSize}
+                    draftedByTeamName={draftedByTeamMap[p.id]}
                   />
                 ))}
               </div>

@@ -48,7 +48,7 @@ interface DraftResultsProps {
   draftSettings: {
     maxTeams: number
     pokemonPerTeam: number
-    draftType: 'snake' | 'auction'
+    draftType: 'tiered' | 'points' | 'auction'
     timeLimit: number
     budgetPerTeam?: number
   }

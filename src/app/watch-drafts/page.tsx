@@ -100,25 +100,11 @@ export default function WatchDraftsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "setup":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-          >
-            Waiting
-          </Badge>
-        );
+        return <Badge variant="outline" className="border-warning/40 text-warning">Waiting</Badge>;
       case "active":
-        return <Badge className="bg-green-600 text-white">Live</Badge>;
+        return <Badge className="bg-success text-success-foreground">Live</Badge>;
       case "paused":
-        return (
-          <Badge
-            variant="outline"
-            className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200"
-          >
-            Paused
-          </Badge>
-        );
+        return <Badge variant="outline" className="border-muted-foreground/40">Paused</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -164,21 +150,17 @@ export default function WatchDraftsPage() {
 
   return (
     <SidebarLayout>
-      <div className="min-h-screen bg-background transition-colors duration-500">
-        <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
           {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold brand-gradient-text mb-4">
-              Watch Public Drafts
-            </h1>
-            <p className="text-lg text-muted-foreground">
+          <div>
+            <h1 className="text-2xl font-bold brand-gradient-text">Watch Public Drafts</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Spectate live Pokémon drafts from around the community
             </p>
           </div>
 
           {/* Filters and Search */}
-          <div className="max-w-4xl mx-auto mb-6">
-            <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm">
+            <Card>
               <CardContent className="pt-6">
                 <div className="flex flex-col md:flex-row gap-4">
                   {/* Search */}
@@ -228,12 +210,11 @@ export default function WatchDraftsPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
           {/* Drafts List */}
-          <div className="max-w-4xl mx-auto">
+          <div>
             {isLoading ? (
-              <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm">
+              <Card className="">
                 <CardContent className="py-12 text-center">
                   <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
                   <p className="text-muted-foreground">
@@ -242,7 +223,7 @@ export default function WatchDraftsPage() {
                 </CardContent>
               </Card>
             ) : filteredDrafts.length === 0 ? (
-              <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm">
+              <Card className="">
                 <CardContent className="py-12 text-center">
                   <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -268,7 +249,7 @@ export default function WatchDraftsPage() {
                 {filteredDrafts.map((draft) => (
                   <Card
                     key={draft.roomCode}
-                    className="bg-white/90 dark:bg-card/90 backdrop-blur-sm hover:shadow-lg transition-shadow cursor-pointer"
+                    className=" hover:shadow-lg transition-shadow cursor-pointer"
                     onClick={() => handleWatchDraft(draft.roomCode)}
                   >
                     <CardHeader>
@@ -331,7 +312,7 @@ export default function WatchDraftsPage() {
                                   handleWatchDraft(draft.roomCode);
                                 }}
                                 variant="outline"
-                                className="border-blue-500 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950"
+                                className="border-info/40 text-info hover:bg-info/10"
                               >
                                 <Eye className="h-3 w-3 mr-1" />
                                 Spectate
@@ -372,17 +353,16 @@ export default function WatchDraftsPage() {
           </div>
 
           {/* Help Text */}
-          <div className="max-w-4xl mx-auto mt-8 space-y-4">
-            <Card className="bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <div className="space-y-4">
+            <Card className="bg-info/5 border-info/20">
               <CardContent className="py-4">
                 <div className="flex items-start gap-3">
-                  <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
-                  <div className="text-sm text-blue-900 dark:text-blue-100">
-                    <p className="font-medium mb-1">Spectator Mode</p>
-                    <p className="text-blue-700 dark:text-blue-300">
+                  <Eye className="h-4 w-4 text-info mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium mb-0.5">Spectator Mode</p>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
                       Click any draft to watch it live. You&apos;ll see all picks,
-                      team rosters, and draft progress in real-time without
-                      participating.
+                      team rosters, and draft progress in real-time without participating.
                     </p>
                   </div>
                 </div>
@@ -390,34 +370,29 @@ export default function WatchDraftsPage() {
             </Card>
 
             {user ? (
-              <Card className="bg-green-50/50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+              <Card className="bg-success/5 border-success/20">
                 <CardContent className="py-4">
                   <div className="flex items-start gap-3">
-                    <UserPlus className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
-                    <div className="text-sm text-green-900 dark:text-green-100">
-                      <p className="font-medium mb-1">
-                        Join as Participant or Spectate
-                      </p>
-                      <p className="text-green-700 dark:text-green-300">
-                        As an authenticated user, you can join drafts with
-                        available team slots using the &quot;Join&quot; button. For full
-                        or active drafts, use the &quot;Spectate&quot; button to watch as
-                        a spectator.
+                    <UserPlus className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium mb-0.5">Join as Participant or Spectate</p>
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        You can join drafts with available team slots using the &quot;Join&quot; button.
+                        For full or active drafts, use &quot;Spectate&quot; to watch as a spectator.
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             ) : (
-              <Card className="bg-amber-50/50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+              <Card className="bg-warning/5 border-warning/20">
                 <CardContent className="py-4">
                   <div className="flex items-start gap-3">
-                    <Users className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                    <div className="text-sm text-amber-900 dark:text-amber-100">
-                      <p className="font-medium mb-1">Sign In to Join Drafts</p>
-                      <p className="text-amber-700 dark:text-amber-300">
-                        Guests can spectate any public draft. To join as a
-                        participant, please sign in or create an account.
+                    <Users className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium mb-0.5">Sign In to Join Drafts</p>
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        Guests can spectate any public draft. To join as a participant, please sign in or create an account.
                       </p>
                     </div>
                   </div>
@@ -425,8 +400,8 @@ export default function WatchDraftsPage() {
               </Card>
             )}
           </div>
-        </div>
       </div>
     </SidebarLayout>
+
   );
 }

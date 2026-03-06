@@ -307,33 +307,52 @@ export class TradeService {
   ): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { error } = await (supabase as SupabaseAny)
-      .from('trades')
-      .update({
-        commissioner_approved: approved,
-        commissioner_id: commissionerId,
-        commissioner_notes: notes || null,
-        status: approved ? 'completed' : 'rejected',
-        completed_at: approved ? new Date().toISOString() : null,
-        responded_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', tradeId)
-
-    if (error) {
-      log.error('Failed to process trade:', error)
-      throw new Error('Failed to process trade: ' + error.message)
-    }
-
-    // If approved, execute the pick swap
     if (approved) {
-      // Re-set status to 'accepted' temporarily for execute_trade function
-      await (supabase as SupabaseAny)
+      // Set to 'accepted' so executeTrade (and its RPC) can run — it requires this status
+      const { data, error } = await (supabase as SupabaseAny)
         .from('trades')
-        .update({ status: 'accepted' })
+        .update({
+          commissioner_approved: true,
+          commissioner_id: commissionerId,
+          commissioner_notes: notes || null,
+          status: 'accepted',
+          responded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', tradeId)
+        .select('league_id')
+        .single()
 
+      if (error) {
+        log.error('Failed to approve trade:', error)
+        throw new Error('Failed to approve trade: ' + error.message)
+      }
+
+      // Execute the pick swap (sets status → 'completed' on success)
       await this.executeTrade(tradeId)
+
+      this.broadcastTradeUpdate(data.league_id, 'completed', tradeId)
+    } else {
+      const { data, error } = await (supabase as SupabaseAny)
+        .from('trades')
+        .update({
+          commissioner_approved: false,
+          commissioner_id: commissionerId,
+          commissioner_notes: notes || null,
+          status: 'rejected',
+          responded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tradeId)
+        .select('league_id')
+        .single()
+
+      if (error) {
+        log.error('Failed to reject trade:', error)
+        throw new Error('Failed to reject trade: ' + error.message)
+      }
+
+      this.broadcastTradeUpdate(data.league_id, 'rejected', tradeId)
     }
 
     const { error: approvalError } = await (supabase as SupabaseAny)
@@ -352,17 +371,25 @@ export class TradeService {
   }
 
   /**
-   * Broadcast trade update via Supabase channel
+   * Broadcast trade update via Supabase channel.
+   * Must subscribe before sending — Supabase requires a joined channel to broadcast.
    */
   private static broadcastTradeUpdate(leagueId: string, event: string, tradeId: string): void {
     if (!supabase) return
 
     try {
       const channel = supabase.channel(`league-trades:${leagueId}`)
-      channel.send({
-        type: 'broadcast',
-        event: 'trade_update',
-        payload: { event, tradeId, leagueId },
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channel
+            .send({
+              type: 'broadcast',
+              event: 'trade_update',
+              payload: { event, tradeId, leagueId },
+            })
+            .catch((err) => log.warn('Failed to send trade broadcast:', err))
+            .finally(() => supabase!.removeChannel(channel))
+        }
       })
     } catch (err) {
       log.warn('Failed to broadcast trade update:', err)

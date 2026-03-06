@@ -256,9 +256,9 @@ export default function DraftStatistics({ pokemon, className }: DraftStatisticsP
                         {pokemonData && (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
-                            src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
+                            src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemonData.id}.gif`}
                             alt={p.name}
-                            className="w-10 h-10 pixelated"
+                            className="w-10 h-10"
                           />
                         )}
 

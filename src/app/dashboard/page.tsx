@@ -472,36 +472,44 @@ export default function DashboardPage() {
         <div id="tour-stats" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Trophy className="h-4 w-4 text-primary" />
+                </div>
                 <p className="text-xs text-muted-foreground">Total Drafts</p>
-                <Trophy className="h-3.5 w-3.5 text-primary" />
               </div>
               <p className="text-2xl font-bold">{drafts.length}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
+                  <Zap className="h-4 w-4 text-success" />
+                </div>
                 <p className="text-xs text-muted-foreground">Active Drafts</p>
-                <Zap className="h-3.5 w-3.5 text-success" />
               </div>
               <p className="text-2xl font-bold">{activeDrafts.length}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0">
+                  <Shield className="h-4 w-4 text-info" />
+                </div>
                 <p className="text-xs text-muted-foreground">Active Leagues</p>
-                <Shield className="h-3.5 w-3.5 text-info" />
               </div>
               <p className="text-2xl font-bold">{activeLeagueCount}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                  <Users className="h-4 w-4 text-accent" />
+                </div>
                 <p className="text-xs text-muted-foreground">League W-L</p>
-                <Users className="h-3.5 w-3.5 text-accent" />
               </div>
               <p className="text-2xl font-bold">
                 {totalWins + totalLosses > 0 ? `${totalWins}-${totalLosses}` : '-'}

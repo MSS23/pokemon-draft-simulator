@@ -13,7 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { getStatColor, getBestPokemonImageUrl, getPokemonAnimatedBackupUrl, getPokemonSpriteUrl, getOfficialArtworkUrl } from '@/utils/pokemon'
+import { getStatColor, getBestPokemonImageUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
 
 interface PokemonDetailsModalProps {
@@ -40,39 +40,19 @@ export default function PokemonDetailsModal({
   maxPicks,
 }: PokemonDetailsModalProps) {
   const [imageError, setImageError] = useState(false)
-  const [showOfficialArt, setShowOfficialArt] = useState(true)
   const [fallbackAttempt, setFallbackAttempt] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
   if (!pokemon) return null
 
-  // Image fallback chain for modal
+  // GIF-only fallback chain
   const getImageUrl = () => {
-    if (showOfficialArt) {
-      switch (fallbackAttempt) {
-        case 0:
-          return getOfficialArtworkUrl(pokemon.id)
-        case 1:
-          return getBestPokemonImageUrl(pokemon.id, pokemon.name)
-        default:
-          return getPokemonSpriteUrl(pokemon.id)
-      }
-    } else {
-      switch (fallbackAttempt) {
-        case 0:
-          return getBestPokemonImageUrl(pokemon.id, pokemon.name)
-        case 1:
-          return getPokemonAnimatedBackupUrl(pokemon.id)
-        case 2:
-          return getPokemonSpriteUrl(pokemon.id)
-        default:
-          return getOfficialArtworkUrl(pokemon.id)
-      }
-    }
+    if (fallbackAttempt === 0) return getBestPokemonImageUrl(pokemon.id, pokemon.name)
+    return getPokemonAnimatedBackupUrl(pokemon.id)
   }
 
   const handleImageError = () => {
-    if (fallbackAttempt < 3) {
+    if (fallbackAttempt < 1) {
       setFallbackAttempt(prev => prev + 1)
       setImageError(false)
     } else {
@@ -84,13 +64,6 @@ export default function PokemonDetailsModal({
   const handleImageLoad = () => {
     setIsLoading(false)
     setImageError(false)
-  }
-
-  const handleImageClick = () => {
-    setShowOfficialArt(!showOfficialArt)
-    setFallbackAttempt(0)
-    setImageError(false)
-    setIsLoading(true)
   }
 
   const statMax = 255
@@ -149,11 +122,10 @@ export default function PokemonDetailsModal({
                     width={200}
                     height={200}
                     className={cn(
-                      "cursor-pointer transition-all duration-200 hover:scale-105",
+                      "transition-all duration-200 hover:scale-105",
                       isLoading && "opacity-0",
                       !isLoading && "opacity-100"
                     )}
-                    onClick={handleImageClick}
                     onError={handleImageError}
                     onLoad={handleImageLoad}
                     unoptimized

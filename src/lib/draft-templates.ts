@@ -11,7 +11,7 @@ export interface DraftTemplate {
   description: string
   format: Format
   settings: {
-    draftType: 'snake' | 'auction'
+    draftType: 'tiered' | 'points' | 'auction'
     teamSize: number
     maxTeams: number
     budget: number
@@ -58,7 +58,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       banlist: [],
     } as unknown as Format,
     settings: {
-      draftType: 'snake',
+      draftType: 'points',
       teamSize: 6,
       maxTeams: 8,
       budget: 100,
@@ -120,7 +120,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       banlist: [],
     } as unknown as Format,
     settings: {
-      draftType: 'snake',
+      draftType: 'points',
       teamSize: 6,
       maxTeams: 8,
       budget: 100,
@@ -189,7 +189,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       banlist: [],
     } as unknown as Format,
     settings: {
-      draftType: 'snake',
+      draftType: 'points',
       teamSize: 4,
       maxTeams: 4,
       budget: 150,
@@ -220,7 +220,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       banlist: [],
     } as unknown as Format,
     settings: {
-      draftType: 'snake',
+      draftType: 'points',
       teamSize: 6,
       maxTeams: 4,
       budget: 100,
@@ -251,7 +251,7 @@ export const BUILT_IN_TEMPLATES: DraftTemplate[] = [
       banlist: [],
     } as unknown as Format,
     settings: {
-      draftType: 'snake',
+      draftType: 'points',
       teamSize: 6,
       maxTeams: 6,
       budget: 100,
@@ -412,7 +412,7 @@ export function incrementUsageCount(id: string): void {
 export function searchTemplates(query: string, filters?: {
   category?: DraftTemplate['category']
   tags?: string[]
-  draftType?: 'snake' | 'auction'
+  draftType?: 'tiered' | 'points' | 'auction'
 }): DraftTemplate[] {
   let templates = getAllTemplates()
 
@@ -560,7 +560,8 @@ export function getTemplateStats() {
   }
 
   const byDraftType = {
-    snake: all.filter(t => t.settings.draftType === 'snake').length,
+    tiered: all.filter(t => t.settings.draftType === 'tiered').length,
+    points: all.filter(t => t.settings.draftType === 'points').length,
     auction: all.filter(t => t.settings.draftType === 'auction').length,
   }
 

@@ -67,7 +67,7 @@ export default function CreateDraftPage() {
     userName: "",
     teamName: "",
     maxTeams: "4",
-    draftType: "snake",
+    draftType: "points",
     timeLimit: "0",
     pokemonPerTeam: "6",
     budgetPerTeam: "100",
@@ -80,7 +80,7 @@ export default function CreateDraftPage() {
     createLeague: true,
     splitIntoConferences: false,
     leagueWeeks: "4",
-    scoringSystem: "budget" as "budget" | "tiered",
+    scoringSystem: "budget" as "budget" | "tiered", // derived from draftType, kept for tier config state
   });
   const [tierConfig, setTierConfig] = useState<TierDefinition[]>(DEFAULT_TIER_CONFIG);
 
@@ -122,10 +122,19 @@ export default function CreateDraftPage() {
 
       const newData = { ...prev, [field]: value };
 
-      // If switching to snake draft, enforce minimum 6 Pokemon
-      if (field === "draftType" && value === "snake") {
-        if (parseInt(prev.pokemonPerTeam) < 6) {
-          newData.pokemonPerTeam = "6";
+      // When switching draft type, sync scoringSystem and enforce constraints
+      if (field === "draftType") {
+        if (value === "tiered") {
+          newData.scoringSystem = "tiered"
+          // Sync pokemonPerTeam to total tier slots
+          const total = totalSlotsFromConfig(tierConfig)
+          newData.pokemonPerTeam = String(total)
+        } else {
+          newData.scoringSystem = "budget"
+          // Enforce min 6 for points/auction snake-style picks
+          if (value !== "auction" && parseInt(prev.pokemonPerTeam) < 6) {
+            newData.pokemonPerTeam = "6"
+          }
         }
       }
 
@@ -233,12 +242,12 @@ export default function CreateDraftPage() {
       return;
     }
 
-    // Enforce minimum Pokemon limit for snake drafts
+    // Enforce minimum Pokemon limit for non-auction drafts
     const pokemonCount = parseInt(formData.pokemonPerTeam);
-    if (formData.draftType === "snake" && pokemonCount < 6) {
+    if (formData.draftType !== "auction" && pokemonCount < 6) {
       notify.warning(
         "Invalid Pokemon Count",
-        "Snake drafts require at least 6 Pokémon per team for points-based gameplay",
+        "Points and tiered drafts require at least 6 Pokémon per team",
       );
       return;
     }
@@ -253,14 +262,14 @@ export default function CreateDraftPage() {
         teamName: formData.teamName,
         settings: {
           maxTeams: parseInt(formData.maxTeams),
-          draftType: formData.draftType as "snake" | "auction",
+          draftType: formData.draftType as "tiered" | "points" | "auction",
           timeLimit: parseInt(formData.timeLimit),
           pokemonPerTeam: parseInt(formData.pokemonPerTeam),
           budgetPerTeam: parseInt(formData.budgetPerTeam),
           formatId: formData.useCustomFormat ? "custom" : formData.formatId,
           // Scoring system
-          scoringSystem: formData.scoringSystem,
-          tierConfig: formData.scoringSystem === 'tiered' ? { tiers: tierConfig } : undefined,
+          scoringSystem: formData.draftType === 'tiered' ? 'tiered' : 'budget',
+          tierConfig: formData.draftType === 'tiered' ? { tiers: tierConfig } : undefined,
           // League settings (stored in draft settings for league creation later)
           createLeague: formData.createLeague,
           splitIntoConferences: formData.splitIntoConferences,
@@ -470,27 +479,32 @@ export default function CreateDraftPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="draftType"
-                        className="text-sm font-medium"
-                      >
-                        Draft Format
-                      </Label>
-                      <Select
-                        value={formData.draftType}
-                        onValueChange={(value) =>
-                          handleInputChange("draftType", value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select draft format" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="snake">Snake Draft</SelectItem>
-                          <SelectItem value="auction">Auction Draft</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="space-y-2 md:col-span-1">
+                      <Label className="text-sm font-medium">Draft Type</Label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {[
+                          { value: "tiered", icon: "🏆", title: "Tiered Draft", desc: "Pick 1 S, 2 A, 2 B, 2 C, 1 D, 1 E tier Pokémon" },
+                          { value: "points", icon: "💰", title: "Points Draft", desc: "Each Pokémon costs points — spend your budget" },
+                          { value: "auction", icon: "🔨", title: "Auction Draft", desc: "Nominate & bid on Pokémon in real-time" },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleInputChange("draftType", opt.value)}
+                            className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                              formData.draftType === opt.value
+                                ? "border-primary bg-primary/10"
+                                : "border-border bg-card hover:border-primary/50"
+                            }`}
+                          >
+                            <span className="text-xl mt-0.5">{opt.icon}</span>
+                            <div>
+                              <div className="font-semibold text-sm">{opt.title}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">{opt.desc}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -856,9 +870,14 @@ export default function CreateDraftPage() {
                         className="text-sm font-medium"
                       >
                         Pokémon per Team{" "}
-                        {formData.draftType === "snake" && (
+                        {formData.draftType === "points" && (
                           <span className="text-xs text-muted-foreground">
-                            (min 6 for points-based)
+                            (min 6)
+                          </span>
+                        )}
+                        {formData.draftType === "tiered" && (
+                          <span className="text-xs text-muted-foreground">
+                            (set by tier config)
                           </span>
                         )}
                       </Label>
@@ -873,7 +892,11 @@ export default function CreateDraftPage() {
                         </SelectTrigger>
                         <SelectContent>
                           {formData.draftType === "auction" && (
-                            <SelectItem value="3">3 Pokémon</SelectItem>
+                            <>
+                              <SelectItem value="3">3 Pokémon</SelectItem>
+                              <SelectItem value="4">4 Pokémon</SelectItem>
+                              <SelectItem value="5">5 Pokémon</SelectItem>
+                            </>
                           )}
                           <SelectItem value="6">6 Pokémon</SelectItem>
                           <SelectItem value="9">9 Pokémon</SelectItem>
@@ -882,56 +905,15 @@ export default function CreateDraftPage() {
                           <SelectItem value="15">15 Pokémon</SelectItem>
                         </SelectContent>
                       </Select>
-                      {formData.draftType === "snake" &&
+                      {formData.draftType === "points" &&
                         parseInt(formData.pokemonPerTeam) < 6 && (
                           <p className="text-xs text-orange-600 dark:text-orange-400">
-                            ⚠️ Snake drafts are typically points-based and
-                            require at least 6 Pokémon
+                            ⚠️ Points drafts require at least 6 Pokémon per team
                           </p>
                         )}
                     </div>
-                    {/* Scoring System Toggle */}
-                    <div className="space-y-3 md:col-span-2">
-                      <Label className="text-sm font-medium">Scoring System</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleInputChange("scoringSystem", "budget")}
-                          className={`flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left ${
-                            formData.scoringSystem === "budget"
-                              ? "border-primary bg-primary/10"
-                              : "border-border bg-card hover:border-primary/50"
-                          }`}
-                        >
-                          <span className="font-semibold text-sm">💰 Budget</span>
-                          <span className="text-xs text-muted-foreground mt-0.5">
-                            Each Pokémon costs points. Spend your budget wisely.
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleInputChange("scoringSystem", "tiered")
-                            // Auto-sync pokemonPerTeam to total tier slots
-                            const total = totalSlotsFromConfig(tierConfig)
-                            handleInputChange("pokemonPerTeam", String(total))
-                          }}
-                          className={`flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left ${
-                            formData.scoringSystem === "tiered"
-                              ? "border-primary bg-primary/10"
-                              : "border-border bg-card hover:border-primary/50"
-                          }`}
-                        >
-                          <span className="font-semibold text-sm">🏆 Tiered</span>
-                          <span className="text-xs text-muted-foreground mt-0.5">
-                            Each team gets a fixed number of slots per tier.
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Budget field — only shown for budget system */}
-                    {formData.scoringSystem === "budget" && (
+                    {/* Budget field — only shown for points/auction draft */}
+                    {formData.draftType !== "tiered" && (
                     <div className="space-y-2">
                       <Label
                         htmlFor="budgetPerTeam"
@@ -968,8 +950,8 @@ export default function CreateDraftPage() {
                     )}
                   </div>
 
-                  {/* Tier Configuration — only shown for tiered system */}
-                  {formData.scoringSystem === "tiered" && (
+                  {/* Tier Configuration — only shown for tiered draft */}
+                  {formData.draftType === "tiered" && (
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center justify-between">
                         <Label className="text-sm font-medium">Tier Configuration</Label>
@@ -1193,13 +1175,10 @@ export default function CreateDraftPage() {
                     </Badge>
                     <Badge
                       variant="secondary"
-                      className="flex items-center gap-1"
+                      className="flex items-center gap-1 capitalize"
                     >
                       <Zap className="h-3 w-3" />
-                      {formData.draftType === "snake"
-                        ? "Snake"
-                        : "Auction"}{" "}
-                      format
+                      {formData.draftType} draft
                     </Badge>
                     <Badge
                       variant="secondary"
@@ -1215,6 +1194,7 @@ export default function CreateDraftPage() {
                       <Trophy className="h-3 w-3" />
                       {formData.pokemonPerTeam} Pokémon each
                     </Badge>
+                    {formData.draftType !== "tiered" && (
                     <Badge
                       variant="secondary"
                       className="flex items-center gap-1"
@@ -1222,6 +1202,16 @@ export default function CreateDraftPage() {
                       <Tag className="h-3 w-3" />
                       {formData.budgetPerTeam} points budget
                     </Badge>
+                    )}
+                    {formData.draftType === "tiered" && (
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
+                      <Tag className="h-3 w-3" />
+                      S/A/B/C/D/E tier slots
+                    </Badge>
+                    )}
                   </div>
                 </div>
               </CardContent>

@@ -153,9 +153,9 @@ export default function MobileDraftView({
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${poke.id}.png`}
+                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${poke.id}.gif`}
                       alt={poke.name}
-                      className="w-20 h-20 mx-auto pixelated"
+                      className="w-20 h-20 mx-auto"
                     />
                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate mt-1">
                       {poke.name}
@@ -236,9 +236,9 @@ export default function MobileDraftView({
                                   <>
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img
-                                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
+                                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemonData.id}.gif`}
                                       alt={pokemonData.name}
-                                      className="w-12 h-12 mx-auto pixelated"
+                                      className="w-12 h-12 mx-auto"
                                     />
                                     <div className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate mt-1">
                                       {pokemonData.name}
@@ -283,9 +283,9 @@ export default function MobileDraftView({
                           {pokemonData && (
                             /* eslint-disable-next-line @next/next/no-img-element */
                             <img
-                              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.id}.png`}
+                              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemonData.id}.gif`}
                               alt={pokemonData.name}
-                              className="w-12 h-12 pixelated flex-shrink-0"
+                              className="w-12 h-12 flex-shrink-0"
                             />
                           )}
 

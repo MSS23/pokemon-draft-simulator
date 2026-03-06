@@ -258,7 +258,7 @@ describe('DraftService', () => {
         teamName: 'Host Team',
         settings: {
           maxTeams: 4,
-          draftType: 'snake',
+          draftType: 'points',
           timeLimit: 60,
           pokemonPerTeam: 6,
           budgetPerTeam: 100,
@@ -283,7 +283,7 @@ describe('DraftService', () => {
           teamName: 'Host Team',
           settings: {
             maxTeams: 4,
-            draftType: 'snake',
+            draftType: 'points',
             timeLimit: 60,
             pokemonPerTeam: 6,
             budgetPerTeam: 100,
@@ -300,13 +300,13 @@ describe('DraftService', () => {
           teamName: 'Host Team',
           settings: {
             maxTeams: 4,
-            draftType: 'snake',
+            draftType: 'points',
             timeLimit: 60,
             pokemonPerTeam: 4, // Too few
             budgetPerTeam: 100,
           },
         })
-      ).rejects.toThrow('Snake drafts require at least 6 Pokémon')
+      ).rejects.toThrow('Points and tiered drafts require at least 6 Pokémon')
     })
 
     it('should handle database errors gracefully', async () => {
@@ -337,7 +337,7 @@ describe('DraftService', () => {
           teamName: 'Host Team',
           settings: {
             maxTeams: 4,
-            draftType: 'snake',
+            draftType: 'points',
             timeLimit: 60,
             pokemonPerTeam: 6,
             budgetPerTeam: 100,

@@ -155,9 +155,9 @@ export default function DraftReplay({
             <div className="flex items-center gap-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${currentPokemon.id}.png`}
+                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${currentPokemon.id}.gif`}
                 alt={currentPokemon.name}
-                className="w-24 h-24 pixelated"
+                className="w-24 h-24"
               />
 
               <div className="flex-1">
@@ -316,9 +316,9 @@ export default function DraftReplay({
                             <>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
-                                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pickPokemon.id}.png`}
+                                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pickPokemon.id}.gif`}
                                 alt={pickPokemon.name}
-                                className="w-12 h-12 mx-auto pixelated"
+                                className="w-12 h-12 mx-auto"
                               />
                               <div className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate mt-1">
                                 {pickPokemon.name}

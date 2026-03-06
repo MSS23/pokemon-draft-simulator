@@ -27,6 +27,7 @@ import { useLatest } from '@/hooks/useLatest'
 import { useDraftRealtime } from '@/hooks/useDraftRealtime'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
 import { getMaxAffordableCost, isPickSafe } from '@/utils/budget-feasibility'
+import { getRemainingTierSlots, getPokemonTier, canAffordTier } from '@/lib/tier-utils'
 
 /**
  * OPTIMIZED DYNAMIC IMPORTS - Strategic code splitting:
@@ -126,7 +127,7 @@ interface DraftUIState {
     maxTeams: number
     timeLimit: number
     pokemonPerTeam: number
-    draftType: 'snake' | 'auction'
+    draftType: 'tiered' | 'points' | 'auction'
     formatId?: string
     customFormatId?: string
     scoringSystem?: 'budget' | 'tiered'
@@ -411,16 +412,31 @@ export default function DraftRoomPage() {
         is_admin: p.is_admin,
         is_host: p.is_host,
       })),
-      draftSettings: {
-        maxTeams: dbState.draft.max_teams,
-        timeLimit: dbState.draft.settings?.timeLimit || 60,
-        pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
-        draftType: dbState.draft.format,
-        formatId: dbState.draft.settings?.formatId,
-        customFormatId: dbState.draft.custom_format_id ?? undefined,
-        scoringSystem: dbState.draft.settings?.scoringSystem as 'budget' | 'tiered' | undefined,
-        tierConfig: dbState.draft.settings?.tierConfig as { tiers: import('@/types').TierDefinition[] } | undefined,
-      },
+      draftSettings: (() => {
+        // Derive user-facing draftType from stored settings or DB format
+        const scoringSystem = dbState.draft.settings?.scoringSystem as 'budget' | 'tiered' | undefined
+        const storedDraftType = dbState.draft.settings?.draftType as string | undefined
+        let draftType: 'tiered' | 'points' | 'auction'
+        if (storedDraftType === 'tiered' || storedDraftType === 'points' || storedDraftType === 'auction') {
+          draftType = storedDraftType
+        } else if (dbState.draft.format === 'auction') {
+          draftType = 'auction'
+        } else if (scoringSystem === 'tiered') {
+          draftType = 'tiered'
+        } else {
+          draftType = 'points'
+        }
+        return {
+          maxTeams: dbState.draft.max_teams,
+          timeLimit: dbState.draft.settings?.timeLimit || 60,
+          pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
+          draftType,
+          formatId: dbState.draft.settings?.formatId,
+          customFormatId: dbState.draft.custom_format_id ?? undefined,
+          scoringSystem,
+          tierConfig: dbState.draft.settings?.tierConfig as { tiers: import('@/types').TierDefinition[] } | undefined,
+        }
+      })(),
       timeRemaining: dbState.draft.settings?.timeLimit || 60,
       draft: {
         id: dbState.draft.id,
@@ -814,6 +830,18 @@ export default function DraftRoomPage() {
     return draftState.teams.flatMap(team => team.picks)
   }, [draftState?.teams])
 
+  // Map pokemonId → team name for "drafted by" display in the grid
+  const draftedByTeamMap = useMemo(() => {
+    if (!draftState?.teams) return {}
+    const map: Record<string, string> = {}
+    draftState.teams.forEach(team => {
+      team.picks.forEach(pokemonId => {
+        map[pokemonId] = team.name
+      })
+    })
+    return map
+  }, [draftState?.teams])
+
   // Memoize legal pokemon list to prevent new array on every render
   const legalPokemon = useMemo(() => {
     if (!pokemon) return EMPTY_ARRAY
@@ -889,6 +917,13 @@ export default function DraftRoomPage() {
       remainingSlots,
     }
   }, [userTeam, _availablePokemon, draftState?.draftSettings])
+
+  // Tier slot tracking for tiered drafts
+  const tierRemainingSlots = useMemo(() => {
+    const tierConfig = draftState?.draftSettings?.tierConfig
+    if (draftState?.draftSettings?.scoringSystem !== 'tiered' || !tierConfig || !userTeam) return undefined
+    return getRemainingTierSlots(tierConfig.tiers, userTeam.pickCosts ?? [])
+  }, [draftState?.draftSettings?.scoringSystem, draftState?.draftSettings?.tierConfig, userTeam])
 
   /**
    * STABLE CALLBACKS - Using useRef pattern to avoid dependency changes
@@ -1076,20 +1111,40 @@ export default function DraftRoomPage() {
 
   // Handler to show confirmation modal before drafting
   const handleInitiateDraft = useCallback((pokemon: Pokemon) => {
-    // Budget feasibility guard: block picks that would make team impossible to fill
-    if (budgetFeasibility && !isPickSafe(
-      pokemon.cost,
-      userTeam?.budgetRemaining ?? 0,
-      budgetFeasibility.remainingSlots,
-      _availablePokemon.map(p => p.cost).sort((a, b) => a - b)
-    )) {
-      const minReserve = (userTeam?.budgetRemaining ?? 0) - budgetFeasibility.maxAffordableCost
-      notify.error(
-        'Pick Blocked',
-        `${pokemon.name} (${pokemon.cost} pts) would leave you unable to fill your remaining ${budgetFeasibility.remainingSlots} slots. Max you can spend: ${budgetFeasibility.maxAffordableCost} pts (need ${minReserve} reserved).`,
-        { duration: 6000 }
-      )
-      return
+    const isTieredDraft = draftState?.draftSettings?.scoringSystem === 'tiered'
+
+    if (isTieredDraft) {
+      // Tier slot guard: block picks when no slot remains in this pokemon's tier
+      const tierConfig = draftState?.draftSettings?.tierConfig
+      if (tierConfig && tierRemainingSlots) {
+        const tier = getPokemonTier(pokemon.cost, tierConfig.tiers)
+        if (!tier || !canAffordTier(pokemon.cost, tierConfig.tiers, tierRemainingSlots)) {
+          notify.error(
+            'No Tier Slot',
+            tier
+              ? `You have no ${tier.name} tier slots remaining.`
+              : `${pokemon.name} doesn't fit any tier in your configuration.`,
+            { duration: 5000 }
+          )
+          return
+        }
+      }
+    } else {
+      // Budget feasibility guard: block picks that would make team impossible to fill
+      if (budgetFeasibility && !isPickSafe(
+        pokemon.cost,
+        userTeam?.budgetRemaining ?? 0,
+        budgetFeasibility.remainingSlots,
+        _availablePokemon.map(p => p.cost).sort((a, b) => a - b)
+      )) {
+        const minReserve = (userTeam?.budgetRemaining ?? 0) - budgetFeasibility.maxAffordableCost
+        notify.error(
+          'Pick Blocked',
+          `${pokemon.name} (${pokemon.cost} pts) would leave you unable to fill your remaining ${budgetFeasibility.remainingSlots} slots. Max you can spend: ${budgetFeasibility.maxAffordableCost} pts (need ${minReserve} reserved).`,
+          { duration: 6000 }
+        )
+        return
+      }
     }
 
     setConfirmationPokemon(pokemon)
@@ -1838,6 +1893,8 @@ export default function DraftRoomPage() {
                   isUserTeam={team.id === draftState?.userTeamId}
                   showTurnIndicator={draftState?.status === 'drafting'}
                   maxPokemonPerTeam={draftState?.draftSettings?.pokemonPerTeam}
+                  scoringSystem={draftState?.draftSettings?.scoringSystem}
+                  tierConfig={draftState?.draftSettings?.tierConfig}
                 />
               </EnhancedErrorBoundary>
             ))
@@ -2022,8 +2079,8 @@ export default function DraftRoomPage() {
           <EnhancedErrorBoundary>
             <PokemonGrid
               pokemon={legalPokemon}
-              onViewDetails={handleViewDetails}
-              onQuickDraft={isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft ? handleInitiateDraft : undefined}
+              onViewDetails={isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft && !isSpectator ? handleInitiateDraft : handleViewDetails}
+              onQuickDraft={undefined}
               onAddToWishlist={handleAddToWishlist}
               onRemoveFromWishlist={handleRemoveFromWishlist}
               draftedPokemonIds={allDraftedIds}
@@ -2034,10 +2091,14 @@ export default function DraftRoomPage() {
               showCost={true}
               showStats={true}
               showWishlistButton={!isSpectator && !!draftState?.userTeamId}
-              showQuickDraft={isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft && !isSpectator}
-              budgetRemaining={userTeam?.budgetRemaining}
-              maxAffordableCost={budgetFeasibility?.maxAffordableCost}
+              showQuickDraft={false}
+              scoringSystem={draftState?.draftSettings?.scoringSystem}
+              tierConfig={draftState?.draftSettings?.tierConfig}
+              remainingTierSlots={tierRemainingSlots}
+              budgetRemaining={draftState?.draftSettings?.scoringSystem === 'tiered' ? undefined : userTeam?.budgetRemaining}
+              maxAffordableCost={draftState?.draftSettings?.scoringSystem === 'tiered' ? undefined : budgetFeasibility?.maxAffordableCost}
               remainingSlots={budgetFeasibility?.remainingSlots}
+              draftedByTeamMap={draftedByTeamMap}
             />
           </EnhancedErrorBoundary>
         </div>

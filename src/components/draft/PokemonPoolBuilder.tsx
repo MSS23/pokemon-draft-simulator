@@ -350,7 +350,7 @@ export default function PokemonPoolBuilder({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`}
+                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${p.id}.gif`}
                   alt=""
                   className="h-8 w-8 object-contain"
                 />
@@ -455,7 +455,7 @@ export default function PokemonPoolBuilder({
                   {entry.id > 0 ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${entry.id}.png`}
+                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${entry.id}.gif`}
                       alt=""
                       className="h-8 w-8 object-contain shrink-0"
                     />

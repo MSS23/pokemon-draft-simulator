@@ -28,7 +28,7 @@ export const analyzeTeamSchema = z.object({
 export const createDraftSchema = z.object({
   name: z.string().min(1).max(100).trim(),
   format: z.string().min(1).max(50),
-  draftType: z.enum(['snake', 'auction']),
+  draftType: z.enum(['tiered', 'points', 'auction']),
   teamCount: z.number().int().min(2).max(8),
   budgetPerTeam: z.number().int().min(50).max(200),
   pokemonPerTeam: z.number().int().min(3).max(15),

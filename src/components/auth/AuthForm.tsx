@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
@@ -123,20 +123,36 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Background decoration */}
+      <div className="absolute inset-0 pokeball-bg pointer-events-none opacity-40" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-info/5 pointer-events-none" />
+
+      <div className="relative w-full max-w-md space-y-5">
+        {/* Brand */}
+        <div className="text-center space-y-1">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <div className="h-9 w-9 rounded-full overflow-hidden border-2 border-primary/50 relative">
+              <div className="absolute inset-0 top-0 h-1/2 bg-primary" />
+              <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-gray-200" />
+              <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/60 -translate-y-1/2" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[10px] w-[10px] rounded-full border-[1.5px] border-foreground/60 bg-background" />
+            </div>
+            <span className="text-xl font-bold brand-gradient-text">Poké Draft</span>
+          </div>
+          <h1 className="text-2xl font-bold">
             {isLogin ? 'Welcome back' : 'Create account'}
-          </CardTitle>
-          <CardDescription className="text-center">
+          </h1>
+          <p className="text-sm text-muted-foreground">
             {isLogin
-              ? 'Sign in to your Pokemon Draft League account'
-              : 'Join the Pokemon Draft League community'
+              ? 'Sign in to your Pokémon Draft League account'
+              : 'Join the Pokémon Draft League community'
             }
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+
+      <Card className="w-full shadow-lg border-border/60">
+        <CardContent className="space-y-4 pt-6">
           {/* Email/Password Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegister && (
@@ -276,6 +292,7 @@ function AuthFormContent({ mode, onSuccess }: AuthFormProps) {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

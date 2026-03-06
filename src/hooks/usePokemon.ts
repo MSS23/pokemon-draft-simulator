@@ -48,9 +48,8 @@ export const usePokemonListByFormat = (formatId?: string, customFormatId?: strin
         return fetchPokemonForCustomFormat(customFormatId)
       }
       // Otherwise use regular format-based fetching
-      // Reduced limit to 150 to avoid rate-limiting from PokeAPI
       if (formatId) {
-        return fetchPokemonForFormat(formatId, 150)
+        return fetchPokemonForFormat(formatId)
       }
       return fetchPokemonList(150)
     },

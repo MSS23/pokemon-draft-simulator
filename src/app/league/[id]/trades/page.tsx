@@ -252,17 +252,46 @@ export default function TradesPage() {
     }
   }, [userTeamId, selectedOpponent, myGives, theirGives, leagueId, league?.currentWeek, tradeNotes])
 
+  const reloadPicks = useCallback(async (teams: Team[]) => {
+    if (!supabase) return
+    const teamIds = teams.map(t => t.id)
+    const { data: picks } = await supabase
+      .from('picks')
+      .select('*')
+      .in('team_id', teamIds)
+      .order('pick_order', { ascending: true })
+
+    if (picks) {
+      const teamNameMap = new Map(teams.map(t => [t.id, t.name]))
+      setAllPicks(picks.map(p => ({
+        id: p.id,
+        draftId: p.draft_id,
+        teamId: p.team_id,
+        pokemonId: p.pokemon_id,
+        pokemonName: p.pokemon_name,
+        cost: p.cost,
+        pickOrder: p.pick_order,
+        round: p.round,
+        createdAt: p.created_at,
+        teamName: teamNameMap.get(p.team_id),
+      })))
+    }
+  }, [])
+
   const handleRespondToTrade = useCallback(async (tradeId: string, accepted: boolean) => {
     try {
       await TradeService.respondToTrade(tradeId, accepted, settings.requireCommissionerApproval)
       notify.success(accepted ? 'Trade Accepted!' : 'Trade Rejected')
-      const tradeData = await TradeService.getLeagueTrades(leagueId)
+      const [tradeData] = await Promise.all([
+        TradeService.getLeagueTrades(leagueId),
+        accepted && league ? reloadPicks(league.teams) : Promise.resolve(),
+      ])
       setTrades(tradeData)
     } catch (err) {
       log.error('Failed to respond to trade:', err)
       notify.error('Error', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [leagueId, settings.requireCommissionerApproval])
+  }, [leagueId, league, settings.requireCommissionerApproval, reloadPicks])
 
   const handleCancelTrade = useCallback(async (tradeId: string) => {
     try {
@@ -281,13 +310,16 @@ export default function TradesPage() {
     try {
       await TradeService.approveTrade(tradeId, userId, approved)
       notify.success(approved ? 'Trade Approved & Executed!' : 'Trade Vetoed')
-      const tradeData = await TradeService.getLeagueTrades(leagueId)
+      const [tradeData] = await Promise.all([
+        TradeService.getLeagueTrades(leagueId),
+        approved && league ? reloadPicks(league.teams) : Promise.resolve(),
+      ])
       setTrades(tradeData)
     } catch (err) {
       log.error('Failed to approve trade:', err)
       notify.error('Error', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [leagueId, userId])
+  }, [leagueId, userId, league, reloadPicks])
 
   // Helper to resolve pick IDs to pokemon names
   const getPickName = useCallback((pickId: string) => {

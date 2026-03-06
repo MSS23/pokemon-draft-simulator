@@ -533,10 +533,10 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
         log.info(`✨ Loaded format pack with ${formatPack.legalPokemon.length} legal Pokemon for ${formatId} from pre-built files`)
 
         // Convert legal Pokemon names to full Pokemon objects using the index
+        // No limit applied here - the pre-built pack is already filtered correctly
         const pokemonList: Pokemon[] = []
-        const legalPokemonSlice = formatPack.legalPokemon.slice(0, limit)
 
-        for (const pokemonName of legalPokemonSlice) {
+        for (const pokemonName of formatPack.legalPokemon) {
           const pokemonData = pokemonIndex[pokemonName]
           if (!pokemonData) {
             log.warn(`Pokemon ${pokemonName} not found in index`)
@@ -562,7 +562,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
                 .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
                 .join(' ')
             ),
-            sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonData.nationalDex}.png`,
+            sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemonData.nationalDex}.gif`,
             cost: formatPack.costs[pokemonName] || 10,
             isLegal: true,
             isLegendary: pokemonData.flags.isLegendary,

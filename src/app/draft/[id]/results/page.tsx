@@ -315,7 +315,13 @@ export default function DraftResultsPage() {
           draftSettings={{
             maxTeams: draftState.draft.max_teams,
             pokemonPerTeam: draftState.draft.settings?.pokemonPerTeam || 6,
-            draftType: draftState.draft.format,
+            draftType: (() => {
+              const dt = (draftState.draft.settings as { draftType?: string })?.draftType
+              if (dt === 'tiered' || dt === 'points' || dt === 'auction') return dt
+              return draftState.draft.format === 'auction' ? 'auction'
+                : (draftState.draft.settings as { scoringSystem?: string })?.scoringSystem === 'tiered' ? 'tiered'
+                : 'points'
+            })(),
             timeLimit: draftState.draft.settings?.timeLimit || 60,
             budgetPerTeam: draftState.draft.budget_per_team
           }}

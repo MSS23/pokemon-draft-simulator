@@ -17,7 +17,7 @@ interface DraftAnalyticsSummaryProps {
   totalTeams: number
   totalPicks: number
   averageDraftTime: number // in minutes
-  popularDraftType: 'snake' | 'auction'
+  popularDraftType: 'tiered' | 'points' | 'auction'
   recentActivity: {
     completedToday: number
     activeNow: number
@@ -113,7 +113,7 @@ export default function DraftAnalyticsSummary({
           <p className="text-xs text-muted-foreground">
             Most played draft format
           </p>
-          <Progress value={popularDraftType === 'snake' ? 75 : 25} className="mt-2" />
+          <Progress value={popularDraftType === 'auction' ? 25 : 75} className="mt-2" />
         </CardContent>
       </Card>
 

@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
 import { TierDefinition } from '@/types'
-import { getPokemonTier as _getPokemonTier, canAffordTier as _canAffordTier } from '@/lib/tier-utils'
+import { canAffordTier } from '@/lib/tier-utils'
 
 interface PokemonGridProps {
   pokemon: Pokemon[]
@@ -44,6 +44,7 @@ interface PokemonGridProps {
   scoringSystem?: 'budget' | 'tiered'
   tierConfig?: { tiers: TierDefinition[] }
   remainingTierSlots?: Record<string, number>
+  draftedByTeamMap?: Record<string, string>
 }
 
 type SortOption = 'name' | 'cost' | 'total' | 'hp' | 'attack' | 'defense' | 'specialAttack' | 'specialDefense' | 'speed'
@@ -92,9 +93,10 @@ export default function PokemonGrid({
   remainingSlots,
   scoringSystem,
   tierConfig,
-  remainingTierSlots: _remainingTierSlots,
+  remainingTierSlots,
+  draftedByTeamMap = {},
 }: PokemonGridProps) {
-  const _isTiered = scoringSystem === 'tiered' && tierConfig?.tiers?.length
+  const isTiered = scoringSystem === 'tiered' && tierConfig?.tiers?.length
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -286,17 +288,19 @@ export default function PokemonGrid({
     return result.slice().sort(sortComparator)
   }, [pokemon, normalizedSearchQuery, typeFilter, costFilter, sortComparator, hpRange, attackRange, defenseRange, speedRange, bstRange])
 
-  const availablePokemon = useMemo(() => {
-    const available = filteredAndSortedPokemon.filter(
-      p => !draftedPokemonIds.includes(p.id)
-    )
-    // Pin wishlisted Pokemon to the top of the grid
-    if (wishlistPokemonIds.length === 0) return available
+  // Show ALL pokemon (including drafted), wishlisted pinned to top
+  const displayPokemon = useMemo(() => {
+    if (wishlistPokemonIds.length === 0) return filteredAndSortedPokemon
     const wishlistSet = new Set(wishlistPokemonIds)
-    const wishlisted = available.filter(p => wishlistSet.has(p.id))
-    const rest = available.filter(p => !wishlistSet.has(p.id))
+    const wishlisted = filteredAndSortedPokemon.filter(p => wishlistSet.has(p.id))
+    const rest = filteredAndSortedPokemon.filter(p => !wishlistSet.has(p.id))
     return [...wishlisted, ...rest]
-  }, [filteredAndSortedPokemon, draftedPokemonIds, wishlistPokemonIds])
+  }, [filteredAndSortedPokemon, wishlistPokemonIds])
+
+  const availableCount = useMemo(() =>
+    displayPokemon.filter(p => !draftedPokemonIds.includes(p.id)).length,
+    [displayPokemon, draftedPokemonIds]
+  )
 
   const gridCols = {
     sm: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8',
@@ -518,7 +522,7 @@ export default function PokemonGrid({
       {/* Results info */}
       <div className="flex items-center justify-between px-1 text-sm text-muted-foreground">
         <span>
-          <span className="font-semibold text-foreground">{availablePokemon.length}</span> available
+          <span className="font-semibold text-foreground">{availableCount}</span> available
           {draftedPokemonIds.length > 0 && (
             <span className="ml-1.5 text-xs">({draftedPokemonIds.length} drafted)</span>
           )}
@@ -554,9 +558,9 @@ export default function PokemonGrid({
       )}
 
       {/* Pokemon Grid - Virtualized for large lists */}
-      {availablePokemon.length > 100 ? (
+      {displayPokemon.length > 100 ? (
         <VirtualizedPokemonGrid
-          pokemon={availablePokemon}
+          pokemon={displayPokemon}
           onViewDetails={onViewDetails}
           onQuickDraft={onQuickDraft}
           onAddToWishlist={onAddToWishlist}
@@ -570,6 +574,10 @@ export default function PokemonGrid({
           showQuickDraft={showQuickDraft}
           budgetRemaining={budgetRemaining}
           maxAffordableCost={maxAffordableCost}
+          draftedByTeamMap={draftedByTeamMap}
+          remainingTierSlots={remainingTierSlots}
+          isTiered={!!isTiered}
+          tierConfig={tierConfig}
         />
       ) : (
         <div className={cn(
@@ -577,7 +585,7 @@ export default function PokemonGrid({
           'auto-rows-max',
           gridCols[cardSize]
         )}>
-          {availablePokemon.map((p) => (
+          {displayPokemon.map((p) => (
             <PokemonCard
               key={p.id}
               pokemon={p}
@@ -587,19 +595,29 @@ export default function PokemonGrid({
               onRemoveFromWishlist={onRemoveFromWishlist}
               isDrafted={draftedPokemonIds.includes(p.id)}
               isInWishlist={wishlistPokemonIds.includes(p.id)}
-              isUnaffordable={budgetRemaining !== undefined && p.cost > budgetRemaining}
-              isUnsafe={maxAffordableCost !== undefined && p.cost > maxAffordableCost && (budgetRemaining === undefined || p.cost <= budgetRemaining)}
+              isUnaffordable={
+                isTiered && tierConfig && remainingTierSlots
+                  ? !canAffordTier(p.cost, tierConfig.tiers, remainingTierSlots)
+                  : budgetRemaining !== undefined && p.cost > budgetRemaining
+              }
+              isUnsafe={
+                !isTiered &&
+                maxAffordableCost !== undefined &&
+                p.cost > maxAffordableCost &&
+                (budgetRemaining === undefined || p.cost <= budgetRemaining)
+              }
               showCost={showCost}
               showStats={showStats}
               showWishlistButton={showWishlistButton}
               showQuickDraft={showQuickDraft}
               size={cardSize}
+              draftedByTeamName={draftedByTeamMap[p.id]}
             />
           ))}
         </div>
       )}
 
-      {availablePokemon.length === 0 && (
+      {displayPokemon.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
           No Pokemon found matching your filters
         </div>

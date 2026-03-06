@@ -198,9 +198,11 @@ export default function SpectateRoomPage() {
                   draftState.draft.status.slice(1)}
               </Badge>
               <Badge variant="outline">
-                {draftState.draft.format === "snake"
-                  ? "Snake Draft"
-                  : "Auction Draft"}
+                {draftState.draft.format === "auction"
+                  ? "Auction Draft"
+                  : (draftState.draft.settings as { scoringSystem?: string })?.scoringSystem === "tiered"
+                  ? "Tiered Draft"
+                  : "Points Draft"}
               </Badge>
               <DraftConnectionStatusBadge status={connectionStatus} showLabel={false} />
             </div>

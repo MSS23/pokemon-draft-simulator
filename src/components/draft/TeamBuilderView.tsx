@@ -238,9 +238,9 @@ export default function TeamBuilderView({
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.id}.png`}
+                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemon.id}.gif`}
                       alt={pokemon.name}
-                      className="w-16 h-16 mx-auto pixelated"
+                      className="w-16 h-16 mx-auto"
                     />
                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate mt-1">
                       {pokemon.name}

@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
 } from 'lucide-react'
+import Link from 'next/link'
 import { SidebarSection } from './SidebarSection'
 import { SidebarLink } from './SidebarLink'
 import { supabase } from '@/lib/supabase'
@@ -103,6 +104,19 @@ export function Sidebar() {
 
   return (
     <aside className="w-60 bg-card border-r border-border flex flex-col h-full">
+      {/* Brand Header */}
+      <div className="px-4 py-3 border-b border-border">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <div className="h-7 w-7 rounded-full overflow-hidden border-2 border-primary/50 group-hover:border-primary transition-colors relative flex-shrink-0">
+            <div className="absolute inset-0 top-0 h-1/2 bg-primary" />
+            <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-gray-200" />
+            <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/60 -translate-y-1/2" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[9px] w-[9px] rounded-full border-[1.5px] border-foreground/60 bg-background" />
+          </div>
+          <span className="font-bold text-sm brand-gradient-text">Poké Draft</span>
+        </Link>
+      </div>
+
       {/* User Profile */}
       <div className="p-4 border-b border-border">
         {user ? (

@@ -183,8 +183,14 @@ export default function FreeAgentsPage() {
       setSelectedPokemon(null)
       setDropPickId(null)
 
-      // Reload picks
-      const picks = await WaiverService.getTeamPicks(userTeamId)
+      // Reload picks and refresh budget from DB
+      const [picks] = await Promise.all([
+        WaiverService.getTeamPicks(userTeamId),
+        supabase
+          ? supabase.from('teams').select('budget_remaining').eq('id', userTeamId).single()
+              .then(({ data }) => { if (data) setUserBudget(data.budget_remaining ?? 0) })
+          : Promise.resolve(),
+      ])
       setUserTeamPicks(picks)
 
       // Reload history

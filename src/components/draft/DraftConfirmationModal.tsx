@@ -1,7 +1,6 @@
 'use client'
 
 import React from 'react'
-import Image from 'next/image'
 import { Pokemon } from '@/types'
 import {
   Dialog,
@@ -88,13 +87,11 @@ export default function DraftConfirmationModal({
                   {/* Image container */}
                   <div className="relative bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-full p-4 sm:p-6 md:p-8 border-2 border-slate-200 dark:border-slate-600 shadow-xl">
                     {!imageError ? (
-                      <Image
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
                         src={imageUrl}
                         alt={pokemon.name}
-                        width={100}
-                        height={100}
                         className="relative z-10 drop-shadow-2xl pixelated w-[100px] h-[100px] sm:w-[120px] sm:h-[120px] md:w-[140px] md:h-[140px]"
-                        unoptimized
                         onError={handleImageError}
                         onLoad={handleImageLoad}
                       />

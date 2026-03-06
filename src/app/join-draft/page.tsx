@@ -8,10 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, Clock, Zap, Trophy, AlertCircle, Eye } from "lucide-react";
@@ -241,33 +238,20 @@ function JoinDraftForm() {
 
   return (
     <SidebarLayout>
-      <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
-        <div className="container mx-auto px-4 py-8">
-          {/* Header */}
-          <div className="relative text-center mb-8">
-            <div className="absolute top-0 right-0">
-              <ThemeToggle />
-            </div>
-            <h1 className="text-4xl font-bold brand-gradient-text mb-4">
-              Join Draft Room
-            </h1>
-            <p className="text-lg text-muted-foreground mb-6">
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold brand-gradient-text">Join Draft Room</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Enter a room code to join an existing Pokémon draft
             </p>
           </div>
+          <ThemeToggle />
+        </div>
 
-          <div className="max-w-2xl mx-auto">
-            <Card className="bg-white/90 dark:bg-card/90 backdrop-blur-sm shadow-xl border-0">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl text-foreground">
-                  Join Existing Draft
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Enter the room code and your details to join the draft
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="space-y-6">
+            <Card>
+              <CardContent className="space-y-6 pt-6">
                 {/* Room Code */}
                 <div className="space-y-4 p-4 bg-muted rounded-lg">
                   <h3 className="font-semibold text-foreground">
@@ -300,19 +284,19 @@ function JoinDraftForm() {
 
                 {/* Error Display */}
                 {error && (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                    <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
-                      <AlertCircle className="h-5 w-5" />
-                      <span className="font-medium">{error}</span>
+                  <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                      <span className="text-sm font-medium">{error}</span>
                     </div>
                   </div>
                 )}
 
                 {/* Draft Info */}
                 {draftInfo && (
-                  <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <h3 className="font-semibold text-green-800 dark:text-green-200 flex items-center gap-2">
-                      <Trophy className="h-5 w-5" />
+                  <div className="space-y-4 p-4 bg-success/10 rounded-lg border border-success/20">
+                    <h3 className="font-semibold text-success flex items-center gap-2">
+                      <Trophy className="h-4 w-4" />
                       Draft Found!
                     </h3>
                     <div className="grid grid-cols-2 gap-3">
@@ -345,7 +329,7 @@ function JoinDraftForm() {
                         {draftInfo.pokemonPerTeam} Pokémon
                       </Badge>
                     </div>
-                    <p className="text-sm text-green-700 dark:text-green-300">
+                    <p className="text-sm text-success/90">
                       Created by: <strong>{draftInfo.createdBy}</strong>
                     </p>
                   </div>
@@ -389,8 +373,8 @@ function JoinDraftForm() {
                           {joinAsSpectator ? "Join Mode" : "Team Name"}
                         </Label>
                         {joinAsSpectator ? (
-                          <div className="flex items-center justify-center h-10 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300 text-sm font-medium">
+                          <div className="flex items-center justify-center h-10 bg-info/10 border border-info/20 rounded-md">
+                            <div className="flex items-center gap-2 text-info text-sm font-medium">
                               <Eye className="h-4 w-4" />
                               Joining as Spectator
                             </div>
@@ -438,15 +422,11 @@ function JoinDraftForm() {
                     )}
 
                     {/* Spectator Mode Toggle */}
-                    <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <div className="pt-4 border-t border-border">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Join as Spectator
-                          </h4>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Watch the draft without participating
-                          </p>
+                          <h4 className="text-sm font-medium">Join as Spectator</h4>
+                          <p className="text-xs text-muted-foreground">Watch the draft without participating</p>
                         </div>
                         <Button
                           type="button"
@@ -476,15 +456,13 @@ function JoinDraftForm() {
                   <Button
                     onClick={handleJoinDraft}
                     disabled={!isFormValid || isJoining}
-                    className="flex-1 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
+                    className="flex-1"
                   >
                     {isJoining ? "Joining..." : "Join Draft"}
                   </Button>
                 )}
               </CardFooter>
             </Card>
-          </div>
-        </div>
       </div>
     </SidebarLayout>
   );

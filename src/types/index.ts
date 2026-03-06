@@ -54,7 +54,7 @@ export interface Draft {
   id: string
   name: string
   hostId: string
-  format: 'snake' | 'auction'
+  format: 'snake' | 'auction' // DB-level; user-facing type is stored in settings.draftType
   ruleset: string
   budgetPerTeam: number
   maxTeams: number
@@ -93,7 +93,8 @@ export interface DraftSettings {
   allowUndos?: boolean
   requireFullRoster?: boolean
   maxPokemonPerTeam?: number
-  // Scoring system
+  // Draft type and scoring system
+  draftType?: 'tiered' | 'points' | 'auction'
   scoringSystem?: 'budget' | 'tiered'
   tierConfig?: { tiers: TierDefinition[] }
   // League settings

@@ -216,6 +216,7 @@
     @apply cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30;
   }
 
+
   /* Pokemon Card Gradients */
   .pokemon-card-normal {
     background: linear-gradient(135deg, hsl(var(--type-normal)) 0%, hsl(var(--type-normal) / 0.7) 100%);

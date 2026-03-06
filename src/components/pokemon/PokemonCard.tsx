@@ -28,6 +28,7 @@ interface PokemonCardProps {
   showQuickDraft?: boolean
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  draftedByTeamName?: string
 }
 
 const CARD_HEIGHTS = {
@@ -59,6 +60,7 @@ const PokemonCard = ({
   showQuickDraft = false,
   size = 'md',
   className,
+  draftedByTeamName,
 }: PokemonCardProps) => {
   const { getPendingActionStatus } = usePendingActionFeedback()
   const pendingPick = getPendingActionStatus('pick', pokemon.id.toString())
@@ -164,8 +166,8 @@ const PokemonCard = ({
       )}
 
       {/* Wishlist Button */}
-      {showWishlistButton && !isDrafted && !isDisabled && (
-        <div className="absolute top-1.5 left-1.5 z-10">
+      {showWishlistButton && !isDisabled && (
+        <div className="absolute top-1.5 left-1.5 z-20">
           <Button
             variant={isInWishlist ? "default" : "ghost"}
             size="sm"
@@ -308,15 +310,17 @@ const PokemonCard = ({
         </div>
       )}
 
-      {/* Drafted overlay */}
+      {/* Drafted label */}
       {isDrafted && (
-        <div className="absolute inset-0 bg-gray-900/70 flex items-center justify-center rounded-xl z-10">
-          <Badge
-            variant="destructive"
-            className="font-bold text-xs px-3 py-1.5 bg-red-600 border border-red-500 shadow-lg"
-          >
-            DRAFTED
-          </Badge>
+        <div className="absolute bottom-0 left-0 right-0 flex justify-center pb-1 z-20 pointer-events-none">
+          <div className={cn(
+            "flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold shadow",
+            "bg-gray-900/85 text-white border border-gray-700",
+            "max-w-[90%]"
+          )}>
+            <Lock className="h-2.5 w-2.5 flex-shrink-0" />
+            <span className="truncate">{draftedByTeamName || 'DRAFTED'}</span>
+          </div>
         </div>
       )}
     </div>
@@ -339,6 +343,7 @@ const arePropsEqual = (
   if (prevProps.showQuickDraft !== nextProps.showQuickDraft) return false
   if (prevProps.size !== nextProps.size) return false
   if (prevProps.className !== nextProps.className) return false
+  if (prevProps.draftedByTeamName !== nextProps.draftedByTeamName) return false
   return true
 }
 

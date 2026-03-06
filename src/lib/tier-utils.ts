@@ -3,9 +3,10 @@ import { TierDefinition } from '@/types'
 export const DEFAULT_TIER_CONFIG: TierDefinition[] = [
   { name: 'S', label: 'S Tier', slotsPerTeam: 1, minCost: 14, color: '#ef4444' },
   { name: 'A', label: 'A Tier', slotsPerTeam: 2, minCost: 11, color: '#f97316' },
-  { name: 'B', label: 'B Tier', slotsPerTeam: 3, minCost: 8,  color: '#eab308' },
+  { name: 'B', label: 'B Tier', slotsPerTeam: 2, minCost: 8,  color: '#eab308' },
   { name: 'C', label: 'C Tier', slotsPerTeam: 2, minCost: 5,  color: '#22c55e' },
-  { name: 'D', label: 'D Tier', slotsPerTeam: 2, minCost: 0,  color: '#6366f1' },
+  { name: 'D', label: 'D Tier', slotsPerTeam: 1, minCost: 3,  color: '#6366f1' },
+  { name: 'E', label: 'E Tier', slotsPerTeam: 1, minCost: 0,  color: '#94a3b8' },
 ]
 
 export const TIER_PRESET_LABELS: Record<string, string> = {
@@ -13,7 +14,8 @@ export const TIER_PRESET_LABELS: Record<string, string> = {
   'A': 'Strong, versatile picks',
   'B': 'Solid mid-tier options',
   'C': 'Situational but useful',
-  'D': 'Lower-tier fillers',
+  'D': 'Lower-tier options',
+  'E': 'Budget / filler picks',
 }
 
 /** Given a pokemon cost and the tier config, return which tier it belongs to */
