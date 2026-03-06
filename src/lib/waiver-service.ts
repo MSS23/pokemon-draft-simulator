@@ -7,8 +7,7 @@
  * - Budget validation for claims
  * - Waiver history tracking
  *
- * Note: waiver_claims table is not in generated Supabase types yet.
- * All queries use typed casts until types are regenerated.
+ * Note: waiver_claims is fully typed in the Database type in supabase.ts.
  */
 
 import { supabase } from './supabase'
@@ -17,8 +16,6 @@ import type { WaiverClaim, Pick } from '@/types'
 
 const log = createLogger('WaiverService')
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type SupabaseAny = any
 
 interface WaiverClaimRow {
   id: string
@@ -108,8 +105,7 @@ export class WaiverService {
       throw new Error(`Free agent pick limit reached (${maxClaims} allowed before first game)`)
     }
 
-    // Insert claim record (table not in generated types yet)
-    const { data: claim, error } = await (supabase as SupabaseAny)
+    const { data: claim, error } = await supabase
       .from('waiver_claims')
       .insert({
         league_id: leagueId,
@@ -123,7 +119,7 @@ export class WaiverService {
       .select()
       .single()
 
-    if (error) throw new Error(`Failed to submit claim: ${(error as { message: string }).message}`)
+    if (error) throw new Error(`Failed to submit claim: ${error.message}`)
 
     const claimRow = claim as WaiverClaimRow
 
@@ -147,7 +143,7 @@ export class WaiverService {
     if (!supabase) throw new Error('Supabase not available')
 
     // Get claim details
-    const { data: rawClaim } = await (supabase as SupabaseAny)
+    const { data: rawClaim } = await supabase
       .from('waiver_claims')
       .select('*')
       .eq('id', claimId)
@@ -208,7 +204,7 @@ export class WaiverService {
     }
 
     // Mark claim as completed
-    await (supabase as SupabaseAny)
+    await supabase
       .from('waiver_claims')
       .update({
         status: 'completed',
@@ -225,13 +221,13 @@ export class WaiverService {
   static async getWaiverHistory(leagueId: string): Promise<WaiverClaim[]> {
     if (!supabase) throw new Error('Supabase not available')
 
-    const { data, error } = await (supabase as SupabaseAny)
+    const { data, error } = await supabase
       .from('waiver_claims')
       .select('*')
       .eq('league_id', leagueId)
       .order('created_at', { ascending: false })
 
-    if (error) throw new Error(`Failed to get waiver history: ${(error as { message: string }).message}`)
+    if (error) throw new Error(`Failed to get waiver history: ${error.message}`)
 
     return ((data || []) as WaiverClaimRow[]).map(this.mapClaim)
   }
@@ -242,14 +238,14 @@ export class WaiverService {
   static async getTeamClaimsThisSeason(teamId: string, leagueId: string): Promise<number> {
     if (!supabase) throw new Error('Supabase not available')
 
-    const { count, error } = await (supabase as SupabaseAny)
+    const { count, error } = await supabase
       .from('waiver_claims')
       .select('id', { count: 'exact', head: true })
       .eq('league_id', leagueId)
       .eq('team_id', teamId)
       .in('status', ['completed', 'pending', 'approved'])
 
-    if (error) throw new Error(`Failed to count claims: ${(error as { message: string }).message}`)
+    if (error) throw new Error(`Failed to count claims: ${error.message}`)
 
     return (count as number) || 0
   }

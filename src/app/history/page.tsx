@@ -93,10 +93,8 @@ export default function HistoryPage() {
     try {
       log.info('Fetching league history for user:', userId)
 
-      // Query the user_league_history view
-      // user_league_history is a custom view not in generated Database types
       const { data: leagueData, error } = await supabase
-        .from('user_league_history' as never)
+        .from('user_league_history')
         .select('*')
         .eq('user_id', userId)
         .order('end_date', { ascending: false, nullsFirst: false }) as unknown as { data: LeagueHistory[] | null; error: { message: string } | null }
@@ -243,7 +241,7 @@ export default function HistoryPage() {
 
   // Helper to get Pokemon sprite URL
   const getPokemonSprite = (pokemonId: string) => {
-    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemonId}.gif`
   }
 
   if (loading) {

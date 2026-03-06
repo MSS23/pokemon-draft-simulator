@@ -60,12 +60,17 @@ interface _MakeDraftPickResponse {
 
 export interface DraftSettings {
   maxTeams: number
-  draftType: 'snake' | 'auction'
+  /** User-facing draft type:
+   *  - 'tiered'  → snake format + tiered scoring (S–E tier slots)
+   *  - 'points'  → snake format + budget scoring
+   *  - 'auction' → auction format
+   */
+  draftType: 'tiered' | 'points' | 'auction'
   timeLimit: number
   pokemonPerTeam: number
   budgetPerTeam?: number
   formatId?: string
-  // Scoring system
+  // Scoring system (derived from draftType, kept for backwards compat)
   scoringSystem?: 'budget' | 'tiered'
   tierConfig?: { tiers: import('@/types').TierDefinition[] }
   // League settings (optional)
@@ -216,9 +221,9 @@ export class DraftService {
       throw new Error('You must be logged in to create a draft. Please sign in or create an account.')
     }
 
-    // Validate minimum Pokemon count for snake drafts
-    if (settings.draftType === 'snake' && settings.pokemonPerTeam < 6) {
-      throw new Error('Snake drafts require at least 6 Pokémon per team for points-based gameplay')
+    // Validate minimum Pokemon count for snake-based drafts
+    if ((settings.draftType === 'points' || settings.draftType === 'tiered') && settings.pokemonPerTeam < 6) {
+      throw new Error('Points and tiered drafts require at least 6 Pokémon per team')
     }
 
     const roomCode = this.generateRoomCode()
@@ -250,13 +255,17 @@ export class DraftService {
       customFormatId = formatData.id
     }
 
+    // Map user-facing draftType to DB format + scoringSystem
+    const dbFormat: 'snake' | 'auction' = settings.draftType === 'auction' ? 'auction' : 'snake'
+    const scoringSystem: 'budget' | 'tiered' = settings.draftType === 'tiered' ? 'tiered' : 'budget'
+    const isTiered = scoringSystem === 'tiered'
+
     // Create draft - build insert object conditionally based on table columns
-    const isTiered = settings.scoringSystem === 'tiered'
     const draftInsert: DraftInsert = {
       room_code: roomCode.toLowerCase(),
       name: name || `${hostName}'s Draft`,
       host_id: hostId,
-      format: settings.draftType,
+      format: dbFormat,
       max_teams: settings.maxTeams,
       // For tiered drafts set a very high budget so the RPC budget check never blocks
       budget_per_team: isTiered ? 99999 : (settings.budgetPerTeam || 100),
@@ -267,8 +276,9 @@ export class DraftService {
         pokemonPerTeam: settings.pokemonPerTeam,
         maxPokemonPerTeam: settings.pokemonPerTeam, // Required for pick validation
         formatId: settings.formatId || DEFAULT_FORMAT,
-        // Scoring system
-        scoringSystem: settings.scoringSystem || 'budget',
+        // Store both the user-facing draftType and derived scoringSystem
+        draftType: settings.draftType,
+        scoringSystem,
         tierConfig: settings.tierConfig,
         // League settings
         createLeague: settings.createLeague,
@@ -302,7 +312,7 @@ export class DraftService {
       name: teamName,
       owner_id: hostId,
       draft_order: 1,
-      budget_remaining: settings.budgetPerTeam || 100
+      budget_remaining: isTiered ? 99999 : (settings.budgetPerTeam || 100)
     }
     const { data: team, error: teamError } = await supabase
       .from('teams')
@@ -989,7 +999,7 @@ export class DraftService {
 
     // Call the atomic database function
     // This performs all validation and updates in a single transaction with row-level locking
-    const { data, error } = await (supabase.rpc as (fn: string, params: Record<string, unknown>) => ReturnType<typeof supabase.rpc>)('make_draft_pick', {
+    const { data, error } = await supabase.rpc('make_draft_pick', {
       p_draft_id: draftUuid,
       p_team_id: teamId,
       p_user_id: userId,

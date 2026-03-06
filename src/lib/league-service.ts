@@ -1516,8 +1516,7 @@ export class LeagueService {
   static async recalculateStandings(leagueId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase as any).rpc('recalculate_league_standings', {
+    const { error } = await supabase.rpc('recalculate_league_standings', {
       p_league_id: leagueId,
     })
 

@@ -11,22 +11,8 @@ declare global {
   }
 }
 
-// CACHE BUST: Build 2025-10-07-12:00
-// Get environment variables - these are embedded at build time for NEXT_PUBLIC_ prefixed vars
-// Environment variables are provided by Vercel at build time
-// Force read from process.env to ensure fresh values
 const supabaseUrl = String(process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim()
 const supabaseAnonKey = String(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim()
-
-// Debug logging for production troubleshooting
-if (typeof window !== 'undefined') {
-  log.info('', {
-    hasUrl: !!supabaseUrl,
-    hasKey: !!supabaseAnonKey,
-    urlPrefix: supabaseUrl?.substring(0, 30),
-    urlLength: supabaseUrl?.length
-  })
-}
 
 // Validate configuration - warn but don't throw at module scope
 // (throwing crashes Next.js static page generation during build)
@@ -508,12 +494,151 @@ export type Database = {
         }
         Relationships: []
       }
+      waiver_claims: {
+        Row: {
+          id: string
+          league_id: string
+          team_id: string
+          claimed_pokemon_id: string
+          claimed_pokemon_name: string
+          dropped_pick_id: string | null
+          status: 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled'
+          waiver_priority: number | null
+          claimed_at: string
+          processed_at: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          league_id: string
+          team_id: string
+          claimed_pokemon_id: string
+          claimed_pokemon_name: string
+          dropped_pick_id?: string | null
+          status?: 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled'
+          waiver_priority?: number | null
+          claimed_at?: string
+          processed_at?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          league_id?: string
+          team_id?: string
+          claimed_pokemon_id?: string
+          claimed_pokemon_name?: string
+          dropped_pick_id?: string | null
+          status?: 'pending' | 'approved' | 'completed' | 'rejected' | 'cancelled'
+          waiver_priority?: number | null
+          claimed_at?: string
+          processed_at?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      draft_actions: {
+        Row: {
+          id: string
+          draft_id: string
+          team_id: string | null
+          action_type: 'pick' | 'bid' | 'auction_win' | 'undo'
+          action_data: Record<string, unknown>
+          performed_by: string
+          can_undo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          draft_id: string
+          team_id?: string | null
+          action_type: 'pick' | 'bid' | 'auction_win' | 'undo'
+          action_data: Record<string, unknown>
+          performed_by: string
+          can_undo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          draft_id?: string
+          team_id?: string | null
+          action_type?: 'pick' | 'bid' | 'auction_win' | 'undo'
+          action_data?: Record<string, unknown>
+          performed_by?: string
+          can_undo?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      draft_result_teams: {
+        Row: {
+          id: string
+          draft_result_id: string
+          team_id: string
+          final_budget: number
+          total_cost: number
+          pick_count: number
+          average_cost: number | null
+          team_stats: Record<string, unknown> | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          draft_result_id: string
+          team_id: string
+          final_budget: number
+          total_cost: number
+          pick_count: number
+          average_cost?: number | null
+          team_stats?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          draft_result_id?: string
+          team_id?: string
+          final_budget?: number
+          total_cost?: number
+          pick_count?: number
+          average_cost?: number | null
+          team_stats?: Record<string, unknown> | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      wishlists: {
+        Row: {
+          id: string
+          participant_id: string
+          draft_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          participant_id: string
+          draft_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          participant_id?: string
+          draft_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       leagues: {
         Row: {
           id: string
           draft_id: string
           name: string
           league_type: 'single' | 'split_conference_a' | 'split_conference_b'
+          battle_type: 'wifi' | 'showdown'
           season_number: number
           status: 'scheduled' | 'active' | 'completed' | 'cancelled'
           start_date: string | null
@@ -529,6 +654,7 @@ export type Database = {
           draft_id: string
           name: string
           league_type?: 'single' | 'split_conference_a' | 'split_conference_b'
+          battle_type?: 'wifi' | 'showdown'
           season_number?: number
           status?: 'scheduled' | 'active' | 'completed' | 'cancelled'
           start_date?: string | null
@@ -544,6 +670,7 @@ export type Database = {
           draft_id?: string
           name?: string
           league_type?: 'single' | 'split_conference_a' | 'split_conference_b'
+          battle_type?: 'wifi' | 'showdown'
           season_number?: number
           status?: 'scheduled' | 'active' | 'completed' | 'cancelled'
           start_date?: string | null
@@ -562,6 +689,7 @@ export type Database = {
           league_id: string
           team_id: string
           seed: number | null
+          final_placement: number | null
           created_at: string
         }
         Insert: {
@@ -569,6 +697,7 @@ export type Database = {
           league_id: string
           team_id: string
           seed?: number | null
+          final_placement?: number | null
           created_at?: string
         }
         Update: {
@@ -576,6 +705,7 @@ export type Database = {
           league_id?: string
           team_id?: string
           seed?: number | null
+          final_placement?: number | null
           created_at?: string
         }
         Relationships: []
@@ -594,6 +724,7 @@ export type Database = {
           away_score: number
           winner_team_id: string | null
           battle_format: string
+          youtube_url: string | null
           notes: string | null
           created_at: string
           updated_at: string
@@ -612,6 +743,7 @@ export type Database = {
           away_score?: number
           winner_team_id?: string | null
           battle_format: string
+          youtube_url?: string | null
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -630,6 +762,7 @@ export type Database = {
           away_score?: number
           winner_team_id?: string | null
           battle_format?: string
+          youtube_url?: string | null
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -1124,6 +1257,60 @@ export type Database = {
         }
         Relationships: []
       }
+      user_draft_summary: {
+        Row: {
+          draft_id: string
+          draft_name: string
+          status: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
+          format: 'snake' | 'auction'
+          ruleset: string
+          room_code: string | null
+          host_id: string
+          created_at: string
+          updated_at: string
+          max_teams: number
+          pokemon_per_team: number
+          current_turn: number | null
+          spectator_count: number
+          user_team_id: string
+          user_team_name: string
+          user_id: string | null
+          budget_remaining: number
+          draft_order: number
+          is_host: boolean
+          picks_made: number
+          progress_percent: number
+        }
+        Relationships: []
+      }
+      user_league_history: {
+        Row: {
+          league_id: string
+          league_name: string
+          league_status: 'scheduled' | 'active' | 'completed' | 'cancelled'
+          start_date: string | null
+          end_date: string | null
+          total_weeks: number
+          current_week: number
+          draft_id: string
+          team_id: string
+          team_name: string
+          user_id: string | null
+          league_team_id: string
+          seed: number | null
+          final_placement: number | null
+          wins: number
+          losses: number
+          draws: number
+          points_for: number
+          points_against: number
+          current_rank: number
+          current_streak: string | null
+          total_teams: number
+          total_picks: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       update_team_budget: {
@@ -1169,6 +1356,33 @@ export type Database = {
       generate_week_summary: {
         Args: { p_league_id: string; p_week_number: number }
         Returns: undefined
+      }
+      make_draft_pick: {
+        Args: {
+          p_draft_id: string
+          p_team_id: string
+          p_user_id: string
+          p_pokemon_id: string
+          p_pokemon_name: string
+          p_cost: number
+          p_expected_turn: number
+        }
+        Returns: {
+          success: boolean
+          error?: string
+          pickId?: string
+          newBudget?: number
+          nextTurn?: number
+          isComplete?: boolean
+        }
+      }
+      recalculate_league_standings: {
+        Args: { p_league_id: string }
+        Returns: undefined
+      }
+      get_current_team_id: {
+        Args: { p_draft_id: string; p_turn: number; p_total_teams: number }
+        Returns: string
       }
     }
     Enums: Record<string, never>
