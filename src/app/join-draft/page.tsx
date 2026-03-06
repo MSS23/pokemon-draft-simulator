@@ -251,7 +251,7 @@ function JoinDraftForm() {
             <Card>
               <CardContent className="space-y-6 pt-6">
                 {/* Room Code */}
-                <div className="space-y-4 p-4 bg-muted rounded-lg">
+                <div id="tour-join-code" className="space-y-4 p-4 bg-muted rounded-lg">
                   <h3 className="font-semibold text-foreground">
                     Room Code
                   </h3>
@@ -335,7 +335,7 @@ function JoinDraftForm() {
 
                 {/* User Identity */}
                 {draftInfo && (
-                  <div className="space-y-4 p-4 bg-muted rounded-lg">
+                  <div id="tour-join-team" className="space-y-4 p-4 bg-muted rounded-lg">
                     <h3 className="font-semibold text-foreground flex items-center gap-2">
                       <Users className="h-5 w-5" />
                       Your Identity

@@ -406,7 +406,7 @@ export default function CreateDraftPage() {
 
               <CardContent className="space-y-6">
                 {/* User Identity */}
-                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <div id="tour-create-identity" className="space-y-4 p-4 bg-muted/50 rounded-lg">
                   <h3 className="font-semibold text-foreground flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
                     Your Identity
@@ -444,7 +444,7 @@ export default function CreateDraftPage() {
                 </div>
 
                 {/* Draft Settings */}
-                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <div id="tour-create-settings" className="space-y-4 p-4 bg-muted/50 rounded-lg">
                   <h3 className="font-semibold text-foreground flex items-center gap-2">
                     <Trophy className="h-5 w-5 text-primary" />
                     Draft Settings
@@ -503,7 +503,7 @@ export default function CreateDraftPage() {
                 </div>
 
                 {/* Format/Ruleset Selection */}
-                <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+                <div id="tour-create-format" className="space-y-4 p-4 bg-muted/50 rounded-lg">
                   <h3 className="font-semibold text-foreground flex items-center gap-2">
                     <Shield className="h-5 w-5 text-primary" />
                     Pokemon Format & Rules
@@ -1205,7 +1205,7 @@ export default function CreateDraftPage() {
                 </div>
               </CardContent>
 
-              <CardFooter className="flex gap-3">
+              <CardFooter id="tour-create-submit" className="flex gap-3">
                 <Button
                   variant="outline"
                   onClick={() => router.push("/")}

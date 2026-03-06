@@ -9,6 +9,7 @@ import { ErrorBoundaryProvider } from "@/components/providers/ErrorBoundaryProvi
 import { ImagePreferenceProvider } from "@/contexts/ImagePreferenceContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
+import { TourProvider } from "@/components/tour/TourProvider";
 import { HydrationErrorFilter } from "./hydration-error-filter";
 import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
 import { Toaster } from "sonner";
@@ -92,6 +93,7 @@ export default function RootLayout({
                     <Toaster position="top-center" richColors />
                     <QueryProvider>
                       <Header />
+                      <TourProvider />
                       <main className="min-h-[calc(100vh-3rem)]">{children}</main>
                       <footer className="border-t py-4 text-center text-xs text-muted-foreground px-4">
                         <a href="/terms" className="hover:underline">Terms</a>

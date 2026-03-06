@@ -15,7 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, Settings, LayoutDashboard, UserCircle } from 'lucide-react'
+import { LogOut, Settings, LayoutDashboard, UserCircle, HelpCircle } from 'lucide-react'
+import { TOUR_OPEN_EVENT } from '@/components/tour/TourGuide'
 
 export function Header() {
   const router = useRouter()
@@ -44,6 +45,16 @@ export function Header() {
           </Link>
 
           <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              aria-label="Open tour guide"
+              title="Tour guide"
+              onClick={() => window.dispatchEvent(new CustomEvent(TOUR_OPEN_EVENT))}
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
             <ThemeToggle />
 
             <div suppressHydrationWarning>

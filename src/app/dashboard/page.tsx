@@ -21,7 +21,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
-import { TourGuide, DASHBOARD_TOUR_STEPS } from '@/components/tour/TourGuide'
+import { TOUR_OPEN_EVENT } from '@/components/tour/TourGuide'
 import { motion } from 'framer-motion'
 
 const log = createLogger('Dashboard')
@@ -133,21 +133,6 @@ export default function DashboardPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null)
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
-  const [tourOpen, setTourOpen] = useState(false)
-
-  // Auto-open tour on first login only
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const pending = localStorage.getItem('tour:pendingStart')
-    if (!pending) return
-    localStorage.removeItem('tour:pendingStart')
-    // Only show if they haven't completed the tour before
-    const alreadyDone = localStorage.getItem('tour:completed')
-    if (!alreadyDone) {
-      localStorage.removeItem('tour:favoritePokemon')
-      setTourOpen(true)
-    }
-  }, [])
 
   const handleDeleteLeague = async (leagueId: string) => {
     if (!user) return
@@ -529,7 +514,7 @@ export default function DashboardPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setTourOpen(true)}
+            onClick={() => window.dispatchEvent(new CustomEvent(TOUR_OPEN_EVENT))}
             className="shrink-0 gap-1.5"
           >
             <MapPin className="h-3.5 w-3.5" />
@@ -829,11 +814,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <TourGuide
-        steps={DASHBOARD_TOUR_STEPS}
-        isOpen={tourOpen}
-        onClose={() => setTourOpen(false)}
-      />
     </SidebarLayout>
   )
 }

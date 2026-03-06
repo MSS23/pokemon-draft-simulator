@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { Pokemon } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getPokemonCardClass, getPokemonRarityClass, isPokemonShiny } from '@/utils/pokemon'
+import { getPokemonCardClass } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
 import { usePendingActionFeedback } from '@/hooks/useOptimisticUpdates'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
@@ -137,8 +137,6 @@ const PokemonCard = ({
         'active:scale-[0.98]',
         'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
         'touch-manipulation',
-        isPokemonShiny(pokemon) && getPokemonRarityClass(pokemon.cost),
-        isPokemonShiny(pokemon) && 'pokemon-sparkle',
         isDrafted && 'opacity-60 grayscale',
         isDisabled && 'opacity-40 cursor-not-allowed',
         isUnaffordable && 'opacity-75 border-orange-300 dark:border-orange-600',
@@ -292,11 +290,6 @@ const PokemonCard = ({
               onLoad={handleImageLoad}
               unoptimized
             />
-            {isPokemonShiny(pokemon) && !isLoading && (
-              <div className="absolute top-1 right-1 text-yellow-400 animate-pulse z-[2]">
-                ✨
-              </div>
-            )}
           </>
         ) : (
           <div className="w-12 h-12 bg-gray-200 dark:bg-muted rounded-lg flex items-center justify-center text-gray-400 text-xs">

@@ -1,10 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { X, Search, Sparkles, Loader2 } from 'lucide-react'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
+
+// ─── Tour event ───────────────────────────────────────────────────────────────
+
+export const TOUR_OPEN_EVENT = 'poke-draft:tour:open'
 
 // ─── Popular Pokemon for the picker ─────────────────────────────────────────
 
@@ -91,6 +96,66 @@ export const DASHBOARD_TOUR_STEPS: TourStep[] = [
   },
 ]
 
+export const CREATE_DRAFT_TOUR_STEPS: TourStep[] = [
+  {
+    message: (name) =>
+      `Hi, I'm ${name}! This is where you create a draft room. Let me walk you through each section!`,
+    targetId: null,
+  },
+  {
+    message: () =>
+      `Start here — set your name and team name. This is how other players will see you during the draft.`,
+    targetId: 'tour-create-identity',
+  },
+  {
+    message: () =>
+      `Pick your draft settings: number of teams, draft type (snake points, tiered, or auction), time per pick, and how many Pokémon each team drafts.`,
+    targetId: 'tour-create-settings',
+  },
+  {
+    message: () =>
+      `Choose a Pokémon format — this controls which Pokémon are legal. VGC Regulation H is the official competitive standard. You can also upload a custom CSV!`,
+    targetId: 'tour-create-format',
+  },
+  {
+    message: () =>
+      `All done! Hit "Create Draft Room" to generate your room. You'll get a 6-letter code — share it with friends so they can join.`,
+    targetId: 'tour-create-submit',
+  },
+]
+
+export const JOIN_DRAFT_TOUR_STEPS: TourStep[] = [
+  {
+    message: (name) =>
+      `Hey there! I'm ${name}. Joining a draft is easy — you just need the 6-letter room code from whoever created it.`,
+    targetId: null,
+  },
+  {
+    message: () =>
+      `Type the room code here and click "Find Room." It'll load the draft details so you know exactly what you're joining.`,
+    targetId: 'tour-join-code',
+  },
+  {
+    message: () =>
+      `Once the room loads, enter your team name here. You can also toggle "Join as Spectator" to watch without picking — great for scouting!`,
+    targetId: 'tour-join-team',
+  },
+]
+
+export const GENERIC_TOUR_STEPS: TourStep[] = [
+  {
+    message: (name) =>
+      `Hi, I'm ${name}! Head to the Dashboard for a full guided tour of all the features — I'll walk you through everything there!`,
+    targetId: null,
+  },
+]
+
+const ROUTE_STEPS: Record<string, TourStep[]> = {
+  '/dashboard': DASHBOARD_TOUR_STEPS,
+  '/create-draft': CREATE_DRAFT_TOUR_STEPS,
+  '/join-draft': JOIN_DRAFT_TOUR_STEPS,
+}
+
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 
 const LS_FAV = 'tour:favoritePokemon'
@@ -117,18 +182,89 @@ function markTourDone() {
   } catch {}
 }
 
-// ─── Highlight helper ────────────────────────────────────────────────────────
+// ─── Spotlight overlay ────────────────────────────────────────────────────────
 
-function highlightElement(id: string | null) {
-  document.querySelectorAll('.tour-highlight-active').forEach((el) => {
-    el.classList.remove('tour-highlight-active')
-  })
+function SpotlightOverlay({ targetId }: { targetId: string | null }) {
+  const [rect, setRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null)
+
+  useEffect(() => {
+    if (!targetId) {
+      setRect(null)
+      return
+    }
+    const el = document.getElementById(targetId)
+    if (!el) {
+      setRect(null)
+      return
+    }
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+    const measure = () => {
+      const found = document.getElementById(targetId)
+      if (!found) return
+      const r = found.getBoundingClientRect()
+      setRect({ left: r.left, top: r.top, width: r.width, height: r.height })
+    }
+
+    const timeout = setTimeout(measure, 380)
+    window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, { passive: true })
+
+    return () => {
+      clearTimeout(timeout)
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure)
+    }
+  }, [targetId])
+
+  if (!targetId || !rect) return null
+
+  const pad = 12
+  const x = Math.round(rect.left - pad)
+  const y = Math.round(rect.top - pad)
+  const w = Math.round(rect.width + pad * 2)
+  const h = Math.round(rect.height + pad * 2)
+  const r = 10
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 150, pointerEvents: 'none' }}>
+      <svg
+        style={{ position: 'fixed', left: 0, top: 0, width: '100%', height: '100%' }}
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <mask id="tour-spotlight">
+            <rect width="100%" height="100%" fill="white" />
+            <rect x={x} y={y} width={w} height={h} rx={r} fill="black" />
+          </mask>
+        </defs>
+        <rect width="100%" height="100%" fill="rgba(0,0,0,0.62)" mask="url(#tour-spotlight)" />
+      </svg>
+      {/* highlight ring */}
+      <div
+        style={{
+          position: 'fixed',
+          left: x,
+          top: y,
+          width: w,
+          height: h,
+          borderRadius: r,
+          boxShadow: '0 0 0 2px hsl(var(--primary)), 0 0 28px rgba(220,38,38,0.3)',
+          transition: 'left 0.35s cubic-bezier(0.4,0,0.2,1), top 0.35s cubic-bezier(0.4,0,0.2,1), width 0.35s cubic-bezier(0.4,0,0.2,1), height 0.35s cubic-bezier(0.4,0,0.2,1)',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
+  )
+}
+
+// ─── Highlight helper (scroll only — SpotlightOverlay handles visuals) ────────
+
+function scrollToElement(id: string | null) {
   if (!id) return
   const el = document.getElementById(id)
-  if (el) {
-    el.classList.add('tour-highlight-active')
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 // ─── Sprite image helper ──────────────────────────────────────────────────────
@@ -582,13 +718,10 @@ export function TourGuide({ steps, isOpen, onClose }: TourGuideProps) {
     prevIsOpen.current = isOpen
   }, [isOpen])
 
-  // Apply highlight when step changes
+  // Scroll to target when step changes (SpotlightOverlay handles the visual)
   useEffect(() => {
     if (isOpen && phase === 'touring') {
-      highlightElement(steps[step]?.targetId ?? null)
-    }
-    return () => {
-      highlightElement(null)
+      scrollToElement(steps[step]?.targetId ?? null)
     }
   }, [isOpen, phase, step, steps])
 
@@ -608,7 +741,6 @@ export function TourGuide({ steps, isOpen, onClose }: TourGuideProps) {
   }, [])
 
   const handleClose = useCallback(() => {
-    highlightElement(null)
     markTourDone()
     onClose()
   }, [onClose])
@@ -633,14 +765,53 @@ export function TourGuide({ steps, isOpen, onClose }: TourGuideProps) {
   const message = currentStep.message(formatPokemonName(pokemon.name))
 
   return (
-    <MascotBubble
-      pokemon={pokemon}
-      message={message}
-      step={step}
-      totalSteps={steps.length}
-      onNext={handleNext}
-      onPrev={handlePrev}
-      onClose={handleClose}
-    />
+    <>
+      <SpotlightOverlay targetId={currentStep.targetId} />
+      <MascotBubble
+        pokemon={pokemon}
+        message={message}
+        step={step}
+        totalSteps={steps.length}
+        onNext={handleNext}
+        onPrev={handlePrev}
+        onClose={handleClose}
+      />
+    </>
   )
+}
+
+// ─── GlobalTourGuide ──────────────────────────────────────────────────────────
+
+export function GlobalTourGuide() {
+  const pathname = usePathname()
+  const [isOpen, setIsOpen] = useState(false)
+
+  // Auto-open on first login
+  useEffect(() => {
+    const pending = localStorage.getItem('tour:pendingStart')
+    if (pending) {
+      localStorage.removeItem('tour:pendingStart')
+      const done = localStorage.getItem('tour:completed')
+      if (!done) {
+        localStorage.removeItem('tour:favoritePokemon') // force picker on first run
+        setIsOpen(true)
+      }
+    }
+  }, [])
+
+  // Listen for manual trigger from ? button
+  useEffect(() => {
+    const handler = () => setIsOpen(true)
+    window.addEventListener(TOUR_OPEN_EVENT, handler)
+    return () => window.removeEventListener(TOUR_OPEN_EVENT, handler)
+  }, [])
+
+  const steps = useMemo(() => {
+    for (const [route, routeSteps] of Object.entries(ROUTE_STEPS)) {
+      if (pathname === route) return routeSteps
+    }
+    return GENERIC_TOUR_STEPS
+  }, [pathname])
+
+  return <TourGuide steps={steps} isOpen={isOpen} onClose={() => setIsOpen(false)} />
 }
