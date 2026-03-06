@@ -10,23 +10,23 @@ interface SidebarLayoutProps {
 
 export function SidebarLayout({ children }: SidebarLayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Mobile Menu (only visible on mobile) */}
-      <div className="md:hidden sticky top-14 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-12 items-center">
-          <MobileSidebar />
-        </div>
+    <div className="flex">
+      {/* Desktop Sidebar — sticky below global header */}
+      <div className="hidden md:block sticky top-14 h-[calc(100vh-3.5rem)] self-start shrink-0">
+        <Sidebar />
       </div>
 
-      {/* Main Content with Sidebar */}
-      <div className="flex-1 flex">
-        {/* Desktop Sidebar */}
-        <div className="hidden md:block">
-          <Sidebar />
+      {/* Content column */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-[calc(100vh-3.5rem)]">
+        {/* Mobile Menu — sticky below global header */}
+        <div className="md:hidden sticky top-14 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <div className="flex h-12 items-center px-4">
+            <MobileSidebar />
+          </div>
         </div>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-x-hidden">
+        <main className="flex-1">
           {children}
         </main>
       </div>

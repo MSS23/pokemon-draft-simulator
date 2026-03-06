@@ -74,6 +74,15 @@ export default function TeamDetailPage() {
   const [canAnalyzeTeams, setCanAnalyzeTeams] = useState(false)
   const [accessChecked, setAccessChecked] = useState(false)
   const [viewerRole, setViewerRole] = useState<ViewerRole>('spectator')
+  const [matchHistory, setMatchHistory] = useState<Array<{
+    matchId: string
+    weekNumber: number
+    opponentId: string
+    opponentName: string
+    myScore: number
+    theirScore: number
+    result: 'W' | 'L' | 'D'
+  }>>([])
 
   const loadTeamData = useCallback(async () => {
     try {
@@ -167,6 +176,38 @@ export default function TeamDetailPage() {
         setPokemonKOStats(koStatsMap)
       } catch (err) {
         log.warn('Failed to load KO stats:', err)
+      }
+
+      // Load match history
+      try {
+        const { data: matchRows } = await supabase
+          .from('matches')
+          .select('*')
+          .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+          .eq('status', 'completed')
+          .order('week_number', { ascending: false })
+
+        if (matchRows && matchRows.length > 0) {
+          const opponentIds = matchRows.map(m =>
+            m.home_team_id === teamId ? m.away_team_id : m.home_team_id
+          )
+          const { data: oppTeams } = await supabase
+            .from('teams')
+            .select('id, name')
+            .in('id', [...new Set(opponentIds)])
+
+          const teamNameMap = new Map((oppTeams || []).map(t => [t.id, t.name]))
+          setMatchHistory(matchRows.map(m => {
+            const isHome = m.home_team_id === teamId
+            const opponentId = isHome ? m.away_team_id : m.home_team_id
+            const myScore = (isHome ? m.home_score : m.away_score) ?? 0
+            const theirScore = (isHome ? m.away_score : m.home_score) ?? 0
+            const result = m.winner_team_id === null ? 'D' : m.winner_team_id === teamId ? 'W' : 'L'
+            return { matchId: m.id, weekNumber: m.week_number, opponentId, opponentName: teamNameMap.get(opponentId) || 'Unknown', myScore, theirScore, result }
+          }))
+        }
+      } catch (err) {
+        log.warn('Failed to load match history:', err)
       }
 
       // Check AI analysis access
@@ -512,11 +553,12 @@ export default function TeamDetailPage() {
 
         {/* Detailed Stats Tabs */}
         <Tabs defaultValue="roster" className="space-y-4">
-          <TabsList className={`grid w-full ${viewerRole === 'owner' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full ${viewerRole === 'owner' ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <TabsTrigger value="roster">Roster</TabsTrigger>
             {viewerRole === 'owner' && (
               <TabsTrigger value="stats">Advanced Stats</TabsTrigger>
             )}
+            <TabsTrigger value="history">Match History</TabsTrigger>
           </TabsList>
 
           {/* Roster Tab */}
@@ -703,6 +745,49 @@ export default function TeamDetailPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Match History Tab */}
+          <TabsContent value="history" className="space-y-3">
+            {matchHistory.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <p className="text-sm">No completed matches yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Match Results ({matchHistory.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {matchHistory.map(m => (
+                      <div
+                        key={m.matchId}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/league/${leagueId}/matchup/${m.matchId}`)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                            m.result === 'W' ? 'bg-green-500 text-white' :
+                            m.result === 'L' ? 'bg-red-500 text-white' :
+                            'bg-gray-400 text-white'
+                          }`}>{m.result}</span>
+                          <div>
+                            <div className="font-medium text-sm">vs {m.opponentName}</div>
+                            <div className="text-xs text-muted-foreground">Week {m.weekNumber}</div>
+                          </div>
+                        </div>
+                        <div className="text-right font-bold tabular-nums text-sm">
+                          {m.myScore} – {m.theirScore}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
         </Tabs>

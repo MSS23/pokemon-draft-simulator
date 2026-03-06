@@ -22,6 +22,7 @@ import { AuthModal } from '@/components/auth/AuthModal'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
 import { TourGuide, DASHBOARD_TOUR_STEPS } from '@/components/tour/TourGuide'
+import { motion } from 'framer-motion'
 
 const log = createLogger('Dashboard')
 
@@ -314,7 +315,12 @@ export default function DashboardPage() {
     return <Badge variant={c.variant} size="sm">{c.label}</Badge>
   }
 
-  const DraftCard = ({ draft }: { draft: DraftSummary }) => (
+  const DraftCard = ({ draft, index = 0 }: { draft: DraftSummary; index?: number }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.07, duration: 0.38, type: 'spring', damping: 22 }}
+    >
     <Card
       className="card-interactive"
       onClick={() => router.push(`/draft/${draft.room_code.toLowerCase()}`)}
@@ -359,6 +365,7 @@ export default function DashboardPage() {
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   )
 
   const PokemonGifRow = ({ picks, maxShow = 6 }: { picks: { pokemonId: string; pokemonName: string }[]; maxShow?: number }) => (
@@ -456,7 +463,12 @@ export default function DashboardPage() {
     <SidebarLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
+        <motion.div
+          className="flex items-start justify-between gap-4"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
           <div>
             <h1 className="text-2xl font-bold">Welcome back, {displayName}</h1>
             <p className="text-sm text-muted-foreground mt-1">
@@ -472,7 +484,7 @@ export default function DashboardPage() {
             <MapPin className="h-3.5 w-3.5" />
             Take a Tour
           </Button>
-        </div>
+        </motion.div>
 
         {/* Error */}
         {fetchError && (
@@ -483,52 +495,31 @@ export default function DashboardPage() {
 
         {/* Stats */}
         <div id="tour-stats" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Trophy className="h-4 w-4 text-primary" />
-                </div>
-                <p className="text-xs text-muted-foreground">Total Drafts</p>
-              </div>
-              <p className="text-2xl font-bold">{drafts.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center flex-shrink-0">
-                  <Zap className="h-4 w-4 text-success" />
-                </div>
-                <p className="text-xs text-muted-foreground">Active Drafts</p>
-              </div>
-              <p className="text-2xl font-bold">{activeDrafts.length}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0">
-                  <Shield className="h-4 w-4 text-info" />
-                </div>
-                <p className="text-xs text-muted-foreground">Active Leagues</p>
-              </div>
-              <p className="text-2xl font-bold">{activeLeagueCount}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                  <Users className="h-4 w-4 text-accent" />
-                </div>
-                <p className="text-xs text-muted-foreground">League W-L</p>
-              </div>
-              <p className="text-2xl font-bold">
-                {totalWins + totalLosses > 0 ? `${totalWins}-${totalLosses}` : '-'}
-              </p>
-            </CardContent>
-          </Card>
+          {[
+            { icon: Trophy,  bg: 'bg-primary/10',  iconColor: 'text-primary',  label: 'Total Drafts',   value: String(drafts.length) },
+            { icon: Zap,     bg: 'bg-success/10',  iconColor: 'text-success',  label: 'Active Drafts',  value: String(activeDrafts.length) },
+            { icon: Shield,  bg: 'bg-info/10',     iconColor: 'text-info',     label: 'Active Leagues', value: String(activeLeagueCount) },
+            { icon: Users,   bg: 'bg-accent/10',   iconColor: 'text-accent',   label: 'League W-L',     value: totalWins + totalLosses > 0 ? `${totalWins}-${totalLosses}` : '-' },
+          ].map((stat, i) => (
+            <motion.div
+              key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08, duration: 0.4, type: 'spring', damping: 22 }}
+            >
+              <Card className="hover:shadow-md transition-shadow">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`h-8 w-8 rounded-lg ${stat.bg} flex items-center justify-center flex-shrink-0`}>
+                      <stat.icon className={`h-4 w-4 ${stat.iconColor}`} />
+                    </div>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  </div>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
 
         {/* This Week's Matches */}
@@ -707,7 +698,7 @@ export default function DashboardPage() {
                     <p className="text-center py-8 text-sm text-muted-foreground">No active drafts.</p>
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      {activeDrafts.map(draft => <DraftCard key={draft.draft_id} draft={draft} />)}
+                      {activeDrafts.map((draft, i) => <DraftCard key={draft.draft_id} draft={draft} index={i} />)}
                     </div>
                   )}
                 </TabsContent>
@@ -717,14 +708,14 @@ export default function DashboardPage() {
                     <p className="text-center py-8 text-sm text-muted-foreground">No completed drafts.</p>
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      {completedDrafts.map(draft => <DraftCard key={draft.draft_id} draft={draft} />)}
+                      {completedDrafts.map((draft, i) => <DraftCard key={draft.draft_id} draft={draft} index={i} />)}
                     </div>
                   )}
                 </TabsContent>
 
                 <TabsContent value="all">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {drafts.map(draft => <DraftCard key={draft.draft_id} draft={draft} />)}
+                    {drafts.map((draft, i) => <DraftCard key={draft.draft_id} draft={draft} index={i} />)}
                   </div>
                 </TabsContent>
               </Tabs>

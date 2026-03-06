@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, Settings, LayoutDashboard } from 'lucide-react'
+import { LogOut, Settings, LayoutDashboard, UserCircle } from 'lucide-react'
 
 export function Header() {
   const router = useRouter()
@@ -69,6 +69,10 @@ export function Header() {
                     <DropdownMenuItem onClick={() => router.push('/dashboard')}>
                       <LayoutDashboard className="h-4 w-4 mr-2" />
                       Dashboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push('/profile')}>
+                      <UserCircle className="h-4 w-4 mr-2" />
+                      Profile
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => router.push('/settings')}>
                       <Settings className="h-4 w-4 mr-2" />

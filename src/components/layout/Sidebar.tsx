@@ -10,6 +10,7 @@ import {
   Trophy,
   Settings,
   LogOut,
+  UserCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import { SidebarSection } from './SidebarSection'
@@ -155,6 +156,7 @@ export function Sidebar() {
 
         <SidebarSection title="My Activity">
           <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+          <SidebarLink href="/profile" icon={UserCircle} label="Profile" />
           <SidebarLink href="/history" icon={History} label="History" />
         </SidebarSection>
 

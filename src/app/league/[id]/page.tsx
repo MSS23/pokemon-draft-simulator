@@ -76,6 +76,7 @@ export default function LeaguePage() {
   const [playoffTournament, setPlayoffTournament] = useState<Tournament | null>(null)
   const [showStartPlayoffs, setShowStartPlayoffs] = useState(false)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [recentResults, setRecentResults] = useState<(Match & { homeTeam: Team; awayTeam: Team })[]>([])
   const { user } = useAuth()
 
   // Determine commissioner status from auth user or guest session
@@ -226,6 +227,33 @@ export default function LeaguePage() {
           setDraftHostId(draft.host_id)
         }
       }
+
+      // Load recent match results (all weeks)
+      try {
+        if (supabase && leagueData.teams.length > 0) {
+          const { data: recentMatches } = await supabase
+            .from('matches')
+            .select('*')
+            .eq('league_id', leagueId)
+            .eq('status', 'completed')
+            .order('updated_at', { ascending: false })
+            .limit(20)
+
+          if (recentMatches) {
+            const teamMap = new Map(leagueData.teams.map(t => [t.id, t]))
+            setRecentResults(
+              recentMatches
+                .map(m => {
+                  const homeTeam = teamMap.get(m.home_team_id)
+                  const awayTeam = teamMap.get(m.away_team_id)
+                  if (!homeTeam || !awayTeam) return null
+                  return { id: m.id, leagueId: m.league_id, weekNumber: m.week_number, matchNumber: m.match_number, homeTeamId: m.home_team_id, awayTeamId: m.away_team_id, scheduledDate: m.scheduled_date, status: m.status as Match['status'], homeScore: m.home_score, awayScore: m.away_score, winnerTeamId: m.winner_team_id, battleFormat: m.battle_format, notes: m.notes, createdAt: m.created_at, updatedAt: m.updated_at, completedAt: m.completed_at, homeTeam, awayTeam }
+                })
+                .filter(Boolean) as (Match & { homeTeam: Team; awayTeam: Team })[]
+            )
+          }
+        }
+      } catch { /* non-fatal */ }
 
       // Load playoff state if exists
       try {
@@ -514,6 +542,7 @@ export default function LeaguePage() {
               <TabsTrigger value="playoffs" className="flex-1 min-w-0 text-xs sm:text-sm">Playoffs</TabsTrigger>
             )}
             <TabsTrigger value="kill-leaders" className="flex-1 min-w-0 text-xs sm:text-sm">Kills</TabsTrigger>
+            <TabsTrigger value="activity" className="flex-1 min-w-0 text-xs sm:text-sm">Activity</TabsTrigger>
             <TabsTrigger value="teams" className="flex-1 min-w-0 text-xs sm:text-sm">Teams</TabsTrigger>
           </TabsList>
 
@@ -907,6 +936,43 @@ export default function LeaguePage() {
               <PlayoffBracket tournament={playoffTournament} />
             </TabsContent>
           )}
+
+          {/* Activity Tab */}
+          <TabsContent value="activity" className="space-y-3">
+            {recentResults.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <p className="text-sm">No completed matches yet.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              recentResults.map(match => {
+                const homeColors = teamColorMap.get(match.homeTeamId)
+                const awayColors = teamColorMap.get(match.awayTeamId)
+                return (
+                  <div
+                    key={match.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
+                  >
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div className={`w-1 h-8 rounded-full shrink-0 ${homeColors?.bg || 'bg-muted'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-medium truncate">{match.homeTeam.name}</span>
+                          <span className="font-bold tabular-nums shrink-0">{match.homeScore} – {match.awayScore}</span>
+                          <span className="font-medium truncate">{match.awayTeam.name}</span>
+                          {match.winnerTeamId && <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Week {match.weekNumber}</div>
+                      </div>
+                      <div className={`w-1 h-8 rounded-full shrink-0 ${awayColors?.bg || 'bg-muted'}`} />
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </TabsContent>
 
           {/* Teams & Pokemon Tab */}
           <TabsContent value="teams" className="space-y-4">

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { motion } from 'framer-motion'
 
 interface SidebarLinkProps {
   href: string
@@ -33,16 +34,25 @@ export function SidebarLink({ href, icon: Icon, label, badge, onClick, isProtect
       href={href}
       onClick={handleClick}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm',
+        'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
         isActive
-          ? 'bg-primary/10 text-primary font-medium'
+          ? 'text-primary font-medium'
           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
       )}
     >
-      <Icon className="h-4 w-4" />
-      <span className="flex-1">{label}</span>
+      {/* Sliding active background */}
+      {isActive && (
+        <motion.div
+          layoutId="sidebar-active-pill"
+          className="absolute inset-0 rounded-lg bg-primary/10"
+          transition={{ type: 'spring', stiffness: 380, damping: 36 }}
+        />
+      )}
+
+      <Icon className="relative h-4 w-4 shrink-0" />
+      <span className="relative flex-1">{label}</span>
       {badge && (
-        <span className="ml-auto text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+        <span className="relative ml-auto text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
           {badge}
         </span>
       )}
