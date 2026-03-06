@@ -242,7 +242,7 @@ function PokemonPicker({
             onClick={onSkip}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Skip tour
+            Choose for me
           </button>
         </div>
       </div>
@@ -380,6 +380,14 @@ export function TourGuide({ steps, isOpen, onClose }: TourGuideProps) {
     setStep(0)
   }, [])
 
+  const handleSkip = useCallback(() => {
+    const random = POPULAR_POKEMON[Math.floor(Math.random() * POPULAR_POKEMON.length)]
+    savePokemon(random)
+    setPokemon(random)
+    setPhase('touring')
+    setStep(0)
+  }, [])
+
   const handleClose = useCallback(() => {
     highlightElement(null)
     markTourDone()
@@ -397,7 +405,7 @@ export function TourGuide({ steps, isOpen, onClose }: TourGuideProps) {
   if (!isOpen) return null
 
   if (phase === 'picker') {
-    return <PokemonPicker onSelect={handleSelect} onSkip={handleClose} />
+    return <PokemonPicker onSelect={handleSelect} onSkip={handleSkip} />
   }
 
   if (!pokemon) return null
