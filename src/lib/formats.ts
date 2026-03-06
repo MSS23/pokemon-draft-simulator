@@ -158,7 +158,7 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
     id: 'vgc-reg-h',
     name: 'VGC 2024 Regulation H',
     shortName: 'Reg H',
-    description: 'Official VGC 2024 Regulation H format - No Legendary, Mythical, or Paradox Pokémon allowed. Paldea, Kitakami, and Blueberry Academy Pokédex only.',
+    description: 'VGC 2024 Regulation H (Sep 2024–Jan 2025) - A return to basics. ALL Legendary, Mythical, and Paradox Pokémon banned. Paldea, Kitakami, and Blueberry Academy Pokédex only.',
     generation: 9,
     gameType: 'doubles',
     category: 'vgc',
@@ -175,22 +175,22 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
         // Box Legendaries
         'koraidon', 'miraidon',
 
-        // Treasures of Ruin
+        // Terapagos (Blueberry Legendary)
+        'terapagos', 'terapagos-terastal', 'terapagos-stellar',
+
+        // Treasures of Ruin (Paldea sub-legendaries — BANNED in Reg H)
         'wo-chien', 'chien-pao', 'ting-lu', 'chi-yu',
 
-        // Loyal Three
+        // Loyal Three (Kitakami sub-legendaries — BANNED in Reg H)
         'okidogi', 'munkidori', 'fezandipiti',
 
-        // Ogerpon (all forms)
+        // Ogerpon (Kitakami sub-legendary — BANNED in Reg H, all forms)
         'ogerpon', 'ogerpon-wellspring', 'ogerpon-hearthflame', 'ogerpon-cornerstone',
-
-        // Terapagos
-        'terapagos', 'terapagos-terastal', 'terapagos-stellar',
 
         // Mythical Pokemon
         'pecharunt',
 
-        // ALL other Legendary Pokemon (from previous generations that can be transferred)
+        // ALL other Legendary Pokemon (from previous generations, HOME transfers)
         'mewtwo', 'mew', 'lugia', 'ho-oh', 'celebi', 'kyogre', 'groudon', 'rayquaza',
         'jirachi', 'deoxys', 'deoxys-attack', 'deoxys-defense', 'deoxys-speed',
         'dialga', 'palkia', 'heatran', 'regigigas', 'giratina', 'giratina-origin',
@@ -242,11 +242,12 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
     }
   },
 
+  // VGC Regulation F
   {
-    id: 'vgc-reg-g',
-    name: 'VGC 2024 Regulation G',
-    shortName: 'Reg G',
-    description: 'Previous VGC regulation with additional legendary restrictions',
+    id: 'vgc-reg-f',
+    name: 'VGC 2024 Regulation F',
+    shortName: 'Reg F',
+    description: 'VGC 2024 Regulation F (Jan–Apr 2024) - Paldea, Kitakami, and Blueberry Pokédex. All Paradox Pokémon and sub-legendaries (Ogerpon, Loyal Three, Treasures of Ruin) allowed. Restricted legendaries and Mythicals banned.',
     generation: 9,
     gameType: 'doubles',
     category: 'vgc',
@@ -254,19 +255,119 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
       speciesClause: true,
       itemClause: true,
       bannedPokemon: [
-        'koraidon', 'miraidon', 'wo-chien', 'chien-pao', 'ting-lu', 'chi-yu',
-        'okidogi', 'munkidori', 'fezandipiti', 'ogerpon', 'terapagos', 'pecharunt'
+        // Restricted Legendaries (banned, 0 restricted slots)
+        'koraidon', 'miraidon', 'terapagos', 'terapagos-terastal', 'terapagos-stellar',
+        'mewtwo', 'lugia', 'ho-oh', 'kyogre', 'groudon', 'rayquaza',
+        'dialga', 'dialga-origin', 'palkia', 'palkia-origin',
+        'giratina', 'giratina-origin',
+        'reshiram', 'zekrom', 'kyurem', 'kyurem-black', 'kyurem-white',
+        'xerneas', 'yveltal', 'zygarde', 'zygarde-10', 'zygarde-complete',
+        'cosmog', 'cosmoem', 'solgaleo', 'lunala', 'necrozma', 'necrozma-dusk-mane',
+        'necrozma-dawn-wings', 'necrozma-ultra',
+        'zacian', 'zacian-crowned', 'zamazenta', 'zamazenta-crowned',
+        'eternatus', 'eternatus-eternamax',
+        'calyrex', 'calyrex-ice', 'calyrex-shadow',
+        // Mythicals
+        'mew', 'celebi', 'jirachi', 'deoxys', 'phione', 'manaphy', 'darkrai',
+        'shaymin', 'arceus', 'victini', 'keldeo', 'meloetta', 'genesect',
+        'diancie', 'hoopa', 'volcanion', 'magearna', 'marshadow', 'zeraora',
+        'meltan', 'melmetal', 'zarude', 'pecharunt', 'calyrex',
+        'enamorus'
       ],
       bannedTiers: [],
-      allowedGenerations: [9],
-      allowedRegions: ['paldea'],
-      legendaryPolicy: 'restricted',
+      allowedGenerations: [],
+      allowedRegions: ['paldea', 'kitakami', 'blueberry'],
+      legendaryPolicy: 'restricted', // Sub-legendaries (Ogerpon, Loyal Three, Treasures of Ruin, paradox) all legal
       mythicalPolicy: 'banned',
       paradoxPolicy: 'allowed',
       bannedAbilities: [],
       bannedItems: [],
       bannedMoves: [],
-      restrictedCount: 2
+    },
+    costConfig: {
+      type: 'hybrid',
+      bstTiers: {
+        600: 30, 550: 25, 500: 20, 450: 15, 400: 10, 350: 8, 300: 5, 0: 3
+      },
+      costOverrides: {
+        // Paradox Pokemon
+        'flutter-mane': 28,
+        'iron-hands': 26,
+        'chi-yu': 25,
+        'chien-pao': 24,
+        'roaring-moon': 23,
+        'iron-valiant': 25,
+        'raging-bolt': 24,
+        'walking-wake': 23,
+        // Ogerpon forms
+        'ogerpon-wellspring': 22,
+        'ogerpon-hearthflame': 21,
+        'ogerpon-cornerstone': 20,
+        'ogerpon': 18,
+        // Loyal Three
+        'okidogi': 15,
+        'munkidori': 16,
+        'fezandipiti': 15,
+        // Treasures of Ruin
+        'wo-chien': 17,
+        'chien-pao': 24,
+        'ting-lu': 18,
+        'chi-yu': 25,
+      },
+      costMultiplier: 1.0,
+      minCost: 3,
+      maxCost: 30
+    },
+    meta: {
+      isOfficial: true,
+      lastUpdated: '2024-01-04',
+      season: '2024 Regulation F',
+      source: 'The Pokémon Company International',
+      popularity: 4,
+      complexity: 4
+    }
+  },
+
+  {
+    id: 'vgc-reg-g',
+    name: 'VGC 2024 Regulation G',
+    shortName: 'Reg G',
+    description: 'VGC 2024 Regulation G (May–Aug 2024) - Used at Worlds 2024. All sub-legendaries and paradox allowed. Up to 1 restricted legendary per team. Only Mythicals are fully banned.',
+    generation: 9,
+    gameType: 'doubles',
+    category: 'vgc',
+    ruleset: {
+      speciesClause: true,
+      itemClause: true,
+      bannedPokemon: [
+        // All Mythical Pokemon (the only category fully banned in Reg G)
+        'mew', 'celebi', 'jirachi', 'deoxys', 'phione', 'manaphy', 'darkrai',
+        'shaymin', 'arceus', 'victini', 'keldeo', 'meloetta', 'genesect',
+        'diancie', 'hoopa', 'volcanion', 'magearna', 'marshadow', 'zeraora',
+        'meltan', 'melmetal', 'zarude', 'pecharunt', 'enamorus',
+        // Restricted legendaries also banned from draft pool (1-per-team limit not enforceable in draft format)
+        'koraidon', 'miraidon', 'terapagos', 'terapagos-terastal', 'terapagos-stellar',
+        'mewtwo', 'lugia', 'ho-oh', 'kyogre', 'groudon', 'rayquaza',
+        'dialga', 'dialga-origin', 'palkia', 'palkia-origin',
+        'giratina', 'giratina-origin',
+        'reshiram', 'zekrom', 'kyurem', 'kyurem-black', 'kyurem-white',
+        'xerneas', 'yveltal', 'zygarde', 'zygarde-10', 'zygarde-complete',
+        'cosmog', 'cosmoem', 'solgaleo', 'lunala', 'necrozma', 'necrozma-dusk-mane',
+        'necrozma-dawn-wings', 'necrozma-ultra',
+        'zacian', 'zacian-crowned', 'zamazenta', 'zamazenta-crowned',
+        'eternatus', 'eternatus-eternamax',
+        'calyrex', 'calyrex-ice', 'calyrex-shadow'
+      ],
+      bannedTiers: [],
+      allowedGenerations: [], // All gens via Blueberry dex HOME transfers
+      allowedRegions: ['paldea', 'kitakami', 'blueberry'],
+      legendaryPolicy: 'restricted', // Sub-legendaries (Ogerpon, Loyal Three, Treasures of Ruin, paradox) all legal
+      mythicalPolicy: 'banned',
+      paradoxPolicy: 'allowed',
+      bannedAbilities: [],
+      bannedItems: [],
+      bannedMoves: [],
+      restrictedCount: 1
     },
     costConfig: {
       type: 'hybrid',
@@ -274,12 +375,24 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
         600: 35, 550: 30, 500: 25, 450: 20, 400: 15, 350: 10, 300: 7, 0: 4
       },
       costOverrides: {
+        // Paradox Pokemon (legal in Reg G)
         'great-tusk': 40,
         'iron-valiant': 40,
         'flutter-mane': 45,
-        'chi-yu': 50,
-        'koraidon': 60,
-        'miraidon': 60
+        // Treasures of Ruin (legal in Reg G)
+        'chi-yu': 35,
+        'chien-pao': 32,
+        'ting-lu': 28,
+        'wo-chien': 25,
+        // Ogerpon forms (legal in Reg G)
+        'ogerpon-wellspring': 30,
+        'ogerpon-hearthflame': 28,
+        'ogerpon-cornerstone': 26,
+        'ogerpon': 24,
+        // Loyal Three (legal in Reg G)
+        'okidogi': 22,
+        'munkidori': 22,
+        'fezandipiti': 20,
       },
       costMultiplier: 1.2,
       minCost: 4,

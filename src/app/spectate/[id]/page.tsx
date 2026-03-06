@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ArrowLeft, Eye, RefreshCw } from "lucide-react";
 import { usePokemonList } from "@/hooks/usePokemon";
 import { useDraftStateWithRealtime } from "@/hooks/useDraftRealtime";
@@ -178,9 +177,6 @@ export default function SpectateRoomPage() {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
-            </div>
-            <div className="absolute top-0 right-0">
-              <ThemeToggle />
             </div>
             <div className="flex items-center justify-center gap-2">
               <Eye className="h-6 w-6 text-primary" />

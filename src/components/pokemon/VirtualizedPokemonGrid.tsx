@@ -12,6 +12,9 @@ interface VirtualizedPokemonGridProps {
   onQuickDraft?: (pokemon: Pokemon) => void
   onAddToWishlist?: (pokemon: Pokemon) => void
   onRemoveFromWishlist?: (pokemon: Pokemon) => void
+  onPreDraft?: (pokemon: Pokemon) => void
+  onClearPreDraft?: (pokemon: Pokemon) => void
+  preDraftPokemonId?: string | null
   draftedPokemonIds?: string[]
   wishlistPokemonIds?: string[]
   className?: string
@@ -23,7 +26,6 @@ interface VirtualizedPokemonGridProps {
   budgetRemaining?: number
   maxAffordableCost?: number
   draftedByTeamMap?: Record<string, string>
-  remainingTierSlots?: Record<string, number>
   isTiered?: boolean
   tierConfig?: { tiers: import('@/types').TierDefinition[] }
 }
@@ -99,6 +101,9 @@ export default function VirtualizedPokemonGrid({
   onQuickDraft,
   onAddToWishlist,
   onRemoveFromWishlist,
+  onPreDraft,
+  onClearPreDraft,
+  preDraftPokemonId,
   draftedPokemonIds = [],
   wishlistPokemonIds = [],
   className,
@@ -110,7 +115,6 @@ export default function VirtualizedPokemonGrid({
   budgetRemaining,
   maxAffordableCost,
   draftedByTeamMap = {},
-  remainingTierSlots,
   isTiered,
   tierConfig,
 }: VirtualizedPokemonGridProps) {
@@ -194,16 +198,20 @@ export default function VirtualizedPokemonGrid({
                     onQuickDraft={onQuickDraft}
                     onAddToWishlist={onAddToWishlist}
                     onRemoveFromWishlist={onRemoveFromWishlist}
+                    onPreDraft={onPreDraft}
+                    onClearPreDraft={onClearPreDraft}
                     isDrafted={draftedPokemonIds.includes(p.id)}
                     isInWishlist={wishlistPokemonIds.includes(p.id)}
+                    isPreDrafted={preDraftPokemonId === p.id}
                     isUnaffordable={
-                      isTiered && tierConfig && remainingTierSlots
+                      isTiered && tierConfig
                         ? (() => {
                             const tier = tierConfig.tiers
                               .slice()
                               .sort((a: { minCost: number }, b: { minCost: number }) => b.minCost - a.minCost)
                               .find((t: { minCost: number }) => p.cost >= t.minCost)
-                            return !tier || (remainingTierSlots[tier.name] ?? 0) <= 0
+                            if (!tier) return true
+                            return budgetRemaining !== undefined && (tier as { cost: number }).cost > budgetRemaining
                           })()
                         : budgetRemaining !== undefined && p.cost > budgetRemaining
                     }

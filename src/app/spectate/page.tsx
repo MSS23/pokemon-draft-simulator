@@ -12,11 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Search, Users, Clock, Eye, Play, Trophy, Hash } from "lucide-react";
+import { Search, Users, Clock, Eye, Play, Trophy, Hash, LogIn } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { createLogger } from '@/lib/logger'
+import { useAuth } from '@/contexts/AuthContext'
+import { AuthModal } from '@/components/auth/AuthModal'
 
 const log = createLogger('SpectatePage')
 
@@ -43,6 +44,10 @@ export default function SpectatePage() {
   const [loading, setLoading] = useState(true);
   const [searchCode, setSearchCode] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
+  const [userDraftIds, setUserDraftIds] = useState<Set<string>>(new Set());
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authRedirectTo, setAuthRedirectTo] = useState<string | undefined>();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadPublicDrafts();
@@ -92,7 +97,25 @@ export default function SpectatePage() {
       if (error) {
         log.error("Error loading public drafts:", error);
       } else {
-        setDrafts((data || []) as unknown as PublicDraft[]);
+        const publicDrafts = (data || []) as unknown as PublicDraft[];
+        setDrafts(publicDrafts);
+
+        // Check which of these drafts the current user is a participant in
+        if (publicDrafts.length > 0) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const draftIds = publicDrafts.map((d) => d.id);
+            const { data: userTeams } = await supabase
+              .from("teams")
+              .select("draft_id")
+              .eq("owner_id", user.id)
+              .in("draft_id", draftIds);
+
+            if (userTeams) {
+              setUserDraftIds(new Set(userTeams.map((t) => t.draft_id)));
+            }
+          }
+        }
       }
     } catch (error) {
       log.error("Failed to load public drafts:", error);
@@ -194,9 +217,6 @@ export default function SpectatePage() {
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="relative text-center mb-8">
-            <div className="absolute top-0 right-0">
-              <ThemeToggle />
-            </div>
 
             <h1 className="text-5xl font-bold brand-gradient-text mb-4">
               🎮 Spectate Drafts
@@ -360,16 +380,39 @@ export default function SpectatePage() {
                           <Clock className="h-3 w-3" />
                           {formatTimeAgo(draft.last_activity)}
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            handleJoinDraft(draft.room_code, draft.id)
-                          }
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Watch
-                        </Button>
+                        {userDraftIds.has(draft.id) ? (
+                          <Button
+                            size="sm"
+                            onClick={() => router.push(`/draft/${draft.id}`)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            Rejoin
+                          </Button>
+                        ) : !user ? (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setAuthRedirectTo(`/draft/${draft.id}`);
+                              setAuthModalOpen(true);
+                            }}
+                            variant="outline"
+                          >
+                            <LogIn className="h-4 w-4 mr-1" />
+                            Join
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              handleJoinDraft(draft.room_code, draft.id)
+                            }
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Watch
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -396,6 +439,12 @@ export default function SpectatePage() {
           </div>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        redirectTo={authRedirectTo}
+      />
     </SidebarLayout>
   );
 }

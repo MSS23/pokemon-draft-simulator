@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays, Trash2, MapPin } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays, Trash2, MapPin, Eye } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { notify } from '@/lib/notifications'
 import Link from 'next/link'
@@ -126,11 +126,13 @@ export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(true)
   const [drafts, setDrafts] = useState<DraftSummary[]>([])
+  const [spectatedDrafts, setSpectatedDrafts] = useState<{ draft_id: string; draft_name: string; status: string; room_code: string }[]>([])
   const [upcomingMatches, setUpcomingMatches] = useState<UpcomingMatch[]>([])
   const [leagueStandings, setLeagueStandings] = useState<LeagueStanding[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null)
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
   const [tourOpen, setTourOpen] = useState(false)
 
   // Auto-open tour on first login only
@@ -166,6 +168,20 @@ export default function DashboardPage() {
       setDeletingLeagueId(null)
     }
   }
+  const handleDeleteDraft = async (draftId: string, roomCode: string) => {
+    if (!user) return
+    try {
+      const { DraftService } = await import('@/lib/draft-service')
+      await DraftService.deleteDraft(roomCode.toLowerCase(), user.id)
+      setDrafts(prev => prev.filter(d => d.draft_id !== draftId))
+      notify.success('Draft Deleted', 'The draft has been removed.')
+    } catch (err) {
+      notify.error('Failed to Delete', err instanceof Error ? err.message : 'Could not delete draft')
+    } finally {
+      setDeletingDraftId(null)
+    }
+  }
+
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
 
   useEffect(() => {
@@ -222,7 +238,30 @@ export default function DashboardPage() {
         }
 
         setFetchError(null)
-        setDrafts(buildDraftSummaries(teams, pickCounts, user.id))
+        const draftSummaries = buildDraftSummaries(teams, pickCounts, user.id)
+        setDrafts(draftSummaries)
+
+        // Fetch spectated drafts (participant with no team)
+        const participantDraftIds = new Set(draftSummaries.map(d => d.draft_id))
+        const { data: spectatorRows } = await supabase
+          .from('participants')
+          .select('draft_id, drafts!inner(id, name, status, room_code, deleted_at)')
+          .eq('user_id', user.id)
+          .is('team_id', null)
+          .is('drafts.deleted_at', null)
+
+        if (spectatorRows) {
+          const unique = spectatorRows
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .map((r: any) => ({
+              draft_id: r.drafts.id as string,
+              draft_name: r.drafts.name as string,
+              status: r.drafts.status as string,
+              room_code: r.drafts.room_code as string,
+            }))
+            .filter(d => !participantDraftIds.has(d.draft_id))
+          setSpectatedDrafts(unique)
+        }
 
         // Load league data in parallel
         try {
@@ -337,7 +376,18 @@ export default function DashboardPage() {
               <span className="font-mono">{draft.room_code}</span> &middot; {draft.user_team_name}
             </p>
           </div>
-          {getStatusBadge(draft.status)}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {getStatusBadge(draft.status)}
+            {draft.is_host && (
+              <button
+                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                title="Delete draft"
+                onClick={(e) => { e.stopPropagation(); setDeletingDraftId(draft.draft_id) }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {draft.status !== 'setup' && (
@@ -644,6 +694,60 @@ export default function DashboardPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <AlertDialog open={!!deletingDraftId} onOpenChange={() => setDeletingDraftId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the draft and all its picks. All participants will be notified. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  const draft = drafts.find(d => d.draft_id === deletingDraftId)
+                  if (draft) handleDeleteDraft(draft.draft_id, draft.room_code)
+                }}
+              >
+                Delete Draft
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Spectating */}
+        {spectatedDrafts.filter(d => d.status !== 'completed').length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Eye className="h-4 w-4" />
+                Spectating
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {spectatedDrafts.filter(d => d.status !== 'completed').map(d => (
+                  <Card
+                    key={d.draft_id}
+                    className="card-interactive"
+                    onClick={() => router.push(`/draft/${d.room_code.toLowerCase()}?spectator=true`)}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{d.draft_name}</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">{d.room_code}</p>
+                      </div>
+                      {getStatusBadge(d.status)}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Empty state for leagues */}
         {leagueStandings.length === 0 && upcomingMatches.length === 0 && drafts.some(d => d.status === 'completed') && (

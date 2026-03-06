@@ -35,7 +35,6 @@ import {
   Tag,
   Download,
 } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { notify } from "@/lib/notifications";
 import {
   POKEMON_FORMATS,
@@ -55,7 +54,7 @@ import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { createLogger } from '@/lib/logger'
 import { TierDefinition } from '@/types'
-import { DEFAULT_TIER_CONFIG, totalSlotsFromConfig } from '@/lib/tier-utils'
+import { DEFAULT_TIER_CONFIG } from '@/lib/tier-utils'
 
 const log = createLogger('CreateDraftPage')
 
@@ -126,9 +125,6 @@ export default function CreateDraftPage() {
       if (field === "draftType") {
         if (value === "tiered") {
           newData.scoringSystem = "tiered"
-          // Sync pokemonPerTeam to total tier slots
-          const total = totalSlotsFromConfig(tierConfig)
-          newData.pokemonPerTeam = String(total)
         } else {
           newData.scoringSystem = "budget"
           // Enforce min 6 for points/auction snake-style picks
@@ -385,9 +381,6 @@ export default function CreateDraftPage() {
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
           <div className="relative text-center mb-8">
-            <div className="absolute top-0 right-0">
-              <ThemeToggle />
-            </div>
             {user?.email && (
               <div className="absolute top-0 left-0 text-sm text-muted-foreground">
                 Signed in as: {user.email}
@@ -483,7 +476,7 @@ export default function CreateDraftPage() {
                       <Label className="text-sm font-medium">Draft Type</Label>
                       <div className="grid grid-cols-1 gap-2">
                         {[
-                          { value: "tiered", icon: "🏆", title: "Tiered Draft", desc: "Pick 1 S, 2 A, 2 B, 2 C, 1 D, 1 E tier Pokémon" },
+                          { value: "tiered", icon: "🏆", title: "Tiered Draft", desc: "Tiers define pick costs — spend your budget on any combination of tiers" },
                           { value: "points", icon: "💰", title: "Points Draft", desc: "Each Pokémon costs points — spend your budget" },
                           { value: "auction", icon: "🔨", title: "Auction Draft", desc: "Nominate & bid on Pokémon in real-time" },
                         ].map(opt => (
@@ -912,8 +905,7 @@ export default function CreateDraftPage() {
                           </p>
                         )}
                     </div>
-                    {/* Budget field — only shown for points/auction draft */}
-                    {formData.draftType !== "tiered" && (
+                    {/* Budget field — shown for all draft types */}
                     <div className="space-y-2">
                       <Label
                         htmlFor="budgetPerTeam"
@@ -921,7 +913,9 @@ export default function CreateDraftPage() {
                       >
                         Budget per Team (Points){" "}
                         <span className="text-xs text-muted-foreground">
-                          Used to draft Pokémon
+                          {formData.draftType === "tiered"
+                            ? "Total tier points to spend"
+                            : "Used to draft Pokémon"}
                         </span>
                       </Label>
                       <Select
@@ -943,11 +937,11 @@ export default function CreateDraftPage() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Each Pokémon has a cost based on its strength. Budget
-                        determines what you can draft.
+                        {formData.draftType === "tiered"
+                          ? "Each pick deducts that tier's point cost. Any combination is valid as long as you stay within budget."
+                          : "Each Pokémon has a cost based on its strength. Budget determines what you can draft."}
                       </p>
                     </div>
-                    )}
                   </div>
 
                   {/* Tier Configuration — only shown for tiered draft */}
@@ -958,10 +952,7 @@ export default function CreateDraftPage() {
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              setTierConfig(DEFAULT_TIER_CONFIG)
-                              handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(DEFAULT_TIER_CONFIG)))
-                            }}
+                            onClick={() => setTierConfig(DEFAULT_TIER_CONFIG)}
                             className="text-xs text-muted-foreground hover:text-foreground underline"
                           >
                             Reset to default
@@ -972,13 +963,11 @@ export default function CreateDraftPage() {
                               const newTier: TierDefinition = {
                                 name: String.fromCharCode(65 + tierConfig.length),
                                 label: `Tier ${String.fromCharCode(65 + tierConfig.length)}`,
-                                slotsPerTeam: 1,
+                                cost: 1,
                                 minCost: 0,
                                 color: '#94a3b8',
                               }
-                              const next = [...tierConfig, newTier]
-                              setTierConfig(next)
-                              handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
+                              setTierConfig([...tierConfig, newTier])
                             }}
                             className="text-xs text-primary hover:underline font-medium"
                           >
@@ -993,8 +982,14 @@ export default function CreateDraftPage() {
                             <tr>
                               <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground w-16">Tier</th>
                               <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Label</th>
-                              <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-24">Min Cost</th>
-                              <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-24">Slots/Team</th>
+                              <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-28">
+                                Format Cost ≥
+                                <span className="block text-[10px] font-normal">(classifies pokemon)</span>
+                              </th>
+                              <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-28">
+                                Pick Cost
+                                <span className="block text-[10px] font-normal">(deducted from budget)</span>
+                              </th>
                               <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-8"></th>
                             </tr>
                           </thead>
@@ -1044,22 +1039,20 @@ export default function CreateDraftPage() {
                                       type="button"
                                       className="w-6 h-6 rounded border border-border text-sm leading-none hover:bg-muted"
                                       onClick={() => {
-                                        if (tier.slotsPerTeam <= 1) return
+                                        if (tier.cost <= 1) return
                                         const next = [...tierConfig]
-                                        next[i] = { ...next[i], slotsPerTeam: tier.slotsPerTeam - 1 }
+                                        next[i] = { ...next[i], cost: tier.cost - 1 }
                                         setTierConfig(next)
-                                        handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
                                       }}
                                     >−</button>
-                                    <span className="w-5 text-center font-mono font-bold">{tier.slotsPerTeam}</span>
+                                    <span className="w-6 text-center font-mono font-bold">{tier.cost}</span>
                                     <button
                                       type="button"
                                       className="w-6 h-6 rounded border border-border text-sm leading-none hover:bg-muted"
                                       onClick={() => {
                                         const next = [...tierConfig]
-                                        next[i] = { ...next[i], slotsPerTeam: tier.slotsPerTeam + 1 }
+                                        next[i] = { ...next[i], cost: tier.cost + 1 }
                                         setTierConfig(next)
-                                        handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
                                       }}
                                     >+</button>
                                   </div>
@@ -1069,11 +1062,7 @@ export default function CreateDraftPage() {
                                     <button
                                       type="button"
                                       className="text-muted-foreground hover:text-destructive transition-colors"
-                                      onClick={() => {
-                                        const next = tierConfig.filter((_, j) => j !== i)
-                                        setTierConfig(next)
-                                        handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
-                                      }}
+                                      onClick={() => setTierConfig(tierConfig.filter((_, j) => j !== i))}
                                     >✕</button>
                                   )}
                                 </td>
@@ -1083,8 +1072,8 @@ export default function CreateDraftPage() {
                         </table>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Total picks per team: <strong>{totalSlotsFromConfig(tierConfig)}</strong>.
-                        Pokémon are assigned to tiers based on their cost in the format — higher cost = higher tier.
+                        Pokémon are assigned to tiers by their format cost threshold.
+                        Each pick deducts that tier&apos;s point cost from your budget — draft any combination as long as you stay within budget.
                       </p>
                     </div>
                   )}

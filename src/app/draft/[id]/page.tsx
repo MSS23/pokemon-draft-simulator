@@ -13,8 +13,9 @@ import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 // ConnectionStatus from ui/ConnectionStatus is replaced by DraftConnectionStatusBadge
-import { Copy, Share2, History, Crown, Clock, CheckCircle2 } from 'lucide-react'
+import { Copy, Share2, History, Crown, Clock, CheckCircle2, Eye } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
 import { useAuth } from '@/contexts/AuthContext'
@@ -27,7 +28,7 @@ import { useLatest } from '@/hooks/useLatest'
 import { useDraftRealtime } from '@/hooks/useDraftRealtime'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
 import { getMaxAffordableCost, isPickSafe } from '@/utils/budget-feasibility'
-import { getRemainingTierSlots, getPokemonTier, canAffordTier } from '@/lib/tier-utils'
+import { getPokemonTier } from '@/lib/tier-utils'
 
 /**
  * OPTIMIZED DYNAMIC IMPORTS - Strategic code splitting:
@@ -51,6 +52,7 @@ import TeamRoster from '@/components/team/TeamRoster'
 import DraftProgress from '@/components/team/DraftProgress'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
+import { AuthModal } from '@/components/auth/AuthModal'
 import { createLogger } from '@/lib/logger'
 import { useDraftStore } from '@/stores/draftStore'
 
@@ -204,6 +206,7 @@ export default function DraftRoomPage() {
 
   const [selectedPokemon, setSelectedPokemon] = useState<Pokemon | null>(null)
   const [detailsPokemon, setDetailsPokemon] = useState<Pokemon | null>(null)
+  const [preDraftPokemonId, setPreDraftPokemonId] = useState<string | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [confirmationPokemon, setConfirmationPokemon] = useState<Pokemon | null>(null)
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false)
@@ -768,6 +771,16 @@ export default function DraftRoomPage() {
         const pickedPokemon = pokemon.find(p => p.id === latestPickId)
         if (pickedPokemon) {
           notify.pickMade(pickedPokemon.name, pickingTeam.name, false)
+
+          // Check if this pick takes away the user's pre-drafted Pokemon
+          if (preDraftPokemonId && latestPickId === preDraftPokemonId) {
+            setPreDraftPokemonId(null)
+            notify.warning(
+              'Pre-draft Pick Taken!',
+              `${pickedPokemon.name} was taken by ${pickingTeam.name}. Please select a new Pokémon.`,
+              { duration: 6000 }
+            )
+          }
         }
       }
     }
@@ -785,7 +798,16 @@ export default function DraftRoomPage() {
           lastTurnNotificationTime.current = now
 
           if (draftState.userTeamId === draftState.currentTeam) {
-          notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
+            notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
+
+            // Auto-open confirmation modal for pre-drafted Pokemon when user's turn starts
+            if (preDraftPokemonId) {
+              const preDraftedPokemon = pokemon.find(p => p.id === preDraftPokemonId)
+              if (preDraftedPokemon && !allDraftedIds.includes(preDraftPokemonId)) {
+                setConfirmationPokemon(preDraftedPokemon)
+                setIsConfirmationOpen(true)
+              }
+            }
           }
           // Removed opponent turn notifications - too spammy, pick notifications suffice
         }
@@ -904,6 +926,8 @@ export default function DraftRoomPage() {
       .map(p => p.cost)
       .sort((a, b) => a - b)
 
+    // If Pokemon data hasn't loaded yet, don't show a false "budget locked" warning
+    if (availableCosts.length < remainingSlots) return null
     if (availableCosts.length === 0) return null
 
     const maxAffordable = getMaxAffordableCost(
@@ -918,12 +942,8 @@ export default function DraftRoomPage() {
     }
   }, [userTeam, _availablePokemon, draftState?.draftSettings])
 
-  // Tier slot tracking for tiered drafts
-  const tierRemainingSlots = useMemo(() => {
-    const tierConfig = draftState?.draftSettings?.tierConfig
-    if (draftState?.draftSettings?.scoringSystem !== 'tiered' || !tierConfig || !userTeam) return undefined
-    return getRemainingTierSlots(tierConfig.tiers, userTeam.pickCosts ?? [])
-  }, [draftState?.draftSettings?.scoringSystem, draftState?.draftSettings?.tierConfig, userTeam])
+  // For tiered drafts, budget remaining is the constraint (same field as points drafts)
+  // No separate slot tracking needed — any combination is valid within budget
 
   /**
    * STABLE CALLBACKS - Using useRef pattern to avoid dependency changes
@@ -1114,16 +1134,20 @@ export default function DraftRoomPage() {
     const isTieredDraft = draftState?.draftSettings?.scoringSystem === 'tiered'
 
     if (isTieredDraft) {
-      // Tier slot guard: block picks when no slot remains in this pokemon's tier
+      // Budget guard: check the tier's point cost against remaining budget
       const tierConfig = draftState?.draftSettings?.tierConfig
-      if (tierConfig && tierRemainingSlots) {
+      if (tierConfig) {
         const tier = getPokemonTier(pokemon.cost, tierConfig.tiers)
-        if (!tier || !canAffordTier(pokemon.cost, tierConfig.tiers, tierRemainingSlots)) {
+        const tierCost = tier ? tier.cost : null
+        const budget = userTeam?.budgetRemaining ?? 0
+        if (!tier || tierCost === null) {
+          notify.error('Unknown Tier', `${pokemon.name} doesn't fit any tier in your configuration.`, { duration: 5000 })
+          return
+        }
+        if (budget < tierCost) {
           notify.error(
-            'No Tier Slot',
-            tier
-              ? `You have no ${tier.name} tier slots remaining.`
-              : `${pokemon.name} doesn't fit any tier in your configuration.`,
+            'Not Enough Budget',
+            `${tier.label} costs ${tierCost} pts. You have ${budget} pts remaining.`,
             { duration: 5000 }
           )
           return
@@ -1153,6 +1177,9 @@ export default function DraftRoomPage() {
   }, [budgetFeasibility, userTeam?.budgetRemaining, _availablePokemon])
 
   const [isDrafting, setIsDrafting] = useState(false)
+  const [joinTeamName, setJoinTeamName] = useState('')
+  const [isJoiningFromLink, setIsJoiningFromLink] = useState(false)
+  const [showJoinAuthModal, setShowJoinAuthModal] = useState(false)
 
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
     // Check if user can draft (their turn)
@@ -1260,6 +1287,7 @@ export default function DraftRoomPage() {
 
       setSelectedPokemon(null)
       setIsDetailsOpen(false)
+      setPreDraftPokemonId(null)
     } catch (err) {
       log.error('Error making pick:', err)
 
@@ -1315,6 +1343,18 @@ export default function DraftRoomPage() {
       pickInFlightRef.current = false
     }
   }, [isUserTurn, isHost, draftState, currentTeam, userTeam, userId, roomCode, shouldShowNotification, transformDraftState, isDrafting])
+
+  const handleSetPreDraft = useCallback((pokemon: Pokemon) => {
+    // Only allow pre-drafting when it's not your turn, draft is active, and user is a participant
+    const state = draftStateRef.current
+    if (!state?.userTeamId || isSpectator) return
+    if (state.status !== 'drafting' || state.userTeamId === state.currentTeam) return
+    setPreDraftPokemonId(prev => prev === pokemon.id ? null : pokemon.id)
+  }, [isSpectator])
+
+  const handleClearPreDraft = useCallback(() => {
+    setPreDraftPokemonId(null)
+  }, [])
 
   const copyRoomCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode)
@@ -1450,6 +1490,20 @@ export default function DraftRoomPage() {
     } catch (err) {
       log.error('Error advancing turn:', err)
       notify.error('Failed to Advance Turn', err instanceof Error ? err.message : 'Failed to advance turn')
+    }
+  }, [roomCode])
+
+  const handleViewResults = useCallback(() => {
+    router.push(`/draft/${roomCode}/results`)
+  }, [roomCode, router])
+
+  const handleRemoveTeam = useCallback(async (teamId: string) => {
+    try {
+      await DraftService.removeTeam(roomCode.toLowerCase(), teamId)
+      notify.success('Team Removed', 'The team has been removed from the draft')
+    } catch (err) {
+      log.error('Error removing team:', err)
+      notify.error('Failed to Remove Team', err instanceof Error ? err.message : 'Failed to remove team')
     }
   }, [roomCode])
 
@@ -1591,6 +1645,31 @@ export default function DraftRoomPage() {
       )
     }
   }, [roomCode, draftState, userId])
+
+  const handleJoinFromLink = useCallback(async () => {
+    if (!authUser?.id || !joinTeamName.trim()) return
+    setIsJoiningFromLink(true)
+    try {
+      const { grantDraftAccess } = await import('@/lib/draft-access')
+      grantDraftAccess(roomCode, false)
+      await DraftService.joinDraft({
+        roomCode: roomCode.toLowerCase(),
+        userId: authUser.id,
+        teamName: joinTeamName.trim(),
+      })
+      DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
+      const dbState = await DraftService.getDraftState(roomCode.toLowerCase())
+      if (dbState) {
+        setDraftState(transformDraftState(dbState, authUser.id))
+      }
+      notify.success('Joined!', `You've joined as ${joinTeamName.trim()}`)
+    } catch (err) {
+      log.error('Error joining from link:', err)
+      notify.error('Failed to Join', err instanceof Error ? err.message : 'Could not join draft')
+    } finally {
+      setIsJoiningFromLink(false)
+    }
+  }, [authUser?.id, joinTeamName, roomCode, transformDraftState])
 
   const handleRequestNotificationPermission = useCallback(() => {
     requestBrowserNotificationPermission()
@@ -1847,6 +1926,42 @@ export default function DraftRoomPage() {
               ))}
             </div>
 
+            {/* Join from link — shown to visitors who don't have a team yet */}
+            {!draftState.userTeamId && !isSpectator && draftState.teams.length < draftState.draftSettings.maxTeams && (
+              <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-800">
+                {authUser ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Your team name"
+                      value={joinTeamName}
+                      onChange={(e) => setJoinTeamName(e.target.value)}
+                      className="h-8 text-sm flex-1"
+                      onKeyDown={(e) => e.key === 'Enter' && handleJoinFromLink()}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleJoinFromLink}
+                      disabled={isJoiningFromLink || !joinTeamName.trim()}
+                      className="h-8 shrink-0"
+                    >
+                      {isJoiningFromLink ? 'Joining...' : 'Join Draft'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs text-muted-foreground flex-1 min-w-0">There are open slots — want to join?</p>
+                    <Button size="sm" className="h-8 shrink-0" onClick={() => setShowJoinAuthModal(true)}>
+                      Sign In to Join
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={() => router.push(`/draft/${roomCode}?spectator=true`)}>
+                      <Eye className="h-3.5 w-3.5 mr-1" />
+                      Spectate
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="text-xs text-muted-foreground">
               Share code <span className="font-mono font-bold text-foreground">{roomCode}</span> to invite players
               {!isHost && !isAdmin && ' — host will start once everyone joins'}
@@ -1876,6 +1991,8 @@ export default function DraftRoomPage() {
               maxRounds={draftState?.draftSettings?.pokemonPerTeam}
               draftStatus={draftState?.status}
               timeRemaining={pickTimeRemaining}
+              userTeamId={draftState?.userTeamId}
+              isUserTurn={isUserTurn}
               teams={draftState?.teams || []}
             />
           </div>
@@ -1969,6 +2086,8 @@ export default function DraftRoomPage() {
               onUndoLastPick={handleUndoLastPick}
               onRequestNotificationPermission={handleRequestNotificationPermission}
               onPingCurrentPlayer={handlePingCurrentPlayer}
+              onViewResults={handleViewResults}
+              onRemoveTeam={draftState?.status === 'waiting' ? handleRemoveTeam : undefined}
               canUndo={draftState?.teams?.some(team => team.picks.length > 0) || false}
               notificationsEnabled={typeof Notification !== 'undefined' && Notification.permission === 'granted'}
               maxPokemonPerTeam={draftState?.draftSettings?.pokemonPerTeam || 6}
@@ -2074,6 +2193,25 @@ export default function DraftRoomPage() {
           </EnhancedErrorBoundary>
         )}
 
+        {/* Pre-draft Banner */}
+        {preDraftPokemonId && !isUserTurn && draftState?.status === 'drafting' && draftState?.userTeamId && !isSpectator && (
+          <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg text-sm">
+            <span className="text-purple-500 flex-shrink-0">🔖</span>
+            <span className="text-purple-800 dark:text-purple-200">
+              Pre-drafted: <strong>{legalPokemon.find(p => p.id === preDraftPokemonId)?.name ?? '...'}</strong>
+              {' '}— will auto-confirm when your turn starts
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearPreDraft}
+              className="ml-auto h-6 px-2 text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 flex-shrink-0"
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+
         {/* Pokemon Grid */}
         <div className="bg-card rounded-lg shadow-sm border p-2 sm:p-4">
           <EnhancedErrorBoundary>
@@ -2083,6 +2221,9 @@ export default function DraftRoomPage() {
               onQuickDraft={undefined}
               onAddToWishlist={handleAddToWishlist}
               onRemoveFromWishlist={handleRemoveFromWishlist}
+              onPreDraft={!isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft && !!draftState?.userTeamId && !isSpectator ? handleSetPreDraft : undefined}
+              onClearPreDraft={!isUserTurn && draftState?.status === 'drafting' && !isAuctionDraft && !!draftState?.userTeamId && !isSpectator ? (p) => { if (p.id === preDraftPokemonId) handleClearPreDraft() } : undefined}
+              preDraftPokemonId={preDraftPokemonId}
               draftedPokemonIds={allDraftedIds}
               wishlistPokemonIds={wishlistPokemonIds}
               isLoading={pokemonLoading}
@@ -2094,8 +2235,7 @@ export default function DraftRoomPage() {
               showQuickDraft={false}
               scoringSystem={draftState?.draftSettings?.scoringSystem}
               tierConfig={draftState?.draftSettings?.tierConfig}
-              remainingTierSlots={tierRemainingSlots}
-              budgetRemaining={draftState?.draftSettings?.scoringSystem === 'tiered' ? undefined : userTeam?.budgetRemaining}
+              budgetRemaining={userTeam?.budgetRemaining}
               maxAffordableCost={draftState?.draftSettings?.scoringSystem === 'tiered' ? undefined : budgetFeasibility?.maxAffordableCost}
               remainingSlots={budgetFeasibility?.remainingSlots}
               draftedByTeamMap={draftedByTeamMap}
@@ -2141,6 +2281,9 @@ export default function DraftRoomPage() {
           />
         )}
       </div>
+
+      {/* Auth modal for join-from-link flow */}
+      <AuthModal isOpen={showJoinAuthModal} onClose={() => setShowJoinAuthModal(false)} />
     </div>
   )
 }

@@ -12,7 +12,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { TeamIcon } from '@/components/league/TeamIcon'
@@ -205,7 +204,6 @@ export default function PowerRankingsPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle />
         </div>
 
         {/* Rankings */}

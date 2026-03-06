@@ -132,9 +132,9 @@ async function makePick(pokemonId: string) {
 - Cost calculation based on BST (Base Stat Total) or tier system
 
 **Key Format: VGC 2024 Regulation H**
-- Bans ALL legendaries, mythicals, and paradox Pokémon
-- Paldea/Kitakami/Blueberry dex only (#001-375, #388-392, etc.)
-- Defined in [src/lib/formats.ts](src/lib/formats.ts) - see `POKEMON_FORMATS` array
+- Bans ALL legendaries, mythicals, and paradox Pokémon — including Ogerpon, Loyal Three, Treasures of Ruin, Terapagos
+- Paldea/Kitakami/Blueberry dex only
+- Defined in [src/lib/formats.ts](src/lib/formats.ts) and [data/formats/reg_h.json](data/formats/reg_h.json)
 
 ### Database Schema (Supabase)
 

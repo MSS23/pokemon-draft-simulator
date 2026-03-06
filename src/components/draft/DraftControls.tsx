@@ -26,7 +26,10 @@ import {
   Bell,
   RotateCcw,
   Trash2,
-  Shuffle
+  Shuffle,
+  Trophy,
+  Users,
+  UserMinus
 } from 'lucide-react'
 import { notify } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
@@ -63,6 +66,8 @@ interface DraftControlsProps {
   onUndoLastPick?: () => void
   onRequestNotificationPermission?: () => void
   onPingCurrentPlayer?: () => void
+  onViewResults?: () => void
+  onRemoveTeam?: (teamId: string) => void
   canUndo?: boolean
   notificationsEnabled?: boolean
   maxPokemonPerTeam?: number
@@ -94,6 +99,8 @@ const DraftControls = memo(function DraftControls({
   onUndoLastPick,
   onRequestNotificationPermission,
   onPingCurrentPlayer,
+  onViewResults,
+  onRemoveTeam,
   canUndo = false,
   notificationsEnabled = false,
   maxPokemonPerTeam = 6
@@ -285,6 +292,27 @@ const DraftControls = memo(function DraftControls({
               </Button>
             )}
 
+            {draftStatus === 'completed' && (
+              <>
+                {onViewResults && (
+                  <Button onClick={onViewResults} size="sm" className="h-9 text-xs bg-blue-600 hover:bg-blue-700 flex-shrink-0">
+                    <Trophy className="h-3.5 w-3.5 mr-1" />
+                    Results
+                  </Button>
+                )}
+                <Button
+                  onClick={handleResetDraft}
+                  variant="outline"
+                  size="sm"
+                  className="h-9 text-xs border-destructive/30 text-destructive hover:bg-destructive/10 flex-shrink-0"
+                  disabled={!onResetDraft}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 sm:mr-1" />
+                  <span className="hidden sm:inline">Reset</span>
+                </Button>
+              </>
+            )}
+
             <Button
               variant="ghost"
               size="sm"
@@ -299,12 +327,12 @@ const DraftControls = memo(function DraftControls({
         {/* Expanded panel */}
         {isExpanded && (
           <div className="border-t px-3 py-3 space-y-3">
-            {/* Timer Controls */}
-            {draftStatus === 'drafting' && (
+            {/* Timer Controls — shown during waiting (pre-config) and drafting */}
+            {(draftStatus === 'waiting' || draftStatus === 'drafting') && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <Timer className="h-3 w-3" />
-                  Turn Timer: {timeRemaining}s
+                  {draftStatus === 'waiting' ? 'Turn Timer (pre-draft)' : `Turn Timer: ${timeRemaining}s`}
                 </label>
                 <div className="flex gap-1.5 flex-wrap">
                   {[30, 60, 90, 120, 180, 300, 0].map(seconds => (
@@ -322,8 +350,35 @@ const DraftControls = memo(function DraftControls({
               </div>
             )}
 
+            {/* Team Management — waiting state only */}
+            {draftStatus === 'waiting' && onRemoveTeam && teams.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  Teams ({teams.length})
+                </label>
+                <div className="flex flex-col gap-1">
+                  {teams.map(team => (
+                    <div key={team.id} className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-xs">
+                      <span className="font-medium">{team.name}</span>
+                      <span className="text-muted-foreground">{team.userName}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive ml-auto"
+                        onClick={() => onRemoveTeam(team.id)}
+                        title={`Remove ${team.name}`}
+                      >
+                        <UserMinus className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Notification Permission */}
-            {!notificationsEnabled && onRequestNotificationPermission && (
+            {!notificationsEnabled && onRequestNotificationPermission && draftStatus !== 'completed' && (
               <Button
                 onClick={onRequestNotificationPermission}
                 variant="outline"
@@ -340,16 +395,18 @@ const DraftControls = memo(function DraftControls({
               <div className="pt-2 border-t border-destructive/20 space-y-2">
                 <span className="text-xs font-medium text-destructive">Danger Zone</span>
                 <div className="flex gap-1.5 flex-wrap">
-                  <Button
-                    onClick={handleResetDraft}
-                    variant="outline"
-                    size="sm"
-                    className="h-9 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
-                    disabled={!onResetDraft}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                    Reset
-                  </Button>
+                  {draftStatus !== 'completed' && (
+                    <Button
+                      onClick={handleResetDraft}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                      disabled={!onResetDraft}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                      Reset
+                    </Button>
+                  )}
                   <Button
                     onClick={handleDeleteDraft}
                     variant="destructive"

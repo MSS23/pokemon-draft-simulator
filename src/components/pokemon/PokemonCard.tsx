@@ -9,7 +9,7 @@ import { getPokemonCardClass, getPokemonRarityClass, isPokemonShiny } from '@/ut
 import { cn } from '@/lib/utils'
 import { usePendingActionFeedback } from '@/hooks/useOptimisticUpdates'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
-import { Clock, AlertCircle, Heart, Zap, Lock } from 'lucide-react'
+import { Clock, AlertCircle, Heart, Zap, Lock, Bookmark } from 'lucide-react'
 
 interface PokemonCardProps {
   pokemon: Pokemon
@@ -17,9 +17,12 @@ interface PokemonCardProps {
   onQuickDraft?: (pokemon: Pokemon) => void
   onAddToWishlist?: (pokemon: Pokemon) => void
   onRemoveFromWishlist?: (pokemon: Pokemon) => void
+  onPreDraft?: (pokemon: Pokemon) => void
+  onClearPreDraft?: (pokemon: Pokemon) => void
   isDrafted?: boolean
   isDisabled?: boolean
   isInWishlist?: boolean
+  isPreDrafted?: boolean
   isUnaffordable?: boolean
   isUnsafe?: boolean
   showCost?: boolean
@@ -49,9 +52,12 @@ const PokemonCard = ({
   onQuickDraft,
   onAddToWishlist,
   onRemoveFromWishlist,
+  onPreDraft,
+  onClearPreDraft,
   isDrafted = false,
   isDisabled = false,
   isInWishlist = false,
+  isPreDrafted = false,
   isUnaffordable = false,
   isUnsafe = false,
   showCost = true,
@@ -75,7 +81,6 @@ const PokemonCard = ({
     hasError,
     handleImageError,
     handleImageLoad,
-    toggleImageMode
   } = usePokemonImage({
     pokemonId: pokemon.id,
     pokemonName: pokemon.name,
@@ -94,6 +99,15 @@ const PokemonCard = ({
   const handleQuickDraft = (e: React.MouseEvent) => {
     e.stopPropagation()
     onQuickDraft?.(pokemon)
+  }
+
+  const handlePreDraftToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isPreDrafted) {
+      onClearPreDraft?.(pokemon)
+    } else {
+      onPreDraft?.(pokemon)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -130,6 +144,7 @@ const PokemonCard = ({
         isUnaffordable && 'opacity-75 border-orange-300 dark:border-orange-600',
         isUnsafe && !isUnaffordable && 'opacity-75 border-red-400 dark:border-red-500',
         !isDisabled && !isDrafted && 'cursor-pointer',
+        isPreDrafted && !isPending && 'ring-2 ring-purple-500 ring-opacity-80 border-purple-400 dark:border-purple-500',
         isPending && 'ring-4 ring-yellow-400 ring-opacity-80 animate-pulse',
         pendingAction?.status === 'failed' && 'ring-4 ring-red-400 ring-opacity-80',
         className
@@ -192,6 +207,33 @@ const PokemonCard = ({
         </div>
       )}
 
+      {/* Pre-draft Button */}
+      {(onPreDraft || onClearPreDraft) && !isDisabled && !isDrafted && (
+        <div className="absolute top-10 left-1.5 z-20">
+          <Button
+            variant={isPreDrafted ? "default" : "ghost"}
+            size="sm"
+            onClick={handlePreDraftToggle}
+            aria-label={isPreDrafted ? `Remove ${pokemon.name} from pre-draft` : `Pre-draft ${pokemon.name}`}
+            aria-pressed={isPreDrafted}
+            className={cn(
+              "h-8 w-8 p-0 rounded-full transition-all duration-200",
+              "shadow-sm border border-white/20",
+              "touch-manipulation active:scale-90",
+              isPreDrafted
+                ? "bg-gradient-to-r from-purple-500 to-violet-500 text-white hover:from-purple-600 hover:to-violet-600"
+                : "bg-white/80 text-gray-500 hover:bg-white hover:text-purple-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            )}
+            title={isPreDrafted ? "Clear pre-draft" : "Pre-draft this Pokémon"}
+          >
+            <Bookmark className={cn("h-3.5 w-3.5", isPreDrafted && "fill-current")} />
+            <span className="sr-only">
+              {isPreDrafted ? `Remove ${pokemon.name} from pre-draft` : `Pre-draft ${pokemon.name}`}
+            </span>
+          </Button>
+        </div>
+      )}
+
       {/* Cost Badge */}
       {showCost && (
         <div className="absolute top-1.5 right-1.5 z-10">
@@ -245,7 +287,7 @@ const PokemonCard = ({
                 maxWidth: `${IMAGE_SIZES[size]}px`,
                 maxHeight: `${IMAGE_SIZES[size]}px`
               }}
-              onClick={(e) => { e.stopPropagation(); toggleImageMode() }}
+              onClick={(e) => { e.stopPropagation(); onViewDetails?.(pokemon) }}
               onError={handleImageError}
               onLoad={handleImageLoad}
               unoptimized
@@ -335,6 +377,7 @@ const arePropsEqual = (
   if (prevProps.isDrafted !== nextProps.isDrafted) return false
   if (prevProps.isDisabled !== nextProps.isDisabled) return false
   if (prevProps.isInWishlist !== nextProps.isInWishlist) return false
+  if (prevProps.isPreDrafted !== nextProps.isPreDrafted) return false
   if (prevProps.isUnaffordable !== nextProps.isUnaffordable) return false
   if (prevProps.isUnsafe !== nextProps.isUnsafe) return false
   if (prevProps.showCost !== nextProps.showCost) return false
@@ -344,6 +387,8 @@ const arePropsEqual = (
   if (prevProps.size !== nextProps.size) return false
   if (prevProps.className !== nextProps.className) return false
   if (prevProps.draftedByTeamName !== nextProps.draftedByTeamName) return false
+  if (!!prevProps.onPreDraft !== !!nextProps.onPreDraft) return false
+  if (!!prevProps.onClearPreDraft !== !!nextProps.onClearPreDraft) return false
   return true
 }
 

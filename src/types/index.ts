@@ -79,9 +79,11 @@ export interface Draft {
 export interface TierDefinition {
   name: string        // e.g. "S", "A", "B"
   label: string       // e.g. "S Tier"
-  slotsPerTeam: number
-  minCost: number     // pokemon costing >= minCost belong to this tier
+  cost: number        // budget points deducted when drafting a pokemon in this tier
+  minCost: number     // pokemon costing >= minCost (format cost) belong to this tier
   color: string       // hex color
+  /** @deprecated use cost instead */
+  slotsPerTeam?: number
 }
 
 export interface DraftSettings {

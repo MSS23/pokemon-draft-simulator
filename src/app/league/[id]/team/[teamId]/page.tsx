@@ -19,7 +19,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { MatchKOService } from '@/lib/match-ko-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
@@ -313,7 +312,6 @@ export default function TeamDetailPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle />
         </div>
 
         {/* Quick Stats Cards */}

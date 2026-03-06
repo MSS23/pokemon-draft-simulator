@@ -15,7 +15,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
 import { MatchKOService } from '@/lib/match-ko-service'
@@ -412,7 +411,6 @@ export default function LeaguePage() {
               </div>
             </div>
           </div>
-          <ThemeToggle />
         </div>
 
         {/* Quick Actions */}

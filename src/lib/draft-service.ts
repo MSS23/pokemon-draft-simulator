@@ -977,22 +977,22 @@ export class DraftService {
 
     const validatedCost = formatValidation.validatedCost
 
-    // Tier slot validation for tiered scoring system
+    // Tier budget validation for tiered scoring system
     const scoringSystem = draftState.draft.settings?.scoringSystem
+    let pickCost = validatedCost
     if (scoringSystem === 'tiered') {
       const tierConfig = draftState.draft.settings?.tierConfig as { tiers: import('@/types').TierDefinition[] } | undefined
       if (tierConfig?.tiers?.length) {
-        const { getPokemonTier, getRemainingTierSlots } = await import('@/lib/tier-utils')
-        // Collect pick costs for this team from draft state
-        const teamPicks = draftState.picks.filter(p => p.team_id === teamId)
-        const pickCosts = teamPicks.map(p => p.cost)
-        const remaining = getRemainingTierSlots(tierConfig.tiers, pickCosts)
+        const { getPokemonTier } = await import('@/lib/tier-utils')
         const tier = getPokemonTier(validatedCost, tierConfig.tiers)
         if (!tier) {
           throw new Error(`${pokemonName} doesn't fit into any tier in this draft.`)
         }
-        if ((remaining[tier.name] ?? 0) <= 0) {
-          throw new Error(`Your ${tier.label} slot is full! You cannot draft any more ${tier.name}-tier Pokémon.`)
+        // In tiered drafts the deducted cost is the tier's point cost, not the raw format cost
+        pickCost = tier.cost
+        const team = draftState.teams.find(t => t.id === teamId)
+        if (team && team.budget_remaining < pickCost) {
+          throw new Error(`Not enough budget. ${tier.label} costs ${pickCost} pts and you have ${team.budget_remaining} pts remaining.`)
         }
       }
     }
@@ -1005,7 +1005,7 @@ export class DraftService {
       p_user_id: userId,
       p_pokemon_id: pokemonId,
       p_pokemon_name: pokemonName,
-      p_cost: validatedCost,
+      p_cost: pickCost,
       p_expected_turn: currentTurn
     })
 
@@ -1446,6 +1446,27 @@ export class DraftService {
     }
 
     log.info(`Draft ${draftId} hard-deleted (permanent)`)
+  }
+
+  static async removeTeam(draftId: string, teamId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const draftState = await this.getDraftState(draftId)
+    if (!draftState) throw new Error('Draft not found')
+    if (draftState.draft.status !== 'setup') throw new Error('Can only remove teams before the draft starts')
+
+    // Delete any picks for this team (shouldn't exist in waiting, but be safe)
+    await (supabase.from('picks')).delete().eq('team_id', teamId)
+
+    // Delete the team
+    const { error } = await (supabase.from('teams')).delete().eq('id', teamId)
+    if (error) {
+      log.error('Error removing team:', error)
+      throw new Error('Failed to remove team')
+    }
+
+    this.invalidateDraftStateCache(draftId)
+    log.info(`Team ${teamId} removed from draft ${draftId}`)
   }
 
   static async updateTimerSetting(draftId: string, timerSeconds: number): Promise<void> {

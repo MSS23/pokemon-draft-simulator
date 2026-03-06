@@ -172,6 +172,7 @@ describe('VGC Regulation H Format', () => {
   })
 
   describe('Treasures of Ruin Bans', () => {
+    // Reg H bans ALL legendaries — Treasures of Ruin are included despite being sub-legendaries
     const ruinPokemon = ['wo-chien', 'chien-pao', 'ting-lu', 'chi-yu']
 
     it.each(ruinPokemon)('should ban %s', (pokemon) => {
@@ -224,12 +225,16 @@ describe('VGC Regulation H Format', () => {
     const expectedBanned = [
       'koraidon',
       'miraidon',
+      'terapagos',
+      'ogerpon',
+      'wo-chien',
+      'okidogi',
       'great-tusk',
       'iron-valiant',
       'flutter-mane',
-      'wo-chien',
       'mew',
-      'celebi'
+      'celebi',
+      'pecharunt'
     ]
 
     it.each(expectedBanned)('should ban %s', (pokemon) => {

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { PokeballIcon } from '@/components/ui/pokeball-icon'
 import { getTeamColor } from '@/utils/team-colors'
-import { getPokemonTier, getRemainingTierSlots } from '@/lib/tier-utils'
+import { getPokemonTier } from '@/lib/tier-utils'
 
 interface TeamRosterProps {
   team: {
@@ -50,10 +50,7 @@ const TeamRoster = memo(function TeamRoster({
       .filter((p): p is Pokemon => p !== undefined)
   }, [allPokemon, team.picks])
 
-  const tierSlots = useMemo(() => {
-    if (!isTiered || !tierConfig) return null
-    return getRemainingTierSlots(tierConfig.tiers, team.pickCosts ?? [])
-  }, [isTiered, tierConfig, team.pickCosts])
+  // In budget-based tiered drafts, budget remaining is the constraint — no separate slot tracking
 
   return (
     <Card className={cn(
@@ -77,7 +74,7 @@ const TeamRoster = memo(function TeamRoster({
               <Badge variant="secondary" size="sm" className="h-4 flex-shrink-0 text-[10px]">You</Badge>
             )}
           </div>
-          {!isTiered && team.budgetRemaining !== undefined && (
+          {team.budgetRemaining !== undefined && (
             <Badge variant="outline" className="text-[10px] font-mono h-5 px-1.5 flex-shrink-0">
               {team.budgetRemaining}pts
             </Badge>
@@ -93,38 +90,13 @@ const TeamRoster = memo(function TeamRoster({
           <span className="font-medium">{team.picks.length}/{maxPokemonPerTeam}</span>
         </div>
 
-        {/* Tier slot tracker — replaces progress bar for tiered drafts */}
-        {isTiered && tierConfig && tierSlots ? (
-          <div className="flex flex-wrap gap-1 mb-3">
-            {tierConfig.tiers.map(tier => {
-              const remaining = tierSlots[tier.name] ?? tier.slotsPerTeam
-              const used = tier.slotsPerTeam - remaining
-              return (
-                <div key={tier.name} className="flex items-center gap-0.5" title={`${tier.label}: ${used}/${tier.slotsPerTeam} used`}>
-                  <span className="text-[10px] font-bold w-4" style={{ color: tier.color }}>{tier.name}</span>
-                  {Array.from({ length: tier.slotsPerTeam }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="w-2.5 h-2.5 rounded-full border"
-                      style={{
-                        backgroundColor: i < used ? tier.color : 'transparent',
-                        borderColor: tier.color,
-                        opacity: i < used ? 1 : 0.4,
-                      }}
-                    />
-                  ))}
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="w-full bg-muted rounded-full h-1.5 mb-3">
-            <div
-              className="h-1.5 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${(team.picks.length / maxPokemonPerTeam) * 100}%`, backgroundColor: teamColor.hex }}
-            />
-          </div>
-        )}
+        {/* Progress bar — same for both tiered and budget drafts */}
+        <div className="w-full bg-muted rounded-full h-1.5 mb-3">
+          <div
+            className="h-1.5 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${(team.picks.length / maxPokemonPerTeam) * 100}%`, backgroundColor: teamColor.hex }}
+          />
+        </div>
 
         {/* Pokemon party */}
         <div className="flex items-center gap-1.5 flex-wrap">

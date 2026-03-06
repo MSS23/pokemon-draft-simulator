@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { User, Shield, Bell, Eye, Trash2, Download } from 'lucide-react'
+import { User, Shield, Bell, Eye, Trash2, Download, MapPin } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -94,22 +94,36 @@ export default function SettingsPage() {
   async function handleSaveProfile() {
     if (!profile || !supabase) return
     setSaving(true)
-    const { error } = await supabase.from('user_profiles').upsert({
-      user_id: profile.user_id,
-      username: profile.username,
-      display_name: profile.display_name,
-      avatar_url: profile.avatar_url,
-      favorite_pokemon: profile.favorite_pokemon,
-      bio: profile.bio,
-      twitter_profile: profile.twitter_profile,
-      twitch_channel: profile.twitch_channel,
-      updated_at: new Date().toISOString(),
-    })
-    setSaving(false)
-    if (!error) {
-      toast.success('Profile saved successfully!')
-    } else {
-      toast.error('Failed to save profile')
+    try {
+      // Upsert profile row
+      const { error: dbError } = await supabase.from('user_profiles').upsert({
+        user_id: profile.user_id,
+        username: profile.username,
+        display_name: profile.display_name,
+        avatar_url: profile.avatar_url,
+        favorite_pokemon: profile.favorite_pokemon,
+        bio: profile.bio,
+        twitter_profile: profile.twitter_profile,
+        twitch_channel: profile.twitch_channel,
+        updated_at: new Date().toISOString(),
+      })
+      if (dbError) throw dbError
+
+      // Sync display_name + avatar into Supabase Auth user_metadata so the
+      // header/sidebar reflect the change without a full page reload
+      const metaUpdate: Record<string, string> = {}
+      if (profile.display_name) metaUpdate.display_name = profile.display_name
+      if (profile.avatar_url) metaUpdate.avatar_url = profile.avatar_url
+      if (Object.keys(metaUpdate).length > 0) {
+        await supabase.auth.updateUser({ data: metaUpdate })
+      }
+
+      toast.success('Profile saved!')
+    } catch (err) {
+      console.error('Save profile error:', err)
+      toast.error(err instanceof Error ? err.message : 'Failed to save profile')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -379,6 +393,34 @@ export default function SettingsPage() {
                     {changingPassword ? 'Updating...' : 'Update Password'}
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Replay Tour */}
+            <Card>
+              <CardContent className="p-6 space-y-3">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Dashboard Tour
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Replay the onboarding tour to rediscover dashboard features.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem('tour:completed')
+                      localStorage.removeItem('tour:favoritePokemon')
+                      localStorage.setItem('tour:pendingStart', '1')
+                      window.location.href = '/dashboard'
+                    } catch {}
+                  }}
+                >
+                  Replay Tour
+                </Button>
               </CardContent>
             </Card>
 

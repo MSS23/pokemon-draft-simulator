@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { ArrowLeft, Home, Trophy, ChevronRight, Shield } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { useAuth } from '@/contexts/AuthContext'
@@ -204,9 +203,6 @@ export default function DraftResultsPage() {
               <ArrowLeft className="h-4 w-4" />
               Back to Draft History
             </Button>
-          </div>
-          <div className="absolute top-0 right-0">
-            <ThemeToggle />
           </div>
           <h1 className="text-3xl font-bold brand-gradient-text mb-2">
             Draft Results: {roomCode}

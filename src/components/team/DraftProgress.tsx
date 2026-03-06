@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Clock, RotateCcw } from 'lucide-react'
+import { Clock, RotateCcw, Swords } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface DraftProgressProps {
@@ -12,6 +12,8 @@ interface DraftProgressProps {
   maxRounds: number
   draftStatus: 'waiting' | 'drafting' | 'completed' | 'paused'
   timeRemaining?: number
+  userTeamId?: string
+  isUserTurn?: boolean
   teams: Array<{
     id: string
     name: string
@@ -26,6 +28,8 @@ export default function DraftProgress({
   maxRounds,
   draftStatus,
   timeRemaining = 0,
+  userTeamId,
+  isUserTurn = false,
   teams
 }: DraftProgressProps) {
   const draftInfo = useMemo(() => {
@@ -75,11 +79,13 @@ export default function DraftProgress({
       const hasPickedThisRound = draftInfo.isReverseRound
         ? index >= totalTeams - draftInfo.pickInRound
         : index < draftInfo.pickInRound
+      const isUserTeam = team.id === userTeamId
 
       return {
         ...team,
         isCurrentPick,
         hasPickedThisRound,
+        isUserTeam,
         orderInRound: draftInfo.isReverseRound ? totalTeams - index : index + 1
       }
     })
@@ -99,7 +105,34 @@ export default function DraftProgress({
   const isTimerWarning = timeRemaining > 0 && timeRemaining <= 30
 
   return (
-    <div className="w-full space-y-3 bg-card rounded-lg border p-3 sm:p-4 shadow-sm">
+    <div className={cn(
+      'w-full space-y-3 rounded-lg border p-3 sm:p-4 shadow-sm transition-all',
+      isUserTurn && draftStatus === 'drafting'
+        ? 'bg-green-50 dark:bg-green-950/30 border-green-400 dark:border-green-600 shadow-green-200 dark:shadow-green-900/50'
+        : 'bg-card'
+    )}>
+      {/* Your Turn / Waiting banner */}
+      {draftStatus === 'drafting' && userTeamId && (
+        <div className={cn(
+          'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold',
+          isUserTurn
+            ? 'bg-green-500 dark:bg-green-600 text-white'
+            : 'bg-muted text-muted-foreground'
+        )}>
+          {isUserTurn ? (
+            <>
+              <Swords className="h-4 w-4 flex-shrink-0" />
+              Your Turn — make your pick!
+            </>
+          ) : (
+            <>
+              <Clock className="h-4 w-4 flex-shrink-0" />
+              Waiting for {pickOrder.find(t => t.isCurrentPick)?.name ?? '...'}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Top bar: stats + timer */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Round */}
@@ -148,14 +181,18 @@ export default function DraftProgress({
               variant={team.isCurrentPick ? 'default' : 'outline'}
               className={cn(
                 'flex-shrink-0 text-xs px-3 py-1 transition-all',
-                team.isCurrentPick
+                team.isCurrentPick && team.isUserTeam
+                  ? 'bg-green-500 dark:bg-green-600 text-white border-green-500 shadow-md scale-110 font-semibold'
+                  : team.isCurrentPick
                   ? 'bg-primary text-primary-foreground shadow-md scale-110 font-semibold'
                   : team.hasPickedThisRound
                   ? 'bg-muted text-muted-foreground line-through opacity-50'
+                  : team.isUserTeam
+                  ? 'border-green-400 dark:border-green-600 text-green-700 dark:text-green-400 font-medium'
                   : 'text-foreground'
               )}
             >
-              {team.name}
+              {team.name}{team.isUserTeam ? ' (You)' : ''}
             </Badge>
           ))}
         </div>

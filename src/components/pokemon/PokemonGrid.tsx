@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
 import { TierDefinition } from '@/types'
-import { canAffordTier } from '@/lib/tier-utils'
+import { getPokemonTier } from '@/lib/tier-utils'
 
 interface PokemonGridProps {
   pokemon: Pokemon[]
@@ -27,6 +27,9 @@ interface PokemonGridProps {
   onQuickDraft?: (pokemon: Pokemon) => void
   onAddToWishlist?: (pokemon: Pokemon) => void
   onRemoveFromWishlist?: (pokemon: Pokemon) => void
+  onPreDraft?: (pokemon: Pokemon) => void
+  onClearPreDraft?: (pokemon: Pokemon) => void
+  preDraftPokemonId?: string | null
   draftedPokemonIds?: string[]
   wishlistPokemonIds?: string[]
   isLoading?: boolean
@@ -43,11 +46,10 @@ interface PokemonGridProps {
   // Tiered draft props
   scoringSystem?: 'budget' | 'tiered'
   tierConfig?: { tiers: TierDefinition[] }
-  remainingTierSlots?: Record<string, number>
   draftedByTeamMap?: Record<string, string>
 }
 
-type SortOption = 'name' | 'cost' | 'total' | 'hp' | 'attack' | 'defense' | 'specialAttack' | 'specialDefense' | 'speed'
+type SortOption = 'dex' | 'name' | 'cost' | 'total' | 'hp' | 'attack' | 'defense' | 'specialAttack' | 'specialDefense' | 'speed'
 type SortDirection = 'asc' | 'desc'
 
 const POKEMON_TYPES = [
@@ -57,6 +59,7 @@ const POKEMON_TYPES = [
 ]
 
 const SORT_OPTIONS: { value: string; label: string; sort: SortOption; direction: SortDirection }[] = [
+  { value: 'dex-asc', label: 'Dex Order', sort: 'dex', direction: 'asc' },
   { value: 'name-asc', label: 'Name (A-Z)', sort: 'name', direction: 'asc' },
   { value: 'name-desc', label: 'Name (Z-A)', sort: 'name', direction: 'desc' },
   { value: 'cost-desc', label: 'Cost (High-Low)', sort: 'cost', direction: 'desc' },
@@ -78,6 +81,9 @@ export default function PokemonGrid({
   onQuickDraft,
   onAddToWishlist,
   onRemoveFromWishlist,
+  onPreDraft,
+  onClearPreDraft,
+  preDraftPokemonId,
   draftedPokemonIds = [],
   wishlistPokemonIds = [],
   isLoading = false,
@@ -93,7 +99,6 @@ export default function PokemonGrid({
   remainingSlots,
   scoringSystem,
   tierConfig,
-  remainingTierSlots,
   draftedByTeamMap = {},
 }: PokemonGridProps) {
   const isTiered = scoringSystem === 'tiered' && tierConfig?.tiers?.length
@@ -102,7 +107,7 @@ export default function PokemonGrid({
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [costFilter, setCostFilter] = useState<string>('all')
   const [_tierFilter, _setTierFilter] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<SortOption>('name')
+  const [sortBy, setSortBy] = useState<SortOption>('dex')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)
 
@@ -128,7 +133,7 @@ export default function PokemonGrid({
     setSearchQuery('')
     setTypeFilter('all')
     setCostFilter('all')
-    setSortBy('name')
+    setSortBy('dex')
     setSortDirection('asc')
     setHpRange([0, 255])
     setAttackRange([0, 255])
@@ -141,7 +146,7 @@ export default function PokemonGrid({
   const hasActiveFilters = searchQuery ||
     (typeFilter !== 'all') ||
     (costFilter !== 'all') ||
-    sortBy !== 'name' ||
+    sortBy !== 'dex' ||
     sortDirection !== 'asc' ||
     hpRange[0] > 0 || hpRange[1] < 255 ||
     attackRange[0] > 0 || attackRange[1] < 255 ||
@@ -167,6 +172,10 @@ export default function PokemonGrid({
       let bValue: number | string
 
       switch (sortBy) {
+        case 'dex':
+          aValue = parseInt(a.id) || 0
+          bValue = parseInt(b.id) || 0
+          break
         case 'name':
           aValue = a.name
           bValue = b.name
@@ -204,8 +213,8 @@ export default function PokemonGrid({
           bValue = b.stats.speed
           break
         default:
-          aValue = a.name
-          bValue = b.name
+          aValue = parseInt(a.id) || 0
+          bValue = parseInt(b.id) || 0
       }
 
       if (typeof aValue === 'string' && typeof bValue === 'string') {
@@ -565,6 +574,9 @@ export default function PokemonGrid({
           onQuickDraft={onQuickDraft}
           onAddToWishlist={onAddToWishlist}
           onRemoveFromWishlist={onRemoveFromWishlist}
+          onPreDraft={onPreDraft}
+          onClearPreDraft={onClearPreDraft}
+          preDraftPokemonId={preDraftPokemonId}
           draftedPokemonIds={draftedPokemonIds}
           wishlistPokemonIds={wishlistPokemonIds}
           cardSize={cardSize}
@@ -575,7 +587,6 @@ export default function PokemonGrid({
           budgetRemaining={budgetRemaining}
           maxAffordableCost={maxAffordableCost}
           draftedByTeamMap={draftedByTeamMap}
-          remainingTierSlots={remainingTierSlots}
           isTiered={!!isTiered}
           tierConfig={tierConfig}
         />
@@ -593,11 +604,18 @@ export default function PokemonGrid({
               onQuickDraft={onQuickDraft}
               onAddToWishlist={onAddToWishlist}
               onRemoveFromWishlist={onRemoveFromWishlist}
+              onPreDraft={onPreDraft}
+              onClearPreDraft={onClearPreDraft}
               isDrafted={draftedPokemonIds.includes(p.id)}
               isInWishlist={wishlistPokemonIds.includes(p.id)}
+              isPreDrafted={preDraftPokemonId === p.id}
               isUnaffordable={
-                isTiered && tierConfig && remainingTierSlots
-                  ? !canAffordTier(p.cost, tierConfig.tiers, remainingTierSlots)
+                isTiered && tierConfig
+                  ? (() => {
+                      const tier = getPokemonTier(p.cost, tierConfig.tiers)
+                      if (!tier) return true
+                      return budgetRemaining !== undefined && tier.cost > budgetRemaining
+                    })()
                   : budgetRemaining !== undefined && p.cost > budgetRemaining
               }
               isUnsafe={

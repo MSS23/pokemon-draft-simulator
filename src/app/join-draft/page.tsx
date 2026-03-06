@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, Clock, Zap, Trophy, AlertCircle, Eye } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
@@ -247,7 +246,6 @@ function JoinDraftForm() {
               Enter a room code to join an existing Pokémon draft
             </p>
           </div>
-          <ThemeToggle />
         </div>
 
             <Card>
