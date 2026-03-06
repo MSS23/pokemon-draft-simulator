@@ -54,6 +54,8 @@ import {
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { createLogger } from '@/lib/logger'
+import { TierDefinition } from '@/types'
+import { DEFAULT_TIER_CONFIG, totalSlotsFromConfig } from '@/lib/tier-utils'
 
 const log = createLogger('CreateDraftPage')
 
@@ -78,7 +80,9 @@ export default function CreateDraftPage() {
     createLeague: true,
     splitIntoConferences: false,
     leagueWeeks: "4",
+    scoringSystem: "budget" as "budget" | "tiered",
   });
+  const [tierConfig, setTierConfig] = useState<TierDefinition[]>(DEFAULT_TIER_CONFIG);
 
   const [customPricing, setCustomPricing] = useState<Record<
     string,
@@ -254,6 +258,9 @@ export default function CreateDraftPage() {
           pokemonPerTeam: parseInt(formData.pokemonPerTeam),
           budgetPerTeam: parseInt(formData.budgetPerTeam),
           formatId: formData.useCustomFormat ? "custom" : formData.formatId,
+          // Scoring system
+          scoringSystem: formData.scoringSystem,
+          tierConfig: formData.scoringSystem === 'tiered' ? { tiers: tierConfig } : undefined,
           // League settings (stored in draft settings for league creation later)
           createLeague: formData.createLeague,
           splitIntoConferences: formData.splitIntoConferences,
@@ -883,6 +890,48 @@ export default function CreateDraftPage() {
                           </p>
                         )}
                     </div>
+                    {/* Scoring System Toggle */}
+                    <div className="space-y-3 md:col-span-2">
+                      <Label className="text-sm font-medium">Scoring System</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleInputChange("scoringSystem", "budget")}
+                          className={`flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left ${
+                            formData.scoringSystem === "budget"
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-card hover:border-primary/50"
+                          }`}
+                        >
+                          <span className="font-semibold text-sm">💰 Budget</span>
+                          <span className="text-xs text-muted-foreground mt-0.5">
+                            Each Pokémon costs points. Spend your budget wisely.
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleInputChange("scoringSystem", "tiered")
+                            // Auto-sync pokemonPerTeam to total tier slots
+                            const total = totalSlotsFromConfig(tierConfig)
+                            handleInputChange("pokemonPerTeam", String(total))
+                          }}
+                          className={`flex flex-col items-start p-3 rounded-lg border-2 transition-all text-left ${
+                            formData.scoringSystem === "tiered"
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-card hover:border-primary/50"
+                          }`}
+                        >
+                          <span className="font-semibold text-sm">🏆 Tiered</span>
+                          <span className="text-xs text-muted-foreground mt-0.5">
+                            Each team gets a fixed number of slots per tier.
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Budget field — only shown for budget system */}
+                    {formData.scoringSystem === "budget" && (
                     <div className="space-y-2">
                       <Label
                         htmlFor="budgetPerTeam"
@@ -916,7 +965,147 @@ export default function CreateDraftPage() {
                         determines what you can draft.
                       </p>
                     </div>
+                    )}
                   </div>
+
+                  {/* Tier Configuration — only shown for tiered system */}
+                  {formData.scoringSystem === "tiered" && (
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">Tier Configuration</Label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTierConfig(DEFAULT_TIER_CONFIG)
+                              handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(DEFAULT_TIER_CONFIG)))
+                            }}
+                            className="text-xs text-muted-foreground hover:text-foreground underline"
+                          >
+                            Reset to default
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newTier: TierDefinition = {
+                                name: String.fromCharCode(65 + tierConfig.length),
+                                label: `Tier ${String.fromCharCode(65 + tierConfig.length)}`,
+                                slotsPerTeam: 1,
+                                minCost: 0,
+                                color: '#94a3b8',
+                              }
+                              const next = [...tierConfig, newTier]
+                              setTierConfig(next)
+                              handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
+                            }}
+                            className="text-xs text-primary hover:underline font-medium"
+                          >
+                            + Add tier
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-lg border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/60">
+                            <tr>
+                              <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground w-16">Tier</th>
+                              <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Label</th>
+                              <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-24">Min Cost</th>
+                              <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-24">Slots/Team</th>
+                              <th className="text-center px-3 py-2 font-medium text-xs text-muted-foreground w-8"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {tierConfig.map((tier, i) => (
+                              <tr key={i} className="border-t">
+                                <td className="px-3 py-2">
+                                  <input
+                                    className="w-10 text-center rounded border border-border bg-background px-1 py-0.5 text-sm font-bold"
+                                    style={{ color: tier.color }}
+                                    value={tier.name}
+                                    maxLength={3}
+                                    onChange={(e) => {
+                                      const next = [...tierConfig]
+                                      next[i] = { ...next[i], name: e.target.value.toUpperCase() }
+                                      setTierConfig(next)
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <input
+                                    className="w-full rounded border border-border bg-background px-2 py-0.5 text-sm"
+                                    value={tier.label}
+                                    onChange={(e) => {
+                                      const next = [...tierConfig]
+                                      next[i] = { ...next[i], label: e.target.value }
+                                      setTierConfig(next)
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <input
+                                    type="number"
+                                    className="w-16 text-center rounded border border-border bg-background px-1 py-0.5 text-sm"
+                                    value={tier.minCost}
+                                    min={0}
+                                    onChange={(e) => {
+                                      const next = [...tierConfig]
+                                      next[i] = { ...next[i], minCost: parseInt(e.target.value) || 0 }
+                                      setTierConfig(next)
+                                    }}
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <button
+                                      type="button"
+                                      className="w-6 h-6 rounded border border-border text-sm leading-none hover:bg-muted"
+                                      onClick={() => {
+                                        if (tier.slotsPerTeam <= 1) return
+                                        const next = [...tierConfig]
+                                        next[i] = { ...next[i], slotsPerTeam: tier.slotsPerTeam - 1 }
+                                        setTierConfig(next)
+                                        handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
+                                      }}
+                                    >−</button>
+                                    <span className="w-5 text-center font-mono font-bold">{tier.slotsPerTeam}</span>
+                                    <button
+                                      type="button"
+                                      className="w-6 h-6 rounded border border-border text-sm leading-none hover:bg-muted"
+                                      onClick={() => {
+                                        const next = [...tierConfig]
+                                        next[i] = { ...next[i], slotsPerTeam: tier.slotsPerTeam + 1 }
+                                        setTierConfig(next)
+                                        handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
+                                      }}
+                                    >+</button>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  {tierConfig.length > 1 && (
+                                    <button
+                                      type="button"
+                                      className="text-muted-foreground hover:text-destructive transition-colors"
+                                      onClick={() => {
+                                        const next = tierConfig.filter((_, j) => j !== i)
+                                        setTierConfig(next)
+                                        handleInputChange("pokemonPerTeam", String(totalSlotsFromConfig(next)))
+                                      }}
+                                    >✕</button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Total picks per team: <strong>{totalSlotsFromConfig(tierConfig)}</strong>.
+                        Pokémon are assigned to tiers based on their cost in the format — higher cost = higher tier.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* League Settings */}

@@ -18,6 +18,8 @@ import { Search, Filter, SortAsc, SortDesc, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
+import { TierDefinition } from '@/types'
+import { getPokemonTier as _getPokemonTier, canAffordTier as _canAffordTier } from '@/lib/tier-utils'
 
 interface PokemonGridProps {
   pokemon: Pokemon[]
@@ -38,6 +40,10 @@ interface PokemonGridProps {
   budgetRemaining?: number
   maxAffordableCost?: number
   remainingSlots?: number
+  // Tiered draft props
+  scoringSystem?: 'budget' | 'tiered'
+  tierConfig?: { tiers: TierDefinition[] }
+  remainingTierSlots?: Record<string, number>
 }
 
 type SortOption = 'name' | 'cost' | 'total' | 'hp' | 'attack' | 'defense' | 'specialAttack' | 'specialDefense' | 'speed'
@@ -84,11 +90,16 @@ export default function PokemonGrid({
   budgetRemaining,
   maxAffordableCost,
   remainingSlots,
+  scoringSystem,
+  tierConfig,
+  remainingTierSlots: _remainingTierSlots,
 }: PokemonGridProps) {
+  const _isTiered = scoringSystem === 'tiered' && tierConfig?.tiers?.length
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [costFilter, setCostFilter] = useState<string>('all')
+  const [_tierFilter, _setTierFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [showFiltersPanel, setShowFiltersPanel] = useState(false)

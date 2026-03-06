@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays, Trash2, MapPin } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { notify } from '@/lib/notifications'
 import Link from 'next/link'
@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
+import { TourGuide, DASHBOARD_TOUR_STEPS } from '@/components/tour/TourGuide'
 
 const log = createLogger('Dashboard')
 
@@ -129,6 +130,7 @@ export default function DashboardPage() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null)
+  const [tourOpen, setTourOpen] = useState(false)
 
   const handleDeleteLeague = async (leagueId: string) => {
     if (!user) return
@@ -441,11 +443,22 @@ export default function DashboardPage() {
     <SidebarLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold">Welcome back, {displayName}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage your drafts and leagues.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Welcome back, {displayName}</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage your drafts and leagues.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTourOpen(true)}
+            className="shrink-0 gap-1.5"
+          >
+            <MapPin className="h-3.5 w-3.5" />
+            Take a Tour
+          </Button>
         </div>
 
         {/* Error */}
@@ -456,7 +469,7 @@ export default function DashboardPage() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div id="tour-stats" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-1">
@@ -499,7 +512,7 @@ export default function DashboardPage() {
 
         {/* This Week's Matches */}
         {upcomingMatches.length > 0 && (
-          <Card>
+          <Card id="tour-matches">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -523,7 +536,7 @@ export default function DashboardPage() {
 
         {/* My Leagues */}
         {leagueStandings.length > 0 && (
-          <Card>
+          <Card id="tour-leagues">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -633,11 +646,11 @@ export default function DashboardPage() {
         )}
 
         {/* Drafts */}
-        <Card>
+        <Card id="tour-drafts">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">My Drafts</CardTitle>
-              <Button size="sm" asChild>
+              <Button id="tour-new-draft" size="sm" asChild>
                 <Link href="/create-draft">
                   <Plus className="h-3.5 w-3.5 mr-1.5" />
                   New Draft
@@ -698,6 +711,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <TourGuide
+        steps={DASHBOARD_TOUR_STEPS}
+        isOpen={tourOpen}
+        onClose={() => setTourOpen(false)}
+      />
     </SidebarLayout>
   )
 }

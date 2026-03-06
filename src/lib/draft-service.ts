@@ -65,6 +65,9 @@ export interface DraftSettings {
   pokemonPerTeam: number
   budgetPerTeam?: number
   formatId?: string
+  // Scoring system
+  scoringSystem?: 'budget' | 'tiered'
+  tierConfig?: { tiers: import('@/types').TierDefinition[] }
   // League settings (optional)
   createLeague?: boolean
   splitIntoConferences?: boolean
@@ -248,13 +251,15 @@ export class DraftService {
     }
 
     // Create draft - build insert object conditionally based on table columns
+    const isTiered = settings.scoringSystem === 'tiered'
     const draftInsert: DraftInsert = {
       room_code: roomCode.toLowerCase(),
       name: name || `${hostName}'s Draft`,
       host_id: hostId,
       format: settings.draftType,
       max_teams: settings.maxTeams,
-      budget_per_team: settings.budgetPerTeam || 100,
+      // For tiered drafts set a very high budget so the RPC budget check never blocks
+      budget_per_team: isTiered ? 99999 : (settings.budgetPerTeam || 100),
       status: 'setup',
       current_round: 1,
       settings: {
@@ -262,6 +267,9 @@ export class DraftService {
         pokemonPerTeam: settings.pokemonPerTeam,
         maxPokemonPerTeam: settings.pokemonPerTeam, // Required for pick validation
         formatId: settings.formatId || DEFAULT_FORMAT,
+        // Scoring system
+        scoringSystem: settings.scoringSystem || 'budget',
+        tierConfig: settings.tierConfig,
         // League settings
         createLeague: settings.createLeague,
         splitIntoConferences: settings.splitIntoConferences,
@@ -958,6 +966,26 @@ export class DraftService {
     }
 
     const validatedCost = formatValidation.validatedCost
+
+    // Tier slot validation for tiered scoring system
+    const scoringSystem = draftState.draft.settings?.scoringSystem
+    if (scoringSystem === 'tiered') {
+      const tierConfig = draftState.draft.settings?.tierConfig as { tiers: import('@/types').TierDefinition[] } | undefined
+      if (tierConfig?.tiers?.length) {
+        const { getPokemonTier, getRemainingTierSlots } = await import('@/lib/tier-utils')
+        // Collect pick costs for this team from draft state
+        const teamPicks = draftState.picks.filter(p => p.team_id === teamId)
+        const pickCosts = teamPicks.map(p => p.cost)
+        const remaining = getRemainingTierSlots(tierConfig.tiers, pickCosts)
+        const tier = getPokemonTier(validatedCost, tierConfig.tiers)
+        if (!tier) {
+          throw new Error(`${pokemonName} doesn't fit into any tier in this draft.`)
+        }
+        if ((remaining[tier.name] ?? 0) <= 0) {
+          throw new Error(`Your ${tier.label} slot is full! You cannot draft any more ${tier.name}-tier Pokémon.`)
+        }
+      }
+    }
 
     // Call the atomic database function
     // This performs all validation and updates in a single transaction with row-level locking

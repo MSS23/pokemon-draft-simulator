@@ -112,6 +112,7 @@ interface DraftUIState {
     draftOrder: number
     picks: string[]
     budgetRemaining: number
+    pickCosts: number[]  // costs of each pick, for tier slot tracking
   }>
   participants: Array<{
     userId: string | null
@@ -128,6 +129,8 @@ interface DraftUIState {
     draftType: 'snake' | 'auction'
     formatId?: string
     customFormatId?: string
+    scoringSystem?: 'budget' | 'tiered'
+    tierConfig?: { tiers: import('@/types').TierDefinition[] }
   }
   timeRemaining: number
   draft: {
@@ -354,7 +357,11 @@ export default function DraftRoomPage() {
         userName: participant?.display_name || 'Unknown',
         draftOrder: team.draft_order,
         picks: teamPicks,
-        budgetRemaining: team.budget_remaining
+        budgetRemaining: team.budget_remaining,
+        pickCosts: dbState.picks
+          .filter(pick => pick.team_id === team.id)
+          .sort((a, b) => a.pick_order - b.pick_order)
+          .map(pick => pick.cost)
       }
     }).sort((a, b) => a.draftOrder - b.draftOrder)
 
@@ -410,7 +417,9 @@ export default function DraftRoomPage() {
         pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
         draftType: dbState.draft.format,
         formatId: dbState.draft.settings?.formatId,
-        customFormatId: dbState.draft.custom_format_id ?? undefined
+        customFormatId: dbState.draft.custom_format_id ?? undefined,
+        scoringSystem: dbState.draft.settings?.scoringSystem as 'budget' | 'tiered' | undefined,
+        tierConfig: dbState.draft.settings?.tierConfig as { tiers: import('@/types').TierDefinition[] } | undefined,
       },
       timeRemaining: dbState.draft.settings?.timeLimit || 60,
       draft: {

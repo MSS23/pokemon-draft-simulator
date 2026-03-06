@@ -76,6 +76,14 @@ export interface Draft {
   updatedAt: string
 }
 
+export interface TierDefinition {
+  name: string        // e.g. "S", "A", "B"
+  label: string       // e.g. "S Tier"
+  slotsPerTeam: number
+  minCost: number     // pokemon costing >= minCost belong to this tier
+  color: string       // hex color
+}
+
 export interface DraftSettings {
   timePerPick?: number
   timePerBid?: number
@@ -85,6 +93,9 @@ export interface DraftSettings {
   allowUndos?: boolean
   requireFullRoster?: boolean
   maxPokemonPerTeam?: number
+  // Scoring system
+  scoringSystem?: 'budget' | 'tiered'
+  tierConfig?: { tiers: TierDefinition[] }
   // League settings
   createLeague?: boolean
   splitIntoConferences?: boolean
