@@ -31,14 +31,26 @@ function createMemoizedSelector<T>(
   let lastResult: T | null = null
 
   return (state: DraftState): T => {
-    const newResult = selector(state)
-
-    // Return cached result if equal
-    if (lastState === state && lastResult !== null && equalityFn(lastResult, newResult)) {
+    // Short-circuit: if Zustand passes the exact same state object, return the
+    // cached result without recomputing. This is the critical guard against the
+    // React #185 infinite loop: selectors that return new array/object references
+    // (e.g. .map().filter().sort()) would otherwise always look "changed" to
+    // Zustand, triggering a re-render → selector re-runs with same state →
+    // new reference → re-render → ... forever.
+    if (lastState === state && lastResult !== null) {
       return lastResult
     }
 
-    // Update cache
+    const newResult = selector(state)
+
+    // If the value hasn't meaningfully changed, return the stable old reference
+    // so Zustand's Object.is check passes and no re-render is scheduled.
+    if (lastResult !== null && equalityFn(lastResult, newResult)) {
+      lastState = state
+      return lastResult
+    }
+
+    // Update cache with genuinely new result
     lastState = state
     lastResult = newResult
     return newResult
