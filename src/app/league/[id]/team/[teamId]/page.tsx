@@ -18,7 +18,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { MatchKOService } from '@/lib/match-ko-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
@@ -33,10 +32,8 @@ import {
   TrendingDown,
   Shield,
   Swords,
-  Heart,
   Zap,
   Target,
-  Award,
   Activity,
   Brain,
   Lock,
@@ -314,62 +311,6 @@ export default function TeamDetailPage() {
           </div>
         </div>
 
-        {/* Quick Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Overall Rating</p>
-                  <p className="text-2xl font-bold">{analysis?.overallRating.toFixed(0) || 'N/A'}</p>
-                </div>
-                <Award className="h-8 w-8 text-yellow-500" />
-              </div>
-              {analysis && (
-                <Progress value={analysis.overallRating} className="mt-2" />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Offensive Rating</p>
-                  <p className="text-2xl font-bold">{stats.offensiveRating.toFixed(1)}</p>
-                </div>
-                <Swords className="h-8 w-8 text-red-500" />
-              </div>
-              <Progress value={Math.min(100, stats.offensiveRating * 10)} className="mt-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Defensive Rating</p>
-                  <p className="text-2xl font-bold">{stats.defensiveRating.toFixed(1)}</p>
-                </div>
-                <Shield className="h-8 w-8 text-blue-500" />
-              </div>
-              <Progress value={Math.min(100, stats.defensiveRating * 10)} className="mt-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Roster Health</p>
-                  <p className="text-2xl font-bold">{stats.healthyRosterPercentage.toFixed(0)}%</p>
-                </div>
-                <Heart className="h-8 w-8 text-green-500" />
-              </div>
-              <Progress value={stats.healthyRosterPercentage} className="mt-2" />
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Form Indicator */}
         {form && (
@@ -666,10 +607,6 @@ export default function TeamDetailPage() {
                     <span className="text-sm text-muted-foreground">Avg KOs/Match</span>
                     <span className="font-semibold">{stats.avgKOsGiven.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Offensive Rating</span>
-                    <span className="font-semibold">{stats.offensiveRating.toFixed(2)}</span>
-                  </div>
                 </CardContent>
               </Card>
 
@@ -700,10 +637,6 @@ export default function TeamDetailPage() {
                     <span className={`font-semibold ${stats.avgPointDifferential >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                       {stats.avgPointDifferential > 0 ? '+' : ''}{stats.avgPointDifferential.toFixed(2)}
                     </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-muted-foreground">Defensive Rating</span>
-                    <span className="font-semibold">{stats.defensiveRating.toFixed(2)}</span>
                   </div>
                 </CardContent>
               </Card>
