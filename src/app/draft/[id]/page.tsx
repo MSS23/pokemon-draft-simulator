@@ -1170,6 +1170,11 @@ export default function DraftRoomPage() {
         pickCost
       )
 
+      // Brief delay so Supabase's read layer sees the committed write before we query it.
+      // Without this, getDraftState can return pre-pick data (read-your-writes race),
+      // overwriting the optimistic update and making the pick disappear for the picker.
+      await new Promise(resolve => setTimeout(resolve, 400))
+
       // Refresh with confirmed server data (high priority - no startTransition)
       try {
         DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
@@ -1899,7 +1904,7 @@ export default function DraftRoomPage() {
               onRequestNotificationPermission={handleRequestNotificationPermission}
               onPingCurrentPlayer={handlePingCurrentPlayer}
               canUndo={draftState?.teams?.some(team => team.picks.length > 0) || false}
-              notificationsEnabled={typeof window !== 'undefined' && Notification.permission === 'granted'}
+              notificationsEnabled={typeof Notification !== 'undefined' && Notification.permission === 'granted'}
               maxPokemonPerTeam={draftState?.draftSettings?.pokemonPerTeam || 6}
             />
           </div>
