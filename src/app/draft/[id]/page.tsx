@@ -1991,7 +1991,7 @@ export default function DraftRoomPage() {
               maxRounds={draftState?.draftSettings?.pokemonPerTeam}
               draftStatus={draftState?.status}
               timeRemaining={pickTimeRemaining}
-              userTeamId={draftState?.userTeamId}
+              userTeamId={draftState?.userTeamId ?? undefined}
               isUserTurn={isUserTurn}
               teams={draftState?.teams || []}
             />
