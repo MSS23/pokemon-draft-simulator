@@ -310,9 +310,7 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
         'fezandipiti': 15,
         // Treasures of Ruin
         'wo-chien': 17,
-        'chien-pao': 24,
         'ting-lu': 18,
-        'chi-yu': 25,
       },
       costMultiplier: 1.0,
       minCost: 3,
