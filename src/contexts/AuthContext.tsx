@@ -28,9 +28,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
+      if (event === 'SIGNED_IN' && typeof window !== 'undefined') {
+        localStorage.setItem('tour:pendingStart', '1')
+      }
     })
 
     return () => subscription.unsubscribe()

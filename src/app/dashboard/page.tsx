@@ -132,6 +132,19 @@ export default function DashboardPage() {
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null)
   const [tourOpen, setTourOpen] = useState(false)
 
+  // Auto-open tour on login: AuthContext sets tour:pendingStart on SIGNED_IN
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const pending = localStorage.getItem('tour:pendingStart')
+    if (pending) {
+      localStorage.removeItem('tour:pendingStart')
+      // Always show the picker fresh on each login
+      localStorage.removeItem('tour:favoritePokemon')
+      localStorage.removeItem('tour:completed')
+      setTourOpen(true)
+    }
+  }, [])
+
   const handleDeleteLeague = async (leagueId: string) => {
     if (!user) return
     try {
