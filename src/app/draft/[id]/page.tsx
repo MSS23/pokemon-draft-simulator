@@ -2236,8 +2236,8 @@ export default function DraftRoomPage() {
               scoringSystem={draftState?.draftSettings?.scoringSystem}
               tierConfig={draftState?.draftSettings?.tierConfig}
               budgetRemaining={userTeam?.budgetRemaining}
-              maxAffordableCost={draftState?.draftSettings?.scoringSystem === 'tiered' ? undefined : budgetFeasibility?.maxAffordableCost}
-              remainingSlots={budgetFeasibility?.remainingSlots}
+              maxAffordableCost={draftState?.status === 'drafting' && draftState?.draftSettings?.scoringSystem !== 'tiered' ? budgetFeasibility?.maxAffordableCost : undefined}
+              remainingSlots={draftState?.status === 'drafting' ? budgetFeasibility?.remainingSlots : undefined}
               draftedByTeamMap={draftedByTeamMap}
             />
           </EnhancedErrorBoundary>
