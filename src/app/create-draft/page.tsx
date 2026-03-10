@@ -232,8 +232,8 @@ export default function CreateDraftPage() {
 
     if (formData.useCustomFormat && !customPricing) {
       notify.warning(
-        "Missing Custom Pricing",
-        "Please upload a CSV file with custom Pokemon pricing",
+        "Missing Draft Pool",
+        "Please upload a CSV file or paste a Google Sheets link",
       );
       return;
     }
@@ -262,7 +262,7 @@ export default function CreateDraftPage() {
           timeLimit: parseInt(formData.timeLimit),
           pokemonPerTeam: parseInt(formData.pokemonPerTeam),
           budgetPerTeam: parseInt(formData.budgetPerTeam),
-          formatId: formData.useCustomFormat ? "custom" : formData.formatId,
+          formatId: customPricing ? "custom" : formData.formatId,
           // Scoring system
           scoringSystem: formData.draftType === 'tiered' ? 'tiered' : 'budget',
           tierConfig: formData.draftType === 'tiered' ? { tiers: tierConfig } : undefined,
@@ -282,7 +282,7 @@ export default function CreateDraftPage() {
         password:
           !formData.isPublic && formData.password ? formData.password : null,
         customFormat:
-          formData.useCustomFormat && customPricing
+          customPricing
             ? {
                 name: `${formData.userName}'s Custom Format`,
                 description:
@@ -510,43 +510,27 @@ export default function CreateDraftPage() {
                   </h3>
 
                   <div className="space-y-3">
-                    {/* Toggle for custom format */}
-                    <div className="flex items-start gap-3 p-3 bg-card rounded-lg border">
-                      <input
-                        type="checkbox"
-                        id="useCustomFormat"
-                        checked={formData.useCustomFormat}
-                        onChange={(e) =>
-                          handleInputChange("useCustomFormat", e.target.checked)
-                        }
-                        className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      <div className="flex-1">
-                        <Label
-                          htmlFor="useCustomFormat"
-                          className="text-sm font-medium cursor-pointer"
-                        >
-                          Use Custom Pricing (CSV)
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Upload your own Pokemon pricing instead of using a
-                          preset format
-                        </p>
-                      </div>
-                    </div>
+                    {/* Import Draft Pool (CSV / Google Sheets) — always visible */}
+                    <CSVUpload
+                      onPricingParsed={(pricing) => {
+                        setCustomPricing(pricing);
+                        handleInputChange("useCustomFormat", true);
+                      }}
+                      onClear={() => {
+                        setCustomPricing(null);
+                        handleInputChange("useCustomFormat", false);
+                      }}
+                    />
 
-                    {/* Show CSV upload if custom format is selected */}
-                    {formData.useCustomFormat ? (
-                      <CSVUpload
-                        onPricingParsed={(pricing) => {
-                          setCustomPricing(pricing);
-                        }}
-                        onClear={() => {
-                          setCustomPricing(null);
-                        }}
-                      />
-                    ) : (
+                    {/* Show format selector when no custom pricing imported */}
+                    {!customPricing && (
                       <>
+                        <div className="relative flex items-center gap-2 py-1">
+                          <div className="flex-1 border-t border-border" />
+                          <span className="text-xs text-muted-foreground px-2">or use a preset format</span>
+                          <div className="flex-1 border-t border-border" />
+                        </div>
+
                         <div className="space-y-2">
                           <Label
                             htmlFor="format"
@@ -593,7 +577,7 @@ export default function CreateDraftPage() {
                     )}
 
                     {/* Format Information Display */}
-                    {selectedFormat && !formData.useCustomFormat && (
+                    {selectedFormat && !customPricing && (
                       <div className="p-3 bg-card rounded-lg border">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
@@ -685,33 +669,6 @@ export default function CreateDraftPage() {
                             points. Edit it to create your own custom format!
                           </p>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Custom Format Template Download */}
-                    {formData.useCustomFormat && (
-                      <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
-                        <div className="flex items-start gap-2 mb-2">
-                          <Info className="h-4 w-4 text-primary mt-0.5" />
-                          <div className="flex-1">
-                            <h4 className="text-sm font-medium text-foreground">
-                              Need a template?
-                            </h4>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Download a template CSV file with example Pokemon
-                              to get started
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          onClick={handleDownloadTemplate}
-                          variant="outline"
-                          size="sm"
-                          className="w-full border-primary/30 text-primary hover:bg-primary/10"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download Custom Format Template
-                        </Button>
                       </div>
                     )}
                   </div>

@@ -435,3 +435,42 @@ export function downloadSampleCSV() {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+
+/**
+ * Checks if a string looks like a Google Sheets URL.
+ */
+export function isGoogleSheetsUrl(input: string): boolean {
+  return input.includes('docs.google.com/spreadsheets')
+}
+
+/**
+ * Fetches CSV data from a Google Sheets URL via our proxy API route.
+ * The sheet must be shared publicly ("Anyone with the link").
+ */
+export async function fetchGoogleSheetCSV(sheetsUrl: string): Promise<ParsedCSVResult> {
+  try {
+    const response = await fetch(`/api/sheets?url=${encodeURIComponent(sheetsUrl)}`)
+    const data = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data.error || `Failed to fetch Google Sheet (HTTP ${response.status})`
+      }
+    }
+
+    if (!data.csv || typeof data.csv !== 'string') {
+      return {
+        success: false,
+        error: 'No CSV data returned from Google Sheet'
+      }
+    }
+
+    return parseCustomPricingCSV(data.csv)
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to fetch Google Sheet: ${error instanceof Error ? error.message : 'Unknown error'}`
+    }
+  }
+}
