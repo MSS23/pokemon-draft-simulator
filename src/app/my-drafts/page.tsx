@@ -2,18 +2,21 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Trophy, Users, ArrowRight, Clock } from 'lucide-react'
+import { Calendar, Trophy, Users, ArrowRight, Clock, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { LeagueService } from '@/lib/league-service'
 import { supabase, type Database } from '@/lib/supabase'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { notify } from '@/lib/notifications'
 import type { Match, League, Team, Draft } from '@/types'
 import { format, isFuture, isToday } from 'date-fns'
+import { cn } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('MyDraftsPage')
@@ -38,6 +41,21 @@ export default function MyDraftsPage() {
   const [drafts, setDrafts] = useState<DraftWithTeam[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
+
+  const handleDeleteDraft = async (draft: DraftWithTeam) => {
+    if (!user) return
+    try {
+      const { DraftService } = await import('@/lib/draft-service')
+      await DraftService.deleteDraft((draft.roomCode || draft.id).toLowerCase(), user.id)
+      setDrafts(prev => prev.filter(d => d.id !== draft.id))
+      notify.success('Draft Deleted', 'The draft has been removed.')
+    } catch (err) {
+      notify.error('Failed to Delete', err instanceof Error ? err.message : 'Could not delete draft')
+    } finally {
+      setDeletingDraftId(null)
+    }
+  }
 
   useEffect(() => {
     // Wait for auth to finish loading
@@ -268,7 +286,13 @@ export default function MyDraftsPage() {
                   return (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4)
                 })
                 .map(draft => (
-                  <DraftCard key={draft.id} draft={draft} onClick={() => handleDraftClick(draft)} />
+                  <DraftCard
+                    key={draft.id}
+                    draft={draft}
+                    onClick={() => handleDraftClick(draft)}
+                    isHost={draft.hostId === user?.id}
+                    onDelete={() => setDeletingDraftId(draft.id)}
+                  />
                 ))}
             </div>
           </div>
@@ -337,11 +361,35 @@ export default function MyDraftsPage() {
         )}
         </div>
       </div>
+
+      {/* Delete draft confirmation */}
+      <AlertDialog open={!!deletingDraftId} onOpenChange={() => setDeletingDraftId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the draft and all its picks. All participants will be notified. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const draft = drafts.find(d => d.id === deletingDraftId)
+                if (draft) handleDeleteDraft(draft)
+              }}
+            >
+              Delete Draft
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarLayout>
   )
 }
 
-function DraftCard({ draft, onClick }: { draft: DraftWithTeam; onClick: () => void }) {
+function DraftCard({ draft, onClick, isHost, onDelete }: { draft: DraftWithTeam; onClick: () => void; isHost?: boolean; onDelete?: () => void }) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'setup': return 'bg-gray-500'
@@ -411,7 +459,16 @@ function DraftCard({ draft, onClick }: { draft: DraftWithTeam; onClick: () => vo
             </div>
           </div>
 
-          <div className="ml-4">
+          <div className="ml-4 flex items-center gap-2">
+            {isHost && onDelete && (
+              <button
+                className="p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                title="Delete draft"
+                onClick={(e) => { e.stopPropagation(); onDelete() }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
             <ArrowRight className="h-6 w-6 text-slate-400" />
           </div>
         </div>
@@ -428,10 +485,10 @@ function MatchCard({ match, onClick }: { match: MatchWithDetails; onClick: () =>
 
   return (
     <Card
-      className="hover:shadow-lg transition-shadow cursor-pointer border-l-4"
-      style={{
-        borderLeftColor: isLive ? '#10b981' : isCompleted ? (userWon ? '#10b981' : '#ef4444') : '#6366f1'
-      }}
+      className={cn(
+        'hover:shadow-lg transition-shadow cursor-pointer border-l-4',
+        isLive ? 'border-l-emerald-500' : isCompleted ? (userWon ? 'border-l-emerald-500' : 'border-l-red-500') : 'border-l-indigo-500'
+      )}
       onClick={onClick}
     >
       <CardContent className="p-6">
