@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -53,13 +53,7 @@ export default function SettingsPage() {
   })
   const [savingPrefs, setSavingPrefs] = useState(false)
 
-  useEffect(() => {
-    if (authLoading) return
-    if (!user) { setLoading(false); return }
-    loadProfile(user.id)
-  }, [authLoading, user])
-
-  async function loadProfile(userId: string) {
+  const loadProfile = useCallback(async (userId: string) => {
     if (!supabase) return
 
     const { data, error } = await supabase
@@ -89,7 +83,13 @@ export default function SettingsPage() {
     }
 
     setLoading(false)
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) { setLoading(false); return }
+    loadProfile(user.id)
+  }, [authLoading, user, loadProfile])
 
   async function handleSaveProfile() {
     if (!profile || !supabase) return

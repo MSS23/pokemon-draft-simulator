@@ -285,29 +285,24 @@ export default function TeamDetailPage() {
   }
 
   const getFormColor = (formType: string) => {
-    if (formType === 'hot') return 'text-red-500'
-    if (formType === 'cold') return 'text-blue-400'
-    return 'text-gray-500'
+    if (formType === 'hot') return 'text-red-500 dark:text-red-400'
+    if (formType === 'cold') return 'text-blue-500 dark:text-blue-400'
+    return 'text-gray-500 dark:text-gray-400'
   }
 
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to League
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold brand-gradient-text">
-                {team.name}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {stats.wins}-{stats.losses}-{stats.draws} • {stats.totalPointsFor} PF, {stats.totalPointsAgainst} PA
-              </p>
-            </div>
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold">{team.name}</h1>
+            <p className="text-sm text-muted-foreground">
+              {stats.wins}-{stats.losses}-{stats.draws} &middot; {stats.totalPointsFor} PF, {stats.totalPointsAgainst} PA
+            </p>
           </div>
         </div>
 
@@ -628,13 +623,13 @@ export default function TeamDetailPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Point Differential</span>
-                    <span className={`font-semibold ${stats.pointDifferential >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`font-semibold ${stats.pointDifferential >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {stats.pointDifferential > 0 ? '+' : ''}{stats.pointDifferential}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Avg Differential/Match</span>
-                    <span className={`font-semibold ${stats.avgPointDifferential >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    <span className={`font-semibold ${stats.avgPointDifferential >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {stats.avgPointDifferential > 0 ? '+' : ''}{stats.avgPointDifferential.toFixed(2)}
                     </span>
                   </div>

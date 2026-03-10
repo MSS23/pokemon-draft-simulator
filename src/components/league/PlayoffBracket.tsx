@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -11,7 +12,7 @@ interface PlayoffBracketProps {
   className?: string
 }
 
-export function PlayoffBracket({ tournament, className }: PlayoffBracketProps) {
+export const PlayoffBracket = memo(function PlayoffBracket({ tournament, className }: PlayoffBracketProps) {
   if (!tournament || tournament.rounds.length === 0) {
     return (
       <Card className={className}>
@@ -46,7 +47,7 @@ export function PlayoffBracket({ tournament, className }: PlayoffBracketProps) {
       </CardContent>
     </Card>
   )
-}
+})
 
 function RoundColumn({ round }: { round: Round }) {
   return (

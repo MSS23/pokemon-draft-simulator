@@ -29,6 +29,7 @@ import { useDraftRealtime } from '@/hooks/useDraftRealtime'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
 import { getMaxAffordableCost, isPickSafe } from '@/utils/budget-feasibility'
 import { getPokemonTier } from '@/lib/tier-utils'
+import { AutoSkipService } from '@/lib/auto-skip-service'
 
 /**
  * OPTIMIZED DYNAMIC IMPORTS - Strategic code splitting:
@@ -431,7 +432,7 @@ export default function DraftRoomPage() {
         }
         return {
           maxTeams: dbState.draft.max_teams,
-          timeLimit: dbState.draft.settings?.timeLimit || 60,
+          timeLimit: dbState.draft.settings?.timeLimit ?? 0,
           pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
           draftType,
           formatId: dbState.draft.settings?.formatId,
@@ -440,7 +441,7 @@ export default function DraftRoomPage() {
           tierConfig: dbState.draft.settings?.tierConfig as { tiers: import('@/types').TierDefinition[] } | undefined,
         }
       })(),
-      timeRemaining: dbState.draft.settings?.timeLimit || 60,
+      timeRemaining: dbState.draft.settings?.timeLimit ?? 0,
       draft: {
         id: dbState.draft.id,
         custom_format_id: dbState.draft.custom_format_id ?? undefined,
@@ -566,11 +567,46 @@ export default function DraftRoomPage() {
     return 'offline'
   }, [realtimeConnectionStatus.status])
 
-  // Stable no-op callback to prevent infinite re-renders (React #185)
-  // Inline `async () => {}` creates a new reference every render, re-triggering effects
-  const noopAutoSkip = useCallback(async () => {
-    // Timer disabled - no auto-skip
-  }, [])
+  // Auto-skip: when timer expires, skip the current team's turn.
+  // Uses a ref to prevent duplicate skip calls across re-renders.
+  const autoSkipInFlightRef = useRef(false)
+  const handleAutoSkip = useCallback(async () => {
+    const draftId = draftState?.draft?.id
+    const currentTeamId = draftState?.currentTeam
+    const timeLimit = draftState?.draftSettings?.timeLimit ?? 0
+
+    // Only auto-skip if a time limit is set
+    if (!draftId || !currentTeamId || timeLimit <= 0) return
+    // Prevent duplicate calls
+    if (autoSkipInFlightRef.current) return
+    autoSkipInFlightRef.current = true
+
+    try {
+      log.info('Timer expired — auto-skipping turn', { draftId, currentTeamId })
+      const result = await AutoSkipService.handleTimeExpired(draftId, currentTeamId)
+
+      if (result.autoPickMade) {
+        notify.info('Auto-Pick', `${result.pokemonName} was auto-picked from wishlist`)
+      } else if (result.skipped) {
+        notify.warning('Turn Skipped', result.reason, { duration: 5000 })
+      }
+
+      // Refresh draft state to pick up the new turn
+      if (roomCode) {
+        const refreshed = await DraftService.getDraftState(roomCode)
+        if (refreshed) {
+          // Force a re-render with the updated state
+          setDraftState(prev => prev ? { ...prev } : prev)
+        }
+      }
+    } catch (err) {
+      // Optimistic lock failure means another client already advanced — that's fine
+      log.info('Auto-skip did not apply (likely already advanced):', err)
+    } finally {
+      // Reset after a short delay to prevent rapid re-triggers
+      setTimeout(() => { autoSkipInFlightRef.current = false }, 2000)
+    }
+  }, [draftState?.draft?.id, draftState?.currentTeam, draftState?.draftSettings?.timeLimit, roomCode])
 
   // Turn notifications with browser notifications
   const { requestBrowserNotificationPermission } = useTurnNotifications({
@@ -581,8 +617,42 @@ export default function DraftRoomPage() {
     warningThreshold: 10,
     isConnected: connectionStatus === 'online',
     currentTurn: draftState?.currentTurn,
-    onAutoSkip: noopAutoSkip
+    onAutoSkip: handleAutoSkip
   })
+
+  // Auto-skip effect: ANY connected client can trigger the skip when the timer hits 0.
+  // The optimistic lock in advanceTurn() ensures only one client actually succeeds.
+  // We add a small random delay (0-2s) to stagger calls across clients.
+  const autoSkipTimerRef = useRef<NodeJS.Timeout | null>(null)
+  useEffect(() => {
+    const timeLimit = draftState?.draftSettings?.timeLimit ?? 0
+    const isDrafting = draftState?.status === 'drafting'
+
+    // Clean up any pending auto-skip
+    if (autoSkipTimerRef.current) {
+      clearTimeout(autoSkipTimerRef.current)
+      autoSkipTimerRef.current = null
+    }
+
+    // Only trigger if timer is active and has expired
+    if (!isDrafting || timeLimit <= 0 || pickTimeRemaining > 0) return
+
+    // Timer has hit 0 — schedule auto-skip with random jitter
+    // If it's the current user's turn, skip immediately (they're AFK)
+    // Otherwise add 1-3s jitter so the picker's client gets first chance
+    const delay = isUserTurn ? 500 : 1000 + Math.random() * 2000
+
+    autoSkipTimerRef.current = setTimeout(() => {
+      handleAutoSkip()
+    }, delay)
+
+    return () => {
+      if (autoSkipTimerRef.current) {
+        clearTimeout(autoSkipTimerRef.current)
+        autoSkipTimerRef.current = null
+      }
+    }
+  }, [pickTimeRemaining, draftState?.status, draftState?.draftSettings?.timeLimit, isUserTurn, handleAutoSkip])
 
   // Load initial draft state
   useEffect(() => {
@@ -1174,7 +1244,7 @@ export default function DraftRoomPage() {
     setConfirmationPokemon(pokemon)
     setIsConfirmationOpen(true)
     setIsDetailsOpen(false) // Close details modal when showing confirmation
-  }, [budgetFeasibility, userTeam?.budgetRemaining, _availablePokemon])
+  }, [budgetFeasibility, userTeam?.budgetRemaining, _availablePokemon, draftState?.draftSettings?.scoringSystem, draftState?.draftSettings?.tierConfig])
 
   const [isDrafting, setIsDrafting] = useState(false)
   const [joinTeamName, setJoinTeamName] = useState('')
@@ -1525,6 +1595,9 @@ export default function DraftRoomPage() {
   }, [roomCode, draftState?.status])
 
   // Proxy picking handlers removed - feature not implemented
+
+  // Stable no-op for unimplemented callbacks (proxy picking)
+  const noopCallback = useCallback(async () => {}, [])
 
   // Ping current player (host-only)
   const lastPingTimeRef = useRef(0)
@@ -2079,8 +2152,8 @@ export default function DraftRoomPage() {
               onDeleteDraft={handleDeleteDraft}
               onAdvanceTurn={handleAdvanceTurn}
               onSetTimer={handleSetTimer}
-              onEnableProxyPicking={noopAutoSkip}
-              onDisableProxyPicking={noopAutoSkip}
+              onEnableProxyPicking={noopCallback}
+              onDisableProxyPicking={noopCallback}
               isProxyPickingEnabled={false}
               isShuffling={isShuffling}
               onUndoLastPick={handleUndoLastPick}

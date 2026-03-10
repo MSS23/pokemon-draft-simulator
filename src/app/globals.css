@@ -277,11 +277,11 @@
   .holographic {
     background: linear-gradient(
       45deg,
-      #ff6b6b 0%,
-      #4ecdc4 25%,
-      #45b7d1 50%,
-      #96ceb4 75%,
-      #ffeaa7 100%
+      hsl(var(--chart-1)) 0%,
+      hsl(var(--chart-3)) 25%,
+      hsl(var(--chart-4)) 50%,
+      hsl(var(--chart-5)) 75%,
+      hsl(var(--chart-2)) 100%
     );
     background-size: 400% 400%;
     animation: holographic 3s ease-in-out infinite;
@@ -312,7 +312,7 @@
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.4),
+      hsl(var(--foreground) / 0.08),
       transparent
     );
     animation: shimmer 2s infinite;
@@ -330,7 +330,7 @@
   /* Background patterns */
   .pokemon-bg {
     background-image:
-      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0);
+      radial-gradient(circle at 1px 1px, hsl(var(--foreground) / 0.06) 1px, transparent 0);
     background-size: 20px 20px;
   }
 
@@ -356,7 +356,7 @@
 
   .pokemon-hover:hover {
     transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--shadow-lg);
   }
 
   .pokemon-selected {
@@ -410,7 +410,7 @@
     left: -50%;
     width: 200%;
     height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px);
+    background: radial-gradient(circle, hsl(var(--foreground) / 0.15) 1px, transparent 1px);
     background-size: 20px 20px;
     animation: sparkleMove 4s linear infinite;
     pointer-events: none;

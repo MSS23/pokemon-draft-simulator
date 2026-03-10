@@ -189,20 +189,15 @@ export default function PowerRankingsPage() {
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
       <div className="container mx-auto px-4 py-6 max-w-6xl">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to League
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold brand-gradient-text">
-                Power Rankings
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Teams ranked by overall performance and form
-              </p>
-            </div>
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold">Power Rankings</h1>
+            <p className="text-sm text-muted-foreground">
+              Ranked by performance and form
+            </p>
           </div>
         </div>
 
@@ -222,8 +217,8 @@ export default function PowerRankingsPage() {
                   <div className="flex flex-col items-center min-w-[80px]">
                     <div className={`text-4xl font-bold ${
                       index === 0 ? 'text-yellow-500' :
-                      index === 1 ? 'text-gray-400' :
-                      index === 2 ? 'text-orange-600' :
+                      index === 1 ? 'text-gray-400 dark:text-gray-500' :
+                      index === 2 ? 'text-orange-600 dark:text-orange-400' :
                       'text-muted-foreground'
                     }`}>
                       {ranking.rank}
@@ -293,7 +288,7 @@ export default function PowerRankingsPage() {
                       <div>
                         <span className="text-muted-foreground">Point Diff:</span>
                         <span className={`ml-2 font-semibold ${
-                          ranking.stats.pointDifferential >= 0 ? 'text-green-500' : 'text-red-500'
+                          ranking.stats.pointDifferential >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                         }`}>
                           {ranking.stats.pointDifferential > 0 ? '+' : ''}{ranking.stats.pointDifferential}
                         </span>

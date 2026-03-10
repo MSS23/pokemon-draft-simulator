@@ -13,7 +13,7 @@ const sizes = {
   lg: 'w-10 h-10',
 }
 
-export function PokeballIcon({ size = 'md', color = '#dc2626', className }: PokeballIconProps) {
+export function PokeballIcon({ size = 'md', color = 'currentColor', className }: PokeballIconProps) {
   return (
     <svg
       viewBox="0 0 100 100"

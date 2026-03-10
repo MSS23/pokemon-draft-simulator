@@ -93,15 +93,14 @@ export default function SchedulePage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-4xl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{league.name}</h1>
+            <h1 className="text-xl font-bold">Schedule</h1>
             <p className="text-sm text-muted-foreground">
-              Full Season Schedule &middot; {league.totalWeeks} weeks
+              {league.name} &middot; {league.totalWeeks} weeks
             </p>
           </div>
         </div>

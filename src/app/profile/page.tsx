@@ -57,6 +57,7 @@ export default function ProfilePage() {
       return
     }
     loadProfileAndStats(user.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadProfileAndStats only uses setters and supabase (stable refs)
   }, [authLoading, user])
 
   async function loadProfileAndStats(userId: string) {

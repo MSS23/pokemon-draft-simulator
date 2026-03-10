@@ -145,7 +145,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+      <nav role="navigation" aria-label="Main navigation" className="flex-1 overflow-y-auto p-2 space-y-1">
         <SidebarSection title="Draft">
           <SidebarLink href="/create-draft" icon={Plus} label="Create Draft" />
           <SidebarLink href="/join-draft" icon={UserPlus} label="Join Draft" />

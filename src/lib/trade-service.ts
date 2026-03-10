@@ -23,10 +23,25 @@ export interface TradeWithDetails {
   commissioner_approved: boolean | null
   commissioner_id: string | null
   commissioner_notes: string | null
+  counter_to_id: string | null
   teamAName?: string
   teamBName?: string
   teamAPickNames?: Record<string, string>
   teamBPickNames?: Record<string, string>
+}
+
+export interface LeagueActivityItem {
+  id: string
+  type: 'trade_proposed' | 'trade_accepted' | 'trade_rejected' | 'trade_completed' | 'trade_cancelled' | 'trade_countered' | 'trade_hijacked' | 'waiver_claim'
+  timestamp: string
+  teamAName?: string
+  teamBName?: string
+  teamAId?: string
+  teamBId?: string
+  pokemonNames?: string[]
+  notes?: string | null
+  tradeId?: string
+  status?: string
 }
 
 export class TradeService {
@@ -368,6 +383,220 @@ export class TradeService {
     if (approvalError) {
       log.warn('Failed to record trade approval:', approvalError)
     }
+  }
+
+  /**
+   * Counter a trade — reject the original and propose a new trade with modified terms.
+   * The counter-offer goes back to the original proposer as team_b.
+   */
+  static async counterTrade(
+    originalTradeId: string,
+    teamAId: string,
+    teamBId: string,
+    teamAGives: string[],
+    teamBGives: string[],
+    proposedBy: string,
+    weekNumber: number,
+    notes?: string
+  ): Promise<TradeWithDetails> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Reject the original trade
+    await (supabase as SupabaseAny)
+      .from('trades')
+      .update({
+        status: 'countered',
+        responded_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', originalTradeId)
+      .eq('status', 'proposed')
+
+    // Create counter-offer with reference to original
+    const { data, error } = await (supabase as SupabaseAny)
+      .from('trades')
+      .insert({
+        league_id: (await (supabase as SupabaseAny).from('trades').select('league_id').eq('id', originalTradeId).single()).data?.league_id,
+        team_a_id: teamAId,
+        team_b_id: teamBId,
+        team_a_gives: teamAGives,
+        team_b_gives: teamBGives,
+        proposed_by: proposedBy,
+        week_number: weekNumber,
+        status: 'proposed',
+        notes: notes ? `[Counter] ${notes}` : '[Counter-offer]',
+        counter_to_id: originalTradeId,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      log.error('Failed to create counter trade:', error)
+      throw new Error('Failed to create counter trade: ' + error.message)
+    }
+
+    const leagueId = data.league_id
+    this.broadcastTradeUpdate(leagueId, 'countered', data.id)
+
+    return data as TradeWithDetails
+  }
+
+  /**
+   * Hijack a pending trade — a third-party manager proposes a competing offer
+   * for the same Pokemon that were being traded.
+   */
+  static async hijackTrade(
+    originalTradeId: string,
+    hijackerTeamId: string,
+    hijackerGives: string[],
+    hijackerWants: string[],
+    targetTeamId: string,
+    proposedBy: string,
+    weekNumber: number,
+    notes?: string
+  ): Promise<TradeWithDetails> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Get the original trade's league
+    const { data: originalTrade } = await (supabase as SupabaseAny)
+      .from('trades')
+      .select('league_id, status')
+      .eq('id', originalTradeId)
+      .single()
+
+    if (!originalTrade) throw new Error('Original trade not found')
+    if (originalTrade.status !== 'proposed') throw new Error('Can only hijack pending trades')
+
+    // Create the hijack trade
+    const { data, error } = await (supabase as SupabaseAny)
+      .from('trades')
+      .insert({
+        league_id: originalTrade.league_id,
+        team_a_id: hijackerTeamId,
+        team_b_id: targetTeamId,
+        team_a_gives: hijackerGives,
+        team_b_gives: hijackerWants,
+        proposed_by: proposedBy,
+        week_number: weekNumber,
+        status: 'proposed',
+        notes: notes ? `[Hijack] ${notes}` : '[Competing offer]',
+        counter_to_id: originalTradeId,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      log.error('Failed to create hijack trade:', error)
+      throw new Error('Failed to create hijack trade: ' + error.message)
+    }
+
+    this.broadcastTradeUpdate(originalTrade.league_id, 'hijacked', data.id)
+
+    return data as TradeWithDetails
+  }
+
+  /**
+   * Get unified activity feed for a league (trades + waiver claims)
+   */
+  static async getLeagueActivity(leagueId: string): Promise<LeagueActivityItem[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const activities: LeagueActivityItem[] = []
+
+    // Get all trades
+    const { data: trades } = await (supabase as SupabaseAny)
+      .from('trades')
+      .select('*')
+      .eq('league_id', leagueId)
+      .order('proposed_at', { ascending: false })
+      .limit(50)
+
+    // Resolve team names
+    const teamIds = new Set<string>()
+    if (trades) {
+      for (const t of trades) {
+        teamIds.add(t.team_a_id)
+        teamIds.add(t.team_b_id)
+      }
+    }
+
+    // Get waiver claims
+    const { data: claims } = await supabase
+      .from('waiver_claims')
+      .select('*')
+      .eq('league_id', leagueId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (claims) {
+      for (const c of claims) {
+        teamIds.add(c.team_id)
+      }
+    }
+
+    const teamMap = new Map<string, string>()
+    if (teamIds.size > 0) {
+      const { data: teams } = await supabase
+        .from('teams')
+        .select('id, name')
+        .in('id', Array.from(teamIds))
+
+      if (teams) {
+        for (const t of teams) {
+          teamMap.set(t.id, t.name)
+        }
+      }
+    }
+
+    // Map trades to activity items
+    if (trades) {
+      for (const t of trades) {
+        const typeMap: Record<string, LeagueActivityItem['type']> = {
+          proposed: 'trade_proposed',
+          accepted: 'trade_accepted',
+          rejected: 'trade_rejected',
+          completed: 'trade_completed',
+          cancelled: 'trade_cancelled',
+          countered: 'trade_countered',
+        }
+        const isHijack = t.counter_to_id && t.notes?.startsWith('[Hijack]')
+        activities.push({
+          id: `trade-${t.id}`,
+          type: isHijack ? 'trade_hijacked' : (typeMap[t.status] || 'trade_proposed'),
+          timestamp: t.completed_at || t.responded_at || t.proposed_at,
+          teamAName: teamMap.get(t.team_a_id) || 'Unknown',
+          teamBName: teamMap.get(t.team_b_id) || 'Unknown',
+          teamAId: t.team_a_id,
+          teamBId: t.team_b_id,
+          notes: t.notes,
+          tradeId: t.id,
+          status: t.status,
+        })
+      }
+    }
+
+    // Map waiver claims to activity items
+    if (claims) {
+      for (const c of claims) {
+        if (c.status === 'completed' || c.status === 'pending') {
+          activities.push({
+            id: `waiver-${c.id}`,
+            type: 'waiver_claim',
+            timestamp: c.claimed_at || c.created_at,
+            teamAName: teamMap.get(c.team_id) || 'Unknown',
+            teamAId: c.team_id,
+            pokemonNames: [c.claimed_pokemon_name],
+            notes: c.dropped_pick_id ? 'Swap' : 'Pickup',
+            status: c.status,
+          })
+        }
+      }
+    }
+
+    // Sort by timestamp descending
+    activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+    return activities.slice(0, 50)
   }
 
   /**

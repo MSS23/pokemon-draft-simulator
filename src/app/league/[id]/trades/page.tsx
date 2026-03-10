@@ -8,12 +8,15 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LeagueService } from '@/lib/league-service'
 import { TradeService } from '@/lib/trade-service'
-import type { TradeWithDetails } from '@/lib/trade-service'
+import type { TradeWithDetails, LeagueActivityItem } from '@/lib/trade-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, ArrowLeftRight, Clock, CheckCircle, XCircle, Send, Inbox, History, Shield } from 'lucide-react'
+import {
+  ArrowLeft, ArrowLeftRight, Clock, CheckCircle, XCircle, Send, Inbox, History,
+  Shield, Activity, Repeat, Swords, UserPlus,
+} from 'lucide-react'
 import type { League, Team, Pick, ExtendedLeagueSettings } from '@/types'
 import { buildTeamColorMap } from '@/utils/team-colors'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
+import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
@@ -40,6 +43,7 @@ export default function TradesPage() {
   const [settings, setSettings] = useState<ExtendedLeagueSettings>({})
   const [isCommissioner, setIsCommissioner] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [activityFeed, setActivityFeed] = useState<LeagueActivityItem[]>([])
 
   // Propose trade state
   const [selectedOpponent, setSelectedOpponent] = useState<string>('')
@@ -47,6 +51,19 @@ export default function TradesPage() {
   const [theirGives, setTheirGives] = useState<Set<string>>(new Set())
   const [tradeNotes, setTradeNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Counter-offer state
+  const [counteringTradeId, setCounteringTradeId] = useState<string | null>(null)
+  const [counterMyGives, setCounterMyGives] = useState<Set<string>>(new Set())
+  const [counterTheirGives, setCounterTheirGives] = useState<Set<string>>(new Set())
+  const [counterNotes, setCounterNotes] = useState('')
+
+  // Hijack state
+  const [hijackingTradeId, setHijackingTradeId] = useState<string | null>(null)
+  const [hijackTargetTeamId, setHijackTargetTeamId] = useState<string | null>(null)
+  const [hijackMyGives, setHijackMyGives] = useState<Set<string>>(new Set())
+  const [hijackTheirGives, setHijackTheirGives] = useState<Set<string>>(new Set())
+  const [hijackNotes, setHijackNotes] = useState('')
 
   // Load data
   useEffect(() => {
@@ -103,6 +120,12 @@ export default function TradesPage() {
           setTrades(tradeData)
         } catch { /* trades table might not exist */ }
 
+        // Load activity feed
+        try {
+          const activity = await TradeService.getLeagueActivity(leagueId)
+          setActivityFeed(activity)
+        } catch { /* ignore */ }
+
         // Load settings
         try {
           const s = await LeagueService.getLeagueSettings(leagueId)
@@ -133,10 +156,9 @@ export default function TradesPage() {
     const channel = supabase.channel(`league-trades:${leagueId}`)
     channel
       .on('broadcast', { event: 'trade_update' }, () => {
-        // Re-fetch trades on any update
-        TradeService.getLeagueTrades(leagueId)
-          .then(setTrades)
-          .catch(() => {})
+        // Re-fetch trades + activity on any update
+        TradeService.getLeagueTrades(leagueId).then(setTrades).catch(() => {})
+        TradeService.getLeagueActivity(leagueId).then(setActivityFeed).catch(() => {})
       })
       .subscribe()
 
@@ -181,13 +203,27 @@ export default function TradesPage() {
     [trades, userTeamId]
   )
 
+  // All pending trades visible to everyone (for hijack)
+  const allPendingTrades = useMemo(() =>
+    trades.filter(t => t.status === 'proposed'),
+    [trades]
+  )
+
+  // Trades from other managers that user can hijack
+  const hijackableTrades = useMemo(() =>
+    allPendingTrades.filter(t =>
+      t.team_a_id !== userTeamId && t.team_b_id !== userTeamId && userTeamId
+    ),
+    [allPendingTrades, userTeamId]
+  )
+
   const pendingCommissioner = useMemo(() =>
     trades.filter(t => t.status === 'accepted' && t.commissioner_approved === null),
     [trades]
   )
 
   const completedTrades = useMemo(() =>
-    trades.filter(t => ['completed', 'rejected', 'cancelled'].includes(t.status)),
+    trades.filter(t => ['completed', 'rejected', 'cancelled', 'countered'].includes(t.status)),
     [trades]
   )
 
@@ -242,8 +278,12 @@ export default function TradesPage() {
       setSelectedOpponent('')
 
       // Refresh
-      const tradeData = await TradeService.getLeagueTrades(leagueId)
+      const [tradeData, activity] = await Promise.all([
+        TradeService.getLeagueTrades(leagueId),
+        TradeService.getLeagueActivity(leagueId),
+      ])
       setTrades(tradeData)
+      setActivityFeed(activity)
     } catch (err) {
       log.error('Failed to propose trade:', err)
       notify.error('Trade Failed', err instanceof Error ? err.message : 'Unknown error')
@@ -278,48 +318,134 @@ export default function TradesPage() {
     }
   }, [])
 
+  const refreshAll = useCallback(async () => {
+    const [tradeData, activity] = await Promise.all([
+      TradeService.getLeagueTrades(leagueId),
+      TradeService.getLeagueActivity(leagueId),
+    ])
+    setTrades(tradeData)
+    setActivityFeed(activity)
+  }, [leagueId])
+
   const handleRespondToTrade = useCallback(async (tradeId: string, accepted: boolean) => {
     try {
       await TradeService.respondToTrade(tradeId, accepted, settings.requireCommissionerApproval)
       notify.success(accepted ? 'Trade Accepted!' : 'Trade Rejected')
-      const [tradeData] = await Promise.all([
-        TradeService.getLeagueTrades(leagueId),
-        accepted && league ? reloadPicks(league.teams) : Promise.resolve(),
-      ])
-      setTrades(tradeData)
+      if (accepted && league) await reloadPicks(league.teams)
+      await refreshAll()
     } catch (err) {
       log.error('Failed to respond to trade:', err)
       notify.error('Error', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [leagueId, league, settings.requireCommissionerApproval, reloadPicks])
+  }, [league, settings.requireCommissionerApproval, reloadPicks, refreshAll])
 
   const handleCancelTrade = useCallback(async (tradeId: string) => {
     try {
       await TradeService.cancelTrade(tradeId)
       notify.success('Trade Cancelled')
-      const tradeData = await TradeService.getLeagueTrades(leagueId)
-      setTrades(tradeData)
+      await refreshAll()
     } catch (err) {
       log.error('Failed to cancel trade:', err)
       notify.error('Error', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [leagueId])
+  }, [refreshAll])
 
   const handleCommissionerApprove = useCallback(async (tradeId: string, approved: boolean) => {
     if (!userId) return
     try {
       await TradeService.approveTrade(tradeId, userId, approved)
       notify.success(approved ? 'Trade Approved & Executed!' : 'Trade Vetoed')
-      const [tradeData] = await Promise.all([
-        TradeService.getLeagueTrades(leagueId),
-        approved && league ? reloadPicks(league.teams) : Promise.resolve(),
-      ])
-      setTrades(tradeData)
+      if (approved && league) await reloadPicks(league.teams)
+      await refreshAll()
     } catch (err) {
       log.error('Failed to approve trade:', err)
       notify.error('Error', err instanceof Error ? err.message : 'Unknown error')
     }
-  }, [leagueId, userId, league, reloadPicks])
+  }, [userId, league, reloadPicks, refreshAll])
+
+  // Counter-offer handlers
+  const handleStartCounter = useCallback((trade: TradeWithDetails) => {
+    setCounteringTradeId(trade.id)
+    // Pre-populate: the counter goes from current user to the original proposer
+    setCounterMyGives(new Set())
+    setCounterTheirGives(new Set())
+    setCounterNotes('')
+  }, [])
+
+  const handleSubmitCounter = useCallback(async () => {
+    if (!counteringTradeId || !userTeamId || counterMyGives.size === 0 || counterTheirGives.size === 0) return
+    setIsSubmitting(true)
+
+    try {
+      const originalTrade = trades.find(t => t.id === counteringTradeId)
+      if (!originalTrade) throw new Error('Original trade not found')
+
+      // Counter goes from me (team_a) to them (team_b = original proposer)
+      await TradeService.counterTrade(
+        counteringTradeId,
+        userTeamId,
+        originalTrade.team_a_id, // send back to the original proposer
+        Array.from(counterMyGives),
+        Array.from(counterTheirGives),
+        userTeamId,
+        league?.currentWeek || 1,
+        counterNotes || undefined
+      )
+
+      notify.success('Counter-Offer Sent!', 'The other team will review your counter.')
+      setCounteringTradeId(null)
+      setCounterMyGives(new Set())
+      setCounterTheirGives(new Set())
+      setCounterNotes('')
+      await refreshAll()
+    } catch (err) {
+      log.error('Failed to counter trade:', err)
+      notify.error('Counter Failed', err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [counteringTradeId, userTeamId, counterMyGives, counterTheirGives, trades, league?.currentWeek, counterNotes, refreshAll])
+
+  // Hijack handlers
+  const handleStartHijack = useCallback((trade: TradeWithDetails) => {
+    setHijackingTradeId(trade.id)
+    // The hijacker targets one of the teams in the original trade
+    // Default to team_b (the one receiving the offer) — hijacker offers them a better deal
+    setHijackTargetTeamId(trade.team_b_id)
+    setHijackMyGives(new Set())
+    setHijackTheirGives(new Set())
+    setHijackNotes('')
+  }, [])
+
+  const handleSubmitHijack = useCallback(async () => {
+    if (!hijackingTradeId || !userTeamId || !hijackTargetTeamId || hijackMyGives.size === 0 || hijackTheirGives.size === 0) return
+    setIsSubmitting(true)
+
+    try {
+      await TradeService.hijackTrade(
+        hijackingTradeId,
+        userTeamId,
+        Array.from(hijackMyGives),
+        Array.from(hijackTheirGives),
+        hijackTargetTeamId,
+        userTeamId,
+        league?.currentWeek || 1,
+        hijackNotes || undefined
+      )
+
+      notify.success('Competing Offer Sent!', 'Your trade offer is now on the table.')
+      setHijackingTradeId(null)
+      setHijackMyGives(new Set())
+      setHijackTheirGives(new Set())
+      setHijackNotes('')
+      await refreshAll()
+    } catch (err) {
+      log.error('Failed to hijack trade:', err)
+      notify.error('Hijack Failed', err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [hijackingTradeId, userTeamId, hijackTargetTeamId, hijackMyGives, hijackTheirGives, league?.currentWeek, hijackNotes, refreshAll])
 
   // Helper to resolve pick IDs to pokemon names
   const getPickName = useCallback((pickId: string) => {
@@ -337,29 +463,36 @@ export default function TradesPage() {
 
   const pendingCount = pendingIncoming.length + pendingOutgoing.length + (isCommissioner ? pendingCommissioner.length : 0)
 
+  // Get picks for counter-offer
+  const counterTrade = counteringTradeId ? trades.find(t => t.id === counteringTradeId) : null
+  const counterOpponentId = counterTrade?.team_a_id
+  const counterOpponentPicks = counterOpponentId ? (picksByTeam.get(counterOpponentId) || []) : []
+
+  // Get picks for hijack
+  const hijackTargetPicks = hijackTargetTeamId ? (picksByTeam.get(hijackTargetTeamId) || []) : []
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-5xl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <ArrowLeftRight className="h-6 w-6" />
-              Trade Center
-            </h1>
+            <h1 className="text-xl font-bold">Trade Center</h1>
             <p className="text-sm text-muted-foreground">
-              {league.name} &middot; Week {league.currentWeek}
-              {isPastDeadline && ' (Trade deadline passed)'}
+              {league.name}{isPastDeadline && ' (Trade deadline passed)'}
             </p>
           </div>
         </div>
 
-        <Tabs defaultValue={canPropose ? 'propose' : 'pending'} className="space-y-4">
-          <TabsList>
+        <Tabs defaultValue="activity" className="space-y-4">
+          <TabsList className="flex-wrap">
+            <TabsTrigger value="activity" className="flex-1">
+              <Activity className="h-4 w-4 mr-1" />
+              Activity
+            </TabsTrigger>
             {canPropose && (
               <TabsTrigger value="propose" className="flex-1">
                 <Send className="h-4 w-4 mr-1" />
@@ -381,10 +514,59 @@ export default function TradesPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Propose Trade Tab */}
+          {/* ============ ACTIVITY TAB (visible to all) ============ */}
+          <TabsContent value="activity" className="space-y-4">
+            {activityFeed.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No activity yet. Trades and free agent claims will appear here.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {activityFeed.map(item => (
+                  <ActivityRow
+                    key={item.id}
+                    item={item}
+                    teamColorMap={teamColorMap}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Open trades visible to all */}
+            {allPendingTrades.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">Open Trades</h3>
+                <div className="space-y-3">
+                  {allPendingTrades.map(trade => (
+                    <TradeCard
+                      key={trade.id}
+                      trade={trade}
+                      getPickName={getPickName}
+                      getPickPokemonId={getPickPokemonId}
+                      teamColorMap={teamColorMap}
+                      actions={
+                        hijackableTrades.some(h => h.id === trade.id) ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStartHijack(trade)}
+                            className="text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                          >
+                            <Swords className="h-4 w-4 mr-1" />
+                            Compete
+                          </Button>
+                        ) : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* ============ PROPOSE TRADE TAB ============ */}
           {canPropose && (
             <TabsContent value="propose" className="space-y-4">
-              {/* Select opponent */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Propose a Trade</CardTitle>
@@ -413,7 +595,6 @@ export default function TradesPage() {
 
                   {selectedOpponent && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* My Pokemon (what I give) */}
                       <div>
                         <h3 className="text-sm font-medium mb-2 text-red-600 dark:text-red-400">
                           You Give ({myGives.size} selected)
@@ -432,8 +613,6 @@ export default function TradesPage() {
                           )}
                         </div>
                       </div>
-
-                      {/* Their Pokemon (what I receive) */}
                       <div>
                         <h3 className="text-sm font-medium mb-2 text-green-600 dark:text-green-400">
                           You Receive ({theirGives.size} selected)
@@ -482,7 +661,7 @@ export default function TradesPage() {
             </TabsContent>
           )}
 
-          {/* Pending Tab */}
+          {/* ============ PENDING TAB ============ */}
           <TabsContent value="pending" className="space-y-4">
             {/* Incoming trades */}
             {pendingIncoming.length > 0 && (
@@ -499,13 +678,22 @@ export default function TradesPage() {
                     getPickPokemonId={getPickPokemonId}
                     teamColorMap={teamColorMap}
                     actions={
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         <Button
                           size="sm"
                           onClick={() => handleRespondToTrade(trade.id, true)}
                         >
                           <CheckCircle className="h-4 w-4 mr-1" />
                           Accept
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStartCounter(trade)}
+                          className="text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                        >
+                          <Repeat className="h-4 w-4 mr-1" />
+                          Counter
                         </Button>
                         <Button
                           size="sm"
@@ -520,6 +708,191 @@ export default function TradesPage() {
                   />
                 ))}
               </div>
+            )}
+
+            {/* Counter-offer form */}
+            {counteringTradeId && counterTrade && (
+              <Card className="border-blue-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Repeat className="h-4 w-4 text-blue-600" />
+                    Counter-Offer to {counterTrade.teamAName}
+                  </CardTitle>
+                  <CardDescription>Propose different terms for this trade</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium mb-2 text-red-600 dark:text-red-400">
+                        You Give ({counterMyGives.size} selected)
+                      </h3>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {myPicks.map(pick => (
+                          <PokemonPickRow
+                            key={pick.id}
+                            pick={pick}
+                            selected={counterMyGives.has(pick.id)}
+                            onToggle={() => {
+                              setCounterMyGives(prev => {
+                                const next = new Set(prev)
+                                if (next.has(pick.id)) next.delete(pick.id)
+                                else next.add(pick.id)
+                                return next
+                              })
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium mb-2 text-green-600 dark:text-green-400">
+                        You Want ({counterTheirGives.size} selected)
+                      </h3>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {counterOpponentPicks.map(pick => (
+                          <PokemonPickRow
+                            key={pick.id}
+                            pick={pick}
+                            selected={counterTheirGives.has(pick.id)}
+                            onToggle={() => {
+                              setCounterTheirGives(prev => {
+                                const next = new Set(prev)
+                                if (next.has(pick.id)) next.delete(pick.id)
+                                else next.add(pick.id)
+                                return next
+                              })
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={counterNotes}
+                    onChange={e => setCounterNotes(e.target.value)}
+                    placeholder="Counter-offer message..."
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleSubmitCounter}
+                      disabled={isSubmitting || counterMyGives.size === 0 || counterTheirGives.size === 0}
+                    >
+                      {isSubmitting ? 'Sending...' : 'Send Counter-Offer'}
+                    </Button>
+                    <Button variant="outline" onClick={() => setCounteringTradeId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Hijack form */}
+            {hijackingTradeId && (
+              <Card className="border-amber-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Swords className="h-4 w-4 text-amber-600" />
+                    Competing Offer
+                  </CardTitle>
+                  <CardDescription>Propose a better deal to one of the teams</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Target team selector */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Make offer to:</label>
+                    <select
+                      value={hijackTargetTeamId || ''}
+                      onChange={e => {
+                        setHijackTargetTeamId(e.target.value)
+                        setHijackTheirGives(new Set())
+                      }}
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                    >
+                      {(() => {
+                        const origTrade = trades.find(t => t.id === hijackingTradeId)
+                        if (!origTrade) return null
+                        return [
+                          <option key={origTrade.team_a_id} value={origTrade.team_a_id}>
+                            {origTrade.teamAName}
+                          </option>,
+                          <option key={origTrade.team_b_id} value={origTrade.team_b_id}>
+                            {origTrade.teamBName}
+                          </option>,
+                        ]
+                      })()}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-sm font-medium mb-2 text-red-600 dark:text-red-400">
+                        You Give ({hijackMyGives.size} selected)
+                      </h3>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {myPicks.map(pick => (
+                          <PokemonPickRow
+                            key={pick.id}
+                            pick={pick}
+                            selected={hijackMyGives.has(pick.id)}
+                            onToggle={() => {
+                              setHijackMyGives(prev => {
+                                const next = new Set(prev)
+                                if (next.has(pick.id)) next.delete(pick.id)
+                                else next.add(pick.id)
+                                return next
+                              })
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium mb-2 text-green-600 dark:text-green-400">
+                        You Want ({hijackTheirGives.size} selected)
+                      </h3>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {hijackTargetPicks.map(pick => (
+                          <PokemonPickRow
+                            key={pick.id}
+                            pick={pick}
+                            selected={hijackTheirGives.has(pick.id)}
+                            onToggle={() => {
+                              setHijackTheirGives(prev => {
+                                const next = new Set(prev)
+                                if (next.has(pick.id)) next.delete(pick.id)
+                                else next.add(pick.id)
+                                return next
+                              })
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={hijackNotes}
+                    onChange={e => setHijackNotes(e.target.value)}
+                    placeholder="Why your deal is better..."
+                    className="w-full px-3 py-2 border rounded-md bg-background text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleSubmitHijack}
+                      disabled={isSubmitting || hijackMyGives.size === 0 || hijackTheirGives.size === 0}
+                      className="bg-amber-600 hover:bg-amber-700"
+                    >
+                      {isSubmitting ? 'Sending...' : 'Submit Competing Offer'}
+                    </Button>
+                    <Button variant="outline" onClick={() => setHijackingTradeId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Outgoing trades */}
@@ -588,7 +961,7 @@ export default function TradesPage() {
               </div>
             )}
 
-            {pendingCount === 0 && (
+            {pendingCount === 0 && !counteringTradeId && !hijackingTradeId && (
               <div className="text-center py-12 text-muted-foreground">
                 <Inbox className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 No pending trades
@@ -596,7 +969,7 @@ export default function TradesPage() {
             )}
           </TabsContent>
 
-          {/* History Tab */}
+          {/* ============ HISTORY TAB ============ */}
           <TabsContent value="history" className="space-y-3">
             {completedTrades.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
@@ -640,14 +1013,10 @@ function PokemonPickRow({ pick, selected, onToggle }: {
           : 'border-transparent hover:bg-muted/50'
       }`}
     >
-      <img
-        src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
-        alt={pick.pokemonName}
+      <PokemonSprite
+        pokemonId={pick.pokemonId}
+        pokemonName={pick.pokemonName}
         className="w-8 h-8 object-contain"
-        onError={e => {
-          (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(pick.pokemonId)
-        }}
-        loading="lazy"
       />
       <span className="text-sm capitalize flex-1">{pick.pokemonName}</span>
       <span className="text-xs text-muted-foreground">{pick.cost} pts</span>
@@ -669,17 +1038,27 @@ function TradeCard({ trade, getPickName, getPickPokemonId, teamColorMap, actions
     completed: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
     rejected: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
     cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300',
+    countered: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
   }[trade.status] || ''
 
   const colorsA = teamColorMap.get(trade.team_a_id)
   const colorsB = teamColorMap.get(trade.team_b_id)
 
+  const isCounter = trade.notes?.startsWith('[Counter')
+  const isHijack = trade.notes?.startsWith('[Hijack]') || trade.notes?.startsWith('[Competing')
+
   return (
     <Card>
       <CardContent className="pt-4 pb-3 px-4">
         <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 flex-wrap">
+            {isHijack ? (
+              <Swords className="h-4 w-4 text-amber-500" />
+            ) : isCounter ? (
+              <Repeat className="h-4 w-4 text-blue-500" />
+            ) : (
+              <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+            )}
             <span className={`text-sm font-medium px-1.5 rounded ${colorsA?.badge || ''}`}>
               {trade.teamAName || 'Team A'}
             </span>
@@ -689,6 +1068,12 @@ function TradeCard({ trade, getPickName, getPickPokemonId, teamColorMap, actions
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {isCounter && (
+              <Badge variant="outline" className="text-[10px] border-blue-300 text-blue-600">Counter</Badge>
+            )}
+            {isHijack && (
+              <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-600">Competing</Badge>
+            )}
             <span className="text-xs text-muted-foreground">Wk {trade.week_number}</span>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
               {trade.status}
@@ -697,7 +1082,6 @@ function TradeCard({ trade, getPickName, getPickPokemonId, teamColorMap, actions
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-3">
-          {/* Team A gives */}
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
               {trade.teamAName} sends
@@ -712,8 +1096,6 @@ function TradeCard({ trade, getPickName, getPickPokemonId, teamColorMap, actions
               ))}
             </div>
           </div>
-
-          {/* Team B gives */}
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
               {trade.teamBName} sends
@@ -731,7 +1113,9 @@ function TradeCard({ trade, getPickName, getPickPokemonId, teamColorMap, actions
         </div>
 
         {trade.notes && (
-          <p className="text-xs text-muted-foreground italic mb-2">&ldquo;{trade.notes}&rdquo;</p>
+          <p className="text-xs text-muted-foreground italic mb-2">
+            &ldquo;{trade.notes.replace(/^\[(Counter|Hijack|Competing offer)\]\s?/, '')}&rdquo;
+          </p>
         )}
 
         {trade.proposed_at && (
@@ -750,16 +1134,86 @@ function TradeCard({ trade, getPickName, getPickPokemonId, teamColorMap, actions
 function PokemonMiniRow({ pokemonId, pokemonName }: { pokemonId: string; pokemonName: string }) {
   return (
     <div className="flex items-center gap-1.5">
-      <img
-        src={getPokemonAnimatedUrl(pokemonId, pokemonName)}
-        alt={pokemonName}
+      <PokemonSprite
+        pokemonId={pokemonId}
+        pokemonName={pokemonName}
         className="w-6 h-6 object-contain"
-        onError={e => {
-          (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(pokemonId)
-        }}
-        loading="lazy"
       />
       <span className="text-xs capitalize">{pokemonName}</span>
     </div>
   )
+}
+
+function ActivityRow({ item, teamColorMap }: {
+  item: LeagueActivityItem
+  teamColorMap: Map<string, { bg: string; border: string; badge: string }>
+}) {
+  const colorsA = item.teamAId ? teamColorMap.get(item.teamAId) : undefined
+  const colorsB = item.teamBId ? teamColorMap.get(item.teamBId) : undefined
+
+  const iconMap: Record<string, { icon: React.ReactNode; color: string }> = {
+    trade_proposed: { icon: <Send className="h-3.5 w-3.5" />, color: 'text-yellow-600' },
+    trade_accepted: { icon: <CheckCircle className="h-3.5 w-3.5" />, color: 'text-blue-600' },
+    trade_rejected: { icon: <XCircle className="h-3.5 w-3.5" />, color: 'text-red-600' },
+    trade_completed: { icon: <ArrowLeftRight className="h-3.5 w-3.5" />, color: 'text-green-600' },
+    trade_cancelled: { icon: <XCircle className="h-3.5 w-3.5" />, color: 'text-gray-500' },
+    trade_countered: { icon: <Repeat className="h-3.5 w-3.5" />, color: 'text-blue-500' },
+    trade_hijacked: { icon: <Swords className="h-3.5 w-3.5" />, color: 'text-amber-500' },
+    waiver_claim: { icon: <UserPlus className="h-3.5 w-3.5" />, color: 'text-purple-600' },
+  }
+
+  const { icon, color } = iconMap[item.type] || { icon: <Activity className="h-3.5 w-3.5" />, color: 'text-muted-foreground' }
+
+  const labelMap: Record<string, string> = {
+    trade_proposed: 'proposed a trade with',
+    trade_accepted: 'accepted trade with',
+    trade_rejected: 'rejected trade from',
+    trade_completed: 'completed trade with',
+    trade_cancelled: 'cancelled trade with',
+    trade_countered: 'countered trade from',
+    trade_hijacked: 'made competing offer to',
+    waiver_claim: 'claimed free agent',
+  }
+
+  const timeAgo = getTimeAgo(item.timestamp)
+
+  return (
+    <div className="flex items-start gap-3 py-2 px-3 rounded-md hover:bg-muted/30 transition-colors">
+      <div className={`mt-0.5 ${color}`}>{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm">
+          <span className={`font-medium px-1 rounded ${colorsA?.badge || ''}`}>
+            {item.teamAName}
+          </span>
+          {' '}
+          <span className="text-muted-foreground">{labelMap[item.type] || item.type}</span>
+          {' '}
+          {item.type === 'waiver_claim' ? (
+            <span className="font-medium capitalize">{item.pokemonNames?.[0]}</span>
+          ) : (
+            <span className={`font-medium px-1 rounded ${colorsB?.badge || ''}`}>
+              {item.teamBName}
+            </span>
+          )}
+        </p>
+        {item.notes && !item.notes.startsWith('[') && (
+          <p className="text-xs text-muted-foreground italic truncate">{item.notes}</p>
+        )}
+      </div>
+      <span className="text-[10px] text-muted-foreground whitespace-nowrap">{timeAgo}</span>
+    </div>
+  )
+}
+
+function getTimeAgo(timestamp: string): string {
+  const now = Date.now()
+  const then = new Date(timestamp).getTime()
+  const diff = now - then
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
 }

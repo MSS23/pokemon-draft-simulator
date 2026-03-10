@@ -33,6 +33,7 @@ export function SidebarLink({ href, icon: Icon, label, badge, onClick, isProtect
     <Link
       href={href}
       onClick={handleClick}
+      aria-current={isActive ? 'page' : undefined}
       className={cn(
         'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
         isActive

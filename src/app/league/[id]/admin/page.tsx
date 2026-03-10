@@ -181,16 +181,13 @@ export default function CommissionerPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-5xl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Commissioner Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              {league.name} &middot; Week {league.currentWeek} of {league.totalWeeks}
-            </p>
+            <h1 className="text-xl font-bold">Commissioner Dashboard</h1>
+            <p className="text-sm text-muted-foreground">{league.name}</p>
           </div>
         </div>
 
@@ -246,7 +243,7 @@ export default function CommissionerPage() {
                   const match = matches.find(m => m.id === editingMatch)
                   if (!match) return null
                   return (
-                    <Card className="border-yellow-500 mt-4">
+                    <Card className="border-yellow-500 dark:border-yellow-500/60 mt-4">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
                           <AlertTriangle className="h-4 w-4 text-yellow-500" />
@@ -307,7 +304,7 @@ export default function CommissionerPage() {
                 ) : (
                   <div className="space-y-3">
                     {pendingTrades.map(trade => (
-                      <Card key={trade.id} className="border-yellow-500/50">
+                      <Card key={trade.id} className="border-yellow-500/50 dark:border-yellow-500/30">
                         <CardContent className="pt-4">
                           <div className="text-sm mb-3">
                             <span className="font-medium">{trade.teamAName || 'Team A'}</span>

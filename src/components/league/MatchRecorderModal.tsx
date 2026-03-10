@@ -10,7 +10,7 @@
  * - Dual-confirmation: both teams submit independently
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -58,7 +58,7 @@ interface GameKOData {
   away: PokemonKO[]
 }
 
-export function MatchRecorderModal({
+export const MatchRecorderModal = memo(function MatchRecorderModal({
   isOpen,
   onClose,
   match,
@@ -437,8 +437,8 @@ export function MatchRecorderModal({
                 </Alert>
               )}
               {submissionResult === 'confirmed' && (
-                <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <Alert className="border-green-500 dark:border-green-700 bg-green-50 dark:bg-green-950/20">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                   <AlertDescription>
                     <strong>Match confirmed!</strong> Both teams submitted matching results.
                     The match has been recorded.
@@ -723,4 +723,4 @@ export function MatchRecorderModal({
       </DialogContent>
     </Dialog>
   )
-}
+})

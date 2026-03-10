@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { TEAM_COLORS } from '@/utils/team-colors'
 
 interface TeamIconProps {
@@ -20,7 +21,7 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase()
 }
 
-export function TeamIcon({ teamName, teamIndex, size = 'md' }: TeamIconProps) {
+export const TeamIcon = memo(function TeamIcon({ teamName, teamIndex, size = 'md' }: TeamIconProps) {
   const color = TEAM_COLORS[teamIndex % TEAM_COLORS.length]
   const initials = getInitials(teamName)
 
@@ -32,4 +33,4 @@ export function TeamIcon({ teamName, teamIndex, size = 'md' }: TeamIconProps) {
       {initials}
     </div>
   )
-}
+}, (prev, next) => prev.teamName === next.teamName && prev.teamIndex === next.teamIndex && prev.size === next.size)

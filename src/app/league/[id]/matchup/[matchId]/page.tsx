@@ -13,9 +13,10 @@ import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { ArrowLeft, Trophy, Swords, TrendingUp, Shield, Zap } from 'lucide-react'
 import type { League, Match, Team, Pick, TeamPokemonStatus } from '@/types'
+import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import type { HeadToHeadRecord, TeamFormIndicator } from '@/lib/league-stats-service'
 import { buildTeamColorMap, type TeamColorSet } from '@/utils/team-colors'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, TYPE_COLORS } from '@/utils/pokemon'
+import { TYPE_COLORS } from '@/utils/pokemon'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
@@ -83,11 +84,11 @@ function formatMultiplier(mult: number): string {
 }
 
 function getMultiplierColor(mult: number): string {
-  if (mult >= 4) return 'text-green-400 font-bold'
-  if (mult >= 2) return 'text-green-500 font-bold'
-  if (mult === 0) return 'text-gray-400'
-  if (mult <= 0.25) return 'text-red-400'
-  if (mult <= 0.5) return 'text-orange-400'
+  if (mult >= 4) return 'text-green-500 dark:text-green-400 font-bold'
+  if (mult >= 2) return 'text-green-600 dark:text-green-400 font-bold'
+  if (mult === 0) return 'text-gray-400 dark:text-gray-500'
+  if (mult <= 0.25) return 'text-red-500 dark:text-red-400'
+  if (mult <= 0.5) return 'text-orange-500 dark:text-orange-400'
   return 'text-muted-foreground'
 }
 
@@ -253,13 +254,12 @@ export default function MatchupPreviewPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-5xl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">Matchup Preview</h1>
+            <h1 className="text-xl font-bold">Matchup Preview</h1>
             <p className="text-sm text-muted-foreground">
               {league.name} &middot; Week {match.weekNumber}
             </p>
@@ -287,9 +287,9 @@ export default function MatchupPreviewPage() {
                       <span
                         key={i}
                         className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold ${
-                          r === 'W' ? 'bg-green-500 text-white' :
-                          r === 'L' ? 'bg-red-500 text-white' :
-                          'bg-gray-400 text-white'
+                          r === 'W' ? 'bg-green-500 dark:bg-green-600 text-white' :
+                          r === 'L' ? 'bg-red-500 dark:bg-red-600 text-white' :
+                          'bg-gray-400 dark:bg-gray-600 text-white'
                         }`}
                       >
                         {r}
@@ -331,9 +331,9 @@ export default function MatchupPreviewPage() {
                       <span
                         key={i}
                         className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold ${
-                          r === 'W' ? 'bg-green-500 text-white' :
-                          r === 'L' ? 'bg-red-500 text-white' :
-                          'bg-gray-400 text-white'
+                          r === 'W' ? 'bg-green-500 dark:bg-green-600 text-white' :
+                          r === 'L' ? 'bg-red-500 dark:bg-red-600 text-white' :
+                          'bg-gray-400 dark:bg-gray-600 text-white'
                         }`}
                       >
                         {r}
@@ -367,15 +367,10 @@ export default function MatchupPreviewPage() {
                 const types = pokemonTypes.get(pick.pokemonId) || []
                 return (
                   <div key={pick.id} className="flex items-center gap-3 p-2 rounded-lg border">
-                    <img
-                      src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
-                      alt={pick.pokemonName}
+                    <PokemonSprite
+                      pokemonId={pick.pokemonId}
+                      pokemonName={pick.pokemonName}
                       className="w-10 h-10 object-contain"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = getPokemonAnimatedBackupUrl(pick.pokemonId)
-                      }}
-                      loading="lazy"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm capitalize truncate">{pick.pokemonName}</div>
@@ -418,15 +413,10 @@ export default function MatchupPreviewPage() {
                 const types = pokemonTypes.get(pick.pokemonId) || []
                 return (
                   <div key={pick.id} className="flex items-center gap-3 p-2 rounded-lg border">
-                    <img
-                      src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
-                      alt={pick.pokemonName}
+                    <PokemonSprite
+                      pokemonId={pick.pokemonId}
+                      pokemonName={pick.pokemonName}
                       className="w-10 h-10 object-contain"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = getPokemonAnimatedBackupUrl(pick.pokemonId)
-                      }}
-                      loading="lazy"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm capitalize truncate">{pick.pokemonName}</div>

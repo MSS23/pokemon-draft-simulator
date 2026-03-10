@@ -12,7 +12,7 @@ import { LoadingScreen } from '@/components/ui/loading-states'
 import { ArrowLeft, ArrowUpDown, Trophy, Skull, Target, Crown } from 'lucide-react'
 import type { League, Team } from '@/types'
 import { buildTeamColorMap } from '@/utils/team-colors'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
+import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('StatsPage')
@@ -117,16 +117,13 @@ export default function StatsPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-6xl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Season Stats</h1>
-            <p className="text-sm text-muted-foreground">
-              {league.name} &middot; Per-Pokemon performance
-            </p>
+            <h1 className="text-xl font-bold">Season Stats</h1>
+            <p className="text-sm text-muted-foreground">{league.name}</p>
           </div>
         </div>
 
@@ -134,15 +131,13 @@ export default function StatsPage() {
         {(mvpKO || mvpWinRate) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             {mvpKO && mvpKO.totalKOs > 0 && (
-              <Card className="border-yellow-500/50">
+              <Card className="border-yellow-500/50 dark:border-yellow-500/30">
                 <CardContent className="pt-4 flex items-center gap-3">
-                  <img
-                    src={getPokemonAnimatedUrl(mvpKO.pokemonId, mvpKO.pokemonName)}
-                    alt={mvpKO.pokemonName}
+                  <PokemonSprite
+                    pokemonId={mvpKO.pokemonId}
+                    pokemonName={mvpKO.pokemonName}
                     className="w-12 h-12 object-contain"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(mvpKO.pokemonId)
-                    }}
+                    lazy={false}
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -156,15 +151,13 @@ export default function StatsPage() {
               </Card>
             )}
             {mvpWinRate && mvpWinRate.winRate > 0 && (
-              <Card className="border-green-500/50">
+              <Card className="border-green-500/50 dark:border-green-500/30">
                 <CardContent className="pt-4 flex items-center gap-3">
-                  <img
-                    src={getPokemonAnimatedUrl(mvpWinRate.pokemonId, mvpWinRate.pokemonName)}
-                    alt={mvpWinRate.pokemonName}
+                  <PokemonSprite
+                    pokemonId={mvpWinRate.pokemonId}
+                    pokemonName={mvpWinRate.pokemonName}
                     className="w-12 h-12 object-contain"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(mvpWinRate.pokemonId)
-                    }}
+                    lazy={false}
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -276,14 +269,10 @@ export default function StatsPage() {
                       <tr key={stat.pickId} className={`border-b last:border-0 hover:bg-muted/50 ${stat.status === 'dead' ? 'opacity-60' : ''}`}>
                         <td className="py-2 pr-2">
                           <div className="flex items-center gap-2">
-                            <img
-                              src={getPokemonAnimatedUrl(stat.pokemonId, stat.pokemonName)}
-                              alt={stat.pokemonName}
+                            <PokemonSprite
+                              pokemonId={stat.pokemonId}
+                              pokemonName={stat.pokemonName}
                               className="w-8 h-8 object-contain shrink-0"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(stat.pokemonId)
-                              }}
-                              loading="lazy"
                             />
                             <div>
                               <div className="font-medium capitalize flex items-center gap-1">

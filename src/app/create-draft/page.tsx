@@ -843,6 +843,7 @@ export default function CreateDraftPage() {
                           <SelectValue placeholder="Select time limit" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="0">No limit (default)</SelectItem>
                           <SelectItem value="30">30 seconds</SelectItem>
                           <SelectItem value="60">1 minute</SelectItem>
                           <SelectItem value="90">90 seconds</SelectItem>
@@ -853,7 +854,6 @@ export default function CreateDraftPage() {
                           <SelectItem value="3600">1 hour</SelectItem>
                           <SelectItem value="7200">2 hours</SelectItem>
                           <SelectItem value="14400">4 hours</SelectItem>
-                          <SelectItem value="0">No limit</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

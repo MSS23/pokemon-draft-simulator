@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Upload, Download, FileText, Check, X, AlertCircle } from 'lucide-react'
-import { processCustomPricingFile, downloadSampleCSV, type ParsedCSVResult } from '@/lib/csv-parser'
+import { processCustomPricingFile, downloadSampleCSV, type ParsedCSVResult, type TierInfo } from '@/lib/csv-parser'
 
 interface CSVUploadProps {
-  onPricingParsed: (pricing: Record<string, number>, stats: ParsedCSVResult['stats']) => void
+  onPricingParsed: (pricing: Record<string, number>, stats: ParsedCSVResult['stats'], extra?: { banned?: string[]; tiers?: TierInfo[] }) => void
   onClear?: () => void
   className?: string
 }
@@ -31,7 +31,10 @@ export default function CSVUpload({ onPricingParsed, onClear, className }: CSVUp
       setResult(parseResult)
 
       if (parseResult.success && parseResult.data && parseResult.stats) {
-        onPricingParsed(parseResult.data, parseResult.stats)
+        onPricingParsed(parseResult.data, parseResult.stats, {
+          banned: parseResult.banned,
+          tiers: parseResult.tiers
+        })
       }
     } catch (error) {
       setResult({
@@ -152,6 +155,31 @@ export default function CSVUpload({ onPricingParsed, onClear, className }: CSVUp
                   </div>
                 </div>
               )}
+
+              {/* Tier Breakdown (for tiered CSV format) */}
+              {result.tiers && result.tiers.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-muted-foreground">Tier Breakdown</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.tiers.map(tier => (
+                      <div
+                        key={tier.name}
+                        className="bg-white dark:bg-card px-2 py-1 rounded border border-border text-xs"
+                      >
+                        <span className="font-semibold">{tier.name}</span>
+                        <span className="text-muted-foreground ml-1">({tier.cost}pts)</span>
+                        <span className="ml-1 text-muted-foreground">&middot; {tier.count}</span>
+                      </div>
+                    ))}
+                    {result.banned && result.banned.length > 0 && (
+                      <div className="bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded border border-red-200 dark:border-red-800 text-xs">
+                        <span className="font-semibold text-red-700 dark:text-red-300">Banned</span>
+                        <span className="ml-1 text-red-600 dark:text-red-400">&middot; {result.banned.length}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -187,14 +215,25 @@ export default function CSVUpload({ onPricingParsed, onClear, className }: CSVUp
           )}
 
           {/* Info */}
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p className="font-medium">Expected CSV format:</p>
-            <code className="block bg-white dark:bg-card p-2 rounded text-xs border border-border">
-              pokemon,cost<br />
-              Pikachu,10<br />
-              Charizard,25<br />
-              Mewtwo,30
-            </code>
+          <div className="text-xs text-muted-foreground space-y-2">
+            <p className="font-medium">Supported CSV formats:</p>
+            <div className="space-y-1.5">
+              <div>
+                <p className="font-medium text-foreground/70">Simple format:</p>
+                <code className="block bg-white dark:bg-card p-2 rounded text-xs border border-border">
+                  pokemon,cost<br />
+                  Pikachu,10<br />
+                  Charizard,25
+                </code>
+              </div>
+              <div>
+                <p className="font-medium text-foreground/70">Tiered format (Google Sheets):</p>
+                <code className="block bg-white dark:bg-card p-2 rounded text-xs border border-border">
+                  ,S Tier (60),,,,A Tier (50),,,,Banned,<br />
+                  ,,Dragonite,,,,Arcanine,,,,Mewtwo
+                </code>
+              </div>
+            </div>
           </div>
         </div>
       </Card>

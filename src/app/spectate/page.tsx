@@ -421,12 +421,40 @@ export default function SpectatePage() {
             )}
           </div>
 
+          {/* League Spectating CTA */}
+          <div className="mt-12">
+            <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <Trophy className="h-8 w-8 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-1">
+                      Spectate Leagues
+                    </h3>
+                    <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                      Follow public leagues to view standings, weekly fixtures, match results,
+                      and playoff brackets in real-time.
+                    </p>
+                    <Button
+                      onClick={() => router.push('/watch-drafts?tab=leagues')}
+                      size="sm"
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      <Trophy className="h-4 w-4 mr-1.5" />
+                      Browse Public Leagues
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Footer Info */}
-          <div className="mt-12 text-center">
+          <div className="mt-6 text-center">
             <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
               <CardContent className="pt-6">
                 <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                  👁️ Spectator Mode
+                  Spectator Mode
                 </h3>
                 <p className="text-sm text-blue-800 dark:text-blue-200">
                   As a spectator, you can watch live picks, see team builds, and

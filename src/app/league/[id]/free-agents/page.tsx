@@ -13,8 +13,9 @@ import { LoadingScreen } from '@/components/ui/loading-states'
 import { ArrowLeft, Search, UserPlus, History, Coins, Lock } from 'lucide-react'
 import type { League, Team, Pick, WaiverClaim } from '@/types'
 import type { Pokemon } from '@/types'
+import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import { buildTeamColorMap } from '@/utils/team-colors'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, TYPE_COLORS } from '@/utils/pokemon'
+import { TYPE_COLORS } from '@/utils/pokemon'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
@@ -220,15 +221,14 @@ export default function FreeAgentsPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-5xl">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+        <div className="flex items-center gap-3 mb-6">
+          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold">Free Agents</h1>
+            <h1 className="text-xl font-bold">Free Agents</h1>
             <p className="text-sm text-muted-foreground">
-              {league.name} &middot; {availablePokemon.length} Pokemon available
+              {league.name} &middot; {availablePokemon.length} available
             </p>
           </div>
           {userTeamId && (
@@ -272,7 +272,7 @@ export default function FreeAgentsPage() {
 
             {/* Claim modal */}
             {selectedPokemon && (
-              <Card className="border-blue-500">
+              <Card className="border-blue-500 dark:border-blue-500/60">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <UserPlus className="h-4 w-4" />
@@ -282,13 +282,11 @@ export default function FreeAgentsPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4 mb-4">
-                    <img
-                      src={getPokemonAnimatedUrl(selectedPokemon.id, selectedPokemon.name)}
-                      alt={selectedPokemon.name}
+                    <PokemonSprite
+                      pokemonId={selectedPokemon.id}
+                      pokemonName={selectedPokemon.name}
                       className="w-16 h-16 object-contain"
-                      onError={e => {
-                        (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(selectedPokemon.id)
-                      }}
+                      lazy={false}
                     />
                     <div>
                       <div className="font-bold capitalize text-lg">{selectedPokemon.name}</div>
@@ -315,7 +313,7 @@ export default function FreeAgentsPage() {
                       Drop a Pokemon to swap (required):
                     </label>
                     {userTeamPicks.length === 0 ? (
-                      <p className="text-xs text-red-500">No Pokemon on your roster to drop.</p>
+                      <p className="text-xs text-red-500 dark:text-red-400">No Pokemon on your roster to drop.</p>
                     ) : (
                       <>
                         <select
@@ -389,14 +387,10 @@ export default function FreeAgentsPage() {
                     onClick={() => setSelectedPokemon(pokemon)}
                   >
                     <CardContent className="pt-3 pb-2 px-3 text-center">
-                      <img
-                        src={getPokemonAnimatedUrl(pokemon.id, pokemon.name)}
-                        alt={pokemon.name}
+                      <PokemonSprite
+                        pokemonId={pokemon.id}
+                        pokemonName={pokemon.name}
                         className="w-12 h-12 mx-auto object-contain"
-                        onError={e => {
-                          (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(pokemon.id)
-                        }}
-                        loading="lazy"
                       />
                       <div className="font-medium text-xs capitalize mt-1 truncate">{pokemon.name}</div>
                       <div className="flex justify-center gap-0.5 mt-1">
@@ -449,14 +443,10 @@ export default function FreeAgentsPage() {
                       return (
                         <div key={claim.id} className="flex items-center justify-between p-3 border rounded-lg">
                           <div className="flex items-center gap-3">
-                            <img
-                              src={getPokemonAnimatedUrl(claim.claimedPokemonId, claim.claimedPokemonName)}
-                              alt={claim.claimedPokemonName}
+                            <PokemonSprite
+                              pokemonId={claim.claimedPokemonId}
+                              pokemonName={claim.claimedPokemonName}
                               className="w-8 h-8 object-contain"
-                              onError={e => {
-                                (e.target as HTMLImageElement).src = getPokemonAnimatedBackupUrl(claim.claimedPokemonId)
-                              }}
-                              loading="lazy"
                             />
                             <div>
                               <div className="text-sm font-medium capitalize">{claim.claimedPokemonName}</div>

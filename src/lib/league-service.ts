@@ -1147,6 +1147,58 @@ export class LeagueService {
   }
 
   /**
+   * Get public leagues available for spectating.
+   * Joins leagues with their drafts and filters by is_public=true.
+   */
+  static async getPublicLeagues(options?: {
+    status?: 'active' | 'scheduled' | 'completed'
+    limit?: number
+  }): Promise<(League & { teams: Team[]; teamCount: number; draftFormat: string })[]> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    // Query leagues joined with their draft (to check is_public) and league_teams
+    let query = supabase
+      .from('leagues')
+      .select(`
+        *,
+        drafts!inner(id, is_public, format, name),
+        league_teams(
+          team:teams(*)
+        )
+      `)
+      .eq('drafts.is_public', true)
+      .order('updated_at', { ascending: false })
+      .limit(options?.limit ?? 30)
+
+    if (options?.status) {
+      query = query.eq('status', options.status)
+    } else {
+      query = query.in('status', ['active', 'scheduled', 'completed'])
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      log.error('Error fetching public leagues:', error)
+      return []
+    }
+
+    if (!data) return []
+
+    type PublicLeagueJoin = LeagueRow & {
+      drafts: { id: string; is_public: boolean; format: string; name: string }
+      league_teams: Array<{ team: TeamRow }>
+    }
+
+    return (data as unknown as PublicLeagueJoin[]).map(row => ({
+      ...mapLeagueRow(row),
+      teams: row.league_teams.map((lt: { team: TeamRow }) => lt.team as unknown as Team),
+      teamCount: row.league_teams.length,
+      draftFormat: row.drafts.format,
+    }))
+  }
+
+  /**
    * Get league by draft ID
    */
   static async getLeagueByDraftId(draftId: string): Promise<League | null> {

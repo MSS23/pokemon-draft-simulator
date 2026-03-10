@@ -182,8 +182,8 @@ export default function DraftResultsPage() {
               <Home className="h-4 w-4" />
             </Link>
             <ChevronRight className="h-4 w-4 mx-2" />
-            <Link href="/draft-history" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-              Draft History
+            <Link href="/history" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              History
             </Link>
             <ChevronRight className="h-4 w-4 mx-2" />
             <span className="text-foreground font-medium">
@@ -197,7 +197,7 @@ export default function DraftResultsPage() {
           <div className="absolute top-0 left-0">
             <Button
               variant="outline"
-              onClick={() => router.push('/draft-history')}
+              onClick={() => router.push('/history')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
