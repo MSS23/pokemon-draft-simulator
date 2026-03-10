@@ -23,7 +23,9 @@ import { MatchKOService } from '@/lib/match-ko-service'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('MatchRecorderModal')
-import { Loader2, Trophy, AlertTriangle, Plus, Minus, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { Loader2, Trophy, AlertTriangle, Plus, Minus, Clock, CheckCircle2, XCircle, ChevronUp, ChevronDown } from 'lucide-react'
+import { PokemonSprite } from '@/components/ui/pokemon-sprite'
+import { Input } from '@/components/ui/input'
 import type { Match, Team, Pick } from '@/types'
 
 interface MatchRecorderModalProps {
@@ -49,6 +51,7 @@ interface PokemonKO {
   pokemonId: string
   pokemonName: string
   koCount: number
+  faintedCount: number
   isDeath: boolean
 }
 
@@ -151,44 +154,53 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
     return null
   }
 
-  const addPokemonKO = (gameNumber: number, teamType: 'home' | 'away', pick: Pick) => {
+  /** Update a stat (koCount or faintedCount) for a Pokemon in a specific game */
+  const updatePokemonStat = (
+    gameNumber: number,
+    teamType: 'home' | 'away',
+    pick: Pick,
+    field: 'koCount' | 'faintedCount',
+    value: number
+  ) => {
+    const clamped = Math.max(0, value)
     setGameKOs(prev => {
       const gameData = prev[gameNumber] || { home: [], away: [] }
       const kos = gameData[teamType]
 
       const existing = kos.find(ko => ko.pickId === pick.id)
-      const updatedKOs = existing
-        ? kos.map(ko => ko.pickId === pick.id ? { ...ko, koCount: ko.koCount + 1 } : ko)
-        : [...kos, {
-            pickId: pick.id,
-            pokemonId: pick.pokemonId,
-            pokemonName: pick.pokemonName,
-            koCount: 1,
-            isDeath: false,
-          }]
-
-      return {
-        ...prev,
-        [gameNumber]: { ...gameData, [teamType]: updatedKOs },
+      if (existing) {
+        const updated = kos.map(ko =>
+          ko.pickId === pick.id ? { ...ko, [field]: clamped } : ko
+        )
+        // Remove entry if both counts are 0
+        const cleaned = updated.filter(ko => ko.koCount > 0 || ko.faintedCount > 0)
+        return { ...prev, [gameNumber]: { ...gameData, [teamType]: cleaned } }
+      } else if (clamped > 0) {
+        return {
+          ...prev,
+          [gameNumber]: {
+            ...gameData,
+            [teamType]: [...kos, {
+              pickId: pick.id,
+              pokemonId: pick.pokemonId,
+              pokemonName: pick.pokemonName,
+              koCount: field === 'koCount' ? clamped : 0,
+              faintedCount: field === 'faintedCount' ? clamped : 0,
+              isDeath: false,
+            }],
+          },
+        }
       }
+      return prev
     })
   }
 
-  const removePokemonKO = (gameNumber: number, teamType: 'home' | 'away', pickId: string) => {
-    setGameKOs(prev => {
-      const gameData = prev[gameNumber] || { home: [], away: [] }
-      const kos = gameData[teamType]
-
-      const existing = kos.find(ko => ko.pickId === pickId)
-      const updatedKOs = existing && existing.koCount > 1
-        ? kos.map(ko => ko.pickId === pickId ? { ...ko, koCount: ko.koCount - 1 } : ko)
-        : kos.filter(ko => ko.pickId !== pickId)
-
-      return {
-        ...prev,
-        [gameNumber]: { ...gameData, [teamType]: updatedKOs },
-      }
-    })
+  /** Get a Pokemon's current stat value for a game */
+  const getStatValue = (gameNumber: number, teamType: 'home' | 'away', pickId: string, field: 'koCount' | 'faintedCount'): number => {
+    const data = gameKOs[gameNumber]
+    if (!data) return 0
+    const ko = data[teamType].find(k => k.pickId === pickId)
+    return ko ? ko[field] : 0
   }
 
   /** Count total KOs across all games for a team */
@@ -198,6 +210,18 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
       const data = gameKOs[Number(gn)]
       if (data) {
         total += data[teamType].reduce((sum, ko) => sum + ko.koCount, 0)
+      }
+    }
+    return total
+  }
+
+  /** Count total faints across all games for a team */
+  const getTotalFaintedCount = (teamType: 'home' | 'away'): number => {
+    let total = 0
+    for (const gn of Object.keys(gameKOs)) {
+      const data = gameKOs[Number(gn)]
+      if (data) {
+        total += data[teamType].reduce((sum, ko) => sum + ko.faintedCount, 0)
       }
     }
     return total
@@ -296,9 +320,88 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   const canProceedToKOs = games.every(g => g.winnerTeamId !== null || g.isDnf)
   const matchWinner = calculateMatchWinner()
 
+  /** Render a single Pokemon row with KO and Fainted counters */
+  const renderPokemonRow = (pick: Pick, gameNumber: number, teamType: 'home' | 'away') => {
+    const kos = getStatValue(gameNumber, teamType, pick.id, 'koCount')
+    const fainted = getStatValue(gameNumber, teamType, pick.id, 'faintedCount')
+
+    return (
+      <div key={pick.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+        <PokemonSprite
+          pokemonId={pick.pokemonId}
+          pokemonName={pick.pokemonName}
+          className="w-10 h-10 object-contain shrink-0"
+          lazy={false}
+        />
+        <span className="text-sm font-medium capitalize flex-1 min-w-0 truncate">{pick.pokemonName}</span>
+
+        {/* KO Counter */}
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">KOs</span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => updatePokemonStat(gameNumber, teamType, pick, 'koCount', kos - 1)}
+              disabled={kos === 0}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+            <Input
+              type="number"
+              min={0}
+              value={kos}
+              onChange={e => updatePokemonStat(gameNumber, teamType, pick, 'koCount', parseInt(e.target.value) || 0)}
+              className="h-7 w-10 text-center text-sm font-bold p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => updatePokemonStat(gameNumber, teamType, pick, 'koCount', kos + 1)}
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Fainted Counter */}
+        <div className="flex flex-col items-center gap-0.5">
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Fainted</span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => updatePokemonStat(gameNumber, teamType, pick, 'faintedCount', fainted - 1)}
+              disabled={fainted === 0}
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+            <Input
+              type="number"
+              min={0}
+              value={fainted}
+              onChange={e => updatePokemonStat(gameNumber, teamType, pick, 'faintedCount', parseInt(e.target.value) || 0)}
+              className="h-7 w-10 text-center text-sm font-bold p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => updatePokemonStat(gameNumber, teamType, pick, 'faintedCount', fainted + 1)}
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   /** Render KO section for a single game */
   const renderGameKOSection = (gameNumber: number) => {
-    const data = gameKOs[gameNumber] || { home: [], away: [] }
     const gameResult = games.find(g => g.gameNumber === gameNumber)
     const gameWinner = gameResult?.winnerTeamId === match.homeTeamId
       ? match.homeTeam.name
@@ -312,95 +415,21 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
           </Badge>
         </div>
 
-        {/* Home Team KOs */}
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">{match.homeTeam.name}</CardTitle>
-            <CardDescription className="text-xs">Pokemon that fainted in Game {gameNumber}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="grid grid-cols-2 gap-1.5">
-              {homeTeamPicks.map(pick => (
-                <Button
-                  key={pick.id}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addPokemonKO(gameNumber, 'home', pick)}
-                  className="justify-start text-xs h-8"
-                >
-                  <Plus className="h-3 w-3 mr-1 shrink-0" />
-                  <span className="truncate">{pick.pokemonName}</span>
-                </Button>
-              ))}
-            </div>
+        {/* Home Team */}
+        <div>
+          <h4 className="text-sm font-semibold mb-2">{match.homeTeam.name}</h4>
+          <div className="space-y-1.5">
+            {homeTeamPicks.map(pick => renderPokemonRow(pick, gameNumber, 'home'))}
+          </div>
+        </div>
 
-            {data.home.length > 0 && (
-              <div className="space-y-1 pt-2 border-t">
-                {data.home.map(ko => (
-                  <div key={ko.pickId} className="flex items-center justify-between p-1.5 bg-muted rounded-md">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{ko.pokemonName}</span>
-                      <Badge variant="secondary" className="text-xs">x{ko.koCount}</Badge>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => removePokemonKO(gameNumber, 'home', ko.pickId)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Away Team KOs */}
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">{match.awayTeam.name}</CardTitle>
-            <CardDescription className="text-xs">Pokemon that fainted in Game {gameNumber}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="grid grid-cols-2 gap-1.5">
-              {awayTeamPicks.map(pick => (
-                <Button
-                  key={pick.id}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addPokemonKO(gameNumber, 'away', pick)}
-                  className="justify-start text-xs h-8"
-                >
-                  <Plus className="h-3 w-3 mr-1 shrink-0" />
-                  <span className="truncate">{pick.pokemonName}</span>
-                </Button>
-              ))}
-            </div>
-
-            {data.away.length > 0 && (
-              <div className="space-y-1 pt-2 border-t">
-                {data.away.map(ko => (
-                  <div key={ko.pickId} className="flex items-center justify-between p-1.5 bg-muted rounded-md">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{ko.pokemonName}</span>
-                      <Badge variant="secondary" className="text-xs">x{ko.koCount}</Badge>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => removePokemonKO(gameNumber, 'away', ko.pickId)}
-                    >
-                      <Minus className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Away Team */}
+        <div>
+          <h4 className="text-sm font-semibold mb-2">{match.awayTeam.name}</h4>
+          <div className="space-y-1.5">
+            {awayTeamPicks.map(pick => renderPokemonRow(pick, gameNumber, 'away'))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -525,12 +554,12 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Pokemon Knockouts</h3>
                 <Badge variant="outline">
-                  {getTotalKOCount('home') + getTotalKOCount('away')} total KOs
+                  {getTotalKOCount('home') + getTotalKOCount('away')} KOs &middot; {getTotalFaintedCount('home') + getTotalFaintedCount('away')} Fainted
                 </Badge>
               </div>
 
               <p className="text-sm text-muted-foreground">
-                Record which Pokemon were KO&apos;d in each game.
+                Record KOs and faints for each Pokemon per game. Use the +/- buttons or type a value.
               </p>
 
               {/* Game tabs */}
@@ -539,7 +568,7 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
                   {playedGames.map(game => {
                     const data = gameKOs[game.gameNumber]
                     const gameKOCount = data
-                      ? data.home.reduce((s, k) => s + k.koCount, 0) + data.away.reduce((s, k) => s + k.koCount, 0)
+                      ? data.home.reduce((s, k) => s + k.koCount + k.faintedCount, 0) + data.away.reduce((s, k) => s + k.koCount + k.faintedCount, 0)
                       : 0
                     return (
                       <Button
@@ -623,7 +652,7 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
                     return d && (d.home.length > 0 || d.away.length > 0)
                   }) && (
                     <div className="border-t pt-4 mt-4 space-y-3">
-                      <Label className="text-sm font-semibold block">Pokemon Knockouts:</Label>
+                      <Label className="text-sm font-semibold block">Pokemon Stats:</Label>
                       {playedGames.map(game => {
                         const data = gameKOs[game.gameNumber]
                         if (!data || (data.home.length === 0 && data.away.length === 0)) return null
@@ -635,20 +664,24 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
                             <div className="grid grid-cols-2 gap-4">
                               <div>
                                 {data.home.length > 0 ? data.home.map(ko => (
-                                  <div key={ko.pickId} className="text-sm py-0.5">
-                                    {ko.pokemonName} <span className="text-muted-foreground">x{ko.koCount}</span>
+                                  <div key={ko.pickId} className="text-sm py-0.5 flex items-center gap-1.5">
+                                    <span className="capitalize">{ko.pokemonName}</span>
+                                    {ko.koCount > 0 && <Badge size="sm" variant="default">{ko.koCount} KO</Badge>}
+                                    {ko.faintedCount > 0 && <Badge size="sm" variant="destructive">{ko.faintedCount} fainted</Badge>}
                                   </div>
                                 )) : (
-                                  <div className="text-sm text-muted-foreground">No KOs</div>
+                                  <div className="text-sm text-muted-foreground">No activity</div>
                                 )}
                               </div>
                               <div>
                                 {data.away.length > 0 ? data.away.map(ko => (
-                                  <div key={ko.pickId} className="text-sm py-0.5">
-                                    {ko.pokemonName} <span className="text-muted-foreground">x{ko.koCount}</span>
+                                  <div key={ko.pickId} className="text-sm py-0.5 flex items-center gap-1.5">
+                                    <span className="capitalize">{ko.pokemonName}</span>
+                                    {ko.koCount > 0 && <Badge size="sm" variant="default">{ko.koCount} KO</Badge>}
+                                    {ko.faintedCount > 0 && <Badge size="sm" variant="destructive">{ko.faintedCount} fainted</Badge>}
                                   </div>
                                 )) : (
-                                  <div className="text-sm text-muted-foreground">No KOs</div>
+                                  <div className="text-sm text-muted-foreground">No activity</div>
                                 )}
                               </div>
                             </div>

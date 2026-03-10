@@ -387,15 +387,6 @@ export default function LeaguePage() {
                     })}
                   </div>
                 )}
-                {isCommissioner && (
-                  <button
-                    onClick={() => router.push(`/league/${leagueId}/rankings`)}
-                    className="w-full mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1.5"
-                  >
-                    <TrendingUp className="h-3 w-3" />
-                    Power Rankings
-                  </button>
-                )}
               </CardContent>
             </Card>
 
