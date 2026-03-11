@@ -25,7 +25,7 @@ import { LoadingScreen } from '@/components/ui/loading-states'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/contexts/AuthContext'
 // UserSessionService used for guest ID fallback
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
+import { RosterCard } from '@/components/pokemon/RosterCard'
 import {
   ArrowLeft,
   TrendingUp,
@@ -505,69 +505,21 @@ export default function TeamDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {picks.map(pick => {
                     const koStats = pokemonKOStats.get(pick.id)
-                    const kd = koStats ? (koStats.kills / Math.max(koStats.deaths, 1)) : null
                     return (
-                      <Card key={pick.id} className="overflow-hidden">
-                        <CardContent className="p-4">
-                          <div className="flex items-center gap-3">
-                            {/* Animated sprite */}
-                            <div className="flex-shrink-0 w-14 h-14 flex items-center justify-center">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={getPokemonAnimatedUrl(pick.pokemonId, pick.pokemonName)}
-                                alt={pick.pokemonName}
-                                className="w-14 h-14 pixelated"
-                                loading="lazy"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  if (!target.dataset.fallback) {
-                                    target.dataset.fallback = '1'
-                                    target.src = getPokemonAnimatedBackupUrl(pick.pokemonId)
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm">{formatPokemonName(pick.pokemonName)}</div>
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                Round {pick.round} • Pick #{pick.pickOrder}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                {/* Show cost only to owner and opponents, not spectators */}
-                                {viewerRole !== 'spectator' && (
-                                  <Badge variant="outline" size="sm">
-                                    {pick.cost} pts
-                                  </Badge>
-                                )}
-                                {koStats && koStats.matchesPlayed > 0 && (
-                                  <>
-                                    <Badge variant="secondary" size="sm">
-                                      {koStats.kills}K / {koStats.deaths}D
-                                    </Badge>
-                                    {kd !== null && (
-                                      <span className={`text-[10px] font-medium ${
-                                        kd >= 2 ? 'text-green-600 dark:text-green-400' :
-                                        kd >= 1 ? 'text-yellow-600 dark:text-yellow-400' :
-                                        'text-red-600 dark:text-red-400'
-                                      }`}>
-                                        {kd.toFixed(1)} K/D
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                              {koStats && koStats.matchesPlayed > 0 && (
-                                <div className="text-[10px] text-muted-foreground mt-0.5">
-                                  {koStats.matchesPlayed} matches • {(koStats.kills / koStats.matchesPlayed).toFixed(1)} KOs/match
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <RosterCard
+                        key={pick.id}
+                        pokemonId={pick.pokemonId}
+                        pokemonName={pick.pokemonName}
+                        cost={pick.cost}
+                        showCost={viewerRole !== 'spectator'}
+                        kills={koStats?.kills}
+                        deaths={koStats?.deaths}
+                        matchesPlayed={koStats?.matchesPlayed}
+                        subtitle={`Round ${pick.round} · Pick #${pick.pickOrder}`}
+                      />
                     )
                   })}
                 </div>
