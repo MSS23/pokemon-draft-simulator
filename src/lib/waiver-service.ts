@@ -44,7 +44,7 @@ export class WaiverService {
       .select('pokemon_id')
       .eq('draft_id', draftId)
 
-    if (error) throw new Error(`Failed to get drafted Pokemon: ${error.message}`)
+    if (error) throw new Error(`Failed to get drafted Pokemon: ${error?.message || 'Unknown error'}`)
 
     return new Set((data || []).map(p => p.pokemon_id))
   }
@@ -119,7 +119,7 @@ export class WaiverService {
       .select()
       .single()
 
-    if (error) throw new Error(`Failed to submit claim: ${error.message}`)
+    if (error) throw new Error(`Failed to submit claim: ${error?.message || 'Unknown error'}`)
 
     const claimRow = claim as WaiverClaimRow
 
@@ -227,7 +227,7 @@ export class WaiverService {
       .eq('league_id', leagueId)
       .order('created_at', { ascending: false })
 
-    if (error) throw new Error(`Failed to get waiver history: ${error.message}`)
+    if (error) throw new Error(`Failed to get waiver history: ${error?.message || 'Unknown error'}`)
 
     return ((data || []) as WaiverClaimRow[]).map(this.mapClaim)
   }
@@ -245,7 +245,7 @@ export class WaiverService {
       .eq('team_id', teamId)
       .in('status', ['completed', 'pending', 'approved'])
 
-    if (error) throw new Error(`Failed to count claims: ${error.message}`)
+    if (error) throw new Error(`Failed to count claims: ${error?.message || 'Unknown error'}`)
 
     return (count as number) || 0
   }
@@ -262,7 +262,7 @@ export class WaiverService {
       .eq('team_id', teamId)
       .order('pick_order', { ascending: true })
 
-    if (error) throw new Error(`Failed to get team picks: ${error.message}`)
+    if (error) throw new Error(`Failed to get team picks: ${error?.message || 'Unknown error'}`)
 
     return (data || []).map(p => ({
       id: p.id,
@@ -292,7 +292,7 @@ export class WaiverService {
       .eq('league_id', leagueId)
       .in('status', ['completed', 'in_progress'])
 
-    if (error) throw new Error(`Failed to check match status: ${error.message}`)
+    if (error) throw new Error(`Failed to check match status: ${error?.message || 'Unknown error'}`)
     return (count ?? 0) > 0
   }
 

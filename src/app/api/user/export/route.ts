@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 
   // Fetch all user data in parallel
   const [profile, participants, teams, picks, bids, wishlist] = await Promise.all([
-    supabase.from('user_profiles').select('*').eq('id', userId),
+    supabase.from('user_profiles').select('*').eq('user_id', userId),
     supabase.from('participants').select('*').eq('user_id', userId),
     supabase.from('teams').select('*').in('id',
       (await supabase.from('participants').select('team_id').eq('user_id', userId)).data?.map(p => p.team_id).filter(Boolean) || []

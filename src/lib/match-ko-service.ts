@@ -74,7 +74,7 @@ export class MatchKOService {
       .single()
 
     if (error) {
-      throw new Error(`Failed to record Pokemon KO: ${error.message}`)
+      throw new Error(`Failed to record Pokemon KO: ${error?.message || 'Unknown error'}`)
     }
 
     // If death, mark Pokemon as dead in status table
@@ -134,7 +134,7 @@ export class MatchKOService {
       .single()
 
     if (error) {
-      throw new Error(`Failed to mark Pokemon as dead: ${error.message}`)
+      throw new Error(`Failed to mark Pokemon as dead: ${error?.message || 'Unknown error'}`)
     }
 
     return this.mapToTeamPokemonStatus(data)
@@ -166,7 +166,7 @@ export class MatchKOService {
         // Not found - return null
         return null
       }
-      throw new Error(`Failed to get Pokemon status: ${error.message}`)
+      throw new Error(`Failed to get Pokemon status: ${error?.message || 'Unknown error'}`)
     }
 
     return this.mapToTeamPokemonStatus(data)
@@ -190,7 +190,7 @@ export class MatchKOService {
       .order('created_at', { ascending: true })
 
     if (error) {
-      throw new Error(`Failed to get match KOs: ${error.message}`)
+      throw new Error(`Failed to get match KOs: ${error?.message || 'Unknown error'}`)
     }
 
     return (data ?? []).map((ko: Record<string, unknown>) => ({
@@ -243,7 +243,7 @@ export class MatchKOService {
       })
 
     if (error) {
-      throw new Error(`Failed to initialize Pokemon status: ${error.message}`)
+      throw new Error(`Failed to initialize Pokemon status: ${error?.message || 'Unknown error'}`)
     }
   }
 
@@ -269,7 +269,7 @@ export class MatchKOService {
       .order('created_at', { ascending: true })
 
     if (error) {
-      throw new Error(`Failed to get team Pokemon statuses: ${error.message}`)
+      throw new Error(`Failed to get team Pokemon statuses: ${error?.message || 'Unknown error'}`)
     }
 
     return (data ?? []).map(this.mapToTeamPokemonStatus)
@@ -319,7 +319,7 @@ export class MatchKOService {
         throw new Error(`Failed to update Pokemon match stats: ${updateError.message}`)
       }
     } else if (error) {
-      throw new Error(`Failed to update Pokemon match stats: ${error.message}`)
+      throw new Error(`Failed to update Pokemon match stats: ${error?.message || 'Unknown error'}`)
     }
   }
 
@@ -420,7 +420,7 @@ export class MatchKOService {
       .limit(limit)
 
     if (error) {
-      throw new Error(`Failed to get KO leaderboard: ${error.message}`)
+      throw new Error(`Failed to get KO leaderboard: ${error?.message || 'Unknown error'}`)
     }
 
     const records = (data ?? []) as unknown as LeaderboardRecord[]
@@ -504,7 +504,7 @@ export class MatchKOService {
       .order('death_date', { ascending: false })
 
     if (error) {
-      throw new Error(`Failed to get dead Pokemon: ${error.message}`)
+      throw new Error(`Failed to get dead Pokemon: ${error?.message || 'Unknown error'}`)
     }
 
     return (data ?? []).map(this.mapToTeamPokemonStatus)

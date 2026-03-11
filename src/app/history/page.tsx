@@ -128,6 +128,7 @@ export default function HistoryPage() {
       return
     }
     loadAllHistory(user.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user])
 
   async function loadAllHistory(userId: string) {

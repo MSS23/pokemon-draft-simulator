@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
+import { canTrade, formatTradeDeadline } from '@/lib/trade-deadline'
 
 const log = createLogger('TradesPage')
 
@@ -227,13 +228,25 @@ export default function TradesPage() {
     [trades]
   )
 
-  // Trade deadline check
-  const isPastDeadline = useMemo(() => {
-    if (!settings.tradeDeadlineWeek || !league) return false
-    return league.currentWeek > settings.tradeDeadlineWeek
-  }, [settings.tradeDeadlineWeek, league])
+  // Trade deadline check (weekly Sunday + season deadline + admin override)
+  const tradeEligibility = useMemo(() => {
+    if (!league) return { allowed: false, reason: 'Loading...' }
+    return canTrade({
+      enableTrades: settings.enableTrades,
+      weeklyTradeDeadline: settings.weeklyTradeDeadline,
+      tradeDeadlineWeek: settings.tradeDeadlineWeek,
+      currentWeek: league.currentWeek,
+      isCommissioner,
+      adminOverrideTradeDeadline: settings.adminOverrideTradeDeadline,
+    })
+  }, [settings, league, isCommissioner])
 
-  const canPropose = userTeamId && settings.enableTrades !== false && !isPastDeadline
+  const tradeDeadlineDisplay = useMemo(() => {
+    if (settings.weeklyTradeDeadline !== false) return formatTradeDeadline()
+    return null
+  }, [settings.weeklyTradeDeadline])
+
+  const canPropose = userTeamId && tradeEligibility.allowed
 
   const toggleMyGive = useCallback((pickId: string) => {
     setMyGives(prev => {
@@ -482,7 +495,13 @@ export default function TradesPage() {
           <div className="flex-1">
             <h1 className="text-xl font-bold">Trade Center</h1>
             <p className="text-sm text-muted-foreground">
-              {league.name}{isPastDeadline && ' (Trade deadline passed)'}
+              {league.name}
+              {!tradeEligibility.allowed && tradeEligibility.reason && (
+                <span className="text-destructive"> ({tradeEligibility.reason})</span>
+              )}
+              {tradeDeadlineDisplay && tradeEligibility.allowed && (
+                <span className="text-muted-foreground"> &middot; {tradeDeadlineDisplay}</span>
+              )}
             </p>
           </div>
         </div>

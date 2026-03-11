@@ -932,11 +932,11 @@ export class DraftService {
       log.error('Error updating draft status:', error)
 
       // Check if it's an RLS policy error
-      if (error.code === '42501' || error.message?.includes('policy')) {
+      if (error.code === '42501' || error?.message?.includes('policy')) {
         throw new Error('Permission denied: You do not have permission to start this draft')
       }
 
-      throw new Error(`Failed to start draft: ${error.message || 'Unknown error'}`)
+      throw new Error(`Failed to start draft: ${error?.message || 'Unknown error'}`)
     }
 
     log.info('Draft started successfully:', { draftId: draftUuid, roomCode: roomCodeOrDraftId })
@@ -1011,7 +1011,7 @@ export class DraftService {
 
     if (error) {
       log.error('Database RPC error:', error)
-      throw new Error(error.message || 'Failed to make pick')
+      throw new Error(error?.message || 'Failed to make pick')
     }
 
     // The function returns a JSONB object with success/error info
@@ -1122,7 +1122,7 @@ export class DraftService {
 
     if (error) {
       log.error('Error looking up participant:', error)
-      throw new Error(`Failed to look up participant: ${error.message}`)
+      throw new Error(`Failed to look up participant: ${error?.message || 'Unknown error'}`)
     }
 
     if (!participant) {
@@ -2552,7 +2552,7 @@ export class DraftService {
     } catch (error) {
       log.error(`Auto-skip failed for draft ${draftId}:`, error)
       // Re-throw only if it's not a "not found" error
-      if (error instanceof Error && !error.message.includes('not found')) {
+      if (error instanceof Error && !error.message?.includes('not found')) {
         throw error
       }
     }
@@ -2585,6 +2585,7 @@ export class DraftService {
       .from('drafts')
       .select('*, teams(count)')
       .eq('is_public', true)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 

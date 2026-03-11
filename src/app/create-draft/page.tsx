@@ -169,7 +169,7 @@ export default function CreateDraftPage() {
     }
   };
 
-  const handleDownloadTemplate = () => {
+  const _handleDownloadTemplate = () => {
     const template = createCustomFormatTemplate();
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");

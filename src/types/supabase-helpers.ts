@@ -157,7 +157,7 @@ export interface DraftSettings {
  */
 export interface LeagueSettings {
   /** Match format (best of 1, 3, or 5) */
-  matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+  matchFormat?: 'best_of_1' | 'best_of_3'
   /** Points awarded for a win */
   pointsPerWin?: number
   /** Points awarded for a draw */

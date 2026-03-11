@@ -46,7 +46,7 @@ export class CommissionerService {
       })
       .eq('id', matchId)
 
-    if (error) throw new Error(`Failed to override match: ${error.message}`)
+    if (error) throw new Error(`Failed to override match: ${error?.message || 'Unknown error'}`)
 
     // Get league ID to recalculate standings
     const { data: match } = await supabase
@@ -159,7 +159,7 @@ export class CommissionerService {
       })
       .eq('id', leagueId)
 
-    if (error) throw new Error(`Failed to post announcement: ${error.message}`)
+    if (error) throw new Error(`Failed to post announcement: ${error?.message || 'Unknown error'}`)
   }
 
   /**
@@ -180,7 +180,7 @@ export class CommissionerService {
       })
       .eq('id', leagueId)
 
-    if (error) throw new Error(`Failed to delete announcement: ${error.message}`)
+    if (error) throw new Error(`Failed to delete announcement: ${error?.message || 'Unknown error'}`)
   }
 
   /**
@@ -203,7 +203,7 @@ export class CommissionerService {
       })
       .eq('id', leagueId)
 
-    if (error) throw new Error(`Failed to toggle pin: ${error.message}`)
+    if (error) throw new Error(`Failed to toggle pin: ${error?.message || 'Unknown error'}`)
   }
 
   /**
@@ -237,7 +237,7 @@ export class CommissionerService {
       .eq('league_id', leagueId)
       .eq('team_id', teamId)
 
-    if (error) throw new Error(`Failed to adjust standings: ${error.message}`)
+    if (error) throw new Error(`Failed to adjust standings: ${error?.message || 'Unknown error'}`)
 
     log.info(`Standings adjusted for team ${teamId}: +${winsAdjust}W, +${lossesAdjust}L`)
   }
@@ -278,7 +278,7 @@ export class CommissionerService {
       .eq('league_id', leagueId)
       .order('week_number', { ascending: true })
 
-    if (error) throw new Error(`Failed to get matches: ${error.message}`)
+    if (error) throw new Error(`Failed to get matches: ${error?.message || 'Unknown error'}`)
 
     return ((data || []) as unknown as MatchWithTeams[]).map(m => ({
       id: m.id,

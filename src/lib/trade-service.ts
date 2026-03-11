@@ -59,7 +59,7 @@ export class TradeService {
 
     if (error) {
       log.error('Failed to fetch trades:', error)
-      throw new Error('Failed to fetch trades: ' + error.message)
+      throw new Error('Failed to fetch trades: ' + error?.message || 'Unknown error')
     }
 
     if (!data || data.length === 0) return []
@@ -123,7 +123,7 @@ export class TradeService {
 
     if (error) {
       log.error('Failed to propose trade:', error)
-      throw new Error('Failed to propose trade: ' + error.message)
+      throw new Error('Failed to propose trade: ' + error?.message || 'Unknown error')
     }
 
     // Broadcast to league channel
@@ -159,7 +159,7 @@ export class TradeService {
 
     if (error) {
       log.error('Failed to respond to trade:', error)
-      throw new Error('Failed to respond to trade: ' + error.message)
+      throw new Error('Failed to respond to trade: ' + error?.message || 'Unknown error')
     }
 
     // If accepted and no commissioner approval needed, execute immediately
@@ -283,7 +283,7 @@ export class TradeService {
 
     if (error) {
       log.error('Failed to cancel trade:', error)
-      throw new Error('Failed to cancel trade: ' + error.message)
+      throw new Error('Failed to cancel trade: ' + error?.message || 'Unknown error')
     }
 
     this.broadcastTradeUpdate(data.league_id, 'cancelled', tradeId)
@@ -305,7 +305,7 @@ export class TradeService {
 
     if (error) {
       log.error('Failed to fetch pending trades:', error)
-      throw new Error('Failed to fetch pending trades: ' + error.message)
+      throw new Error('Failed to fetch pending trades: ' + error?.message || 'Unknown error')
     }
 
     return (data || []) as TradeWithDetails[]
@@ -340,7 +340,7 @@ export class TradeService {
 
       if (error) {
         log.error('Failed to approve trade:', error)
-        throw new Error('Failed to approve trade: ' + error.message)
+        throw new Error('Failed to approve trade: ' + error?.message || 'Unknown error')
       }
 
       // Execute the pick swap (sets status → 'completed' on success)
@@ -364,7 +364,7 @@ export class TradeService {
 
       if (error) {
         log.error('Failed to reject trade:', error)
-        throw new Error('Failed to reject trade: ' + error.message)
+        throw new Error('Failed to reject trade: ' + error?.message || 'Unknown error')
       }
 
       this.broadcastTradeUpdate(data.league_id, 'rejected', tradeId)
@@ -432,7 +432,7 @@ export class TradeService {
 
     if (error) {
       log.error('Failed to create counter trade:', error)
-      throw new Error('Failed to create counter trade: ' + error.message)
+      throw new Error('Failed to create counter trade: ' + error?.message || 'Unknown error')
     }
 
     const leagueId = data.league_id
@@ -487,7 +487,7 @@ export class TradeService {
 
     if (error) {
       log.error('Failed to create hijack trade:', error)
-      throw new Error('Failed to create hijack trade: ' + error.message)
+      throw new Error('Failed to create hijack trade: ' + error?.message || 'Unknown error')
     }
 
     this.broadcastTradeUpdate(originalTrade.league_id, 'hijacked', data.id)

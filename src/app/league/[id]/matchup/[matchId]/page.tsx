@@ -247,8 +247,7 @@ export default function MatchupPreviewPage() {
 
   const homeColors = teamColorMap.get(match.homeTeamId)
   const awayColors = teamColorMap.get(match.awayTeamId)
-  const isCurrentWeek = match.weekNumber === league.currentWeek
-  const canRecord = match.status === 'scheduled' && isCurrentWeek && !!currentUserTeamId
+  const canRecord = (match.status === 'scheduled' || match.status === 'in_progress') && !!currentUserTeamId
 
   return (
     <div className="min-h-screen bg-background">

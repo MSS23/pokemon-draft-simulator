@@ -42,7 +42,7 @@ export function CreateLeagueModal({
 }: CreateLeagueModalProps) {
   const [leagueName, setLeagueName] = useState(`${draftName} Season 1`)
   const [totalWeeks, setTotalWeeks] = useState(10)
-  const [matchFormat, setMatchFormat] = useState<'best_of_1' | 'best_of_3' | 'best_of_5'>('best_of_3')
+  const [matchFormat, setMatchFormat] = useState<'best_of_1' | 'best_of_3'>('best_of_3')
   const [splitConferences, setSplitConferences] = useState(false)
   const [freeAgentPicksAllowed, setFreeAgentPicksAllowed] = useState(3)
   const [isCreating, setIsCreating] = useState(false)
@@ -148,14 +148,13 @@ export function CreateLeagueModal({
               <Swords className="h-4 w-4" />
               Match Format
             </Label>
-            <Select value={matchFormat} onValueChange={(v) => setMatchFormat(v as 'best_of_1' | 'best_of_3' | 'best_of_5')}>
+            <Select value={matchFormat} onValueChange={(v) => setMatchFormat(v as 'best_of_1' | 'best_of_3')}>
               <SelectTrigger id="match-format">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="best_of_1">Best of 1 (single game)</SelectItem>
                 <SelectItem value="best_of_3">Best of 3 (recommended)</SelectItem>
-                <SelectItem value="best_of_5">Best of 5 (competitive)</SelectItem>
               </SelectContent>
             </Select>
           </div>

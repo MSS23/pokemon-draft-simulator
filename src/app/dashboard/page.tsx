@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/lib/supabase'
@@ -8,12 +8,18 @@ import type { DraftSettings } from '@/types/supabase-helpers'
 import type { League, Match, Team } from '@/types'
 import { LeagueService } from '@/lib/league-service'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
-import { Loader2, Plus, Users, Trophy, Zap, Swords, Shield, ChevronRight, CalendarDays, Trash2, MapPin, Eye } from 'lucide-react'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import {
+  Loader2, Plus, Users, Trophy, Zap, Swords, Shield,
+  ChevronRight, Trash2, Eye, TrendingUp, Clock, Crown
+} from 'lucide-react'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { notify } from '@/lib/notifications'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
@@ -21,7 +27,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
-import { TOUR_OPEN_EVENT } from '@/components/tour/TourGuide'
 import { motion } from 'framer-motion'
 
 const log = createLogger('Dashboard')
@@ -121,6 +126,15 @@ function buildDraftSummaries(
   })
 }
 
+/* ── Fade-in animation helpers ── */
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0,
+    transition: { delay: i * 0.06, duration: 0.4, type: 'spring' as const, damping: 24 },
+  }),
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -133,16 +147,15 @@ export default function DashboardPage() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null)
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
 
-  const handleDeleteLeague = async (leagueId: string) => {
+  const handleDeleteLeague = useCallback(async (leagueId: string) => {
     if (!user) return
     try {
-      // Find the draft associated with this league before deleting
       const leagueDraftId = leagueStandings.find(s => s.league.id === leagueId)?.league.draftId
       await LeagueService.deleteLeague(leagueId, user.id)
       setLeagueStandings(prev => prev.filter(s => s.league.id !== leagueId))
       setUpcomingMatches(prev => prev.filter(m => m.league.id !== leagueId))
-      // Also remove the associated draft from the dashboard
       if (leagueDraftId) {
         setDrafts(prev => prev.filter(d => d.draft_id !== leagueDraftId))
       }
@@ -152,8 +165,9 @@ export default function DashboardPage() {
     } finally {
       setDeletingLeagueId(null)
     }
-  }
-  const handleDeleteDraft = async (draftId: string, roomCode: string) => {
+  }, [user, leagueStandings])
+
+  const handleDeleteDraft = useCallback(async (draftId: string, roomCode: string) => {
     if (!user) return
     try {
       const { DraftService } = await import('@/lib/draft-service')
@@ -165,26 +179,16 @@ export default function DashboardPage() {
     } finally {
       setDeletingDraftId(null)
     }
-  }
-
-  const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
+  }, [user])
 
   useEffect(() => {
     const loadDashboardData = async () => {
       if (authLoading) return
-      if (!user) {
-        setLoading(false)
-        return
-      }
+      if (!user) { setLoading(false); return }
 
       try {
-        if (!supabase) {
-          setDrafts([])
-          setLoading(false)
-          return
-        }
+        if (!supabase) { setDrafts([]); setLoading(false); return }
 
-        // Fetch teams with their draft data
         const { data: userTeams, error: teamsError } = await supabase
           .from('teams')
           .select(`
@@ -197,23 +201,16 @@ export default function DashboardPage() {
 
         if (teamsError) {
           setFetchError(`Failed to load your drafts: ${teamsError.message}`)
-          setDrafts([])
-          setLoading(false)
-          return
+          setDrafts([]); setLoading(false); return
         }
 
         const teams = (userTeams ?? []) as unknown as TeamWithDraft[]
-
-        // Batch-query pick counts for all user teams
         const teamIds = teams.map(t => t.id)
         let pickCounts: Record<string, number> = {}
 
         if (teamIds.length > 0) {
           const { data: picks, error: picksError } = await supabase
-            .from('picks')
-            .select('team_id')
-            .in('team_id', teamIds)
-
+            .from('picks').select('team_id').in('team_id', teamIds)
           if (!picksError && picks) {
             pickCounts = picks.reduce<Record<string, number>>((acc, pick) => {
               acc[pick.team_id] = (acc[pick.team_id] ?? 0) + 1
@@ -226,7 +223,7 @@ export default function DashboardPage() {
         const draftSummaries = buildDraftSummaries(teams, pickCounts, user.id)
         setDrafts(draftSummaries)
 
-        // Fetch spectated drafts (participant with no team)
+        // Spectated drafts
         const participantDraftIds = new Set(draftSummaries.map(d => d.draft_id))
         const { data: spectatorRows } = await supabase
           .from('participants')
@@ -248,7 +245,7 @@ export default function DashboardPage() {
           setSpectatedDrafts(unique)
         }
 
-        // Load league data in parallel
+        // League data
         try {
           const [matches, standings] = await Promise.all([
             LeagueService.getUpcomingMatches(user.id),
@@ -258,7 +255,6 @@ export default function DashboardPage() {
           setLeagueStandings(standings)
         } catch (err) {
           log.error('Failed to load league data:', err)
-          // Non-fatal: leagues section just won't show
         }
       } catch {
         setFetchError('An unexpected error occurred. Please try again.')
@@ -271,6 +267,7 @@ export default function DashboardPage() {
     loadDashboardData()
   }, [authLoading, user])
 
+  /* ── Loading ── */
   if (authLoading || loading) {
     return (
       <SidebarLayout>
@@ -281,138 +278,65 @@ export default function DashboardPage() {
     )
   }
 
+  /* ── Not authenticated ── */
   if (!user) {
     return (
       <SidebarLayout>
         <div className="min-h-[60vh] flex items-center justify-center p-8">
-          <Card className="max-w-sm w-full">
-            <CardHeader className="text-center">
-              <CardTitle className="text-lg">Sign in to continue</CardTitle>
-              <CardDescription>
-                View your drafts and league activity
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button className="w-full" onClick={() => setAuthModalOpen(true)}>
+          <Card className="max-w-sm w-full text-center">
+            <CardContent className="pt-8 pb-6 px-6 space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Trophy className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Sign in to continue</h2>
+                <p className="text-sm text-muted-foreground mt-1">View your drafts and league activity.</p>
+              </div>
+              <Button variant="brand" className="w-full" onClick={() => setAuthModalOpen(true)}>
                 Sign In
               </Button>
             </CardContent>
           </Card>
-          <AuthModal
-            isOpen={authModalOpen}
-            onClose={() => setAuthModalOpen(false)}
-            redirectTo="/dashboard"
-          />
+          <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} redirectTo="/dashboard" />
         </div>
       </SidebarLayout>
     )
   }
 
-  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User'
+  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Trainer'
   const activeDrafts = drafts.filter(d => d.status === 'active' || d.status === 'setup')
   const completedDrafts = drafts.filter(d => d.status === 'completed')
-
-  // Aggregate league W-L across all leagues
   const totalWins = leagueStandings.reduce((sum, s) => sum + s.wins, 0)
   const totalLosses = leagueStandings.reduce((sum, s) => sum + s.losses, 0)
   const activeLeagueCount = leagueStandings.filter(s => s.league.status === 'active').length
+  const winRate = totalWins + totalLosses > 0
+    ? Math.round((totalWins / (totalWins + totalLosses)) * 100)
+    : null
 
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+  /* ── Status badge helper ── */
+  const statusBadge = (status: string) => {
+    const map: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'success' | 'live' }> = {
       setup: { label: 'Setup', variant: 'outline' },
-      active: { label: 'Active', variant: 'default' },
+      active: { label: 'Live', variant: 'live' },
       completed: { label: 'Completed', variant: 'secondary' },
       paused: { label: 'Paused', variant: 'outline' },
-      scheduled: { label: 'Starts Soon', variant: 'outline' }
-    }
-    const c = config[status] || config.setup
-    return <Badge variant={c.variant} size="sm">{c.label}</Badge>
-  }
-
-  const getMatchStatusBadge = (status: string) => {
-    const config: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
       scheduled: { label: 'Scheduled', variant: 'outline' },
-      in_progress: { label: 'Live', variant: 'default' },
-      completed: { label: 'Done', variant: 'secondary' },
-      cancelled: { label: 'Cancelled', variant: 'outline' },
+      in_progress: { label: 'In Progress', variant: 'live' },
     }
-    const c = config[status] || config.scheduled
+    const c = map[status] || map.setup
     return <Badge variant={c.variant} size="sm">{c.label}</Badge>
   }
 
-  const DraftCard = ({ draft, index = 0 }: { draft: DraftSummary; index?: number }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.07, duration: 0.38, type: 'spring', damping: 22 }}
-    >
-    <Card
-      className="card-interactive"
-      onClick={() => router.push(`/draft/${draft.room_code.toLowerCase()}`)}
-    >
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-medium text-sm truncate">{draft.draft_name}</p>
-              {draft.is_host && <Badge variant="host" size="sm" className="shrink-0">Host</Badge>}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              <span className="font-mono">{draft.room_code}</span> &middot; {draft.user_team_name}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {getStatusBadge(draft.status)}
-            {draft.is_host && (
-              <button
-                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                title="Delete draft"
-                onClick={(e) => { e.stopPropagation(); setDeletingDraftId(draft.draft_id) }}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {draft.status !== 'setup' && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Progress</span>
-              <span className="font-medium text-foreground">{draft.progress_percent}%</span>
-            </div>
-            <Progress value={draft.progress_percent} className="h-1.5" />
-          </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div>
-            <p className="text-xs text-muted-foreground">Picks</p>
-            <p className="text-sm font-semibold">{draft.picks_made}/{draft.pokemon_per_team}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Budget</p>
-            <p className="text-sm font-semibold">{draft.budget_remaining}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Format</p>
-            <p className="text-sm font-semibold capitalize">{draft.format}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-    </motion.div>
-  )
-
-  const PokemonGifRow = ({ picks, maxShow = 6 }: { picks: { pokemonId: string; pokemonName: string }[]; maxShow?: number }) => (
-    <div className="flex items-center justify-center gap-0.5">
-      {picks.slice(0, maxShow).map((p) => (
+  /* ── Pokemon sprite row ── */
+  const SpriteRow = ({ picks, max = 6 }: { picks: { pokemonId: string; pokemonName: string }[]; max?: number }) => (
+    <div className="flex items-center gap-0.5">
+      {picks.slice(0, max).map((p) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           key={p.pokemonId}
           src={getPokemonAnimatedUrl(p.pokemonId, p.pokemonName)}
           alt={p.pokemonName}
-          className="w-8 h-8 pixelated"
+          className="w-7 h-7 pixelated"
           loading="lazy"
           onError={(e) => {
             const target = e.target as HTMLImageElement
@@ -426,240 +350,414 @@ export default function DashboardPage() {
     </div>
   )
 
-  const MatchupCard = ({ matchup }: { matchup: UpcomingMatch }) => {
-    const isHome = matchup.match.homeTeamId === matchup.userTeamId
-    const userScore = isHome ? matchup.match.homeScore : matchup.match.awayScore
-    const opponentScore = isHome ? matchup.match.awayScore : matchup.match.homeScore
-
-    return (
-      <Card
-        className="card-interactive"
-        onClick={() => router.push(`/league/${matchup.league.id}/team/${matchup.opponentTeamId}`)}
-      >
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground truncate">
-              {matchup.league.name}
-            </p>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" size="sm">
-                Week {matchup.league.currentWeek}/{matchup.league.totalWeeks}
-              </Badge>
-              {getMatchStatusBadge(matchup.match.status)}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-4">
-            <div className="flex-1 text-right space-y-1">
-              <p className="text-sm font-semibold truncate">{matchup.userTeamName}</p>
-              <PokemonGifRow picks={matchup.userTeamPicks} />
-            </div>
-
-            {matchup.match.status === 'completed' ? (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-muted/50 shrink-0">
-                <span className="text-lg font-bold tabular-nums">{userScore}</span>
-                <span className="text-xs text-muted-foreground">-</span>
-                <span className="text-lg font-bold tabular-nums">{opponentScore}</span>
-              </div>
-            ) : (
-              <div className="px-3 py-1.5 shrink-0">
-                <Swords className="h-5 w-5 text-muted-foreground" />
-              </div>
-            )}
-
-            <div className="flex-1 text-left space-y-1">
-              <p className="text-sm font-semibold truncate">{matchup.opponentTeamName}</p>
-              <PokemonGifRow picks={matchup.opponentTeamPicks} />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <button
-              className="text-[10px] text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
-              onClick={(e) => {
-                e.stopPropagation()
-                router.push(`/league/${matchup.league.id}/schedule`)
-              }}
-            >
-              <CalendarDays className="h-3 w-3" />
-              {matchup.match.scheduledDate
-                ? new Date(matchup.match.scheduledDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-                : 'Full Schedule'}
-            </button>
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-              View opponent&apos;s team <ChevronRight className="h-3 w-3" />
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <SidebarLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {/* Header */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+        {/* ═══════════════════ Header ═══════════════════ */}
         <motion.div
-          className="flex items-start justify-between gap-4"
-          initial={{ opacity: 0, y: -10 }}
+          className="flex flex-col sm:flex-row sm:items-end justify-between gap-3"
+          initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.35 }}
         >
           <div>
-            <h1 className="text-2xl font-bold">Welcome back, {displayName}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage your drafts and leagues.
-            </p>
+            <p className="text-sm text-muted-foreground">Welcome back,</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{displayName}</h1>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.dispatchEvent(new CustomEvent(TOUR_OPEN_EVENT))}
-            className="shrink-0 gap-1.5"
-          >
-            <MapPin className="h-3.5 w-3.5" />
-            Take a Tour
-          </Button>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/join-draft">Join Draft</Link>
+            </Button>
+            <Button size="sm" variant="brand" asChild>
+              <Link href="/create-draft">
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                New Draft
+              </Link>
+            </Button>
+          </div>
         </motion.div>
 
-        {/* Error */}
+        {/* ═══════════════════ Error ═══════════════════ */}
         {fetchError && (
-          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <p className="text-sm font-medium text-destructive">{fetchError}</p>
+          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+            {fetchError}
           </div>
         )}
 
-        {/* Stats */}
-        <div id="tour-stats" className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* ═══════════════════ Stat Cards ═══════════════════ */}
+        <div id="tour-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            { icon: Trophy,  bg: 'bg-primary/10',  iconColor: 'text-primary',  label: 'Total Drafts',   value: String(drafts.length) },
-            { icon: Zap,     bg: 'bg-success/10',  iconColor: 'text-success',  label: 'Active Drafts',  value: String(activeDrafts.length) },
-            { icon: Shield,  bg: 'bg-info/10',     iconColor: 'text-info',     label: 'Active Leagues', value: String(activeLeagueCount) },
-            { icon: Users,   bg: 'bg-accent/10',   iconColor: 'text-accent',   label: 'League W-L',     value: totalWins + totalLosses > 0 ? `${totalWins}-${totalLosses}` : '-' },
+            {
+              icon: Trophy, label: 'Total Drafts', value: String(drafts.length),
+              accent: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10',
+            },
+            {
+              icon: Zap, label: 'Active Now', value: String(activeDrafts.length),
+              accent: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10',
+            },
+            {
+              icon: Shield, label: 'Leagues', value: String(activeLeagueCount),
+              accent: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10',
+            },
+            {
+              icon: TrendingUp, label: 'Win Rate',
+              value: winRate !== null ? `${winRate}%` : '-',
+              sub: totalWins + totalLosses > 0 ? `${totalWins}W ${totalLosses}L` : undefined,
+              accent: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-500/10',
+            },
           ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08, duration: 0.4, type: 'spring', damping: 22 }}
-            >
-              <Card className="hover:shadow-md transition-shadow">
+            <motion.div key={stat.label} custom={i} variants={fadeUp} initial="hidden" animate="visible">
+              <Card className="relative overflow-hidden">
                 <CardContent className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className={`h-8 w-8 rounded-lg ${stat.bg} flex items-center justify-center flex-shrink-0`}>
-                      <stat.icon className={`h-4 w-4 ${stat.iconColor}`} />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`h-9 w-9 rounded-lg ${stat.bg} flex items-center justify-center`}>
+                      <stat.icon className={`h-[18px] w-[18px] ${stat.accent}`} />
                     </div>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
                   </div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {stat.label}
+                    {stat.sub && <span className="ml-1.5 text-foreground/60">({stat.sub})</span>}
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
           ))}
         </div>
 
-        {/* This Week's Matches */}
+        {/* ═══════════════════ Upcoming Matches ═══════════════════ */}
         {upcomingMatches.length > 0 && (
-          <Card id="tour-matches">
-            <CardHeader className="pb-3">
+          <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible">
+            <div className="space-y-3" id="tour-matches">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Swords className="h-4 w-4" />
-                  This Week&apos;s Matches
-                </CardTitle>
-                <Badge variant="secondary" size="sm">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Swords className="h-4 w-4 text-muted-foreground" />
+                  This Week
+                </h2>
+                <Badge variant="outline" size="sm">
                   {upcomingMatches.length} {upcomingMatches.length === 1 ? 'match' : 'matches'}
                 </Badge>
               </div>
-            </CardHeader>
-            <CardContent>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {upcomingMatches.map(matchup => (
-                  <MatchupCard key={matchup.match.id} matchup={matchup} />
-                ))}
+                {upcomingMatches.map(matchup => {
+                  const isHome = matchup.match.homeTeamId === matchup.userTeamId
+                  const userScore = isHome ? matchup.match.homeScore : matchup.match.awayScore
+                  const opponentScore = isHome ? matchup.match.awayScore : matchup.match.homeScore
+
+                  return (
+                    <Card
+                      key={matchup.match.id}
+                      className="card-interactive group"
+                      onClick={() => router.push(`/league/${matchup.league.id}/team/${matchup.opponentTeamId}`)}
+                    >
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground truncate max-w-[60%]">
+                            {matchup.league.name} &middot; Week {matchup.league.currentWeek}
+                          </p>
+                          {statusBadge(matchup.match.status)}
+                        </div>
+
+                        {/* VS layout */}
+                        <div className="flex items-center gap-3">
+                          {/* Your team */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{matchup.userTeamName}</p>
+                            <SpriteRow picks={matchup.userTeamPicks} />
+                          </div>
+
+                          {/* Score / VS */}
+                          {matchup.match.status === 'completed' ? (
+                            <div className="shrink-0 flex items-center gap-1.5 bg-muted/60 rounded-lg px-3 py-1.5">
+                              <span className="text-lg font-bold tabular-nums">{userScore}</span>
+                              <span className="text-muted-foreground text-xs">-</span>
+                              <span className="text-lg font-bold tabular-nums">{opponentScore}</span>
+                            </div>
+                          ) : (
+                            <div className="shrink-0 px-2">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase">vs</span>
+                            </div>
+                          )}
+
+                          {/* Opponent */}
+                          <div className="flex-1 min-w-0 text-right">
+                            <p className="text-sm font-semibold truncate">{matchup.opponentTeamName}</p>
+                            <div className="flex justify-end">
+                              <SpriteRow picks={matchup.opponentTeamPicks} />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                          View matchup <ChevronRight className="h-3 w-3 ml-0.5" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ═══════════════════ My Leagues ═══════════════════ */}
+        {leagueStandings.length > 0 && (
+          <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible">
+            <div className="space-y-3" id="tour-leagues">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4 text-muted-foreground" />
+                My Leagues
+              </h2>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {leagueStandings.map(standing => {
+                  const isCommissioner = standing.league.settings?.commissionerId === user?.id
+                  const totalGames = standing.wins + standing.losses + standing.draws
+                  const wPct = totalGames > 0 ? Math.round((standing.wins / totalGames) * 100) : 0
+
+                  return (
+                    <Card
+                      key={standing.league.id}
+                      className="card-interactive group"
+                      onClick={() => router.push(`/league/${standing.league.id}`)}
+                    >
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-sm truncate">{standing.league.name}</p>
+                              {isCommissioner && (
+                                <Crown className="h-3 w-3 text-amber-500 shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {standing.userTeamName} &middot; Week {standing.league.currentWeek}/{standing.league.totalWeeks}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {statusBadge(standing.league.status)}
+                            {isCommissioner && (
+                              <button
+                                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete league"
+                                onClick={(e) => { e.stopPropagation(); setDeletingLeagueId(standing.league.id) }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Stats row */}
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-xl font-bold tabular-nums">
+                              {standing.wins}-{standing.losses}
+                              {standing.draws > 0 && <span className="text-base">-{standing.draws}</span>}
+                            </span>
+                          </div>
+
+                          {standing.rank && (
+                            <Badge variant="outline" size="sm" className="tabular-nums">
+                              #{standing.rank}
+                            </Badge>
+                          )}
+
+                          {standing.currentStreak && (
+                            <span className={`text-xs font-semibold ${
+                              standing.currentStreak.startsWith('W') ? 'text-green-600 dark:text-green-400' :
+                              standing.currentStreak.startsWith('L') ? 'text-red-500 dark:text-red-400' :
+                              'text-muted-foreground'
+                            }`}>
+                              {standing.currentStreak}
+                            </span>
+                          )}
+
+                          <div className="flex-1" />
+                          <span className="text-xs text-muted-foreground tabular-nums">{wPct}% WR</span>
+                        </div>
+
+                        {/* Progress through season */}
+                        <Progress
+                          value={Math.round((standing.league.currentWeek / standing.league.totalWeeks) * 100)}
+                          className="h-1"
+                        />
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ═══════════════════ Empty league CTA ═══════════════════ */}
+        {leagueStandings.length === 0 && upcomingMatches.length === 0 && completedDrafts.length > 0 && (
+          <Card className="border-dashed">
+            <CardContent className="py-8 text-center space-y-2">
+              <Shield className="h-8 w-8 mx-auto text-muted-foreground/40" />
+              <p className="text-sm font-medium">No leagues yet</p>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                You have completed drafts. Create a league to start battling with your team.
+              </p>
             </CardContent>
           </Card>
         )}
 
-        {/* My Leagues */}
-        {leagueStandings.length > 0 && (
-          <Card id="tour-leagues">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  My Leagues
-                </CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {leagueStandings.map(standing => (
+        {/* ═══════════════════ My Drafts ═══════════════════ */}
+        <motion.div custom={6} variants={fadeUp} initial="hidden" animate="visible">
+          <div className="space-y-3" id="tour-drafts">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">My Drafts</h2>
+              {drafts.length > 0 && (
+                <span className="text-xs text-muted-foreground">{drafts.length} total</span>
+              )}
+            </div>
+
+            {drafts.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-12 text-center space-y-4">
+                  <div className="mx-auto w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Trophy className="h-7 w-7 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-semibold">No drafts yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Create your first draft to get started.</p>
+                  </div>
+                  <Button variant="brand" asChild>
+                    <Link href="/create-draft">
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Create Draft
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+                <TabsList>
+                  <TabsTrigger value="active">Active ({activeDrafts.length})</TabsTrigger>
+                  <TabsTrigger value="completed">Completed ({completedDrafts.length})</TabsTrigger>
+                  <TabsTrigger value="all">All ({drafts.length})</TabsTrigger>
+                </TabsList>
+
+                {(['active', 'completed', 'all'] as const).map(tab => {
+                  const list = tab === 'active' ? activeDrafts : tab === 'completed' ? completedDrafts : drafts
+                  return (
+                    <TabsContent key={tab} value={tab} className="mt-3">
+                      {list.length === 0 ? (
+                        <p className="text-center py-8 text-sm text-muted-foreground">
+                          No {tab === 'all' ? '' : tab} drafts.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                          {list.map((draft, i) => (
+                            <motion.div key={draft.draft_id} custom={i} variants={fadeUp} initial="hidden" animate="visible">
+                              <Card
+                                className="card-interactive group"
+                                onClick={() => router.push(`/draft/${draft.room_code.toLowerCase()}`)}
+                              >
+                                <CardContent className="p-4 space-y-3">
+                                  {/* Title row */}
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <p className="font-semibold text-sm truncate">{draft.draft_name}</p>
+                                        {draft.is_host && <Badge variant="host" size="sm" className="shrink-0">Host</Badge>}
+                                      </div>
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        <span className="font-mono">{draft.room_code}</span>
+                                        <span className="mx-1">&middot;</span>
+                                        {draft.user_team_name}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {statusBadge(draft.status)}
+                                      {draft.is_host && (
+                                        <button
+                                          className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                                          title="Delete draft"
+                                          onClick={(e) => { e.stopPropagation(); setDeletingDraftId(draft.draft_id) }}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Progress bar */}
+                                  {draft.status !== 'setup' && (
+                                    <div className="space-y-1">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">
+                                          {draft.picks_made}/{draft.pokemon_per_team} picks
+                                        </span>
+                                        <span className="font-medium tabular-nums">{draft.progress_percent}%</span>
+                                      </div>
+                                      <Progress value={draft.progress_percent} className="h-1.5" />
+                                    </div>
+                                  )}
+
+                                  {/* Stats row */}
+                                  <div className="flex items-center gap-4 text-xs">
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                      <Clock className="h-3 w-3" />
+                                      <span className="capitalize">{draft.format}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1 text-muted-foreground">
+                                      <Users className="h-3 w-3" />
+                                      <span>{draft.max_teams} teams</span>
+                                    </div>
+                                    <div className="flex-1" />
+                                    <span className="font-medium tabular-nums text-foreground">
+                                      {draft.budget_remaining} pts
+                                    </span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+                  )
+                })}
+              </Tabs>
+            )}
+          </div>
+        </motion.div>
+
+        {/* ═══════════════════ Spectating ═══════════════════ */}
+        {spectatedDrafts.filter(d => d.status !== 'completed').length > 0 && (
+          <motion.div custom={7} variants={fadeUp} initial="hidden" animate="visible">
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Eye className="h-4 w-4 text-muted-foreground" />
+                Spectating
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {spectatedDrafts.filter(d => d.status !== 'completed').map(d => (
                   <Card
-                    key={standing.league.id}
+                    key={d.draft_id}
                     className="card-interactive"
-                    onClick={() => router.push(`/league/${standing.league.id}`)}
+                    onClick={() => router.push(`/draft/${d.room_code.toLowerCase()}?spectator=true`)}
                   >
-                    <CardContent className="p-4 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{standing.league.name}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {standing.userTeamName}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {getStatusBadge(standing.league.status)}
-                          {standing.league.settings?.commissionerId === user?.id && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={(e) => { e.stopPropagation(); setDeletingLeagueId(standing.league.id) }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
+                    <CardContent className="p-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{d.draft_name}</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">{d.room_code}</p>
                       </div>
-                      <div className="grid grid-cols-4 gap-2 text-center">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Record</p>
-                          <p className="text-sm font-semibold">
-                            {standing.wins}-{standing.losses}{standing.draws > 0 ? `-${standing.draws}` : ''}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Week</p>
-                          <p className="text-sm font-semibold">
-                            {standing.league.currentWeek}/{standing.league.totalWeeks}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Rank</p>
-                          <p className="text-sm font-semibold">
-                            {standing.rank ? `#${standing.rank}` : '-'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Streak</p>
-                          <p className={`text-sm font-semibold ${
-                            standing.currentStreak?.startsWith('W') ? 'text-success' :
-                            standing.currentStreak?.startsWith('L') ? 'text-destructive' : ''
-                          }`}>
-                            {standing.currentStreak || '-'}
-                          </p>
-                        </div>
-                      </div>
+                      {statusBadge(d.status)}
                     </CardContent>
                   </Card>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </motion.div>
         )}
 
+        {/* ═══════════════════ Delete Dialogs ═══════════════════ */}
         <AlertDialog open={!!deletingLeagueId} onOpenChange={() => setDeletingLeagueId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -702,118 +800,7 @@ export default function DashboardPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* Spectating */}
-        {spectatedDrafts.filter(d => d.status !== 'completed').length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Eye className="h-4 w-4" />
-                Spectating
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {spectatedDrafts.filter(d => d.status !== 'completed').map(d => (
-                  <Card
-                    key={d.draft_id}
-                    className="card-interactive"
-                    onClick={() => router.push(`/draft/${d.room_code.toLowerCase()}?spectator=true`)}
-                  >
-                    <CardContent className="p-4 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{d.draft_name}</p>
-                        <p className="text-xs text-muted-foreground font-mono mt-0.5">{d.room_code}</p>
-                      </div>
-                      {getStatusBadge(d.status)}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Empty state for leagues */}
-        {leagueStandings.length === 0 && upcomingMatches.length === 0 && drafts.some(d => d.status === 'completed') && (
-          <Card>
-            <CardContent className="py-8 text-center space-y-2">
-              <Shield className="h-8 w-8 mx-auto text-muted-foreground/50" />
-              <p className="text-sm font-medium">No leagues yet</p>
-              <p className="text-xs text-muted-foreground">
-                Complete a draft and create a league to start battling.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Drafts */}
-        <Card id="tour-drafts">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">My Drafts</CardTitle>
-              <Button id="tour-new-draft" size="sm" asChild>
-                <Link href="/create-draft">
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  New Draft
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {drafts.length === 0 ? (
-              <div className="text-center py-12 space-y-3">
-                <Trophy className="h-10 w-10 mx-auto text-muted-foreground/50" />
-                <div>
-                  <p className="font-medium text-sm">No drafts yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Create your first draft to get started.</p>
-                </div>
-                <Button size="sm" asChild>
-                  <Link href="/create-draft">
-                    <Plus className="h-3.5 w-3.5 mr-1.5" />
-                    Create Draft
-                  </Link>
-                </Button>
-              </div>
-            ) : (
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-                <TabsList className="mb-4">
-                  <TabsTrigger value="active">Active ({activeDrafts.length})</TabsTrigger>
-                  <TabsTrigger value="completed">Completed ({completedDrafts.length})</TabsTrigger>
-                  <TabsTrigger value="all">All ({drafts.length})</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="active">
-                  {activeDrafts.length === 0 ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">No active drafts.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      {activeDrafts.map((draft, i) => <DraftCard key={draft.draft_id} draft={draft} index={i} />)}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="completed">
-                  {completedDrafts.length === 0 ? (
-                    <p className="text-center py-8 text-sm text-muted-foreground">No completed drafts.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      {completedDrafts.map((draft, i) => <DraftCard key={draft.draft_id} draft={draft} index={i} />)}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="all">
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {drafts.map((draft, i) => <DraftCard key={draft.draft_id} draft={draft} index={i} />)}
-                  </div>
-                </TabsContent>
-              </Tabs>
-            )}
-          </CardContent>
-        </Card>
       </div>
-
     </SidebarLayout>
   )
 }

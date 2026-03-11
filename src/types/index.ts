@@ -238,7 +238,7 @@ export interface League {
 }
 
 export interface LeagueSettings {
-  matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+  matchFormat?: 'best_of_1' | 'best_of_3'
   pointsPerWin?: number
   pointsPerDraw?: number
   playoffTeams?: number
@@ -355,6 +355,8 @@ export interface ExtendedLeagueSettings extends LeagueSettings {
   freeAgentPicksAllowed?: number // Max free agent picks allowed post-draft (before first game)
   enableTrades?: boolean // Allow trades between teams
   tradeDeadlineWeek?: number // Week after which trades are disabled
+  weeklyTradeDeadline?: boolean // Lock trades on Sunday (match day) each week
+  adminOverrideTradeDeadline?: boolean // Admin can bypass trade deadline
   requireCommissionerApproval?: boolean // Require commissioner to approve trades
 }
 

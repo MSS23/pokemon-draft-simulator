@@ -97,7 +97,7 @@ export class LeagueService {
       leagueName?: string
       totalWeeks: number
       startDate?: Date
-      matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+      matchFormat?: 'best_of_1' | 'best_of_3'
       maxMatchesPerWeek?: number
     }
   ): Promise<{ leagues: League[]; matches: Match[] }> {
@@ -215,7 +215,7 @@ export class LeagueService {
     config: {
       totalWeeks: number
       startDate?: Date
-      matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+      matchFormat?: 'best_of_1' | 'best_of_3'
       maxMatchesPerWeek?: number
     }
   ): Promise<League> {
@@ -282,7 +282,7 @@ export class LeagueService {
     config: {
       totalWeeks: number
       startDate?: Date
-      matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+      matchFormat?: 'best_of_1' | 'best_of_3'
       maxMatchesPerWeek?: number
     }
   ): Promise<Match[]> {
@@ -431,7 +431,7 @@ export class LeagueService {
     config: {
       totalWeeks: number
       startDate?: Date
-      matchFormat?: 'best_of_1' | 'best_of_3' | 'best_of_5'
+      matchFormat?: 'best_of_1' | 'best_of_3'
     }
   ): Promise<Match[]> {
     if (!supabase) throw new Error('Supabase not configured')
@@ -1008,6 +1008,8 @@ export class LeagueService {
       freeAgentPicksAllowed: s?.freeAgentPicksAllowed ?? 3,
       enableTrades: s?.enableTrades || false,
       tradeDeadlineWeek: s?.tradeDeadlineWeek ?? undefined,
+      weeklyTradeDeadline: s?.weeklyTradeDeadline ?? true,
+      adminOverrideTradeDeadline: s?.adminOverrideTradeDeadline ?? false,
       requireCommissionerApproval: s?.requireCommissionerApproval || false,
     }
   }
@@ -1073,7 +1075,7 @@ export class LeagueService {
       .eq('id', leagueId)
 
     if (error) {
-      throw new Error(`Failed to update league settings: ${error.message}`)
+      throw new Error(`Failed to update league settings: ${error?.message || 'Unknown error'}`)
     }
   }
 
@@ -1094,7 +1096,7 @@ export class LeagueService {
       .eq('id', leagueId)
 
     if (error) {
-      throw new Error(`Failed to save playoff state: ${error.message}`)
+      throw new Error(`Failed to save playoff state: ${error?.message || 'Unknown error'}`)
     }
   }
 
@@ -1662,7 +1664,7 @@ export class LeagueService {
       .eq('id', leagueId)
 
     if (error) {
-      throw new Error(`Failed to delete league: ${error.message}`)
+      throw new Error(`Failed to delete league: ${error?.message || 'Unknown error'}`)
     }
 
     // Also delete the associated draft so it no longer appears on the dashboard
