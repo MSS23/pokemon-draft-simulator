@@ -213,6 +213,18 @@ export class WaiverService {
       .eq('id', claimId)
 
     log.info(`Waiver claim ${claimId} processed: ${claim.claimed_pokemon_name} to team ${claim.team_id}`)
+
+    // Broadcast roster invalidation so league pages refresh
+    try {
+      const ch = supabase.channel(`league-roster-invalidate:${claim.league_id}`)
+      ch.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          ch.send({ type: 'broadcast', event: 'trade_update', payload: { event: 'waiver_completed', claimId } })
+            .catch(() => {})
+            .finally(() => supabase!.removeChannel(ch))
+        }
+      })
+    } catch { /* non-critical */ }
   }
 
   /**

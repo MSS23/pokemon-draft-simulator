@@ -7,7 +7,7 @@ import { Crown, User, Layers, Grid2x2 } from 'lucide-react'
 import { usePokemonList } from '@/hooks/usePokemon'
 import { Pokemon, TierDefinition } from '@/types'
 import { cn } from '@/lib/utils'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, getTypeColor } from '@/utils/pokemon'
 import { PokeballIcon } from '@/components/ui/pokeball-icon'
 import { getTeamColor } from '@/utils/team-colors'
 import { getPokemonTier } from '@/lib/tier-utils'
@@ -116,20 +116,26 @@ const TeamRoster = memo(function TeamRoster({
           <RosterCardStack pokemon={teamPokemon} />
         ) : (
           /* Grid view (default) */
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${maxPokemonPerTeam > 8 ? '56px' : '68px'}, 1fr))` }}>
             {teamPokemon.map((pokemon) => {
               const tier = isTiered && tierConfig ? getPokemonTier(pokemon.cost, tierConfig.tiers) : null
+              const primaryColor = getTypeColor(pokemon.types[0]?.name || 'normal')
+              const secondaryColor = pokemon.types[1] ? getTypeColor(pokemon.types[1].name) : primaryColor
               return (
                 <div
                   key={pokemon.id}
-                  className="relative group"
+                  className="relative group flex flex-col items-center rounded-lg p-1 pt-1.5 transition-all duration-200 hover:scale-105 hover:shadow-md"
+                  style={{
+                    background: `linear-gradient(135deg, ${primaryColor}18, ${secondaryColor}18)`,
+                    border: `1.5px solid ${primaryColor}30`,
+                  }}
                   title={tier ? `${pokemon.name} [${tier.name}]` : `${pokemon.name} (${pokemon.cost}pts)`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={getPokemonAnimatedUrl(pokemon.id, pokemon.name)}
                     alt={pokemon.name}
-                    className="w-11 h-11 sm:w-12 sm:h-12 bg-muted/30 rounded-xl border border-black/[0.06] dark:border-white/[0.08] hover:border-primary/50 transition-all duration-200 hover:scale-110 hover:shadow-md shadow-sm"
+                    className="w-10 h-10 sm:w-11 sm:h-11 drop-shadow-sm"
                     loading="lazy"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement
@@ -139,6 +145,21 @@ const TeamRoster = memo(function TeamRoster({
                       }
                     }}
                   />
+                  {/* Type dots */}
+                  <div className="flex items-center gap-0.5 mt-0.5">
+                    {pokemon.types.map((t) => (
+                      <span
+                        key={t.name}
+                        className="w-2 h-2 rounded-full shadow-sm"
+                        style={{ backgroundColor: getTypeColor(t.name) }}
+                        title={t.name}
+                      />
+                    ))}
+                  </div>
+                  {/* Name — hidden on small, visible on hover */}
+                  <span className="text-[9px] leading-tight font-medium text-foreground/70 truncate w-full text-center mt-0.5 hidden sm:block">
+                    {pokemon.name.split('-')[0]}
+                  </span>
                   {tier && (
                     <span
                       className="absolute -top-1 -right-1 text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center text-white shadow-sm"
@@ -147,15 +168,25 @@ const TeamRoster = memo(function TeamRoster({
                       {tier.name}
                     </span>
                   )}
+                  {/* Cost badge */}
+                  {!tier && (
+                    <span
+                      className="absolute -top-1 -right-1 text-[7px] font-bold px-1 py-0.5 rounded-full text-white shadow-sm leading-none"
+                      style={{ backgroundColor: primaryColor }}
+                    >
+                      {pokemon.cost}
+                    </span>
+                  )}
                 </div>
               )
             })}
             {Array.from({ length: Math.max(0, maxPokemonPerTeam - teamPokemon.length) }).map((_, i) => (
               <div
                 key={`empty-${i}`}
-                className="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center opacity-20"
+                className="flex flex-col items-center justify-center rounded-lg border border-dashed border-muted-foreground/15 p-1 pt-1.5 opacity-30"
+                style={{ minHeight: maxPokemonPerTeam > 8 ? '56px' : '68px' }}
               >
-                <PokeballIcon size="md" color={teamColor.hex} />
+                <PokeballIcon size="sm" color={teamColor.hex} />
               </div>
             ))}
           </div>

@@ -620,6 +620,23 @@ export class TradeService {
             .finally(() => supabase!.removeChannel(channel))
         }
       })
+
+      // Also invalidate roster caches on league pages when trade completes
+      if (event === 'completed') {
+        const rosterChannel = supabase.channel(`league-roster-invalidate:${leagueId}`)
+        rosterChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            rosterChannel
+              .send({
+                type: 'broadcast',
+                event: 'trade_update',
+                payload: { event, tradeId },
+              })
+              .catch((err) => log.warn('Failed to send roster invalidation:', err))
+              .finally(() => supabase!.removeChannel(rosterChannel))
+          }
+        })
+      }
     } catch (err) {
       log.warn('Failed to broadcast trade update:', err)
     }

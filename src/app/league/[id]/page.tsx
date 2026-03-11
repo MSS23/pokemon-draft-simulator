@@ -24,7 +24,7 @@ import {
   ArrowLeft, Trophy, TrendingUp, Loader2,
   ChevronLeft, ChevronRight, Settings, Copy, Check,
   CalendarDays, BarChart3, ShieldCheck, UserPlus,
-  Megaphone, ArrowLeftRight, ChevronDown, ChevronUp,
+  Megaphone, ArrowLeftRight,
 } from 'lucide-react'
 import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import type { League, Match, Standing, Team, Pick, ExtendedLeagueSettings } from '@/types'
@@ -65,10 +65,23 @@ export default function LeaguePage() {
   const [playoffTournament, setPlayoffTournament] = useState<Tournament | null>(null)
   const [showStartPlayoffs, setShowStartPlayoffs] = useState(false)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [expandedFixture, setExpandedFixture] = useState<string | null>(null)
   const [fixtureRosters, setFixtureRosters] = useState<Record<string, { home: Pick[]; away: Pick[] }>>({})
 
   const { user } = useAuth()
+
+  // Subscribe to trade events to invalidate cached rosters
+  useEffect(() => {
+    if (!supabase) return
+    const channel = supabase
+      .channel(`league-roster-invalidate:${leagueId}`)
+      .on('broadcast', { event: 'trade_update' }, () => {
+        // Clear cached rosters — the auto-load effect will re-fetch
+        setFixtureRosters({})
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [leagueId])
 
   // Determine commissioner status
   useEffect(() => {
@@ -91,40 +104,41 @@ export default function LeaguePage() {
     void checkCommissioner()
   }, [user?.id, leagueId])
 
-  // Load rosters for expanded fixture
-  const handleToggleFixture = useCallback(async (matchId: string, homeTeamId: string, awayTeamId: string) => {
-    if (expandedFixture === matchId) {
-      setExpandedFixture(null)
-      return
-    }
-    setExpandedFixture(matchId)
+  // Auto-load rosters for all fixtures when week changes
+  useEffect(() => {
+    if (weekFixtures.length === 0 || !supabase) return
+    const loadAllRosters = async () => {
+      const teamIds = weekFixtures.flatMap(m => [m.homeTeamId, m.awayTeamId])
+      const uniqueTeamIds = [...new Set(teamIds)]
+      try {
+        const { data: allPicks } = await supabase
+          .from('picks')
+          .select('*')
+          .in('team_id', uniqueTeamIds)
+          .order('pick_order')
 
-    // Don't re-fetch if already loaded
-    if (fixtureRosters[matchId]) return
-
-    try {
-      const sb = (await import('@/lib/supabase')).supabase!
-      const [{ data: homePicks }, { data: awayPicks }] = await Promise.all([
-        sb.from('picks').select('*').eq('team_id', homeTeamId).order('pick_order'),
-        sb.from('picks').select('*').eq('team_id', awayTeamId).order('pick_order'),
-      ])
-      const mapPick = (p: PickRow): Pick => ({
-        id: p.id, draftId: p.draft_id, teamId: p.team_id,
-        pokemonId: p.pokemon_id, pokemonName: p.pokemon_name,
-        cost: p.cost, pickOrder: p.pick_order, round: p.round,
-        createdAt: p.created_at,
-      })
-      setFixtureRosters(prev => ({
-        ...prev,
-        [matchId]: {
-          home: (homePicks || []).map(mapPick),
-          away: (awayPicks || []).map(mapPick),
-        },
-      }))
-    } catch (err) {
-      log.error('Failed to load fixture rosters:', err)
+        if (!allPicks) return
+        const mapPick = (p: PickRow): Pick => ({
+          id: p.id, draftId: p.draft_id, teamId: p.team_id,
+          pokemonId: p.pokemon_id, pokemonName: p.pokemon_name,
+          cost: p.cost, pickOrder: p.pick_order, round: p.round,
+          createdAt: p.created_at,
+        })
+        const mapped = allPicks.map(mapPick)
+        const rostersByMatch: Record<string, { home: Pick[]; away: Pick[] }> = {}
+        for (const match of weekFixtures) {
+          rostersByMatch[match.id] = {
+            home: mapped.filter(p => p.teamId === match.homeTeamId),
+            away: mapped.filter(p => p.teamId === match.awayTeamId),
+          }
+        }
+        setFixtureRosters(rostersByMatch)
+      } catch (err) {
+        log.error('Failed to load fixture rosters:', err)
+      }
     }
-  }, [expandedFixture, fixtureRosters])
+    loadAllRosters()
+  }, [weekFixtures])
 
   const loadLeagueData = useCallback(async () => {
     try {
@@ -213,6 +227,8 @@ export default function LeaguePage() {
   const handleChangeWeek = async (newWeek: number) => {
     if (!league || newWeek < 1 || newWeek > league.totalWeeks) return
     setViewingWeek(newWeek)
+    // Clear cached rosters from previous week
+    setFixtureRosters({})
     try {
       const fixtures = await LeagueService.getWeekFixtures(leagueId, newWeek)
       setWeekFixtures(fixtures)
@@ -498,7 +514,7 @@ export default function LeaguePage() {
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-3">
                 {weekFixtures.length === 0 ? (
                   <p className="text-center text-muted-foreground py-4 text-sm">
                     No fixtures this week
@@ -507,99 +523,92 @@ export default function LeaguePage() {
                   weekFixtures.map(match => {
                     const homeColors = teamColorMap.get(match.homeTeamId)
                     const awayColors = teamColorMap.get(match.awayTeamId)
-                    const isExpanded = expandedFixture === match.id
                     const rosters = fixtureRosters[match.id]
                     const canRecord = (match.status === 'scheduled' || match.status === 'in_progress')
 
                     return (
-                      <div key={match.id} className="border rounded-lg overflow-hidden">
-                        {/* Match header row */}
-                        <div
-                          className="flex items-center justify-between p-3 hover:bg-muted/50 transition-colors cursor-pointer"
-                          onClick={() => handleToggleFixture(match.id, match.homeTeamId, match.awayTeamId)}
-                        >
+                      <div
+                        key={match.id}
+                        className="border rounded-lg overflow-hidden hover:border-foreground/20 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
+                      >
+                        {/* Score / Status bar */}
+                        <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
                           <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className={`w-1 h-8 rounded-full shrink-0 ${homeColors?.bg || 'bg-muted'}`} />
-                            <span className="font-medium text-sm truncate">{match.homeTeam.name}</span>
+                            <div className={`w-1.5 h-6 rounded-full shrink-0 ${homeColors?.bg || 'bg-muted'}`} />
+                            <span className="font-semibold text-sm truncate">{match.homeTeam.name}</span>
                           </div>
-                          <div className="px-2 text-center shrink-0 flex items-center gap-1.5">
+                          <div className="px-3 text-center shrink-0 flex items-center gap-2">
                             {match.status === 'completed' ? (
                               <>
-                                <span className="text-lg font-bold tabular-nums">{match.homeScore}</span>
+                                <span className={`text-lg font-bold tabular-nums ${match.winnerTeamId === match.homeTeamId ? 'text-green-500' : ''}`}>{match.homeScore}</span>
                                 <span className="text-xs text-muted-foreground">-</span>
-                                <span className="text-lg font-bold tabular-nums">{match.awayScore}</span>
+                                <span className={`text-lg font-bold tabular-nums ${match.winnerTeamId === match.awayTeamId ? 'text-green-500' : ''}`}>{match.awayScore}</span>
                                 {match.winnerTeamId && <Trophy className="h-3 w-3 text-yellow-500" />}
                               </>
                             ) : (
-                              <span className="text-xs text-muted-foreground font-medium">vs</span>
+                              <Badge variant="outline" size="sm">Upcoming</Badge>
                             )}
                           </div>
                           <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                            <span className="font-medium text-sm truncate">{match.awayTeam.name}</span>
-                            <div className={`w-1 h-8 rounded-full shrink-0 ${awayColors?.bg || 'bg-muted'}`} />
+                            <span className="font-semibold text-sm truncate">{match.awayTeam.name}</span>
+                            <div className={`w-1.5 h-6 rounded-full shrink-0 ${awayColors?.bg || 'bg-muted'}`} />
                           </div>
-                          {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground ml-1 shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground ml-1 shrink-0" />}
                         </div>
 
-                        {/* Expanded: team rosters + actions */}
-                        {isExpanded && (
-                          <div className="border-t px-3 py-3 bg-muted/20 space-y-3">
+                        {/* Rosters side-by-side */}
+                        <div className="grid grid-cols-2 gap-0 divide-x">
+                          {/* Home roster */}
+                          <div className="px-2.5 py-2 space-y-0.5">
                             {rosters ? (
-                              <div className="grid grid-cols-2 gap-3">
-                                {/* Home roster */}
-                                <div>
-                                  <p className="text-xs font-semibold text-muted-foreground mb-1.5">{match.homeTeam.name}</p>
-                                  <div className="space-y-1">
-                                    {rosters.home.map(pick => (
-                                      <div key={pick.id} className="flex items-center gap-1.5">
-                                        <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-6 h-6 object-contain" lazy />
-                                        <span className="text-xs capitalize truncate">{pick.pokemonName}</span>
-                                      </div>
-                                    ))}
-                                    {rosters.home.length === 0 && <p className="text-xs text-muted-foreground">No Pokemon</p>}
+                              rosters.home.length > 0 ? (
+                                rosters.home.map(pick => (
+                                  <div key={pick.id} className="flex items-center gap-1.5">
+                                    <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-6 h-6 object-contain" lazy />
+                                    <span className="text-xs capitalize truncate">{pick.pokemonName}</span>
                                   </div>
-                                </div>
-                                {/* Away roster */}
-                                <div>
-                                  <p className="text-xs font-semibold text-muted-foreground mb-1.5">{match.awayTeam.name}</p>
-                                  <div className="space-y-1">
-                                    {rosters.away.map(pick => (
-                                      <div key={pick.id} className="flex items-center gap-1.5">
-                                        <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-6 h-6 object-contain" lazy />
-                                        <span className="text-xs capitalize truncate">{pick.pokemonName}</span>
-                                      </div>
-                                    ))}
-                                    {rosters.away.length === 0 && <p className="text-xs text-muted-foreground">No Pokemon</p>}
-                                  </div>
-                                </div>
-                              </div>
+                                ))
+                              ) : (
+                                <p className="text-xs text-muted-foreground py-1">No Pokemon</p>
+                              )
                             ) : (
-                              <div className="flex items-center justify-center py-2">
-                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                              <div className="flex items-center justify-center py-3">
+                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                               </div>
                             )}
+                          </div>
+                          {/* Away roster */}
+                          <div className="px-2.5 py-2 space-y-0.5">
+                            {rosters ? (
+                              rosters.away.length > 0 ? (
+                                rosters.away.map(pick => (
+                                  <div key={pick.id} className="flex items-center gap-1.5 justify-end">
+                                    <span className="text-xs capitalize truncate">{pick.pokemonName}</span>
+                                    <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-6 h-6 object-contain" lazy />
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-xs text-muted-foreground py-1 text-right">No Pokemon</p>
+                              )
+                            ) : (
+                              <div className="flex items-center justify-center py-3">
+                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-2 pt-1 border-t">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-xs flex-1"
-                                onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
-                              >
-                                View Matchup
-                              </Button>
-                              {canRecord && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs flex-1"
-                                  onClick={(e) => { e.stopPropagation(); handleRecordMatch(match) }}
-                                >
-                                  Record Result
-                                </Button>
-                              )}
-                            </div>
+                        {/* Action bar */}
+                        {canRecord && (
+                          <div className="border-t px-3 py-1.5 bg-muted/10">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-xs w-full h-7"
+                              onClick={(e) => { e.stopPropagation(); handleRecordMatch(match) }}
+                            >
+                              Record Result
+                            </Button>
                           </div>
                         )}
                       </div>
