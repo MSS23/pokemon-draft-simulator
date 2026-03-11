@@ -26,6 +26,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/contexts/AuthContext'
 // UserSessionService used for guest ID fallback
 import { RosterCard } from '@/components/pokemon/RosterCard'
+import { usePokemonList } from '@/hooks/usePokemon'
 import {
   ArrowLeft,
   TrendingUp,
@@ -70,6 +71,8 @@ export default function TeamDetailPage() {
   const [canAnalyzeTeams, setCanAnalyzeTeams] = useState(false)
   const [accessChecked, setAccessChecked] = useState(false)
   const [viewerRole, setViewerRole] = useState<ViewerRole>('spectator')
+  const { data: allPokemon } = usePokemonList()
+
   const [matchHistory, setMatchHistory] = useState<Array<{
     matchId: string
     weekNumber: number
@@ -508,11 +511,14 @@ export default function TeamDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {picks.map(pick => {
                     const koStats = pokemonKOStats.get(pick.id)
+                    const pokemonData = allPokemon?.find(p => p.id === pick.pokemonId)
                     return (
                       <RosterCard
                         key={pick.id}
                         pokemonId={pick.pokemonId}
                         pokemonName={pick.pokemonName}
+                        primaryType={pokemonData?.types[0]?.name}
+                        secondaryType={pokemonData?.types[1]?.name}
                         cost={pick.cost}
                         showCost={viewerRole !== 'spectator'}
                         kills={koStats?.kills}

@@ -4,6 +4,37 @@ import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Loader2, Zap, Users, Trophy } from 'lucide-react'
 
+// Animated Pokéball SVG for thematic loading
+function PokeballSpinner({ size = 48, className }: { size?: number; className?: string }) {
+  return (
+    <div className={cn('relative', className)} style={{ width: size, height: size }}>
+      <svg
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className="animate-[spin_1.2s_ease-in-out_infinite] drop-shadow-lg"
+        width={size}
+        height={size}
+      >
+        {/* Top half — red */}
+        <path d="M50 2 A48 48 0 0 1 98 50 H62 A12 12 0 0 0 38 50 H2 A48 48 0 0 1 50 2Z" fill="hsl(var(--primary))" />
+        {/* Bottom half — white */}
+        <path d="M2 50 H38 A12 12 0 0 0 62 50 H98 A48 48 0 0 1 2 50Z" fill="white" />
+        {/* Dark mode bottom */}
+        <path d="M2 50 H38 A12 12 0 0 0 62 50 H98 A48 48 0 0 1 2 50Z" className="fill-white dark:fill-zinc-200" />
+        {/* Center line */}
+        <line x1="2" y1="50" x2="38" y2="50" stroke="hsl(var(--foreground))" strokeWidth="3" strokeOpacity="0.2" />
+        <line x1="62" y1="50" x2="98" y2="50" stroke="hsl(var(--foreground))" strokeWidth="3" strokeOpacity="0.2" />
+        {/* Outer ring */}
+        <circle cx="50" cy="50" r="48" stroke="hsl(var(--foreground))" strokeWidth="3" strokeOpacity="0.15" fill="none" />
+        {/* Center button */}
+        <circle cx="50" cy="50" r="12" fill="white" stroke="hsl(var(--foreground))" strokeWidth="3" strokeOpacity="0.2" />
+        <circle cx="50" cy="50" r="6" fill="hsl(var(--foreground))" fillOpacity="0.15" />
+      </svg>
+    </div>
+  )
+}
+
 // Generic Loading Spinner
 export function LoadingSpinner({
   size = 'md',
@@ -23,7 +54,7 @@ export function LoadingSpinner({
   )
 }
 
-// Loading Screen for Full Page
+// Loading Screen for Full Page — Pokéball themed
 export function LoadingScreen({
   title = 'Loading...',
   description,
@@ -34,35 +65,23 @@ export function LoadingScreen({
   showLogo?: boolean
 }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-cyan-50 dark:from-background dark:via-secondary dark:to-background flex items-center justify-center">
-      <div className="text-center space-y-6">
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center space-y-5">
         {showLogo && (
           <div className="flex justify-center">
-            <div className="p-4 bg-white dark:bg-card rounded-full shadow-lg">
-              <Zap className="h-12 w-12 text-blue-600 dark:text-blue-400" />
-            </div>
+            <PokeballSpinner size={56} />
           </div>
         )}
 
-        <div className="space-y-4">
-          <LoadingSpinner size="lg" className="mx-auto text-blue-600 dark:text-blue-400" />
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {title}
-            </h1>
-            {description && (
-              <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                {description}
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Animated progress indicator */}
-        <div className="w-64 mx-auto">
-          <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full brand-gradient-bg rounded-full animate-pulse" />
-          </div>
+        <div className="space-y-2">
+          <h1 className="text-lg font-bold tracking-tight">
+            {title}
+          </h1>
+          {description && (
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+              {description}
+            </p>
+          )}
         </div>
       </div>
     </div>
