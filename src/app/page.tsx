@@ -63,24 +63,28 @@ export default function Home() {
         {/* Grid */}
         <div className="absolute inset-0 hero-lines" />
 
+        {/* Ambient glow — warm primary accent */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[60rem] h-[40rem] bg-primary/[0.04] rounded-full blur-[120px]" />
+
         {/* Pokéball — single, subtle */}
-        <div className="absolute right-[10%] top-1/2 -translate-y-1/2 w-[28rem] h-[28rem] opacity-[0.04]">
+        <div className="absolute right-[8%] top-1/2 -translate-y-1/2 w-[32rem] h-[32rem] opacity-[0.03]">
           <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="50" cy="50" r="48" stroke="white" strokeWidth="1" />
-            <line x1="2" y1="50" x2="98" y2="50" stroke="white" strokeWidth="1" />
-            <circle cx="50" cy="50" r="12" stroke="white" strokeWidth="1" />
+            <circle cx="50" cy="50" r="48" stroke="white" strokeWidth="0.8" />
+            <line x1="2" y1="50" x2="98" y2="50" stroke="white" strokeWidth="0.8" />
+            <circle cx="50" cy="50" r="12" stroke="white" strokeWidth="0.8" />
+            <circle cx="50" cy="50" r="6" fill="white" fillOpacity="0.3" />
           </svg>
         </div>
 
         {/* Content */}
         <div className="relative z-10 w-full max-w-3xl mx-auto px-6 py-24">
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-8">
-            <motion.p
-              variants={fadeIn}
-              className="text-primary text-sm font-medium tracking-wide"
-            >
-              Competitive Pokémon drafting platform
-            </motion.p>
+            <motion.div variants={fadeIn} className="flex items-center gap-2">
+              <div className="h-px w-8 bg-primary/60" />
+              <p className="text-primary text-sm font-semibold tracking-wide uppercase">
+                Draft League
+              </p>
+            </motion.div>
 
             <motion.h1
               variants={fadeIn}
@@ -103,17 +107,17 @@ export default function Home() {
               <Button
                 size="lg"
                 onClick={() => router.push('/join-draft')}
-                className="bg-primary text-white hover:bg-primary/90 font-medium h-11 px-6"
+                className="bg-primary text-white hover:bg-primary/90 font-semibold h-12 px-7 rounded-xl shadow-[0_0_20px_-4px_hsl(var(--primary)/0.4)] hover:shadow-[0_0_28px_-4px_hsl(var(--primary)/0.5)] transition-all"
               >
                 <Users className="h-4 w-4 mr-2" />
                 Join a Draft
-                <ArrowRight className="h-4 w-4 ml-1" />
+                <ArrowRight className="h-4 w-4 ml-1.5" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 onClick={() => router.push('/create-draft')}
-                className="border-zinc-700 text-zinc-300 bg-transparent hover:bg-white/5 hover:text-white font-medium h-11 px-6"
+                className="border-zinc-700 text-zinc-300 bg-transparent hover:bg-white/5 hover:text-white font-medium h-12 px-7 rounded-xl"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Draft
@@ -134,7 +138,7 @@ export default function Home() {
         </div>
 
         {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
       </div>
 
       {/* Features */}
@@ -163,13 +167,15 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.06, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                 onClick={() => router.push(action.href)}
-                className="group cursor-pointer p-4 rounded-lg border bg-card hover:border-primary/30 transition-colors"
+                className="group cursor-pointer p-5 rounded-xl border bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200"
               >
                 <div className="flex items-center gap-3 mb-2">
-                  <action.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  <h3 className="font-medium text-sm">{action.label}</h3>
+                  <div className="w-8 h-8 rounded-lg bg-primary/8 dark:bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
+                    <action.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                  <h3 className="font-semibold text-sm">{action.label}</h3>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{action.desc}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed pl-11">{action.desc}</p>
               </motion.div>
             ))}
           </div>
@@ -185,20 +191,22 @@ export default function Home() {
             Built for competitive play
           </motion.p>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             {FEATURES.map((feat, i) => (
               <motion.div
                 key={feat.title}
                 initial={{ opacity: 0, y: 12 }}
                 animate={featuresInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ delay: i * 0.1, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-                className="flex gap-4 p-4 rounded-lg border bg-card"
+                className="flex gap-4 p-5 rounded-xl border bg-card hover:shadow-sm transition-shadow"
               >
                 <div className="mt-0.5 shrink-0">
-                  <feat.icon className="h-4 w-4 text-muted-foreground" />
+                  <div className="w-8 h-8 rounded-lg bg-primary/8 dark:bg-primary/10 flex items-center justify-center">
+                    <feat.icon className="h-4 w-4 text-primary/70" />
+                  </div>
                 </div>
                 <div>
-                  <h3 className="font-medium text-sm mb-1">{feat.title}</h3>
+                  <h3 className="font-semibold text-sm mb-1">{feat.title}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{feat.desc}</p>
                 </div>
               </motion.div>

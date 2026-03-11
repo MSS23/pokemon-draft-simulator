@@ -58,10 +58,10 @@
     --brand-via: 347 77% 50%;
     --brand-to: 347 77% 50%;
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.03);
+    /* Shadows — softer, warmer */
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.03), 0 1px 2px -1px rgb(0 0 0 / 0.02);
+    --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.03);
+    --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.08), 0 4px 8px -4px rgb(0 0 0 / 0.03);
     --shadow-glow: 0 0 0 3px hsl(347 77% 50% / 0.12);
 
     /* Pokemon type colors */
@@ -222,25 +222,25 @@
     @apply relative overflow-hidden;
   }
 
-  /* Pokemon card type gradients */
-  .pokemon-card-normal { background: linear-gradient(135deg, hsl(var(--type-normal)), hsl(var(--type-normal) / 0.7)); }
-  .pokemon-card-fire { background: linear-gradient(135deg, hsl(var(--type-fire)), hsl(var(--type-fire) / 0.7)); }
-  .pokemon-card-water { background: linear-gradient(135deg, hsl(var(--type-water)), hsl(var(--type-water) / 0.7)); }
-  .pokemon-card-electric { background: linear-gradient(135deg, hsl(var(--type-electric)), hsl(var(--type-electric) / 0.7)); }
-  .pokemon-card-grass { background: linear-gradient(135deg, hsl(var(--type-grass)), hsl(var(--type-grass) / 0.7)); }
-  .pokemon-card-ice { background: linear-gradient(135deg, hsl(var(--type-ice)), hsl(var(--type-ice) / 0.7)); }
-  .pokemon-card-fighting { background: linear-gradient(135deg, hsl(var(--type-fighting)), hsl(var(--type-fighting) / 0.7)); }
-  .pokemon-card-poison { background: linear-gradient(135deg, hsl(var(--type-poison)), hsl(var(--type-poison) / 0.7)); }
-  .pokemon-card-ground { background: linear-gradient(135deg, hsl(var(--type-ground)), hsl(var(--type-ground) / 0.7)); }
-  .pokemon-card-flying { background: linear-gradient(135deg, hsl(var(--type-flying)), hsl(var(--type-flying) / 0.7)); }
-  .pokemon-card-psychic { background: linear-gradient(135deg, hsl(var(--type-psychic)), hsl(var(--type-psychic) / 0.7)); }
-  .pokemon-card-bug { background: linear-gradient(135deg, hsl(var(--type-bug)), hsl(var(--type-bug) / 0.7)); }
-  .pokemon-card-rock { background: linear-gradient(135deg, hsl(var(--type-rock)), hsl(var(--type-rock) / 0.7)); }
-  .pokemon-card-ghost { background: linear-gradient(135deg, hsl(var(--type-ghost)), hsl(var(--type-ghost) / 0.7)); }
-  .pokemon-card-dragon { background: linear-gradient(135deg, hsl(var(--type-dragon)), hsl(var(--type-dragon) / 0.7)); }
-  .pokemon-card-dark { background: linear-gradient(135deg, hsl(var(--type-dark)), hsl(var(--type-dark) / 0.7)); }
-  .pokemon-card-steel { background: linear-gradient(135deg, hsl(var(--type-steel)), hsl(var(--type-steel) / 0.7)); }
-  .pokemon-card-fairy { background: linear-gradient(135deg, hsl(var(--type-fairy)), hsl(var(--type-fairy) / 0.7)); }
+  /* Pokemon card type gradients — warm radial for softer card feel */
+  .pokemon-card-normal { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-normal)) 0%, hsl(var(--type-normal) / 0.5) 70%, hsl(var(--type-normal) / 0.2) 100%); }
+  .pokemon-card-fire { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-fire)) 0%, hsl(var(--type-fire) / 0.5) 70%, hsl(var(--type-fire) / 0.2) 100%); }
+  .pokemon-card-water { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-water)) 0%, hsl(var(--type-water) / 0.5) 70%, hsl(var(--type-water) / 0.2) 100%); }
+  .pokemon-card-electric { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-electric)) 0%, hsl(var(--type-electric) / 0.5) 70%, hsl(var(--type-electric) / 0.2) 100%); }
+  .pokemon-card-grass { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-grass)) 0%, hsl(var(--type-grass) / 0.5) 70%, hsl(var(--type-grass) / 0.2) 100%); }
+  .pokemon-card-ice { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-ice)) 0%, hsl(var(--type-ice) / 0.5) 70%, hsl(var(--type-ice) / 0.2) 100%); }
+  .pokemon-card-fighting { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-fighting)) 0%, hsl(var(--type-fighting) / 0.5) 70%, hsl(var(--type-fighting) / 0.2) 100%); }
+  .pokemon-card-poison { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-poison)) 0%, hsl(var(--type-poison) / 0.5) 70%, hsl(var(--type-poison) / 0.2) 100%); }
+  .pokemon-card-ground { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-ground)) 0%, hsl(var(--type-ground) / 0.5) 70%, hsl(var(--type-ground) / 0.2) 100%); }
+  .pokemon-card-flying { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-flying)) 0%, hsl(var(--type-flying) / 0.5) 70%, hsl(var(--type-flying) / 0.2) 100%); }
+  .pokemon-card-psychic { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-psychic)) 0%, hsl(var(--type-psychic) / 0.5) 70%, hsl(var(--type-psychic) / 0.2) 100%); }
+  .pokemon-card-bug { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-bug)) 0%, hsl(var(--type-bug) / 0.5) 70%, hsl(var(--type-bug) / 0.2) 100%); }
+  .pokemon-card-rock { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-rock)) 0%, hsl(var(--type-rock) / 0.5) 70%, hsl(var(--type-rock) / 0.2) 100%); }
+  .pokemon-card-ghost { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-ghost)) 0%, hsl(var(--type-ghost) / 0.5) 70%, hsl(var(--type-ghost) / 0.2) 100%); }
+  .pokemon-card-dragon { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-dragon)) 0%, hsl(var(--type-dragon) / 0.5) 70%, hsl(var(--type-dragon) / 0.2) 100%); }
+  .pokemon-card-dark { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-dark)) 0%, hsl(var(--type-dark) / 0.5) 70%, hsl(var(--type-dark) / 0.2) 100%); }
+  .pokemon-card-steel { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-steel)) 0%, hsl(var(--type-steel) / 0.5) 70%, hsl(var(--type-steel) / 0.2) 100%); }
+  .pokemon-card-fairy { background: radial-gradient(ellipse at 50% 0%, hsl(var(--type-fairy)) 0%, hsl(var(--type-fairy) / 0.5) 70%, hsl(var(--type-fairy) / 0.2) 100%); }
 
   /* Holographic (kept for Pokemon cards) */
   .holographic {

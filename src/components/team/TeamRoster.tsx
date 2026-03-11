@@ -112,7 +112,7 @@ const TeamRoster = memo(function TeamRoster({
                 <img
                   src={getPokemonAnimatedUrl(pokemon.id, pokemon.name)}
                   alt={pokemon.name}
-                  className="w-11 h-11 sm:w-12 sm:h-12 bg-muted/50 rounded-lg border border-border hover:border-primary transition-all hover:scale-110 shadow-sm"
+                  className="w-11 h-11 sm:w-12 sm:h-12 bg-muted/30 rounded-xl border border-black/[0.06] dark:border-white/[0.08] hover:border-primary/50 transition-all duration-200 hover:scale-110 hover:shadow-md shadow-sm"
                   loading="lazy"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement

@@ -128,35 +128,39 @@ const PokemonCard = ({
       onKeyDown={handleKeyDown}
       onClick={() => !isDisabled && !isDrafted && onViewDetails?.(pokemon)}
       className={cn(
-        'relative group rounded-xl overflow-hidden',
+        'relative group rounded-2xl overflow-hidden',
         CARD_HEIGHTS[size],
         'flex flex-col',
-        'border border-gray-200 dark:border-gray-700',
-        'transition-all duration-200 ease-out',
-        'hover:shadow-lg hover:scale-[1.02]',
-        'active:scale-[0.98]',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+        'border border-black/[0.06] dark:border-white/[0.08]',
+        'transition-all duration-250 ease-out',
+        'hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.12)] hover:scale-[1.03] hover:-translate-y-0.5',
+        'dark:hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.4)]',
+        'active:scale-[0.97]',
+        'focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2',
         'touch-manipulation',
-        isDrafted && 'opacity-60 grayscale',
+        isDrafted && 'opacity-50 grayscale saturate-50',
         isDisabled && 'opacity-40 cursor-not-allowed',
         isUnaffordable && 'opacity-75 border-orange-300 dark:border-orange-600',
         isUnsafe && !isUnaffordable && 'opacity-75 border-red-400 dark:border-red-500',
         !isDisabled && !isDrafted && 'cursor-pointer',
-        isPreDrafted && !isPending && 'ring-2 ring-purple-500 ring-opacity-80 border-purple-400 dark:border-purple-500',
-        isPending && 'ring-4 ring-yellow-400 ring-opacity-80 animate-pulse',
-        pendingAction?.status === 'failed' && 'ring-4 ring-red-400 ring-opacity-80',
+        isPreDrafted && !isPending && 'ring-2 ring-purple-500/80 border-purple-400 dark:border-purple-500',
+        isPending && 'ring-4 ring-yellow-400/80 animate-pulse',
+        pendingAction?.status === 'failed' && 'ring-4 ring-red-400/80',
         className
       )}
     >
-      {/* Type-tinted background */}
+      {/* Type-tinted background — warm, visible gradient */}
       <div className={cn(
         'absolute inset-0',
         getPokemonCardClass(pokemon),
-        'opacity-15 dark:opacity-20'
+        'opacity-25 dark:opacity-30'
       )} />
 
-      {/* Card background */}
-      <div className="absolute inset-0 bg-white/85 dark:bg-card/90" />
+      {/* Soft radial highlight for depth */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_30%,rgba(255,255,255,0.7)_0%,transparent_70%)] dark:bg-[radial-gradient(ellipse_at_50%_30%,rgba(255,255,255,0.08)_0%,transparent_70%)]" />
+
+      {/* Card background — more translucent to let type color through */}
+      <div className="absolute inset-0 bg-white/70 dark:bg-card/80" />
 
       {/* Pending Action Indicator */}
       {isPending && (
@@ -234,17 +238,17 @@ const PokemonCard = ({
 
       {/* Cost Badge */}
       {showCost && (
-        <div className="absolute top-1.5 right-1.5 z-10">
+        <div className="absolute top-2 right-2 z-10">
           <Badge
             size={size === 'sm' ? "sm" : undefined}
             className={cn(
-              "font-bold px-1.5 py-0.5 rounded-full shadow-sm",
+              "font-bold px-2 py-0.5 rounded-full shadow-md border-0 tabular-nums",
               size !== 'sm' && "text-xs",
-              pokemon.cost >= 25 ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" :
-              pokemon.cost >= 20 ? "bg-gradient-to-r from-purple-400 to-pink-500 text-white" :
-              pokemon.cost >= 15 ? "bg-gradient-to-r from-blue-400 to-cyan-500 text-white" :
-              pokemon.cost >= 10 ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white" :
-              "bg-gradient-to-r from-gray-400 to-gray-500 text-white"
+              pokemon.cost >= 25 ? "bg-gradient-to-br from-amber-400 to-orange-500 text-white" :
+              pokemon.cost >= 20 ? "bg-gradient-to-br from-violet-400 to-purple-600 text-white" :
+              pokemon.cost >= 15 ? "bg-gradient-to-br from-sky-400 to-blue-500 text-white" :
+              pokemon.cost >= 10 ? "bg-gradient-to-br from-emerald-400 to-green-500 text-white" :
+              "bg-white/80 dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-300 backdrop-blur-sm border border-black/[0.06] dark:border-white/[0.1]"
             )}
           >
             {pokemon.cost}
@@ -263,11 +267,11 @@ const PokemonCard = ({
       )}
 
       {/* Image area */}
-      <div className="relative flex-1 flex items-center justify-center p-2">
+      <div className="relative flex-1 flex items-center justify-center p-3">
         {!hasError ? (
           <>
             {isLoading && (
-              <div className="absolute inset-0 m-2 rounded-lg bg-gray-100 dark:bg-muted animate-pulse" />
+              <div className="absolute inset-0 m-3 rounded-xl bg-gray-100/60 dark:bg-muted/40 animate-pulse" />
             )}
             <Image
               src={imageUrl}
@@ -275,9 +279,10 @@ const PokemonCard = ({
               width={IMAGE_SIZES[size]}
               height={IMAGE_SIZES[size]}
               className={cn(
-                "relative z-[1] cursor-pointer transition-all duration-200 hover:scale-110",
-                "drop-shadow-md",
-                isLoading ? "opacity-0" : "opacity-100"
+                "relative z-[1] cursor-pointer transition-all duration-300 ease-out",
+                "group-hover:scale-110 group-hover:drop-shadow-[0_4px_12px_rgba(0,0,0,0.15)]",
+                "drop-shadow-[0_2px_8px_rgba(0,0,0,0.08)]",
+                isLoading ? "opacity-0 scale-90" : "opacity-100 scale-100"
               )}
               style={{
                 width: 'auto',
@@ -292,16 +297,20 @@ const PokemonCard = ({
             />
           </>
         ) : (
-          <div className="w-12 h-12 bg-gray-200 dark:bg-muted rounded-lg flex items-center justify-center text-gray-400 text-xs">
+          <div className="w-12 h-12 bg-gray-200/60 dark:bg-muted/40 rounded-xl flex items-center justify-center text-gray-400 text-xs font-medium">
             ?
           </div>
         )}
       </div>
 
-      {/* Bottom info: name + types */}
-      <div className="relative z-[1] px-2.5 pb-2 space-y-1">
+      {/* Bottom info: name + types — glass footer */}
+      <div className={cn(
+        "relative z-[1] px-3 pb-2.5 pt-2 space-y-1.5",
+        "bg-white/50 dark:bg-black/20 backdrop-blur-sm",
+        "border-t border-black/[0.04] dark:border-white/[0.06]"
+      )}>
         <h3 className={cn(
-          "font-semibold text-gray-900 dark:text-gray-100 leading-tight truncate",
+          "font-bold text-gray-900 dark:text-gray-100 leading-tight truncate tracking-tight",
           size === 'sm' ? "text-xs" : "text-sm"
         )}>
           {pokemon.name}
@@ -312,7 +321,7 @@ const PokemonCard = ({
               key={type.name}
               size={size !== 'sm' ? "sm" : undefined}
               className={cn(
-                "text-white font-medium shadow-sm border-0",
+                "text-white font-semibold shadow-sm border-0 rounded-full",
                 size === 'sm' && "text-[9px] px-1 py-0"
               )}
               style={{ backgroundColor: type.color }}
