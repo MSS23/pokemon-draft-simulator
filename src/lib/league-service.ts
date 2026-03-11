@@ -1006,7 +1006,7 @@ export class LeagueService {
       pointsPerDraw: s?.pointsPerDraw || 1,
       commissionerId: s?.commissionerId ?? undefined,
       freeAgentPicksAllowed: s?.freeAgentPicksAllowed ?? 3,
-      enableTrades: s?.enableTrades || false,
+      enableTrades: s?.enableTrades ?? true,
       tradeDeadlineWeek: s?.tradeDeadlineWeek ?? undefined,
       weeklyTradeDeadline: s?.weeklyTradeDeadline ?? true,
       adminOverrideTradeDeadline: s?.adminOverrideTradeDeadline ?? false,
