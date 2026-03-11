@@ -233,8 +233,7 @@ export default function WatchDraftsPage() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
           {/* Header */}
           <div>
-            <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-2">Live</p>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-2">Watch Live</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight mb-2">Watch Live</h1>
             <p className="text-sm text-muted-foreground">Spectate active drafts in real time.</p>
           </div>
 

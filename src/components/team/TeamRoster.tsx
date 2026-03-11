@@ -124,7 +124,7 @@ const TeamRoster = memo(function TeamRoster({
                 />
                 {tier && (
                   <span
-                    className="absolute -top-1 -right-1 text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center text-white shadow-sm"
+                    className="absolute -top-1 -right-1 text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center text-white shadow-sm"
                     style={{ backgroundColor: tier.color }}
                   >
                     {tier.name}

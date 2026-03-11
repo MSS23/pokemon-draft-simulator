@@ -298,7 +298,7 @@ export default function LeaguePage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight truncate">{league.name}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{league.name}</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               Week {league.currentWeek} of {league.totalWeeks} &middot; {league.teams.length} teams
             </p>

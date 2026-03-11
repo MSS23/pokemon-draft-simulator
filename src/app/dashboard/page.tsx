@@ -13,8 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import {
-  Loader2, Plus, Users, Trophy, Zap, Swords, Shield,
-  ChevronRight, Trash2, Eye, TrendingUp, Clock, Crown
+  Loader2, Plus, Users, Trophy, Swords, Shield,
+  ChevronRight, Trash2, Eye, Clock, Crown
 } from 'lucide-react'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -128,10 +128,10 @@ function buildDraftSummaries(
 
 /* ── Fade-in animation helpers ── */
 const fadeUp = {
-  hidden: { opacity: 0, y: 16 },
+  hidden: { opacity: 0, y: 12 },
   visible: (i: number) => ({
     opacity: 1, y: 0,
-    transition: { delay: i * 0.06, duration: 0.4, type: 'spring' as const, damping: 24 },
+    transition: { delay: i * 0.04, duration: 0.35, ease: [0.25, 0.1, 0.25, 1] as const },
   }),
 }
 
@@ -352,24 +352,24 @@ export default function DashboardPage() {
 
   return (
     <SidebarLayout>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
 
-        {/* ═══════════════════ Header ═══════════════════ */}
+        {/* Header */}
         <motion.div
           className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
         >
           <div>
-            <p className="text-xs font-medium text-muted-foreground/70 uppercase tracking-widest mb-1">Welcome back</p>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{displayName}</h1>
+            <p className="text-xs text-muted-foreground mb-1">Welcome back</p>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">{displayName}</h1>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="text-xs font-semibold" asChild>
+            <Button size="sm" variant="outline" className="text-xs" asChild>
               <Link href="/join-draft">Join Draft</Link>
             </Button>
-            <Button size="sm" variant="brand" className="text-xs font-semibold" asChild>
+            <Button size="sm" className="text-xs" asChild>
               <Link href="/create-draft">
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 New Draft
@@ -388,37 +388,22 @@ export default function DashboardPage() {
         {/* ═══════════════════ Stat Cards ═══════════════════ */}
         <div id="tour-stats" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
+            { label: 'Total Drafts', value: String(drafts.length) },
+            { label: 'Active Now', value: String(activeDrafts.length) },
+            { label: 'Leagues', value: String(activeLeagueCount) },
             {
-              icon: Trophy, label: 'Total Drafts', value: String(drafts.length),
-              accent: 'text-amber-500', bg: 'bg-amber-500/8 dark:bg-amber-500/10',
-            },
-            {
-              icon: Zap, label: 'Active Now', value: String(activeDrafts.length),
-              accent: 'text-emerald-500', bg: 'bg-emerald-500/8 dark:bg-emerald-500/10',
-            },
-            {
-              icon: Shield, label: 'Leagues', value: String(activeLeagueCount),
-              accent: 'text-blue-500', bg: 'bg-blue-500/8 dark:bg-blue-500/10',
-            },
-            {
-              icon: TrendingUp, label: 'Win Rate',
+              label: 'Win Rate',
               value: winRate !== null ? `${winRate}%` : '-',
               sub: totalWins + totalLosses > 0 ? `${totalWins}W ${totalLosses}L` : undefined,
-              accent: 'text-violet-500', bg: 'bg-violet-500/8 dark:bg-violet-500/10',
             },
           ].map((stat, i) => (
             <motion.div key={stat.label} custom={i} variants={fadeUp} initial="hidden" animate="visible">
-              <Card className="stat-card group hover:shadow-sm transition-shadow">
+              <Card>
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`h-8 w-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
-                      <stat.icon className={`h-4 w-4 ${stat.accent}`} />
-                    </div>
-                  </div>
-                  <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">{stat.value}</p>
-                  <p className="text-[11px] font-medium text-muted-foreground/70 mt-1.5 uppercase tracking-wider">
+                  <p className="text-2xl font-bold tabular-nums tracking-tight">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     {stat.label}
-                    {stat.sub && <span className="ml-1.5 normal-case tracking-normal text-foreground/50">({stat.sub})</span>}
+                    {stat.sub && <span className="ml-1 text-foreground/50">({stat.sub})</span>}
                   </p>
                 </CardContent>
               </Card>
@@ -431,7 +416,7 @@ export default function DashboardPage() {
           <motion.div custom={4} variants={fadeUp} initial="hidden" animate="visible">
             <div className="space-y-3" id="tour-matches">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold flex items-center gap-2 uppercase tracking-wide">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
                   <Swords className="h-4 w-4 text-primary" />
                   This Week
                 </h2>
@@ -471,13 +456,13 @@ export default function DashboardPage() {
                           {/* Score / VS */}
                           {matchup.match.status === 'completed' ? (
                             <div className="shrink-0 flex items-center gap-1 bg-muted/50 rounded-lg px-3 py-1.5">
-                              <span className="text-xl font-black tabular-nums tracking-tighter">{userScore}</span>
+                              <span className="text-xl font-bold tabular-nums tracking-tight">{userScore}</span>
                               <span className="text-muted-foreground/40 text-xs font-bold mx-0.5">-</span>
-                              <span className="text-xl font-black tabular-nums tracking-tighter">{opponentScore}</span>
+                              <span className="text-xl font-bold tabular-nums tracking-tight">{opponentScore}</span>
                             </div>
                           ) : (
                             <div className="shrink-0 px-3">
-                              <span className="text-[10px] font-black text-muted-foreground/50 uppercase tracking-widest">vs</span>
+                              <span className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wider">vs</span>
                             </div>
                           )}
 
@@ -506,7 +491,7 @@ export default function DashboardPage() {
         {leagueStandings.length > 0 && (
           <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible">
             <div className="space-y-3" id="tour-leagues">
-              <h2 className="text-sm font-bold flex items-center gap-2 uppercase tracking-wide">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
                 <Shield className="h-4 w-4 text-primary" />
                 My Leagues
               </h2>
@@ -553,7 +538,7 @@ export default function DashboardPage() {
                         {/* Stats row */}
                         <div className="flex items-center gap-4">
                           <div className="flex items-baseline gap-1">
-                            <span className="text-2xl font-black tabular-nums tracking-tighter">
+                            <span className="text-2xl font-bold tabular-nums tracking-tight">
                               {standing.wins}-{standing.losses}
                               {standing.draws > 0 && <span className="text-lg">-{standing.draws}</span>}
                             </span>
@@ -610,7 +595,7 @@ export default function DashboardPage() {
         <motion.div custom={6} variants={fadeUp} initial="hidden" animate="visible">
           <div className="space-y-3" id="tour-drafts">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wide">My Drafts</h2>
+              <h2 className="text-sm font-semibold">My Drafts</h2>
               {drafts.length > 0 && (
                 <span className="text-[11px] font-medium text-muted-foreground/60 tabular-nums">{drafts.length} total</span>
               )}
@@ -732,7 +717,7 @@ export default function DashboardPage() {
         {spectatedDrafts.filter(d => d.status !== 'completed').length > 0 && (
           <motion.div custom={7} variants={fadeUp} initial="hidden" animate="visible">
             <div className="space-y-3">
-              <h2 className="text-sm font-bold flex items-center gap-2 uppercase tracking-wide">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
                 <Eye className="h-4 w-4 text-primary" />
                 Spectating
               </h2>

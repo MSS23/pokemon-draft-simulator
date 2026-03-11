@@ -204,7 +204,7 @@ export default function DraftResultsPage() {
               Back to Draft History
             </Button>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight brand-gradient-text mb-2">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight brand-gradient-text mb-2">
             Draft Results: {roomCode}
           </h1>
           <Badge variant="secondary" className="text-green-700 bg-green-100 border-green-300">

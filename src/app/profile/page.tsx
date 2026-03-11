@@ -222,7 +222,7 @@ export default function ProfilePage() {
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
-                    <h1 className="text-2xl font-black tracking-tight">{displayName}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
                     {profile?.username && profile.username !== displayName && (
                       <p className="text-sm text-muted-foreground">@{profile.username}</p>
                     )}
@@ -289,7 +289,7 @@ export default function ProfilePage() {
                   <Trophy className="h-4 w-4 text-primary" />
                 </div>
               </div>
-              <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">{stats.totalDrafts}</p>
+              <p className="text-3xl font-bold tracking-tight tabular-nums leading-none">{stats.totalDrafts}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Total Drafts</p>
             </CardContent>
           </Card>
@@ -301,7 +301,7 @@ export default function ProfilePage() {
                   <Star className="h-4 w-4 text-emerald-500" />
                 </div>
               </div>
-              <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">{stats.picksMade}</p>
+              <p className="text-3xl font-bold tracking-tight tabular-nums leading-none">{stats.picksMade}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Picks Made</p>
             </CardContent>
           </Card>
@@ -313,7 +313,7 @@ export default function ProfilePage() {
                   <Swords className="h-4 w-4 text-blue-500" />
                 </div>
               </div>
-              <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">
+              <p className="text-3xl font-bold tracking-tight tabular-nums leading-none">
                 {hasLeagueRecord
                   ? `${stats.leagueWins}-${stats.leagueLosses}${stats.leagueDraws > 0 ? `-${stats.leagueDraws}` : ''}`
                   : '-'}
@@ -329,7 +329,7 @@ export default function ProfilePage() {
                   <Trophy className="h-4 w-4 text-violet-500" />
                 </div>
               </div>
-              <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">{stats.activeLeagues}</p>
+              <p className="text-3xl font-bold tracking-tight tabular-nums leading-none">{stats.activeLeagues}</p>
               <p className="text-xs text-muted-foreground mt-0.5">Active Leagues</p>
             </CardContent>
           </Card>

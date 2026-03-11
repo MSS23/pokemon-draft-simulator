@@ -180,7 +180,7 @@ export default function SpectateRoomPage() {
             </div>
             <div className="flex items-center justify-center gap-2">
               <Eye className="h-6 w-6 text-primary" />
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight brand-gradient-text">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight brand-gradient-text">
                 Spectating: {roomCode.toUpperCase()}
               </h1>
             </div>

@@ -155,7 +155,7 @@ export default function MatchDetailPage() {
             <div className="grid grid-cols-3 gap-2 sm:gap-8 items-center my-4 sm:my-6">
               {/* Home Team */}
               <div className="text-center">
-                <div className={`text-lg sm:text-3xl font-black tracking-tight mb-2 truncate ${isUserHomeTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
+                <div className={`text-lg sm:text-3xl font-bold tracking-tight mb-2 truncate ${isUserHomeTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
                   {match.homeTeam.name}
                 </div>
                 {isUserHomeTeam && (
@@ -190,7 +190,7 @@ export default function MatchDetailPage() {
 
               {/* Away Team */}
               <div className="text-center">
-                <div className={`text-lg sm:text-3xl font-black tracking-tight mb-2 truncate ${isUserAwayTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
+                <div className={`text-lg sm:text-3xl font-bold tracking-tight mb-2 truncate ${isUserAwayTeam ? 'text-blue-600 dark:text-blue-400' : 'text-slate-900 dark:text-white'}`}>
                   {match.awayTeam.name}
                 </div>
                 {isUserAwayTeam && (

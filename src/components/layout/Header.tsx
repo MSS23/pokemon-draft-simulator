@@ -32,19 +32,19 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <Link href="/" className="flex items-center gap-2 mr-auto group">
-            <div className="h-7 w-7 rounded-full overflow-hidden border-2 border-primary/40 group-hover:border-primary transition-colors duration-200 relative flex-shrink-0 shadow-sm">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="container flex h-12 items-center">
+          <Link href="/" className="flex items-center gap-2 mr-auto">
+            <div className="h-6 w-6 rounded-full overflow-hidden relative flex-shrink-0">
               <div className="absolute inset-0 top-0 h-1/2 bg-primary" />
-              <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-gray-200" />
-              <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/50 -translate-y-1/2" />
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[9px] w-[9px] rounded-full border-[1.5px] border-foreground/50 bg-background" />
+              <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-zinc-200" />
+              <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/40 -translate-y-1/2" />
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-2 w-2 rounded-full border-[1.5px] border-foreground/40 bg-background" />
             </div>
-            <span className="font-bold text-sm hidden sm:inline brand-gradient-text tracking-tight">Poké Draft</span>
+            <span className="font-semibold text-sm hidden sm:inline">Poké Draft</span>
           </Link>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
@@ -65,7 +65,7 @@ export function Header() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
                       <Avatar className="h-7 w-7">
-                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                        <AvatarFallback className="bg-muted text-muted-foreground text-xs font-medium">
                           {displayName[0]?.toUpperCase()}
                         </AvatarFallback>
                       </Avatar>

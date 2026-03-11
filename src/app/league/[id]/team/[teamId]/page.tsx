@@ -330,7 +330,7 @@ export default function TeamDetailPage() {
                   ))}
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-2xl font-black tracking-tighter tabular-nums ${getFormColor(form.formType)}`}>
+                  <span className={`text-2xl font-bold tracking-tight tabular-nums ${getFormColor(form.formType)}`}>
                     {form.formType === 'hot' ? '🔥' : form.formType === 'cold' ? '❄️' : '➖'}
                   </span>
                   <span className="text-sm text-muted-foreground">

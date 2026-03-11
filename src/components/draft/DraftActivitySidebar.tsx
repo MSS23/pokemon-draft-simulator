@@ -171,7 +171,7 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
                     <div key={round}>
                       {/* Round divider */}
                       <div className="flex items-center gap-2 mb-1.5 px-1">
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
                           Round {round}
                         </span>
                         <div className="flex-1 h-px bg-border" />

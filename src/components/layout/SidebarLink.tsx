@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
 
 interface SidebarLinkProps {
   href: string
@@ -35,25 +34,16 @@ export function SidebarLink({ href, icon: Icon, label, badge, onClick, isProtect
       onClick={handleClick}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'relative flex items-center gap-3 px-3 py-1.5 rounded-lg text-[13px] transition-colors',
+        'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors',
         isActive
-          ? 'text-primary font-semibold'
-          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+          ? 'bg-muted text-foreground font-medium'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       )}
     >
-      {/* Sliding active background */}
-      {isActive && (
-        <motion.div
-          layoutId="sidebar-active-pill"
-          className="absolute inset-0 rounded-lg bg-primary/10"
-          transition={{ type: 'spring', stiffness: 380, damping: 36 }}
-        />
-      )}
-
-      <Icon className="relative h-4 w-4 shrink-0" />
-      <span className="relative flex-1">{label}</span>
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="flex-1 truncate">{label}</span>
       {badge && (
-        <span className="relative ml-auto text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium tabular-nums">
           {badge}
         </span>
       )}

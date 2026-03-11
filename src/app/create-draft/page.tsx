@@ -381,8 +381,7 @@ export default function CreateDraftPage() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
           {/* Header */}
           <div className="mb-8">
-            <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-2">New Draft</p>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-2">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight mb-2">
               Create Draft Room
             </h1>
             <p className="text-sm text-muted-foreground">

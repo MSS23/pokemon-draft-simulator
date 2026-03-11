@@ -9,11 +9,11 @@ interface SidebarSectionProps {
 
 export function SidebarSection({ title, children }: SidebarSectionProps) {
   return (
-    <div className="py-2">
-      <h3 className="px-3 mb-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em]">
+    <div className="py-1.5">
+      <h3 className="px-2.5 mb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
         {title}
       </h3>
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         {children}
       </div>
     </div>

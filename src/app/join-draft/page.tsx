@@ -240,8 +240,7 @@ function JoinDraftForm() {
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* Header */}
         <div>
-          <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-2">Join</p>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-2">Join Draft Room</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mb-1">Join Draft Room</h1>
           <p className="text-sm text-muted-foreground">
             Enter a room code to join an existing Pokémon draft.
           </p>

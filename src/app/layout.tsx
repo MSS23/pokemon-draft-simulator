@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Outfit, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import QueryProvider from "@/components/providers/QueryProvider";
@@ -19,14 +19,14 @@ import { validateEnv } from "@/lib/env";
 // Validate environment variables at startup
 validateEnv();
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const outfit = Outfit({
+  variable: "--font-outfit",
   subsets: ["latin"],
   display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
   display: "swap",
 });
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#10b981",
+  themeColor: "#dc2855",
 };
 
 export default function RootLayout({
@@ -77,7 +77,8 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        style={{ fontFamily: 'var(--font-outfit), system-ui, sans-serif' }}
         suppressHydrationWarning
       >
         <HydrationErrorFilter />
@@ -95,13 +96,12 @@ export default function RootLayout({
                       <Header />
                       <TourProvider />
                       <main className="min-h-[calc(100vh-3rem)]">{children}</main>
-                      <footer className="border-t border-border/40 py-5 text-center text-[11px] text-muted-foreground/70 px-4 space-y-1">
-                        <div className="flex items-center justify-center gap-3">
+                      <footer className="border-t py-4 text-center text-xs text-muted-foreground px-4">
+                        <div className="flex items-center justify-center gap-4">
                           <a href="/terms" className="hover:text-foreground transition-colors">Terms</a>
-                          <span className="text-border">|</span>
                           <a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a>
+                          <span className="text-muted-foreground/50">Pokémon is &copy; Nintendo/Game Freak</span>
                         </div>
-                        <p>Pokémon Draft League is a fan project. Pokémon is &copy; Nintendo/Game Freak.</p>
                       </footer>
                     </QueryProvider>
                   </AuthProvider>

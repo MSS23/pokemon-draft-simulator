@@ -427,7 +427,7 @@ export default function HistoryPage() {
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Header */}
           <div>
-            <h1 className="text-3xl font-black tracking-tight mb-1">
+            <h1 className="text-3xl font-bold tracking-tight mb-1">
               {displayName}&apos;s History
             </h1>
             <p className="text-muted-foreground">
@@ -443,7 +443,7 @@ export default function HistoryPage() {
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-black tracking-tighter tabular-nums leading-none">{stats.totalDrafts}</div>
+                <div className="text-3xl font-bold tracking-tight tabular-nums leading-none">{stats.totalDrafts}</div>
               </CardContent>
             </Card>
 
@@ -453,7 +453,7 @@ export default function HistoryPage() {
                 <Swords className="h-3.5 w-3.5 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-black tracking-tighter tabular-nums leading-none">{stats.totalLeagues}</div>
+                <div className="text-3xl font-bold tracking-tight tabular-nums leading-none">{stats.totalLeagues}</div>
               </CardContent>
             </Card>
 
@@ -465,7 +465,7 @@ export default function HistoryPage() {
                 <Trophy className="h-3.5 w-3.5 text-yellow-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-black tracking-tighter tabular-nums leading-none text-yellow-500">
+                <div className="text-3xl font-bold tracking-tight tabular-nums leading-none text-yellow-500">
                   {stats.championships}
                 </div>
               </CardContent>
@@ -477,7 +477,7 @@ export default function HistoryPage() {
                 <TrendingUp className="h-3.5 w-3.5 text-green-500" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-black tracking-tighter tabular-nums leading-none text-green-500">
+                <div className="text-3xl font-bold tracking-tight tabular-nums leading-none text-green-500">
                   {stats.winRate}%
                 </div>
                 {(stats.totalWins > 0 || stats.totalLosses > 0) && (

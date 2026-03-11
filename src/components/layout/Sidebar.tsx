@@ -104,33 +104,33 @@ export function Sidebar() {
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
 
   return (
-    <aside className="w-60 bg-card/80 backdrop-blur-sm border-r border-border/60 flex flex-col h-full">
-      {/* Brand Header */}
-      <div className="px-4 py-3.5 border-b border-border/40">
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="h-7 w-7 rounded-full overflow-hidden border-2 border-primary/40 group-hover:border-primary transition-colors duration-200 relative flex-shrink-0 shadow-sm">
+    <aside className="w-56 bg-card border-r flex flex-col h-full">
+      {/* Brand */}
+      <div className="px-4 py-3 border-b">
+        <Link href="/" className="flex items-center gap-2">
+          <div className="h-5 w-5 rounded-full overflow-hidden relative flex-shrink-0">
             <div className="absolute inset-0 top-0 h-1/2 bg-primary" />
-            <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-gray-200" />
-            <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/50 -translate-y-1/2" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[9px] w-[9px] rounded-full border-[1.5px] border-foreground/50 bg-background" />
+            <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-zinc-200" />
+            <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-foreground/30 -translate-y-1/2" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[7px] w-[7px] rounded-full border-[1px] border-foreground/30 bg-background" />
           </div>
-          <span className="font-bold text-sm brand-gradient-text tracking-tight">Poké Draft</span>
+          <span className="font-semibold text-sm">Poké Draft</span>
         </Link>
       </div>
 
-      {/* User Profile */}
-      <div className="p-4 border-b border-border/40">
+      {/* User */}
+      <div className="px-3 py-3 border-b">
         {user ? (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-8 w-8 ring-1 ring-border/50">
+          <div className="flex items-center gap-2.5">
+            <Avatar className="h-7 w-7">
               <AvatarImage src={user.user_metadata?.avatar_url} />
-              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+              <AvatarFallback className="bg-muted text-muted-foreground text-[10px] font-medium">
                 {displayName[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm truncate">{displayName}</div>
-              <div className="text-[11px] text-muted-foreground/70 truncate">{user.email}</div>
+              <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>
             </div>
           </div>
         ) : (
@@ -144,17 +144,17 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Navigation */}
-      <nav role="navigation" aria-label="Main navigation" className="flex-1 overflow-y-auto p-2 space-y-1">
+      {/* Nav */}
+      <nav role="navigation" aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
         <SidebarSection title="Draft">
           <SidebarLink href="/create-draft" icon={Plus} label="Create Draft" />
           <SidebarLink href="/join-draft" icon={UserPlus} label="Join Draft" />
           <SidebarLink href="/watch-drafts" icon={Eye} label="Watch Live" />
         </SidebarSection>
 
-        <Separator className="my-1" />
+        <Separator className="my-1.5" />
 
-        <SidebarSection title="My Activity">
+        <SidebarSection title="Activity">
           <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
           <SidebarLink href="/profile" icon={UserCircle} label="Profile" />
           <SidebarLink href="/history" icon={History} label="History" />
@@ -162,7 +162,7 @@ export function Sidebar() {
 
         {leagues.length > 0 && (
           <>
-            <Separator className="my-1" />
+            <Separator className="my-1.5" />
             <SidebarSection title="Leagues">
               {leagues.map((league) => (
                 <SidebarLink
@@ -179,11 +179,11 @@ export function Sidebar() {
 
       {/* Bottom */}
       {user && (
-        <div className="p-2 border-t border-border/40 space-y-0.5">
+        <div className="px-2 py-2 border-t space-y-0.5">
           <SidebarLink href="/settings" icon={Settings} label="Settings" />
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm w-full text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] w-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <LogOut className="h-4 w-4" />
             <span>Sign Out</span>
