@@ -237,15 +237,14 @@ function JoinDraftForm() {
 
   return (
     <SidebarLayout>
-      <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold brand-gradient-text">Join Draft Room</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Enter a room code to join an existing Pokémon draft
-            </p>
-          </div>
+        <div>
+          <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-2">Join</p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-2">Join Draft Room</h1>
+          <p className="text-sm text-muted-foreground">
+            Enter a room code to join an existing Pokémon draft.
+          </p>
         </div>
 
             <Card>

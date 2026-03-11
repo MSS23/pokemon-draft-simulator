@@ -261,7 +261,7 @@ export default function MyDraftsPage() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-3">
                 <Trophy className="h-8 w-8 text-yellow-500" />
                 My League Matches
               </h1>
@@ -274,7 +274,7 @@ export default function MyDraftsPage() {
         {/* Drafts Section */}
         {drafts.length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+            <h2 className="text-xl font-bold tracking-tight uppercase flex items-center gap-3">
               <Users className="h-6 w-6 text-blue-500" />
               My Drafts
             </h2>
@@ -528,7 +528,7 @@ function MatchCard({ match, onClick }: { match: MatchWithDetails; onClick: () =>
               {/* VS / Score */}
               <div className="text-center">
                 {isCompleted ? (
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                  <div className="text-3xl font-black tracking-tighter tabular-nums">
                     {match.isUserHome ? match.homeScore : match.awayScore}
                     {' - '}
                     {match.isUserHome ? match.awayScore : match.homeScore}

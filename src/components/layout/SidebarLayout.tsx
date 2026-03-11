@@ -19,8 +19,8 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
       {/* Content column */}
       <div className="flex-1 flex flex-col min-w-0 min-h-[calc(100vh-3.5rem)]">
         {/* Mobile Menu — sticky below global header */}
-        <div className="md:hidden sticky top-14 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-12 items-center px-4">
+        <div className="md:hidden sticky top-14 z-40 border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+          <div className="flex h-11 items-center px-4">
             <MobileSidebar />
           </div>
         </div>

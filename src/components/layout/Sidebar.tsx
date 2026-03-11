@@ -104,33 +104,33 @@ export function Sidebar() {
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
 
   return (
-    <aside className="w-60 bg-card border-r border-border flex flex-col h-full">
+    <aside className="w-60 bg-card/80 backdrop-blur-sm border-r border-border/60 flex flex-col h-full">
       {/* Brand Header */}
-      <div className="px-4 py-3 border-b border-border">
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="h-7 w-7 rounded-full overflow-hidden border-2 border-primary/50 group-hover:border-primary transition-colors relative flex-shrink-0">
+      <div className="px-4 py-3.5 border-b border-border/40">
+        <Link href="/" className="flex items-center gap-2 group">
+          <div className="h-7 w-7 rounded-full overflow-hidden border-2 border-primary/40 group-hover:border-primary transition-colors duration-200 relative flex-shrink-0 shadow-sm">
             <div className="absolute inset-0 top-0 h-1/2 bg-primary" />
             <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-gray-200" />
-            <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/60 -translate-y-1/2" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[9px] w-[9px] rounded-full border-[1.5px] border-foreground/60 bg-background" />
+            <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/50 -translate-y-1/2" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[9px] w-[9px] rounded-full border-[1.5px] border-foreground/50 bg-background" />
           </div>
-          <span className="font-bold text-sm brand-gradient-text">Poké Draft</span>
+          <span className="font-bold text-sm brand-gradient-text tracking-tight">Poké Draft</span>
         </Link>
       </div>
 
       {/* User Profile */}
-      <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border/40">
         {user ? (
           <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
+            <Avatar className="h-8 w-8 ring-1 ring-border/50">
               <AvatarImage src={user.user_metadata?.avatar_url} />
-              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+              <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                 {displayName[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm truncate">{displayName}</div>
-              <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+              <div className="text-[11px] text-muted-foreground/70 truncate">{user.email}</div>
             </div>
           </div>
         ) : (
@@ -179,7 +179,7 @@ export function Sidebar() {
 
       {/* Bottom */}
       {user && (
-        <div className="p-2 border-t border-border space-y-0.5">
+        <div className="p-2 border-t border-border/40 space-y-0.5">
           <SidebarLink href="/settings" icon={Settings} label="Settings" />
           <button
             onClick={handleSignOut}

@@ -27,7 +27,7 @@ export default function Error({
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">Something went wrong</h1>
+          <h1 className="text-2xl font-black tracking-tight">Something went wrong</h1>
           <p className="text-muted-foreground">
             An unexpected error occurred. Please try again or return to the home page.
           </p>

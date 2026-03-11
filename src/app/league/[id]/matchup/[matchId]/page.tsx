@@ -305,11 +305,11 @@ export default function MatchupPreviewPage() {
 
               <div className="text-center px-6">
                 {match.status === 'completed' ? (
-                  <div className="text-3xl font-bold tabular-nums">
+                  <div className="text-4xl font-black tracking-tighter tabular-nums">
                     {match.homeScore} - {match.awayScore}
                   </div>
                 ) : (
-                  <div className="text-2xl font-bold text-muted-foreground">VS</div>
+                  <div className="text-xl font-black tracking-widest text-muted-foreground">VS</div>
                 )}
                 <Badge
                   variant={match.status === 'completed' ? 'default' : match.status === 'scheduled' ? 'outline' : 'secondary'}
@@ -513,15 +513,15 @@ export default function MatchupPreviewPage() {
             <CardContent>
               <div className="flex items-center justify-between mb-4">
                 <div className="text-center flex-1">
-                  <div className="text-3xl font-bold text-green-500">{h2h.wins}</div>
+                  <div className="text-3xl font-black tracking-tighter tabular-nums text-green-500">{h2h.wins}</div>
                   <div className="text-xs text-muted-foreground">Wins</div>
                 </div>
                 <div className="text-center flex-1">
-                  <div className="text-3xl font-bold text-gray-400">{h2h.draws}</div>
+                  <div className="text-3xl font-black tracking-tighter tabular-nums text-gray-400">{h2h.draws}</div>
                   <div className="text-xs text-muted-foreground">Draws</div>
                 </div>
                 <div className="text-center flex-1">
-                  <div className="text-3xl font-bold text-red-500">{h2h.losses}</div>
+                  <div className="text-3xl font-black tracking-tighter tabular-nums text-red-500">{h2h.losses}</div>
                   <div className="text-xs text-muted-foreground">Losses</div>
                 </div>
               </div>

@@ -24,9 +24,9 @@ const badgeVariants = cva(
         cost:
           "border-transparent bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 font-mono",
         host:
-          "border-transparent bg-primary/10 text-primary",
+          "border-transparent bg-primary/10 text-primary font-bold",
         live:
-          "border-transparent bg-success/15 text-success animate-pulse",
+          "border-transparent bg-primary/15 text-primary",
       },
       size: {
         sm: "px-1.5 py-0 text-[10px]",

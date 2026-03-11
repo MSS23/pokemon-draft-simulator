@@ -1829,7 +1829,7 @@ export default function DraftRoomPage() {
         <div className="container mx-auto px-4 py-6">
           {/* Header */}
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold brand-gradient-text mb-2">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight brand-gradient-text mb-2">
               Draft Room: {roomCode}
             </h1>
           </div>

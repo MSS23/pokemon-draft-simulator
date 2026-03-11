@@ -35,10 +35,10 @@ export function SidebarLink({ href, icon: Icon, label, badge, onClick, isProtect
       onClick={handleClick}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+        'relative flex items-center gap-3 px-3 py-1.5 rounded-lg text-[13px] transition-colors',
         isActive
-          ? 'text-primary font-medium'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          ? 'text-primary font-semibold'
+          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
       )}
     >
       {/* Sliding active background */}

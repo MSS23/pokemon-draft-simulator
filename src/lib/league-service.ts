@@ -305,12 +305,11 @@ export class LeagueService {
     // Use circle method for round-robin scheduling (handles even/odd teams)
     const roundRobinRounds = this.buildRoundRobinRounds(teams)
 
-    // Fill weeks from round-robin rounds; cap at available rounds to avoid
-    // duplicate matchups. If totalWeeks > rounds, we only schedule unique rounds.
-    const weeksToSchedule = Math.min(config.totalWeeks, roundRobinRounds.length)
+    // Fill all configured weeks by cycling through round-robin rounds.
+    // When totalWeeks > unique rounds, matchups repeat (rematches).
     const weeklyMatchups: [Team, Team][][] = []
-    for (let week = 0; week < weeksToSchedule; week++) {
-      weeklyMatchups.push(roundRobinRounds[week])
+    for (let week = 0; week < config.totalWeeks; week++) {
+      weeklyMatchups.push(roundRobinRounds[week % roundRobinRounds.length])
     }
 
     // Build match records

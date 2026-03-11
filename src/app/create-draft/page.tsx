@@ -377,27 +377,23 @@ export default function CreateDraftPage() {
 
   return (
     <SidebarLayout>
-      <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
-        <div className="container mx-auto px-4 py-8">
+      <div className="min-h-screen bg-background transition-colors duration-500">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
           {/* Header */}
-          <div className="relative text-center mb-8">
-            {user?.email && (
-              <div className="absolute top-0 left-0 text-sm text-muted-foreground">
-                Signed in as: {user.email}
-              </div>
-            )}
-            <h1 className="text-4xl font-bold brand-gradient-text mb-4">
+          <div className="mb-8">
+            <p className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-2">New Draft</p>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-2">
               Create Draft Room
             </h1>
-            <p className="text-lg text-muted-foreground mb-6">
-              Set up a multiplayer Pokémon draft for your team
+            <p className="text-sm text-muted-foreground">
+              Set up a multiplayer Pokémon draft for your team.
             </p>
           </div>
 
           <div className="max-w-2xl mx-auto">
-            <Card className="shadow-xl">
-              <CardHeader className="text-center">
-                <CardTitle className="text-2xl">Draft Configuration</CardTitle>
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg font-bold">Draft Configuration</CardTitle>
                 <CardDescription>
                   Configure your draft settings and create a room for teams to
                   join

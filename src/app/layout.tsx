@@ -60,7 +60,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#dc2626",
+  themeColor: "#10b981",
 };
 
 export default function RootLayout({
@@ -95,12 +95,13 @@ export default function RootLayout({
                       <Header />
                       <TourProvider />
                       <main className="min-h-[calc(100vh-3rem)]">{children}</main>
-                      <footer className="border-t py-4 text-center text-xs text-muted-foreground px-4">
-                        <a href="/terms" className="hover:underline">Terms</a>
-                        {' · '}
-                        <a href="/privacy" className="hover:underline">Privacy</a>
-                        {' · '}
-                        <span>Pokémon Draft League is a fan project. Pokémon is &copy; Nintendo/Game Freak.</span>
+                      <footer className="border-t border-border/40 py-5 text-center text-[11px] text-muted-foreground/70 px-4 space-y-1">
+                        <div className="flex items-center justify-center gap-3">
+                          <a href="/terms" className="hover:text-foreground transition-colors">Terms</a>
+                          <span className="text-border">|</span>
+                          <a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a>
+                        </div>
+                        <p>Pokémon Draft League is a fan project. Pokémon is &copy; Nintendo/Game Freak.</p>
                       </footer>
                     </QueryProvider>
                   </AuthProvider>
