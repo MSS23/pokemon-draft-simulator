@@ -242,6 +242,210 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
     }
   },
 
+  // VGC 2025 Regulation I (Current)
+  {
+    id: 'vgc-reg-i',
+    name: 'VGC 2025 Regulation I',
+    shortName: 'Reg I',
+    description: 'VGC 2025 Regulation I (Jan 2025+) - Current format. Up to 2 restricted legendaries per team. All Paradox, sub-legendaries, and HOME transfers allowed. Only Mythicals fully banned.',
+    generation: 9,
+    gameType: 'doubles',
+    category: 'vgc',
+    ruleset: {
+      speciesClause: true,
+      itemClause: true,
+      bannedPokemon: [
+        // All Mythical Pokemon (only category fully banned)
+        'mew', 'celebi', 'jirachi', 'deoxys', 'deoxys-attack', 'deoxys-defense', 'deoxys-speed',
+        'phione', 'manaphy', 'darkrai', 'shaymin', 'shaymin-sky', 'arceus',
+        'victini', 'keldeo', 'keldeo-resolute', 'meloetta', 'meloetta-pirouette', 'genesect',
+        'diancie', 'diancie-mega', 'hoopa', 'hoopa-unbound', 'volcanion',
+        'magearna', 'marshadow', 'zeraora', 'meltan', 'melmetal', 'zarude', 'pecharunt',
+        'enamorus',
+      ],
+      bannedTiers: [],
+      allowedGenerations: [],
+      allowedRegions: ['paldea', 'kitakami', 'blueberry'],
+      legendaryPolicy: 'restricted',
+      mythicalPolicy: 'banned',
+      paradoxPolicy: 'allowed',
+      bannedAbilities: [],
+      bannedItems: [],
+      bannedMoves: [],
+      restrictedCount: 2,
+    },
+    costConfig: {
+      type: 'hybrid',
+      bstTiers: {
+        680: 50, 600: 35, 550: 30, 500: 25, 450: 20, 400: 15, 350: 10, 300: 7, 0: 4
+      },
+      costOverrides: {
+        // Restricted legendaries (premium)
+        'koraidon': 55, 'miraidon': 55, 'terapagos': 50,
+        'calyrex-ice': 60, 'calyrex-shadow': 60,
+        'kyogre': 55, 'groudon': 55, 'rayquaza': 60,
+        'zacian-crowned': 60, 'zamazenta-crowned': 45,
+        'mewtwo': 58, 'lugia': 45, 'ho-oh': 48,
+        'dialga': 50, 'palkia': 50, 'giratina': 48,
+        'reshiram': 50, 'zekrom': 50, 'kyurem-white': 52, 'kyurem-black': 50,
+        'xerneas': 52, 'yveltal': 50, 'necrozma-dusk-mane': 55,
+        'solgaleo': 48, 'lunala': 48,
+        // Top-tier non-restricted
+        'flutter-mane': 40, 'iron-hands': 35, 'chi-yu': 38, 'chien-pao': 36,
+        'raging-bolt': 35, 'walking-wake': 32,
+        'ogerpon-wellspring': 30, 'ogerpon-hearthflame': 28,
+        'urshifu': 32, 'urshifu-rapid-strike': 32,
+        'landorus-therian': 35, 'incineroar': 28,
+      },
+      costMultiplier: 1.0,
+      minCost: 4,
+      maxCost: 60
+    },
+    meta: {
+      isOfficial: true,
+      lastUpdated: '2025-01-01',
+      season: '2025 Regulation I',
+      source: 'The Pokémon Company International',
+      popularity: 5,
+      complexity: 5
+    }
+  },
+
+  // VGC 2023 Regulation C
+  {
+    id: 'vgc-reg-c',
+    name: 'VGC 2023 Regulation C',
+    shortName: 'Reg C',
+    description: 'VGC 2023 Regulation C (Jun–Aug 2023) - Paldea Pokédex only. Paradox Pokémon now ALLOWED. No legendaries, mythicals, or Treasures of Ruin.',
+    generation: 9,
+    gameType: 'doubles',
+    category: 'vgc',
+    ruleset: {
+      speciesClause: true,
+      itemClause: true,
+      bannedPokemon: [
+        // Treasures of Ruin
+        'wo-chien', 'chien-pao', 'ting-lu', 'chi-yu',
+
+        // Box Legendaries
+        'koraidon', 'miraidon',
+
+        // Non-Paldean regional variants
+        'rattata-alola', 'raticate-alola', 'raichu-alola', 'sandshrew-alola', 'sandslash-alola',
+        'vulpix-alola', 'ninetales-alola', 'diglett-alola', 'dugtrio-alola', 'meowth-alola',
+        'persian-alola', 'geodude-alola', 'graveler-alola', 'golem-alola', 'grimer-alola',
+        'muk-alola', 'exeggutor-alola', 'marowak-alola',
+
+        'gimmighoul-roaming',
+      ],
+      bannedTiers: [],
+      allowedGenerations: [9],
+      allowedRegions: ['paldea'],
+      legendaryPolicy: 'banned',
+      mythicalPolicy: 'banned',
+      paradoxPolicy: 'allowed',
+      bannedAbilities: [],
+      bannedItems: [],
+      bannedMoves: [],
+    },
+    costConfig: {
+      type: 'hybrid',
+      bstTiers: {
+        600: 30, 550: 25, 500: 20, 450: 15, 400: 10, 350: 8, 300: 5, 0: 3
+      },
+      costOverrides: {
+        'flutter-mane': 28, 'iron-hands': 26, 'iron-bundle': 25,
+        'roaring-moon': 24, 'iron-valiant': 25,
+        'great-tusk': 24, 'iron-moth': 20,
+        'sandy-shocks': 18, 'iron-thorns': 18,
+        'scream-tail': 16, 'brute-bonnet': 14, 'slither-wing': 15,
+        'iron-treads': 20, 'iron-jugulis': 18,
+      },
+      costMultiplier: 1.0,
+      minCost: 3,
+      maxCost: 30
+    },
+    meta: {
+      isOfficial: true,
+      lastUpdated: '2023-06-01',
+      season: '2023 Regulation C',
+      source: 'The Pokémon Company International',
+      popularity: 3,
+      complexity: 3
+    }
+  },
+
+  // VGC 2024 Regulation E
+  {
+    id: 'vgc-reg-e',
+    name: 'VGC 2024 Regulation E',
+    shortName: 'Reg E',
+    description: 'VGC 2024 Regulation E (Jan 2024) - Full Paldea + Kitakami + Blueberry dex with HOME transfers. Paradox & sub-legendaries allowed. Restricted legendaries and Mythicals banned.',
+    generation: 9,
+    gameType: 'doubles',
+    category: 'vgc',
+    ruleset: {
+      speciesClause: true,
+      itemClause: true,
+      bannedPokemon: [
+        // Restricted Legendaries (banned, 0 restricted slots)
+        'koraidon', 'miraidon', 'terapagos', 'terapagos-terastal', 'terapagos-stellar',
+        'mewtwo', 'lugia', 'ho-oh', 'kyogre', 'groudon', 'rayquaza',
+        'dialga', 'dialga-origin', 'palkia', 'palkia-origin',
+        'giratina', 'giratina-origin',
+        'reshiram', 'zekrom', 'kyurem', 'kyurem-black', 'kyurem-white',
+        'xerneas', 'yveltal', 'zygarde', 'zygarde-10', 'zygarde-complete',
+        'cosmog', 'cosmoem', 'solgaleo', 'lunala', 'necrozma', 'necrozma-dusk-mane',
+        'necrozma-dawn-wings', 'necrozma-ultra',
+        'zacian', 'zacian-crowned', 'zamazenta', 'zamazenta-crowned',
+        'eternatus', 'eternatus-eternamax',
+        'calyrex', 'calyrex-ice', 'calyrex-shadow',
+        // Mythicals
+        'mew', 'celebi', 'jirachi', 'deoxys', 'phione', 'manaphy', 'darkrai',
+        'shaymin', 'arceus', 'victini', 'keldeo', 'meloetta', 'genesect',
+        'diancie', 'hoopa', 'volcanion', 'magearna', 'marshadow', 'zeraora',
+        'meltan', 'melmetal', 'zarude', 'pecharunt', 'enamorus',
+      ],
+      bannedTiers: [],
+      allowedGenerations: [],
+      allowedRegions: ['paldea', 'kitakami', 'blueberry'],
+      legendaryPolicy: 'restricted',
+      mythicalPolicy: 'banned',
+      paradoxPolicy: 'allowed',
+      bannedAbilities: [],
+      bannedItems: [],
+      bannedMoves: [],
+    },
+    costConfig: {
+      type: 'hybrid',
+      bstTiers: {
+        600: 30, 550: 25, 500: 20, 450: 15, 400: 10, 350: 8, 300: 5, 0: 3
+      },
+      costOverrides: {
+        'flutter-mane': 28, 'iron-hands': 26, 'chi-yu': 25, 'chien-pao': 24,
+        'roaring-moon': 23, 'iron-valiant': 25,
+        'raging-bolt': 24, 'walking-wake': 23,
+        'ogerpon-wellspring': 22, 'ogerpon-hearthflame': 21,
+        'ogerpon-cornerstone': 20, 'ogerpon': 18,
+        'okidogi': 15, 'munkidori': 16, 'fezandipiti': 15,
+        'wo-chien': 17, 'ting-lu': 18,
+        'urshifu': 24, 'urshifu-rapid-strike': 24,
+        'landorus-therian': 26, 'incineroar': 22,
+      },
+      costMultiplier: 1.0,
+      minCost: 3,
+      maxCost: 30
+    },
+    meta: {
+      isOfficial: true,
+      lastUpdated: '2024-01-01',
+      season: '2024 Regulation E',
+      source: 'The Pokémon Company International',
+      popularity: 4,
+      complexity: 4
+    }
+  },
+
   // VGC Regulation F
   {
     id: 'vgc-reg-f',
@@ -670,7 +874,7 @@ export function getPopularFormats(): PokemonFormat[] {
 }
 
 // Default format
-export const DEFAULT_FORMAT = 'vgc-reg-h'
+export const DEFAULT_FORMAT = 'vgc-reg-i'
 
 /**
  * Merge Showdown data with local formats

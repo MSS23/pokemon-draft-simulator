@@ -7,6 +7,7 @@ import type { Database } from '@/lib/supabase'
 import type { DraftSettings } from '@/types/supabase-helpers'
 import type { League, Match, Team } from '@/types'
 import { LeagueService } from '@/lib/league-service'
+import { getFormatById } from '@/lib/formats'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -369,6 +370,12 @@ export default function DashboardPage() {
             <Button size="sm" variant="outline" className="text-xs" asChild>
               <Link href="/join-draft">Join Draft</Link>
             </Button>
+            <Button size="sm" variant="outline" className="text-xs" asChild>
+              <Link href="/create-tournament">
+                <Swords className="h-3.5 w-3.5 mr-1" />
+                Tournament
+              </Link>
+            </Button>
             <Button size="sm" className="text-xs" asChild>
               <Link href="/create-draft">
                 <Plus className="h-3.5 w-3.5 mr-1" />
@@ -487,8 +494,76 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
+        {/* ═══════════════════ My Knockouts ═══════════════════ */}
+        <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <Swords className="h-4 w-4 text-red-500" />
+                Knockouts
+              </h2>
+              <Button size="sm" variant="ghost" className="text-xs h-7" asChild>
+                <Link href="/create-tournament"><Plus className="h-3 w-3 mr-1" />New Tournament</Link>
+              </Button>
+            </div>
+            {leagueStandings.filter(s => s.league.leagueType === 'knockout').length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {leagueStandings.filter(s => s.league.leagueType === 'knockout').map(standing => {
+                  const isCommissioner = standing.league.settings?.commissionerId === user?.id
+                  const leagueUrl = `/tournament/${standing.league.id}`
+                  const formatId = (standing.league.settings as Record<string, unknown>)?.formatId as string | undefined
+                  const format = formatId ? getFormatById(formatId) : null
+                  return (
+                    <Card key={standing.league.id} className="card-interactive group" onClick={() => router.push(leagueUrl)}>
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-sm truncate">{standing.league.name}</p>
+                              {isCommissioner && <Crown className="h-3 w-3 text-amber-500 shrink-0" />}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {format && <Badge variant="outline" size="sm" className="text-[10px]">{format.shortName}</Badge>}
+                              <span className="text-xs text-muted-foreground">
+                                Round {standing.league.currentWeek}/{standing.league.totalWeeks}
+                              </span>
+                            </div>
+                          </div>
+                          {statusBadge(standing.league.status)}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-bold tabular-nums">{standing.wins}W-{standing.losses}L</span>
+                          {standing.league.status === 'completed' && standing.wins > standing.losses && (
+                            <Trophy className="h-4 w-4 text-yellow-500" />
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            ) : (
+              <Card className="border-dashed">
+                <CardContent className="py-8 text-center space-y-2">
+                  <Trophy className="h-8 w-8 mx-auto text-muted-foreground/40" />
+                  <p className="text-sm font-medium">No tournaments yet</p>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                    Create a knockout tournament — pick a regulation like Reg I, F, or H and invite players.
+                  </p>
+                  <Button size="sm" variant="outline" className="mt-2" asChild>
+                    <Link href="/create-tournament">
+                      <Swords className="h-3.5 w-3.5 mr-1.5" />
+                      Create Tournament
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </motion.div>
+
         {/* ═══════════════════ My Leagues ═══════════════════ */}
-        {leagueStandings.length > 0 && (
+        {leagueStandings.filter(s => s.league.leagueType !== 'knockout').length > 0 && (
           <motion.div custom={5} variants={fadeUp} initial="hidden" animate="visible">
             <div className="space-y-3" id="tour-leagues">
               <h2 className="text-sm font-semibold flex items-center gap-2">
@@ -497,28 +572,33 @@ export default function DashboardPage() {
               </h2>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                {leagueStandings.map(standing => {
+                {leagueStandings.filter(s => s.league.leagueType !== 'knockout').map(standing => {
                   const isCommissioner = standing.league.settings?.commissionerId === user?.id
                   const totalGames = standing.wins + standing.losses + standing.draws
                   const wPct = totalGames > 0 ? Math.round((standing.wins / totalGames) * 100) : 0
+                  const isKnockout = standing.league.leagueType === 'knockout'
+                  const leagueUrl = isKnockout ? `/tournament/${standing.league.id}` : `/league/${standing.league.id}`
 
                   return (
                     <Card
                       key={standing.league.id}
                       className="card-interactive group"
-                      onClick={() => router.push(`/league/${standing.league.id}`)}
+                      onClick={() => router.push(leagueUrl)}
                     >
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <p className="font-semibold text-sm truncate">{standing.league.name}</p>
+                              {isKnockout && (
+                                <Badge variant="outline" size="sm" className="text-[10px] text-red-500 border-red-500/30">KO</Badge>
+                              )}
                               {isCommissioner && (
                                 <Crown className="h-3 w-3 text-amber-500 shrink-0" />
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {standing.userTeamName} &middot; Week {standing.league.currentWeek}/{standing.league.totalWeeks}
+                              {standing.userTeamName} &middot; {isKnockout ? `Round ${standing.league.currentWeek}/${standing.league.totalWeeks}` : `Week ${standing.league.currentWeek}/${standing.league.totalWeeks}`}
                             </p>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
