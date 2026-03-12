@@ -371,10 +371,7 @@ export default function DashboardPage() {
               <Link href="/join-draft">Join Draft</Link>
             </Button>
             <Button size="sm" variant="outline" className="text-xs" asChild>
-              <Link href="/create-tournament">
-                <Swords className="h-3.5 w-3.5 mr-1" />
-                Tournament
-              </Link>
+              <Link href="/join-tournament">Join Tournament</Link>
             </Button>
             <Button size="sm" className="text-xs" asChild>
               <Link href="/create-draft">

@@ -17,7 +17,7 @@ import { UserSessionService } from '@/lib/user-session'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
 import {
-  ArrowLeft, Trophy, Swords, Copy, Check, Crown,
+  ArrowLeft, Trophy, Swords, Copy, Check, Crown, Users, Play, Loader2,
 } from 'lucide-react'
 import type { League, Match, Team, Pick } from '@/types'
 import type { Tournament } from '@/lib/tournament-service'
@@ -36,7 +36,13 @@ export default function TournamentPage() {
   const [isCommissioner, setIsCommissioner] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [copiedLink, setCopiedLink] = useState(false)
+  const [copiedCode, setCopiedCode] = useState(false)
+
+  // Lobby state
+  const [lobbyPlayers, setLobbyPlayers] = useState<{ id: string; name: string; ownerId: string | null }[]>([])
+  const [isLobby, setIsLobby] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
+  const [roomCode, setRoomCode] = useState<string | null>(null)
 
   // Match recorder
   const [selectedMatch, setSelectedMatch] = useState<(Match & { homeTeam: Team; awayTeam: Team }) | null>(null)
@@ -50,17 +56,76 @@ export default function TournamentPage() {
       setIsLoading(true)
       setError(null)
 
+      // First try loading as an active tournament
       const data = await KnockoutService.getFullTournament(tournamentId)
-      if (!data) { setError('Tournament not found'); return }
 
-      setLeague(data.league)
-      setTournament(data.tournament)
-      setMatches(data.matches)
+      if (data) {
+        // Active tournament with bracket
+        setLeague(data.league)
+        setTournament(data.tournament)
+        setMatches(data.matches)
+        setIsLobby(false)
 
-      // Load team rosters
-      const teamIds = data.league.teams.map(t => t.id)
-      const picks = await KnockoutService.getTeamPicks(teamIds)
-      setTeamPicks(picks)
+        // Load team rosters
+        const teamIds = data.league.teams.map(t => t.id)
+        const picks = await KnockoutService.getTeamPicks(teamIds)
+        setTeamPicks(picks)
+
+        // Get room code from settings
+        const settings = data.league.settings as Record<string, unknown>
+        if (settings?.roomCode) setRoomCode(settings.roomCode as string)
+      } else {
+        // Might be a lobby (no bracket yet) — try loading league directly
+        const { supabase } = await import('@/lib/supabase')
+        if (!supabase) { setError('Not connected'); return }
+
+        const { data: leagueRow } = await supabase
+          .from('leagues')
+          .select('*')
+          .eq('id', tournamentId)
+          .single()
+
+        if (!leagueRow) { setError('Tournament not found'); return }
+
+        const settings = (leagueRow.settings ?? {}) as Record<string, unknown>
+        const code = settings.roomCode as string | undefined
+
+        if (leagueRow.status === 'scheduled' && code) {
+          // It's a lobby
+          setIsLobby(true)
+          setRoomCode(code)
+
+          // Load players from teams table via draft
+          const { data: teamRows } = await supabase
+            .from('teams')
+            .select('id, name, owner_id')
+            .eq('draft_id', leagueRow.draft_id)
+            .order('draft_order')
+
+          setLobbyPlayers(teamRows?.map(t => ({ id: t.id, name: t.name, ownerId: t.owner_id })) || [])
+
+          // Create a minimal league object for display
+          setLeague({
+            id: leagueRow.id,
+            draftId: leagueRow.draft_id,
+            name: leagueRow.name,
+            leagueType: leagueRow.league_type,
+            seasonNumber: leagueRow.season_number,
+            status: leagueRow.status,
+            startDate: leagueRow.start_date,
+            endDate: leagueRow.end_date,
+            currentWeek: leagueRow.current_week,
+            totalWeeks: leagueRow.total_weeks,
+            settings: leagueRow.settings,
+            createdAt: leagueRow.created_at,
+            updatedAt: leagueRow.updated_at,
+            teams: [],
+          })
+        } else {
+          setError('Tournament not found')
+          return
+        }
+      }
 
       // Check commissioner
       let userId = user?.id
@@ -84,11 +149,34 @@ export default function TournamentPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(`${window.location.origin}/tournament/${tournamentId}`)
-    setCopiedLink(true)
-    setTimeout(() => setCopiedLink(false), 2000)
+  // Poll lobby for new players
+  useEffect(() => {
+    if (!isLobby) return
+    const interval = setInterval(loadData, 5000)
+    return () => clearInterval(interval)
+  }, [isLobby, loadData])
+
+  const handleCopyCode = async () => {
+    if (!roomCode) return
+    await navigator.clipboard.writeText(roomCode)
+    setCopiedCode(true)
+    setTimeout(() => setCopiedCode(false), 2000)
   }
+
+  const handleStart = useCallback(async () => {
+    if (!user) return
+    setIsStarting(true)
+    try {
+      await KnockoutService.beginTournament(tournamentId, user.id)
+      notify.success('Tournament Started!', 'Bracket generated')
+      await loadData()
+    } catch (err) {
+      log.error('Failed to start tournament:', err)
+      notify.error('Failed', err instanceof Error ? err.message : 'Could not start tournament')
+    } finally {
+      setIsStarting(false)
+    }
+  }, [user, tournamentId, loadData])
 
   const handleRecordMatch = useCallback((match: Match & { homeTeam: Team; awayTeam: Team }) => {
     setHomeTeamPicks(teamPicks[match.homeTeamId] || [])
@@ -99,11 +187,7 @@ export default function TournamentPage() {
   const handleMatchRecorded = useCallback(async () => {
     if (!selectedMatch) return
     setSelectedMatch(null)
-
-    // After recording via MatchRecorderModal, also update the bracket
     try {
-      // Find winner from the match (modal already updated the DB match)
-      // Reload everything to get fresh state
       await loadData()
       notify.success('Match Recorded', 'Bracket updated')
     } catch (err) {
@@ -111,7 +195,6 @@ export default function TournamentPage() {
     }
   }, [selectedMatch, loadData])
 
-  // Derive active (pending) matches from the bracket
   const activeMatches = useMemo(() => {
     if (!tournament) return []
     return matches.filter(m => m.status === 'scheduled' || m.status === 'in_progress')
@@ -122,15 +205,18 @@ export default function TournamentPage() {
   }, [matches])
 
   const teamColorMap = useMemo(() => {
-    if (!league) return new Map()
-    return buildTeamColorMap(league.teams.map(t => t.id))
-  }, [league])
+    if (!league) return new Map<string, { bg: string; text: string; border: string }>()
+    const teamIds = isLobby
+      ? lobbyPlayers.map(p => p.id)
+      : league.teams.map(t => t.id)
+    return buildTeamColorMap(teamIds)
+  }, [league, isLobby, lobbyPlayers])
 
   if (isLoading) {
-    return <LoadingScreen title="Loading Tournament..." description="Fetching bracket and match data." />
+    return <LoadingScreen title="Loading Tournament..." description="Fetching tournament data." />
   }
 
-  if (error || !league || !tournament) {
+  if (error || !league) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
@@ -146,12 +232,119 @@ export default function TournamentPage() {
     )
   }
 
-  const currentRoundName = tournament.rounds.find(r =>
-    r.matches.some(m => m.status === 'pending' || m.status === 'in-progress')
-  )?.name || (tournament.status === 'completed' ? 'Complete' : 'Round 1')
-
   const formatId = (league.settings as Record<string, unknown>)?.formatId as string | undefined
   const tournamentFormat = formatId ? getFormatById(formatId) : null
+  const tournamentType = (league.settings as Record<string, unknown>)?.tournamentType as string | undefined
+
+  // ═══════════════════ LOBBY VIEW ═══════════════════
+  if (isLobby) {
+    return (
+      <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
+        <div className="container mx-auto px-4 py-6 max-w-2xl">
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-6">
+            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push('/dashboard')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{league.name}</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                {tournamentFormat && <Badge variant="outline">{tournamentFormat.shortName}</Badge>}
+                {tournamentType && (
+                  <Badge variant="secondary" className="text-[10px] capitalize">
+                    {tournamentType.replace('-', ' ')}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="text-yellow-600 border-yellow-500/30">Waiting for players</Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Room Code */}
+          <Card className="mb-4 border-2 border-primary/30 bg-primary/5">
+            <CardContent className="py-5 text-center space-y-2">
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Room Code</p>
+              <button
+                onClick={handleCopyCode}
+                className="text-4xl font-mono font-bold tracking-[0.3em] hover:text-primary transition-colors"
+              >
+                {roomCode}
+              </button>
+              <p className="text-xs text-muted-foreground">
+                {copiedCode ? (
+                  <span className="text-green-500 flex items-center justify-center gap-1">
+                    <Check className="h-3 w-3" /> Copied!
+                  </span>
+                ) : (
+                  'Tap to copy — share with players'
+                )}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Players */}
+          <Card className="mb-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Users className="h-4 w-4 text-primary" />
+                Players
+                <Badge variant="outline" className="ml-auto">{lobbyPlayers.length}/32</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {lobbyPlayers.map((player, i) => {
+                const colors = teamColorMap.get(player.id)
+                return (
+                  <div key={player.id} className="flex items-center gap-3 p-2.5 border rounded-lg">
+                    <div className={`w-2 h-8 rounded-full shrink-0 ${colors?.bg || 'bg-muted'}`} />
+                    <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">{i + 1}</span>
+                    <span className="font-medium text-sm flex-1 truncate">{player.name}</span>
+                    {i === 0 && (
+                      <Badge variant="outline" size="sm" className="text-amber-500 border-amber-500/30">
+                        <Crown className="h-3 w-3 mr-0.5" /> Host
+                      </Badge>
+                    )}
+                  </div>
+                )
+              })}
+
+              {lobbyPlayers.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No players yet</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Start Button */}
+          {isCommissioner && (
+            <Button
+              className="w-full h-12 text-base"
+              onClick={handleStart}
+              disabled={isStarting || lobbyPlayers.length < 2}
+            >
+              {isStarting ? (
+                <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Generating Bracket...</>
+              ) : lobbyPlayers.length < 2 ? (
+                <><Users className="h-5 w-5 mr-2" />Need at least 2 players</>
+              ) : (
+                <><Play className="h-5 w-5 mr-2" />Start Tournament ({lobbyPlayers.length} players)</>
+              )}
+            </Button>
+          )}
+
+          {!isCommissioner && (
+            <div className="text-center text-sm text-muted-foreground py-4">
+              Waiting for the host to start the tournament...
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════ ACTIVE TOURNAMENT VIEW ═══════════════════
+  const currentRoundName = tournament?.rounds.find(r =>
+    r.matches.some(m => m.status === 'pending' || m.status === 'in-progress')
+  )?.name || (tournament?.status === 'completed' ? 'Complete' : 'Round 1')
 
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
@@ -159,7 +352,7 @@ export default function TournamentPage() {
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push('/')}>
+          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push('/dashboard')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1 min-w-0">
@@ -168,21 +361,24 @@ export default function TournamentPage() {
               {tournamentFormat && (
                 <Badge variant="outline">{tournamentFormat.shortName}</Badge>
               )}
-              {tournament.status === 'completed' && (
+              {tournament?.status === 'completed' && (
                 <Badge variant="default" className="bg-yellow-500 text-yellow-950">Complete</Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
-              Knockout Tournament &middot; {league.teams.length} players &middot; {currentRoundName}
+              {tournamentType ? tournamentType.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Knockout'} &middot; {league.teams.length} players &middot; {currentRoundName}
             </p>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={handleCopyLink}>
-            {copiedLink ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-          </Button>
+          {roomCode && (
+            <Button variant="ghost" size="sm" className="shrink-0 font-mono text-xs" onClick={handleCopyCode}>
+              {copiedCode ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+              {roomCode}
+            </Button>
+          )}
         </div>
 
         {/* Champion Banner */}
-        {tournament.winner && (
+        {tournament?.winner && (
           <Card className="mb-6 border-2 border-yellow-500/50 bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20">
             <CardContent className="py-4 flex items-center justify-center gap-3">
               <Crown className="h-6 w-6 text-yellow-500" />
@@ -194,7 +390,7 @@ export default function TournamentPage() {
         )}
 
         {/* Bracket */}
-        <PlayoffBracket tournament={tournament} className="mb-6" />
+        {tournament && <PlayoffBracket tournament={tournament} className="mb-6" />}
 
         {/* Active Matches */}
         {activeMatches.length > 0 && (
@@ -286,7 +482,7 @@ export default function TournamentPage() {
               {completedMatches.map(match => {
                 const homeColors = teamColorMap.get(match.homeTeamId)
                 const awayColors = teamColorMap.get(match.awayTeamId)
-                const roundInfo = tournament.rounds.find(r =>
+                const roundInfo = tournament?.rounds.find(r =>
                   r.matches.some(m =>
                     (m.participant1?.teamId === match.homeTeamId && m.participant2?.teamId === match.awayTeamId) ||
                     (m.participant1?.teamId === match.awayTeamId && m.participant2?.teamId === match.homeTeamId)

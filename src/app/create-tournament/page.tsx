@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,7 +15,7 @@ import { POKEMON_FORMATS, getFormatById } from '@/lib/formats'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
 import {
-  Swords, Trophy, ArrowLeft, Plus, Trash2, Loader2, Shield, ChevronLeft, ChevronRight,
+  Swords, Trophy, ArrowLeft, Loader2, Shield, ChevronLeft, ChevronRight, GitBranch,
 } from 'lucide-react'
 
 const log = createLogger('CreateTournamentPage')
@@ -26,7 +26,6 @@ const VGC_FORMATS = POKEMON_FORMATS
 
 const STEPS = [
   { id: 'format', label: 'Format' },
-  { id: 'players', label: 'Players' },
   { id: 'settings', label: 'Settings' },
 ] as const
 
@@ -38,49 +37,31 @@ export default function CreateTournamentPage() {
 
   const [name, setName] = useState('')
   const [formatId, setFormatId] = useState('')
+  const [tournamentType, setTournamentType] = useState<'single-elimination' | 'double-elimination'>('single-elimination')
   const [matchFormat, setMatchFormat] = useState<'best_of_1' | 'best_of_3'>('best_of_3')
-  const [players, setPlayers] = useState<{ name: string }[]>([
-    { name: '' }, { name: '' }, { name: '' }, { name: '' },
-  ])
 
   const selectedFormat = formatId ? getFormatById(formatId) : null
-  const validPlayers = players.filter(p => p.name.trim())
-  const totalRounds = validPlayers.length >= 2 ? Math.ceil(Math.log2(validPlayers.length)) : 0
-  const nextPow2 = validPlayers.length >= 2 ? Math.pow(2, totalRounds) : 0
-  const byesNeeded = nextPow2 - validPlayers.length
-
-  const addPlayer = useCallback(() => {
-    if (players.length >= KnockoutService.MAX_PLAYERS) return
-    setPlayers(prev => [...prev, { name: '' }])
-  }, [players.length])
-
-  const removePlayer = useCallback((index: number) => {
-    if (players.length <= 2) return
-    setPlayers(prev => prev.filter((_, i) => i !== index))
-  }, [players.length])
-
-  const updatePlayer = useCallback((index: number, value: string) => {
-    setPlayers(prev => prev.map((p, i) => i === index ? { name: value } : p))
-  }, [])
 
   const canProceed = (s: number) => {
     if (s === 0) return !!formatId
-    if (s === 1) return validPlayers.length >= 2 && name.trim().length > 0
+    if (s === 1) return name.trim().length > 0
     return true
   }
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     if (!user) return
     setIsCreating(true)
     try {
-      const { league } = await KnockoutService.createStandalone({
+      const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Host'
+      const { league, roomCode } = await KnockoutService.createLobby({
         name: name.trim(),
         formatId,
-        players: validPlayers,
+        tournamentType,
         matchFormat,
         hostId: user.id,
+        hostName: displayName,
       })
-      notify.success('Tournament Created!', 'Bracket is ready')
+      notify.success('Tournament Created!', `Room code: ${roomCode}`)
       router.push(`/tournament/${league.id}`)
     } catch (err) {
       log.error('Failed to create tournament:', err)
@@ -88,7 +69,7 @@ export default function CreateTournamentPage() {
     } finally {
       setIsCreating(false)
     }
-  }
+  }, [user, name, formatId, tournamentType, matchFormat, router])
 
   if (authLoading) {
     return (
@@ -105,12 +86,10 @@ export default function CreateTournamentPage() {
       <SidebarLayout>
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="max-w-md w-full">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardContent className="pt-8 pb-6 space-y-3">
+              <div className="flex items-center gap-2 font-semibold text-lg">
                 <Shield className="h-6 w-6 text-yellow-500" />Sign In Required
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </div>
               <p className="text-sm text-muted-foreground">Sign in to create and manage tournaments.</p>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => router.push('/')} className="flex-1">Go Back</Button>
@@ -132,8 +111,8 @@ export default function CreateTournamentPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">Create Knockout Tournament</h1>
-            <p className="text-sm text-muted-foreground">Single elimination bracket — up to 32 players</p>
+            <h1 className="text-xl font-bold">Create Tournament</h1>
+            <p className="text-sm text-muted-foreground">Pick a format, share the room code, and start when ready</p>
           </div>
         </div>
 
@@ -157,38 +136,36 @@ export default function CreateTournamentPage() {
             {/* Step 0: Format */}
             {step === 0 && (
               <div className="space-y-4">
-                <div>
-                  <Label className="text-base font-semibold mb-3 block">Choose a Tournament Regulation</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {VGC_FORMATS.map(fmt => (
-                      <button
-                        key={fmt.id}
-                        onClick={() => {
-                          setFormatId(fmt.id)
-                          if (!name.trim()) setName(`${fmt.shortName} Tournament`)
-                        }}
-                        className={`p-3 border-2 rounded-lg text-left transition-colors ${
-                          formatId === fmt.id
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-muted-foreground/30'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold text-sm">{fmt.shortName}</span>
-                          <Badge variant="outline" size="sm" className="text-[10px]">Gen {fmt.generation}</Badge>
-                          {fmt.gameType === 'doubles' && <Badge variant="secondary" size="sm" className="text-[10px]">Doubles</Badge>}
-                        </div>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{fmt.description}</p>
-                      </button>
-                    ))}
-                  </div>
+                <Label className="text-base font-semibold mb-3 block">Choose a Regulation</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {VGC_FORMATS.map(fmt => (
+                    <button
+                      key={fmt.id}
+                      onClick={() => {
+                        setFormatId(fmt.id)
+                        if (!name.trim()) setName(`${fmt.shortName} Tournament`)
+                      }}
+                      className={`p-3 border-2 rounded-lg text-left transition-colors ${
+                        formatId === fmt.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-muted-foreground/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-sm">{fmt.shortName}</span>
+                        <Badge variant="outline" size="sm" className="text-[10px]">Gen {fmt.generation}</Badge>
+                        {fmt.gameType === 'doubles' && <Badge variant="secondary" size="sm" className="text-[10px]">Doubles</Badge>}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{fmt.description}</p>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Step 1: Players */}
+            {/* Step 1: Settings */}
             {step === 1 && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="tournament-name">Tournament Name</Label>
                   <Input
@@ -199,44 +176,42 @@ export default function CreateTournamentPage() {
                   />
                 </div>
 
+                {/* Elimination Type */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Players ({validPlayers.length})</Label>
-                    <Button
-                      variant="outline" size="sm"
-                      onClick={addPlayer}
-                      disabled={players.length >= KnockoutService.MAX_PLAYERS}
+                  <Label>Elimination Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setTournamentType('single-elimination')}
+                      className={`p-3 border-2 rounded-lg text-left transition-colors ${
+                        tournamentType === 'single-elimination'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-muted-foreground/30'
+                      }`}
                     >
-                      <Plus className="h-3 w-3 mr-1" />Add
-                    </Button>
-                  </div>
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {players.map((player, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground w-5 text-right shrink-0">{i + 1}</span>
-                        <Input
-                          value={player.name}
-                          onChange={e => updatePlayer(i, e.target.value)}
-                          placeholder={`Player ${i + 1}`}
-                          className="h-9"
-                        />
-                        <Button
-                          variant="ghost" size="icon" className="h-9 w-9 shrink-0"
-                          onClick={() => removePlayer(i)}
-                          disabled={players.length <= 2}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                      <div className="flex items-center gap-2 mb-1">
+                        <GitBranch className="h-4 w-4" />
+                        <span className="font-semibold text-sm">Single Elimination</span>
                       </div>
-                    ))}
+                      <p className="text-xs text-muted-foreground">Lose once and you&apos;re out</p>
+                    </button>
+                    <button
+                      onClick={() => setTournamentType('double-elimination')}
+                      className={`p-3 border-2 rounded-lg text-left transition-colors ${
+                        tournamentType === 'double-elimination'
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-muted-foreground/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <GitBranch className="h-4 w-4 rotate-180" />
+                        <span className="font-semibold text-sm">Double Elimination</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Two losses to be eliminated</p>
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* Step 2: Settings & Review */}
-            {step === 2 && (
-              <div className="space-y-5">
+                {/* Match Format */}
                 <div className="space-y-2">
                   <Label>Match Format</Label>
                   <Select value={matchFormat} onValueChange={v => setMatchFormat(v as 'best_of_1' | 'best_of_3')}>
@@ -248,42 +223,25 @@ export default function CreateTournamentPage() {
                   </Select>
                 </div>
 
-                {/* Review */}
+                {/* Summary */}
                 <div className="p-4 bg-muted/50 rounded-lg space-y-3">
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <Trophy className="h-4 w-4 text-yellow-500" />
-                    Tournament Summary
+                    Summary
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                     <span className="text-muted-foreground">Name</span>
                     <span className="font-medium truncate">{name || '—'}</span>
                     <span className="text-muted-foreground">Format</span>
                     <span className="font-medium">{selectedFormat?.shortName || '—'}</span>
-                    <span className="text-muted-foreground">Players</span>
-                    <span className="font-medium">{validPlayers.length}</span>
-                    <span className="text-muted-foreground">Rounds</span>
-                    <span className="font-medium">{totalRounds}</span>
-                    {byesNeeded > 0 && (
-                      <>
-                        <span className="text-muted-foreground">First-round Byes</span>
-                        <span className="font-medium">{byesNeeded}</span>
-                      </>
-                    )}
+                    <span className="text-muted-foreground">Bracket</span>
+                    <span className="font-medium capitalize">{tournamentType.replace('-', ' ')}</span>
                     <span className="text-muted-foreground">Match Format</span>
                     <span className="font-medium">{matchFormat === 'best_of_3' ? 'Best of 3' : 'Best of 1'}</span>
                   </div>
-
-                  {/* Player list */}
-                  <div className="pt-2 border-t">
-                    <span className="text-xs font-medium text-muted-foreground mb-1.5 block">Seeding (entry order)</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {validPlayers.map((p, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {i + 1}. {p.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
+                  <p className="text-xs text-muted-foreground pt-2 border-t">
+                    After creating, share the room code with players. Start when everyone has joined (2–32 players).
+                  </p>
                 </div>
               </div>
             )}
