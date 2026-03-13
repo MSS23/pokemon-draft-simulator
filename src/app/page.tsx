@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
-import { Trophy, Users, Eye, Zap, Plus, LogIn, Shield, ArrowRight } from 'lucide-react'
+import { Trophy, Users, Eye, Zap, Plus, LogIn, Shield, ArrowRight, Swords } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { motion, useInView } from 'framer-motion'
@@ -122,6 +122,15 @@ export default function Home() {
                 <Plus className="h-4 w-4 mr-2" />
                 Create Draft
               </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => router.push('/create-tournament')}
+                className="border-zinc-700 text-zinc-300 bg-transparent hover:bg-white/5 hover:text-white font-medium h-12 px-7 rounded-xl"
+              >
+                <Swords className="h-4 w-4 mr-2" />
+                Create Tournament
+              </Button>
             </motion.div>
 
             <motion.div variants={fadeIn} className="flex items-center gap-2 text-sm text-zinc-500">
@@ -154,10 +163,12 @@ export default function Home() {
             Get started
           </motion.p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { href: '/create-draft', icon: Plus, label: 'Create Draft', desc: 'Set up a new draft room' },
+              { href: '/create-tournament', icon: Swords, label: 'Create Tournament', desc: 'Run a knockout bracket' },
               { href: '/join-draft', icon: Users, label: 'Join Draft', desc: 'Enter a room code' },
+              { href: '/join-tournament', icon: Trophy, label: 'Join Tournament', desc: 'Enter a tournament code' },
               { href: '/watch-drafts', icon: Eye, label: 'Watch Live', desc: 'Spectate public drafts' },
             ].map((action, i) => (
               <motion.div
