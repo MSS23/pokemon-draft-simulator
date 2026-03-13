@@ -370,9 +370,6 @@ export default function DashboardPage() {
             <Button size="sm" variant="outline" className="text-xs" asChild>
               <Link href="/join-draft">Join Draft</Link>
             </Button>
-            <Button size="sm" variant="outline" className="text-xs" asChild>
-              <Link href="/join-tournament">Join Tournament</Link>
-            </Button>
             <Button size="sm" className="text-xs" asChild>
               <Link href="/create-draft">
                 <Plus className="h-3.5 w-3.5 mr-1" />
@@ -499,9 +496,6 @@ export default function DashboardPage() {
                 <Swords className="h-4 w-4 text-red-500" />
                 Knockouts
               </h2>
-              <Button size="sm" variant="ghost" className="text-xs h-7" asChild>
-                <Link href="/create-tournament"><Plus className="h-3 w-3 mr-1" />New Tournament</Link>
-              </Button>
             </div>
             {leagueStandings.filter(s => s.league.leagueType === 'knockout').length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

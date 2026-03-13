@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   History,
   Trophy,
+  Swords,
   Settings,
   LogOut,
   UserCircle,
@@ -150,6 +151,13 @@ export function Sidebar() {
           <SidebarLink href="/create-draft" icon={Plus} label="Create Draft" />
           <SidebarLink href="/join-draft" icon={UserPlus} label="Join Draft" />
           <SidebarLink href="/watch-drafts" icon={Eye} label="Watch Live" />
+        </SidebarSection>
+
+        <Separator className="my-1.5" />
+
+        <SidebarSection title="Tournament">
+          <SidebarLink href="/create-tournament" icon={Swords} label="Create Tournament" />
+          <SidebarLink href="/join-tournament" icon={UserPlus} label="Join Tournament" />
         </SidebarSection>
 
         <Separator className="my-1.5" />
