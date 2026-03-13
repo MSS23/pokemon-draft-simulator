@@ -637,7 +637,7 @@ export type Database = {
           id: string
           draft_id: string
           name: string
-          league_type: 'single' | 'split_conference_a' | 'split_conference_b'
+          league_type: 'single' | 'split_conference_a' | 'split_conference_b' | 'knockout'
           battle_type: 'wifi' | 'showdown'
           season_number: number
           status: 'scheduled' | 'active' | 'completed' | 'cancelled'
@@ -653,7 +653,7 @@ export type Database = {
           id?: string
           draft_id: string
           name: string
-          league_type?: 'single' | 'split_conference_a' | 'split_conference_b'
+          league_type?: 'single' | 'split_conference_a' | 'split_conference_b' | 'knockout'
           battle_type?: 'wifi' | 'showdown'
           season_number?: number
           status?: 'scheduled' | 'active' | 'completed' | 'cancelled'
@@ -669,7 +669,7 @@ export type Database = {
           id?: string
           draft_id?: string
           name?: string
-          league_type?: 'single' | 'split_conference_a' | 'split_conference_b'
+          league_type?: 'single' | 'split_conference_a' | 'split_conference_b' | 'knockout'
           battle_type?: 'wifi' | 'showdown'
           season_number?: number
           status?: 'scheduled' | 'active' | 'completed' | 'cancelled'

@@ -5,12 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Home, Trophy, ChevronRight, Shield } from 'lucide-react'
+import { ArrowLeft, Home, Trophy, ChevronRight, Shield, Swords } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { LeagueService } from '@/lib/league-service'
 import DraftResults from '@/components/draft/DraftResults'
 import { CreateLeagueModal } from '@/components/league/CreateLeagueModal'
+import { CreateTournamentModal } from '@/components/league/CreateTournamentModal'
 import { notify } from '@/lib/notifications'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import Link from 'next/link'
@@ -28,9 +29,10 @@ export default function DraftResultsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [existingLeagueId, setExistingLeagueId] = useState<string | null>(null)
+  const [existingLeagueType, setExistingLeagueType] = useState<string | null>(null)
   const [isLeagueModalOpen, setIsLeagueModalOpen] = useState(false)
+  const [isTournamentModalOpen, setIsTournamentModalOpen] = useState(false)
   const [isCheckingLeague, setIsCheckingLeague] = useState(false)
-  const [hasAutoOpenedModal, setHasAutoOpenedModal] = useState(false)
   const { user: authUser } = useAuth()
 
   useEffect(() => {
@@ -53,12 +55,13 @@ export default function DraftResultsPage() {
 
         setDraftState(dbState)
 
-        // Check if league already exists for this draft
+        // Check if league/tournament already exists for this draft
         setIsCheckingLeague(true)
         try {
           const league = await LeagueService.getLeagueByDraftId(dbState.draft.id)
           if (league) {
             setExistingLeagueId(league.id)
+            setExistingLeagueType(league.leagueType)
           }
         } catch (err) {
           log.error('Error checking for existing league:', err)
@@ -76,24 +79,20 @@ export default function DraftResultsPage() {
     loadDraftState()
   }, [roomCode])
 
-  // Auto-open league settings modal for the host when no league exists yet
-  useEffect(() => {
-    if (
-      !hasAutoOpenedModal &&
-      !isCheckingLeague &&
-      !existingLeagueId &&
-      draftState &&
-      authUser?.id === draftState.draft.host_id
-    ) {
-      setIsLeagueModalOpen(true)
-      setHasAutoOpenedModal(true)
-    }
-  }, [hasAutoOpenedModal, isCheckingLeague, existingLeagueId, draftState, authUser?.id])
+  // No longer auto-open — user chooses between league and tournament
 
   const handleLeagueSuccess = (leagueId: string) => {
     notify.success('League Created!', 'Your league has been created successfully')
     setExistingLeagueId(leagueId)
+    setExistingLeagueType('single')
     router.push(`/league/${leagueId}`)
+  }
+
+  const handleTournamentSuccess = (leagueId: string) => {
+    notify.success('Tournament Created!', 'Your knockout bracket is ready')
+    setExistingLeagueId(leagueId)
+    setExistingLeagueType('knockout')
+    router.push(`/tournament/${leagueId}`)
   }
 
   if (isLoading) {
@@ -212,37 +211,66 @@ export default function DraftResultsPage() {
           </Badge>
         </div>
 
-        {/* League Section - View for everyone, Create for host only */}
+        {/* Post-Draft: League or Tournament */}
         {!isCheckingLeague && (existingLeagueId || isHost) && (
           <Card className="mb-6 border-2 border-yellow-500/50 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-950/20 dark:to-orange-950/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                {existingLeagueId ? 'League Created' : 'Create League'}
+                {existingLeagueId
+                  ? (existingLeagueType === 'knockout' ? 'Tournament Created' : 'League Created')
+                  : 'Continue to Competition'}
               </CardTitle>
               <CardDescription>
                 {existingLeagueId
-                  ? 'A league has been created from this draft. View standings, fixtures, and match results.'
-                  : 'Configure your league settings to start a competitive season with weekly fixtures, standings, and Pokemon battles.'}
+                  ? existingLeagueType === 'knockout'
+                    ? 'A knockout tournament bracket has been created. View the bracket and record match results.'
+                    : 'A league has been created from this draft. View standings, fixtures, and match results.'
+                  : 'Choose how you want to compete — a round-robin league season or a single-elimination knockout tournament.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {existingLeagueId ? (
                 <Button
-                  onClick={() => router.push(`/league/${existingLeagueId}`)}
+                  onClick={() => router.push(
+                    existingLeagueType === 'knockout'
+                      ? `/tournament/${existingLeagueId}`
+                      : `/league/${existingLeagueId}`
+                  )}
                   className="w-full"
                 >
-                  <Trophy className="mr-2 h-4 w-4" />
-                  View League
+                  {existingLeagueType === 'knockout'
+                    ? <><Swords className="mr-2 h-4 w-4" />View Tournament</>
+                    : <><Trophy className="mr-2 h-4 w-4" />View League</>
+                  }
                 </Button>
               ) : (
-                <Button
-                  onClick={() => setIsLeagueModalOpen(true)}
-                  className="w-full"
-                >
-                  <Trophy className="mr-2 h-4 w-4" />
-                  Set Up League
-                </Button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setIsLeagueModalOpen(true)}
+                    className="p-4 border-2 rounded-lg text-left hover:border-primary hover:bg-primary/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Trophy className="h-5 w-5 text-yellow-500" />
+                      <span className="font-semibold">League Season</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Round-robin schedule with weekly fixtures, standings, and optional playoffs.
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => setIsTournamentModalOpen(true)}
+                    className="p-4 border-2 rounded-lg text-left hover:border-red-500 hover:bg-red-500/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Swords className="h-5 w-5 text-red-500" />
+                      <span className="font-semibold">Knockout Tournament</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Single elimination bracket — lose once and you&apos;re out. Up to 32 players.
+                    </p>
+                  </button>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -355,6 +383,18 @@ export default function DraftResultsPage() {
             draftName={draftState.draft.name}
             teamCount={draftState.teams.length}
             onSuccess={handleLeagueSuccess}
+          />
+        )}
+
+        {/* Tournament Creation Modal */}
+        {draftState && (
+          <CreateTournamentModal
+            isOpen={isTournamentModalOpen}
+            onClose={() => setIsTournamentModalOpen(false)}
+            draftId={draftState.draft.id}
+            draftName={draftState.draft.name}
+            teamCount={draftState.teams.length}
+            onSuccess={handleTournamentSuccess}
           />
         )}
       </div>

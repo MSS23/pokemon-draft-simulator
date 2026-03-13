@@ -225,7 +225,7 @@ export interface League {
   id: string
   draftId: string
   name: string
-  leagueType: 'single' | 'split_conference_a' | 'split_conference_b'
+  leagueType: 'single' | 'split_conference_a' | 'split_conference_b' | 'knockout'
   seasonNumber: number
   status: 'scheduled' | 'active' | 'completed' | 'cancelled'
   startDate: string | null
