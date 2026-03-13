@@ -16,8 +16,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
+import { TeamSheetService, type TeamSheet } from '@/lib/teamsheet-service'
+import { TeamSheetModal } from '@/components/tournament/TeamSheetModal'
+import { TeamSheetView } from '@/components/tournament/TeamSheetView'
 import {
-  ArrowLeft, Trophy, Swords, Copy, Check, Crown, Users, Play, Loader2,
+  ArrowLeft, Trophy, Swords, Copy, Check, Crown, Users, Play, Loader2, FileText, ClipboardList,
 } from 'lucide-react'
 import type { League, Match, Team, Pick } from '@/types'
 import type { Tournament } from '@/lib/tournament-service'
@@ -43,6 +46,12 @@ export default function TournamentPage() {
   const [isLobby, setIsLobby] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
   const [roomCode, setRoomCode] = useState<string | null>(null)
+
+  // Team sheets
+  const [teamSheets, setTeamSheets] = useState<Record<string, TeamSheet>>({})
+  const [showSheetModal, setShowSheetModal] = useState(false)
+  const [viewingSheet, setViewingSheet] = useState<{ name: string; sheet: TeamSheet } | null>(null)
+  const [userTeamId, setUserTeamId] = useState<string | null>(null)
 
   // Match recorder
   const [selectedMatch, setSelectedMatch] = useState<(Match & { homeTeam: Team; awayTeam: Team }) | null>(null)
@@ -74,6 +83,18 @@ export default function TournamentPage() {
         // Get room code from settings
         const settings = data.league.settings as Record<string, unknown>
         if (settings?.roomCode) setRoomCode(settings.roomCode as string)
+
+        // Load team sheets
+        try {
+          const sheets = await TeamSheetService.getAllTeamSheets(data.league.draftId)
+          setTeamSheets(sheets)
+        } catch { /* ignore */ }
+
+        // Find user's team
+        if (user?.id) {
+          const myTeam = data.league.teams.find(t => t.ownerId === user.id)
+          if (myTeam) setUserTeamId(myTeam.id)
+        }
       } else {
         // Might be a lobby (no bracket yet) — try loading league directly
         const { supabase } = await import('@/lib/supabase')
@@ -103,6 +124,18 @@ export default function TournamentPage() {
             .order('draft_order')
 
           setLobbyPlayers(teamRows?.map(t => ({ id: t.id, name: t.name, ownerId: t.owner_id })) || [])
+
+          // Load team sheets
+          try {
+            const sheets = await TeamSheetService.getAllTeamSheets(leagueRow.draft_id)
+            setTeamSheets(sheets)
+          } catch { /* ignore */ }
+
+          // Find user's team
+          if (user?.id && teamRows) {
+            const myTeam = teamRows.find(t => t.owner_id === user.id)
+            if (myTeam) setUserTeamId(myTeam.id)
+          }
 
           // Create a minimal league object for display
           setLeague({
@@ -299,6 +332,13 @@ export default function TournamentPage() {
                     <div className={`w-2 h-8 rounded-full shrink-0 ${colors?.bg || 'bg-muted'}`} />
                     <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">{i + 1}</span>
                     <span className="font-medium text-sm flex-1 truncate">{player.name}</span>
+                    {teamSheets[player.id] ? (
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setViewingSheet({ name: player.name, sheet: teamSheets[player.id] }) }}>
+                        <FileText className="h-3 w-3 mr-0.5 text-green-500" />Team
+                      </Button>
+                    ) : (
+                      <Badge variant="outline" size="sm" className="text-[10px] text-muted-foreground">No team</Badge>
+                    )}
                     {i === 0 && (
                       <Badge variant="outline" size="sm" className="text-amber-500 border-amber-500/30">
                         <Crown className="h-3 w-3 mr-0.5" /> Host
@@ -313,6 +353,26 @@ export default function TournamentPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Submit Team Sheet */}
+          {userTeamId && (
+            <Card className="mb-4">
+              <CardContent className="py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Open Team Sheet</p>
+                    <p className="text-xs text-muted-foreground">
+                      {teamSheets[userTeamId] ? `${teamSheets[userTeamId].length} Pokemon submitted` : 'Submit your team before the tournament starts'}
+                    </p>
+                  </div>
+                </div>
+                <Button size="sm" variant={teamSheets[userTeamId] ? 'outline' : 'default'} onClick={() => setShowSheetModal(true)}>
+                  {teamSheets[userTeamId] ? 'Edit Team' : 'Submit Team'}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Start Button */}
           {isCommissioner && (
@@ -335,6 +395,26 @@ export default function TournamentPage() {
             <div className="text-center text-sm text-muted-foreground py-4">
               Waiting for the host to start the tournament...
             </div>
+          )}
+
+          {/* Modals */}
+          {showSheetModal && userTeamId && (
+            <TeamSheetModal
+              isOpen={showSheetModal}
+              onClose={() => setShowSheetModal(false)}
+              draftId={league.draftId}
+              teamId={userTeamId}
+              existingSheet={teamSheets[userTeamId]}
+              onSubmitted={loadData}
+            />
+          )}
+          {viewingSheet && (
+            <TeamSheetView
+              isOpen={!!viewingSheet}
+              onClose={() => setViewingSheet(null)}
+              playerName={viewingSheet.name}
+              sheet={viewingSheet.sheet}
+            />
           )}
         </div>
       </div>
@@ -389,8 +469,52 @@ export default function TournamentPage() {
           </Card>
         )}
 
+        {/* Submit Team Sheet (active tournament) */}
+        {userTeamId && !teamSheets[userTeamId] && (
+          <Card className="mb-4 border-primary/30">
+            <CardContent className="py-3 flex items-center justify-between">
+              <p className="text-sm"><ClipboardList className="h-4 w-4 inline mr-1.5 text-primary" />Submit your open team sheet</p>
+              <Button size="sm" onClick={() => setShowSheetModal(true)}>Submit Team</Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Bracket */}
         {tournament && <PlayoffBracket tournament={tournament} className="mb-6" />}
+
+        {/* Open Team Sheets */}
+        {Object.keys(teamSheets).length > 0 && (
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileText className="h-4 w-4 text-primary" />
+                Open Team Sheets
+                <Badge variant="outline" className="ml-auto">{Object.keys(teamSheets).length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {league.teams.filter(t => teamSheets[t.id]).map(team => {
+                const sheet = teamSheets[team.id]
+                const colors = teamColorMap.get(team.id)
+                return (
+                  <button
+                    key={team.id}
+                    onClick={() => setViewingSheet({ name: team.name, sheet })}
+                    className="w-full flex items-center gap-3 p-2.5 border rounded-lg hover:bg-muted/50 transition-colors text-left"
+                  >
+                    <div className={`w-1.5 h-8 rounded-full shrink-0 ${colors?.bg || 'bg-muted'}`} />
+                    <span className="font-medium text-sm flex-1 min-w-0 truncate">{team.name}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {sheet.slice(0, 6).map((mon, i) => (
+                        <span key={i} className="px-1.5 py-0.5 bg-muted/60 rounded text-[10px] font-medium truncate max-w-[65px]">{mon.name}</span>
+                      ))}
+                    </div>
+                  </button>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Active Matches */}
         {activeMatches.length > 0 && (
@@ -533,6 +657,26 @@ export default function TournamentPage() {
             homeTeamPicks={homeTeamPicks}
             awayTeamPicks={awayTeamPicks}
             onSuccess={handleMatchRecorded}
+          />
+        )}
+
+        {/* Team Sheet Modals */}
+        {showSheetModal && userTeamId && (
+          <TeamSheetModal
+            isOpen={showSheetModal}
+            onClose={() => setShowSheetModal(false)}
+            draftId={league.draftId}
+            teamId={userTeamId}
+            existingSheet={teamSheets[userTeamId]}
+            onSubmitted={loadData}
+          />
+        )}
+        {viewingSheet && (
+          <TeamSheetView
+            isOpen={!!viewingSheet}
+            onClose={() => setViewingSheet(null)}
+            playerName={viewingSheet.name}
+            sheet={viewingSheet.sheet}
           />
         )}
       </div>
