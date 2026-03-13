@@ -224,16 +224,43 @@ function parsePokepaste(text: string): TeamSheetPokemon[] {
         mon.ability = line.replace('Ability:', '').trim()
       } else if (line.startsWith('Tera Type:')) {
         mon.teraType = line.replace('Tera Type:', '').trim()
+      } else if (line.startsWith('Level:')) {
+        mon.level = parseInt(line.replace('Level:', '').trim(), 10) || 50
+      } else if (line.startsWith('EVs:')) {
+        mon.evs = parseStatLine(line.replace('EVs:', '').trim())
+      } else if (line.startsWith('IVs:')) {
+        mon.ivs = parseStatLine(line.replace('IVs:', '').trim(), 31)
+      } else if (line.match(/^(\w+)\s+Nature$/)) {
+        mon.nature = line.replace(/\s+Nature$/, '').trim()
       } else if (line.startsWith('-') && moveIdx < 4) {
         mon.moves[moveIdx++] = line.replace(/^-\s*/, '').trim()
       }
-      // Skip EVs, IVs, Nature, Level lines
     }
 
     if (mon.name) pokemon.push(mon)
   }
 
   return pokemon
+}
+
+/** Parse "252 HP / 4 Def / 252 SpD" into stat object */
+function parseStatLine(text: string, defaultVal = 0): { hp: number; atk: number; def: number; spa: number; spd: number; spe: number } {
+  const stats = { hp: defaultVal, atk: defaultVal, def: defaultVal, spa: defaultVal, spd: defaultVal, spe: defaultVal }
+  const statMap: Record<string, keyof typeof stats> = {
+    hp: 'hp', atk: 'atk', def: 'def', spa: 'spa', spd: 'spd', spe: 'spe',
+    'sp. atk': 'spa', 'sp. def': 'spd', 'sp.atk': 'spa', 'sp.def': 'spd',
+    spatk: 'spa', spdef: 'spd', speed: 'spe', attack: 'atk', defense: 'def',
+    'special attack': 'spa', 'special defense': 'spd',
+  }
+  const parts = text.split('/')
+  for (const part of parts) {
+    const m = part.trim().match(/^(\d+)\s+(.+)$/)
+    if (m) {
+      const key = statMap[m[2].trim().toLowerCase()]
+      if (key) stats[key] = parseInt(m[1], 10)
+    }
+  }
+  return stats
 }
 
 function cleanPokemonName(raw: string): string {

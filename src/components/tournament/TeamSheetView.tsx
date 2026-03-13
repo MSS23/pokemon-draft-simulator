@@ -24,13 +24,14 @@ interface TeamSheetViewProps {
   onClose: () => void
   playerName: string
   sheet: TeamSheet
+  isOwner?: boolean
 }
 
-export function TeamSheetView({ isOpen, onClose, playerName, sheet }: TeamSheetViewProps) {
+export function TeamSheetView({ isOpen, onClose, playerName, sheet, isOwner = false }: TeamSheetViewProps) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
-    const text = TeamSheetService.toPokepaste(sheet)
+    const text = TeamSheetService.toPokepaste(sheet, isOwner)
     await navigator.clipboard.writeText(text)
     setCopied(true)
     notify.success('Copied', 'Team sheet copied to clipboard')
@@ -73,6 +74,21 @@ export function TeamSheetView({ isOpen, onClose, playerName, sheet }: TeamSheetV
                     </Badge>
                   )}
                 </div>
+
+                {/* EVs / Nature / IVs — owner only */}
+                {isOwner && (mon.evs || mon.nature || mon.ivs) && (
+                  <div className="text-[11px] text-muted-foreground space-y-0.5 border-t pt-1.5 mt-1">
+                    {mon.evs && (() => {
+                      const parts = Object.entries(mon.evs).filter(([, v]) => v > 0).map(([k, v]) => `${v} ${k.toUpperCase()}`)
+                      return parts.length > 0 ? <p><span className="font-medium text-foreground">EVs:</span> {parts.join(' / ')}</p> : null
+                    })()}
+                    {mon.nature && <p><span className="font-medium text-foreground">{mon.nature}</span> Nature</p>}
+                    {mon.ivs && (() => {
+                      const parts = Object.entries(mon.ivs).filter(([, v]) => v !== 31).map(([k, v]) => `${v} ${k.toUpperCase()}`)
+                      return parts.length > 0 ? <p><span className="font-medium text-foreground">IVs:</span> {parts.join(' / ')}</p> : null
+                    })()}
+                  </div>
+                )}
 
                 {/* Moves */}
                 <div className="grid grid-cols-2 gap-1">

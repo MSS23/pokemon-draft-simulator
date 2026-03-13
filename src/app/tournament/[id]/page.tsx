@@ -50,7 +50,7 @@ export default function TournamentPage() {
   // Team sheets
   const [teamSheets, setTeamSheets] = useState<Record<string, TeamSheet>>({})
   const [showSheetModal, setShowSheetModal] = useState(false)
-  const [viewingSheet, setViewingSheet] = useState<{ name: string; sheet: TeamSheet } | null>(null)
+  const [viewingSheet, setViewingSheet] = useState<{ name: string; sheet: TeamSheet; teamId: string } | null>(null)
   const [userTeamId, setUserTeamId] = useState<string | null>(null)
 
   // Match recorder
@@ -333,7 +333,7 @@ export default function TournamentPage() {
                     <span className="text-xs text-muted-foreground font-mono w-5 shrink-0">{i + 1}</span>
                     <span className="font-medium text-sm flex-1 truncate">{player.name}</span>
                     {teamSheets[player.id] ? (
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setViewingSheet({ name: player.name, sheet: teamSheets[player.id] }) }}>
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={(e) => { e.stopPropagation(); setViewingSheet({ name: player.name, sheet: teamSheets[player.id], teamId: player.id }) }}>
                         <FileText className="h-3 w-3 mr-0.5 text-green-500" />Team
                       </Button>
                     ) : (
@@ -414,6 +414,7 @@ export default function TournamentPage() {
               onClose={() => setViewingSheet(null)}
               playerName={viewingSheet.name}
               sheet={viewingSheet.sheet}
+              isOwner={viewingSheet.teamId === userTeamId}
             />
           )}
         </div>
@@ -499,7 +500,7 @@ export default function TournamentPage() {
                 return (
                   <button
                     key={team.id}
-                    onClick={() => setViewingSheet({ name: team.name, sheet })}
+                    onClick={() => setViewingSheet({ name: team.name, sheet, teamId: team.id })}
                     className="w-full flex items-center gap-3 p-2.5 border rounded-lg hover:bg-muted/50 transition-colors text-left"
                   >
                     <div className={`w-1.5 h-8 rounded-full shrink-0 ${colors?.bg || 'bg-muted'}`} />

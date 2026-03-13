@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS leagues (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   draft_id UUID NOT NULL REFERENCES drafts(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  league_type TEXT NOT NULL CHECK (league_type IN ('single', 'split_conference_a', 'split_conference_b')),
+  league_type TEXT NOT NULL CHECK (league_type IN ('single', 'split_conference_a', 'split_conference_b', 'knockout')),
   battle_type TEXT NOT NULL DEFAULT 'showdown' CHECK (battle_type IN ('wifi', 'showdown')),
   season_number INTEGER DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'active', 'completed', 'cancelled')),

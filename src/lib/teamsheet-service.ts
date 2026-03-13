@@ -9,6 +9,10 @@ export interface TeamSheetPokemon {
   ability: string
   teraType: string
   moves: [string, string, string, string]
+  nature?: string
+  evs?: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number }
+  ivs?: { hp: number; atk: number; def: number; spa: number; spd: number; spe: number }
+  level?: number
 }
 
 export type TeamSheet = TeamSheetPokemon[]
@@ -96,12 +100,28 @@ export class TeamSheetService {
   /**
    * Format a team sheet as Pokepaste text (for copy to clipboard)
    */
-  static toPokepaste(sheet: TeamSheet): string {
+  static toPokepaste(sheet: TeamSheet, includeSpread = true): string {
     return sheet.map(mon => {
       const lines = []
       lines.push(mon.item ? `${mon.name} @ ${mon.item}` : mon.name)
       lines.push(`Ability: ${mon.ability}`)
+      if (mon.level && mon.level !== 50) lines.push(`Level: ${mon.level}`)
       if (mon.teraType) lines.push(`Tera Type: ${mon.teraType}`)
+      if (includeSpread) {
+        if (mon.evs) {
+          const evParts = Object.entries(mon.evs)
+            .filter(([, v]) => v > 0)
+            .map(([k, v]) => `${v} ${k.charAt(0).toUpperCase() + k.slice(1)}`)
+          if (evParts.length > 0) lines.push(`EVs: ${evParts.join(' / ')}`)
+        }
+        if (mon.nature) lines.push(`${mon.nature} Nature`)
+        if (mon.ivs) {
+          const ivParts = Object.entries(mon.ivs)
+            .filter(([, v]) => v !== 31)
+            .map(([k, v]) => `${v} ${k.charAt(0).toUpperCase() + k.slice(1)}`)
+          if (ivParts.length > 0) lines.push(`IVs: ${ivParts.join(' / ')}`)
+        }
+      }
       for (const move of mon.moves) {
         if (move.trim()) lines.push(`- ${move}`)
       }
