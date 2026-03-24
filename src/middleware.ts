@@ -1,11 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 
 // ============================================================================
-// RATE LIMITING
+// RATE LIMITING — Upstash Redis (with in-memory fallback)
 // ============================================================================
 
-class RateLimiter {
+// In-memory fallback for when Redis is not configured
+class InMemoryRateLimiter {
   private requests = new Map<string, number[]>()
 
   isAllowed(key: string, limit: number, windowMs: number): boolean {
@@ -13,37 +16,50 @@ class RateLimiter {
     const timestamps = this.requests.get(key) || []
     const validTimestamps = timestamps.filter(t => now - t < windowMs)
 
-    if (validTimestamps.length >= limit) {
-      return false
-    }
+    if (validTimestamps.length >= limit) return false
 
     validTimestamps.push(now)
     this.requests.set(key, validTimestamps)
 
-    // Prevent memory leak: purge stale entries when the map grows too large
     if (this.requests.size > 10000) {
       for (const [entryKey, entryTimestamps] of this.requests) {
         const valid = entryTimestamps.filter(t => now - t < windowMs)
-        if (valid.length === 0) {
-          this.requests.delete(entryKey)
-        } else {
-          this.requests.set(entryKey, valid)
-        }
+        if (valid.length === 0) this.requests.delete(entryKey)
+        else this.requests.set(entryKey, valid)
       }
     }
-
     return true
   }
 }
 
-const rateLimiter = new RateLimiter()
+const inMemoryLimiter = new InMemoryRateLimiter()
 
-const RATE_LIMITS: Record<string, { limit: number; window: number }> = {
-  '/api/drafts': { limit: 10, window: 3600000 }, // 10 drafts per hour
-  '/api/picks': { limit: 60, window: 60000 },    // 60 picks per minute
-  '/api/bids': { limit: 120, window: 60000 },    // 120 bids per minute
-  '/api/user/export': { limit: 5, window: 3600000 }, // 5 exports per hour
-  '/api/': { limit: 100, window: 60000 },        // 100 requests per minute (default)
+// Upstash Redis rate limiters (per route pattern)
+const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+
+const redis = hasRedis
+  ? new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    })
+  : null
+
+const upstashLimiters = redis
+  ? {
+      drafts: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:drafts' }),
+      picks: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:picks' }),
+      bids: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '1 m'), prefix: 'rl:bids' }),
+      export: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 h'), prefix: 'rl:export' }),
+      default: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '1 m'), prefix: 'rl:api' }),
+    }
+  : null
+
+const RATE_LIMITS: Record<string, { limit: number; window: number; key?: keyof NonNullable<typeof upstashLimiters> }> = {
+  '/api/drafts': { limit: 10, window: 3600000, key: 'drafts' },
+  '/api/picks': { limit: 60, window: 60000, key: 'picks' },
+  '/api/bids': { limit: 120, window: 60000, key: 'bids' },
+  '/api/user/export': { limit: 5, window: 3600000, key: 'export' },
+  '/api/': { limit: 100, window: 60000, key: 'default' },
 }
 
 function getClientId(request: NextRequest): string {
@@ -63,6 +79,9 @@ function getClientId(request: NextRequest): string {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Generate request ID for tracing
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
+
   // Apply rate limiting to API routes
   if (pathname.startsWith('/api/')) {
     const clientId = getClientId(request)
@@ -76,29 +95,53 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    const { limit, window } = rateLimit
-    if (!rateLimiter.isAllowed(clientId, limit, window)) {
+    const { limit, window: windowMs } = rateLimit
+    let isAllowed = true
+
+    // Use Upstash Redis if available, otherwise fall back to in-memory
+    if (upstashLimiters && rateLimit.key) {
+      try {
+        const result = await upstashLimiters[rateLimit.key].limit(clientId)
+        isAllowed = result.success
+      } catch {
+        // Redis unavailable — fall back to in-memory
+        isAllowed = inMemoryLimiter.isAllowed(clientId, limit, windowMs)
+      }
+    } else {
+      isAllowed = inMemoryLimiter.isAllowed(clientId, limit, windowMs)
+    }
+
+    if (!isAllowed) {
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
           message: 'Too many requests. Please try again later.',
-          retryAfter: Math.ceil(window / 1000),
+          retryAfter: Math.ceil(windowMs / 1000),
+          requestId,
         },
         {
           status: 429,
           headers: {
-            'Retry-After': String(Math.ceil(window / 1000)),
+            'Retry-After': String(Math.ceil(windowMs / 1000)),
             'X-RateLimit-Limit': String(limit),
             'X-RateLimit-Remaining': '0',
+            'X-Request-Id': requestId,
           },
         }
       )
     }
   }
 
+  // Inject request ID header for downstream use
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-request-id', requestId)
+
   let supabaseResponse = NextResponse.next({
-    request,
+    request: { headers: requestHeaders },
   })
+
+  // Propagate request ID to response
+  supabaseResponse.headers.set('x-request-id', requestId)
 
   // Check if we're in demo mode or if Supabase is not configured
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
@@ -136,6 +179,7 @@ export async function middleware(request: NextRequest) {
             supabaseResponse = NextResponse.next({
               request,
             })
+            supabaseResponse.headers.set('x-request-id', requestId)
             cookiesToSet.forEach(({ name, value, options }) =>
               supabaseResponse.cookies.set(name, value, options)
             )
@@ -171,16 +215,16 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   )
 
-  // Check admin access for admin routes
+  // Check admin access for admin routes — verify is_admin flag, not just profile existence
   if (isAdminRoute && user && supabase) {
     try {
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('id')
+        .select('id, is_admin')
         .eq('user_id', user.id)
         .single()
 
-      if (!profile) {
+      if (!profile || !profile.is_admin) {
         return NextResponse.redirect(new URL('/unauthorized', request.url))
       }
     } catch {

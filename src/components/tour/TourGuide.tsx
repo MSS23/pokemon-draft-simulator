@@ -66,27 +66,22 @@ export const DASHBOARD_TOUR_STEPS: TourStep[] = [
   },
   {
     message: () =>
-      `Your weekly matchups live here. Click any card to scout your opponent's full team before the battle!`,
-    targetId: 'tour-matches',
+      `Your dashboard is organized into three tabs. The Drafts tab is where you manage your draft rooms — create, join, or spectate live picks.`,
+    targetId: 'tour-view-tabs',
   },
   {
     message: () =>
-      `These are your leagues. Standings, W/L records, and rankings — all updated live after every match result.`,
-    targetId: 'tour-leagues',
+      `Switch to the Leagues tab for your round-robin seasons — standings, W/L records, streaks, and this week's matchups all live here.`,
+    targetId: 'tour-view-tabs',
   },
   {
     message: () =>
-      `Your draft command center. Track active rooms, see pick progress, and jump back into any draft with one click.`,
-    targetId: 'tour-drafts',
+      `The Tournaments tab is for knockout brackets. Create a tournament, invite players, and battle through single-elimination rounds!`,
+    targetId: 'tour-view-tabs',
   },
   {
     message: () =>
-      `Hit "New Draft" to create a room. Pick snake or auction format, set a budget, and share the 6-letter code with friends!`,
-    targetId: 'tour-new-draft',
-  },
-  {
-    message: () =>
-      `Use the sidebar to get around: join a room by code, spectate live drafts, check your history, or update settings.`,
+      `Use the sidebar to quickly create or join a draft or tournament, watch live drafts, or jump into your active leagues.`,
     targetId: null,
   },
   {

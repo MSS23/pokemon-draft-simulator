@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('UserDeleteAPI')
 
 export async function DELETE(request: Request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -36,26 +39,30 @@ export async function DELETE(request: Request) {
       .update({ owner_id: 'deleted-user', name: 'Deleted User' })
       .eq('owner_id', userId)
 
-    // Delete user-specific data
-    await Promise.all([
+    // Delete user-specific data (use allSettled so one failure doesn't block others)
+    const results = await Promise.allSettled([
       supabase.from('user_profiles').delete().eq('user_id', userId),
       supabase.from('participants').delete().eq('user_id', userId),
       supabase.from('wishlist_items').delete().eq('participant_id', userId),
     ])
+    const failures = results.filter(r => r.status === 'rejected')
+    if (failures.length > 0) {
+      log.warn('Some user data deletions failed', { userId, failureCount: failures.length })
+    }
 
     // Delete auth user if service role key is available
     if (supabaseServiceKey) {
       const adminClient = createClient(supabaseUrl, supabaseServiceKey)
       const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
       if (deleteError) {
-        console.error('Failed to delete auth user:', deleteError)
+        log.error('Failed to delete auth user:', deleteError)
         // Continue anyway - data is already cleaned up
       }
     }
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('Account deletion error:', err)
+    log.error('Account deletion error:', err)
     return NextResponse.json(
       { error: 'Failed to delete account' },
       { status: 500 }

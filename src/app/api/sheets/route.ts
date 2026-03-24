@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       headers: {
         'User-Agent': 'PokemonDraft/1.0',
       },
+      signal: AbortSignal.timeout(10000),
     })
 
     if (!response.ok) {

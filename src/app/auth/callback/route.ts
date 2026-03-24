@@ -35,7 +35,32 @@ export async function GET(request: Request) {
       }
     )
 
-    await supabase.auth.exchangeCodeForSession(code)
+    const { data: { session } } = await supabase.auth.exchangeCodeForSession(code)
+
+    // Auto-create user profile for OAuth users on first sign-in
+    if (session?.user) {
+      const user = session.user
+      const { data: existingProfile } = await supabase
+        .from('user_profiles')
+        .select('user_id')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!existingProfile) {
+        const displayName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.display_name ||
+          user.user_metadata?.name ||
+          user.email?.split('@')[0] ||
+          'User'
+
+        await supabase.from('user_profiles').insert({
+          user_id: user.id,
+          display_name: displayName,
+          avatar_url: user.user_metadata?.avatar_url || null,
+        })
+      }
+    }
   }
 
   // URL to redirect to after sign in process completes

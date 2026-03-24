@@ -19,8 +19,9 @@ import { createLogger } from '@/lib/logger'
 import { TeamSheetService, type TeamSheet } from '@/lib/teamsheet-service'
 import { TeamSheetModal } from '@/components/tournament/TeamSheetModal'
 import { TeamSheetView } from '@/components/tournament/TeamSheetView'
+import { TournamentMatchView } from '@/components/tournament/TournamentMatchView'
 import {
-  ArrowLeft, Trophy, Swords, Copy, Check, Crown, Users, Play, Loader2, FileText, ClipboardList,
+  ArrowLeft, Trophy, Swords, Copy, Check, Crown, Users, Play, Loader2, FileText, ClipboardList, Eye,
 } from 'lucide-react'
 import type { League, Match, Team, Pick } from '@/types'
 import type { Tournament } from '@/lib/tournament-service'
@@ -57,6 +58,9 @@ export default function TournamentPage() {
   const [selectedMatch, setSelectedMatch] = useState<(Match & { homeTeam: Team; awayTeam: Team }) | null>(null)
   const [homeTeamPicks, setHomeTeamPicks] = useState<Pick[]>([])
   const [awayTeamPicks, setAwayTeamPicks] = useState<Pick[]>([])
+
+  // OTS Match View (player-facing)
+  const [viewingMatch, setViewingMatch] = useState<(Match & { homeTeam: Team; awayTeam: Team }) | null>(null)
 
   const { user } = useAuth()
 
@@ -227,6 +231,11 @@ export default function TournamentPage() {
       log.error('Error updating bracket:', err)
     }
   }, [selectedMatch, loadData])
+
+  /** Open the OTS match view for a player's match */
+  const handleViewMatch = useCallback((match: Match & { homeTeam: Team; awayTeam: Team }) => {
+    setViewingMatch(match)
+  }, [])
 
   const activeMatches = useMemo(() => {
     if (!tournament) return []
@@ -505,9 +514,15 @@ export default function TournamentPage() {
                   >
                     <div className={`w-1.5 h-8 rounded-full shrink-0 ${colors?.bg || 'bg-muted'}`} />
                     <span className="font-medium text-sm flex-1 min-w-0 truncate">{team.name}</span>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       {sheet.slice(0, 6).map((mon, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-muted/60 rounded text-[10px] font-medium truncate max-w-[65px]">{mon.name}</span>
+                        <PokemonSprite
+                          key={i}
+                          pokemonId="0"
+                          pokemonName={mon.name}
+                          className="w-7 h-7 object-contain"
+                          lazy
+                        />
                       ))}
                     </div>
                   </button>
@@ -573,19 +588,43 @@ export default function TournamentPage() {
                       </div>
                     </div>
 
-                    {/* Record button */}
-                    {isCommissioner && (
-                      <div className="border-t px-3 py-1.5 bg-muted/10">
+                    {/* Action buttons */}
+                    <div className="border-t px-3 py-1.5 bg-muted/10 flex gap-2">
+                      {/* Any player involved in this match can view OTS + record */}
+                      {(userTeamId === match.homeTeamId || userTeamId === match.awayTeamId) && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="text-xs flex-1 h-7"
+                          onClick={() => handleViewMatch(match)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View Matchup
+                        </Button>
+                      )}
+                      {/* Anyone NOT in the match can still view if they want */}
+                      {userTeamId && userTeamId !== match.homeTeamId && userTeamId !== match.awayTeamId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs flex-1 h-7"
+                          onClick={() => handleViewMatch(match)}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View Teams
+                        </Button>
+                      )}
+                      {isCommissioner && (
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-xs w-full h-7"
+                          className="text-xs flex-1 h-7"
                           onClick={() => handleRecordMatch(match)}
                         >
                           Record Result
                         </Button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 )
               })}
@@ -680,6 +719,32 @@ export default function TournamentPage() {
             sheet={viewingSheet.sheet}
           />
         )}
+
+        {/* OTS Match View */}
+        {viewingMatch && (() => {
+          const isUserHome = userTeamId === viewingMatch.homeTeamId
+          const opponentTeamId = isUserHome ? viewingMatch.awayTeamId : viewingMatch.homeTeamId
+          const opponentTeam = isUserHome ? viewingMatch.awayTeam : viewingMatch.homeTeam
+          const yourTeam = isUserHome ? viewingMatch.homeTeam : viewingMatch.awayTeam
+          const opponentSheet = teamSheets[opponentTeamId] || []
+          const yourSheet = userTeamId ? teamSheets[userTeamId] : null
+          const isParticipant = userTeamId === viewingMatch.homeTeamId || userTeamId === viewingMatch.awayTeamId
+
+          return (
+            <TournamentMatchView
+              isOpen={!!viewingMatch}
+              onClose={() => setViewingMatch(null)}
+              match={viewingMatch}
+              opponentSheet={opponentSheet}
+              opponentName={opponentTeam.name}
+              yourName={yourTeam.name}
+              yourSheet={yourSheet}
+              canRecordResult={isParticipant}
+              currentUserTeamId={userTeamId}
+              onResultRecorded={loadData}
+            />
+          )
+        })()}
       </div>
     </div>
   )

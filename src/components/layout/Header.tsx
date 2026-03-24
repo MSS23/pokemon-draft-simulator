@@ -41,7 +41,7 @@ export function Header() {
               <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/40 -translate-y-1/2" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-2 w-2 rounded-full border-[1.5px] border-foreground/40 bg-background" />
             </div>
-            <span className="font-semibold text-sm hidden sm:inline">Poké Draft</span>
+            <span className="font-semibold text-sm"><span className="hidden sm:inline">Poké </span>Draft</span>
           </Link>
 
           <div className="flex items-center gap-1">

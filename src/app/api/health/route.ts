@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase'
 
 interface ServiceCheck {
   status: 'up' | 'down' | 'unconfigured'
-  latencyMs: number | null
 }
 
 interface HealthCheck {
@@ -20,7 +19,6 @@ interface HealthCheck {
 const startTime = Date.now()
 
 async function checkPokeAPI(): Promise<ServiceCheck> {
-  const start = Date.now()
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 5000)
@@ -29,12 +27,9 @@ async function checkPokeAPI(): Promise<ServiceCheck> {
       method: 'HEAD',
     })
     clearTimeout(timeout)
-    return {
-      status: res.ok ? 'up' : 'down',
-      latencyMs: Date.now() - start,
-    }
+    return { status: res.ok ? 'up' : 'down' }
   } catch {
-    return { status: 'down', latencyMs: Date.now() - start }
+    return { status: 'down' }
   }
 }
 
@@ -45,8 +40,8 @@ export async function GET() {
     version: '0.1.2',
     uptime: Math.floor((Date.now() - startTime) / 1000),
     checks: {
-      database: { status: 'unconfigured', latencyMs: null },
-      pokeapi: { status: 'unconfigured', latencyMs: null },
+      database: { status: 'unconfigured' },
+      pokeapi: { status: 'unconfigured' },
     },
   }
 
@@ -54,20 +49,18 @@ export async function GET() {
   if (!supabase) {
     health.status = 'degraded'
   } else {
-    const start = Date.now()
     try {
       const { error } = await supabase.from('drafts').select('id').limit(1)
-      const latencyMs = Date.now() - start
 
       if (error) {
         health.status = 'degraded'
-        health.checks.database = { status: 'down', latencyMs }
+        health.checks.database = { status: 'down' }
       } else {
-        health.checks.database = { status: 'up', latencyMs }
+        health.checks.database = { status: 'up' }
       }
     } catch {
       health.status = 'unhealthy'
-      health.checks.database = { status: 'down', latencyMs: Date.now() - start }
+      health.checks.database = { status: 'down' }
     }
   }
 

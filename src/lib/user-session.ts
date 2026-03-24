@@ -30,6 +30,7 @@ export interface DraftParticipation {
 
 const USER_SESSION_KEY = 'pokemon-draft-user-session'
 const DRAFT_PARTICIPATION_KEY = 'pokemon-draft-participation'
+const SESSION_BACKUP_PREFIX = 'pokemon-draft-backup-'
 
 /**
  * Generate a cryptographically secure guest user ID to prevent collisions
@@ -193,6 +194,71 @@ export class UserSessionService {
   }
 
   /**
+   * Recover guest session for a specific draft.
+   * If localStorage was cleared, tries sessionStorage backup, then checks
+   * the database for an existing participant record matching this browser.
+   */
+  static async recoverSessionForDraft(draftId: string): Promise<UserSession | null> {
+    if (typeof window === 'undefined') return null
+
+    // 1. Check if main session exists (normal case)
+    const existing = this.getCurrentSession()
+    if (existing) return existing
+
+    // 2. Try sessionStorage backup (survives localStorage clear)
+    try {
+      const backup = sessionStorage.getItem(`${SESSION_BACKUP_PREFIX}${draftId}`)
+      if (backup) {
+        const session = JSON.parse(backup) as UserSession
+        // Restore to localStorage
+        localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
+        log.info('Recovered guest session from sessionStorage backup', { draftId, userId: session.userId })
+        return session
+      }
+    } catch {
+      log.warn('Failed to recover session from sessionStorage backup')
+    }
+
+    // 3. Try draft-specific sessionStorage (legacy fallback)
+    try {
+      const legacyUserId = sessionStorage.getItem(`draft-user-${draftId}`)
+      if (legacyUserId) {
+        const session: UserSession = {
+          userId: legacyUserId,
+          displayName: 'Guest',
+          createdAt: new Date().toISOString(),
+          lastActivity: new Date().toISOString(),
+          isAuthenticated: false,
+        }
+        localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
+        log.info('Recovered guest session from legacy sessionStorage', { draftId, userId: legacyUserId })
+        return session
+      }
+    } catch {
+      log.warn('Failed to recover from legacy sessionStorage')
+    }
+
+    return null
+  }
+
+  /**
+   * Back up session to sessionStorage for a specific draft.
+   * Called when joining or making picks to ensure recovery is possible.
+   */
+  static backupSessionForDraft(draftId: string): void {
+    if (typeof window === 'undefined') return
+
+    try {
+      const session = this.getCurrentSession()
+      if (session) {
+        sessionStorage.setItem(`${SESSION_BACKUP_PREFIX}${draftId}`, JSON.stringify(session))
+      }
+    } catch {
+      // sessionStorage might be full or unavailable
+    }
+  }
+
+  /**
    * Record participation in a draft
    */
   static recordDraftParticipation(participation: Omit<DraftParticipation, 'lastActivity' | 'joinedAt'>): void {
@@ -203,6 +269,9 @@ export class UserSessionService {
       lastActivity: new Date().toISOString(),
       joinedAt: new Date().toISOString()
     }
+
+    // Back up session to sessionStorage for recovery if localStorage is cleared
+    this.backupSessionForDraft(participation.draftId)
 
     try {
       const stored = localStorage.getItem(DRAFT_PARTICIPATION_KEY)

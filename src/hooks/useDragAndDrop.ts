@@ -1,4 +1,27 @@
-import { useState, useRef } from 'react'
+'use client'
+
+import { useState, useCallback, useMemo } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragStartEvent,
+  type DragEndEvent,
+  type UniqueIdentifier,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+
+export { DndContext, SortableContext, verticalListSortingStrategy }
 
 export interface DragDropItem {
   id: string
@@ -10,137 +33,145 @@ interface UseDragAndDropOptions<T extends DragDropItem> {
   onReorder: (reorderedItems: T[]) => void
 }
 
+/**
+ * Hook that wraps @dnd-kit/core and @dnd-kit/sortable for accessible,
+ * touch-friendly drag-and-drop reordering.
+ *
+ * Returns:
+ *  - sensors / context props to wire into <DndContext> + <SortableContext>
+ *  - activeId / dragOverIndex for visual feedback
+ *  - arrow-button helpers (moveUp, moveDown, moveToTop, moveToBottom)
+ *  - handleDragStart / handleDragEnd callbacks
+ *  - isDragging boolean
+ *
+ * Backward-compat: draggedItem is still exposed (the full item object).
+ */
 export function useDragAndDrop<T extends DragDropItem>({
   items,
-  onReorder
+  onReorder,
 }: UseDragAndDropOptions<T>) {
-  const [draggedItem, setDraggedItem] = useState<T | null>(null)
+  const [activeId, setActiveId] = useState<UniqueIdentifier | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
-  const dragCounter = useRef(0)
 
-  const handleDragStart = (e: React.DragEvent, item: T, _index: number) => {
-    setDraggedItem(item)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/html', item.id)
+  // --- Sensors ---------------------------------------------------
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },
+  })
 
-    // Add some visual feedback
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '0.5'
-    }
-  }
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 200, tolerance: 5 },
+  })
 
-  const handleDragEnd = (e: React.DragEvent) => {
-    setDraggedItem(null)
-    setDragOverIndex(null)
-    dragCounter.current = 0
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  })
 
-    // Reset visual feedback
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '1'
-    }
-  }
+  const sensors = useSensors(pointerSensor, touchSensor, keyboardSensor)
 
-  const handleDragEnter = (e: React.DragEvent, index: number) => {
-    e.preventDefault()
-    dragCounter.current++
-    setDragOverIndex(index)
-  }
+  // --- Item id list for SortableContext --------------------------
+  const itemIds = useMemo(() => items.map((i) => i.id), [items])
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    dragCounter.current--
-    if (dragCounter.current === 0) {
+  // --- Drag callbacks --------------------------------------------
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      setActiveId(event.active.id)
+      const idx = items.findIndex((i) => i.id === event.active.id)
+      if (idx !== -1) setDragOverIndex(idx)
+    },
+    [items],
+  )
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      setActiveId(null)
       setDragOverIndex(null)
-    }
-  }
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
+      if (!over || active.id === over.id) return
 
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault()
+      const oldIndex = items.findIndex((i) => i.id === active.id)
+      const newIndex = items.findIndex((i) => i.id === over.id)
 
-    if (!draggedItem) return
+      if (oldIndex === -1 || newIndex === -1) return
 
-    const draggedIndex = items.findIndex(item => item.id === draggedItem.id)
-    if (draggedIndex === -1 || draggedIndex === targetIndex) {
-      setDraggedItem(null)
-      setDragOverIndex(null)
-      return
-    }
+      const reordered = arrayMove(items, oldIndex, newIndex).map(
+        (item, idx) => ({ ...item, priority: idx + 1 }),
+      )
+      onReorder(reordered)
+    },
+    [items, onReorder],
+  )
 
-    // Create new array with reordered items
-    const newItems = [...items]
-    const [removed] = newItems.splice(draggedIndex, 1)
-    newItems.splice(targetIndex, 0, removed)
+  // --- Arrow-button helpers (accessibility) ----------------------
+  const moveItem = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (fromIndex === toIndex) return
+      const reordered = arrayMove([...items], fromIndex, toIndex).map(
+        (item, idx) => ({ ...item, priority: idx + 1 }),
+      )
+      onReorder(reordered)
+    },
+    [items, onReorder],
+  )
 
-    // Update priorities to match new order
-    const reorderedItems = newItems.map((item, index) => ({
-      ...item,
-      priority: index + 1
-    }))
+  const moveUp = useCallback(
+    (index: number) => {
+      if (index > 0) moveItem(index, index - 1)
+    },
+    [moveItem],
+  )
 
-    onReorder(reorderedItems)
+  const moveDown = useCallback(
+    (index: number) => {
+      if (index < items.length - 1) moveItem(index, index + 1)
+    },
+    [moveItem, items.length],
+  )
 
-    setDraggedItem(null)
-    setDragOverIndex(null)
-    dragCounter.current = 0
-  }
+  const moveToTop = useCallback(
+    (index: number) => {
+      if (index > 0) moveItem(index, 0)
+    },
+    [moveItem],
+  )
 
-  const moveItem = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return
+  const moveToBottom = useCallback(
+    (index: number) => {
+      if (index < items.length - 1) moveItem(index, items.length - 1)
+    },
+    [moveItem, items.length],
+  )
 
-    const newItems = [...items]
-    const [removed] = newItems.splice(fromIndex, 1)
-    newItems.splice(toIndex, 0, removed)
-
-    const reorderedItems = newItems.map((item, index) => ({
-      ...item,
-      priority: index + 1
-    }))
-
-    onReorder(reorderedItems)
-  }
-
-  const moveUp = (index: number) => {
-    if (index > 0) {
-      moveItem(index, index - 1)
-    }
-  }
-
-  const moveDown = (index: number) => {
-    if (index < items.length - 1) {
-      moveItem(index, index + 1)
-    }
-  }
-
-  const moveToTop = (index: number) => {
-    if (index > 0) {
-      moveItem(index, 0)
-    }
-  }
-
-  const moveToBottom = (index: number) => {
-    if (index < items.length - 1) {
-      moveItem(index, items.length - 1)
-    }
-  }
+  // --- Derived state ---------------------------------------------
+  const draggedItem = useMemo(
+    () => (activeId ? items.find((i) => i.id === activeId) ?? null : null),
+    [activeId, items],
+  )
 
   return {
-    draggedItem,
-    dragOverIndex,
+    // dnd-kit wiring
+    sensors,
+    itemIds,
     handleDragStart,
     handleDragEnd,
-    handleDragEnter,
-    handleDragLeave,
-    handleDragOver,
-    handleDrop,
+    collisionDetection: closestCenter,
+
+    // Visual feedback
+    activeId,
+    draggedItem,
+    dragOverIndex,
+    isDragging: activeId !== null,
+
+    // Accessibility arrow helpers
     moveUp,
     moveDown,
     moveToTop,
     moveToBottom,
-    isDragging: draggedItem !== null
   }
 }
+
+/**
+ * Re-export useSortable so consumers don't need a separate import.
+ */
+export { useSortable, arrayMove }
+export type { DragStartEvent, DragEndEvent }

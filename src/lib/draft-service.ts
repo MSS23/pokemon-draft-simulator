@@ -292,7 +292,7 @@ export class DraftService {
     if (description) draftInsert.description = description
     if (tags) draftInsert.tags = tags
     // Hash password before storing for security
-    if (password) draftInsert.password = await bcrypt.hash(password, 10)
+    if (password) draftInsert.password = await bcrypt.hash(password, 12)
     if (customFormatId) draftInsert.custom_format_id = customFormatId
 
     const { data: draft, error: draftError } = await supabase

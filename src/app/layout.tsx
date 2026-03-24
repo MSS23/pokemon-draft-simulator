@@ -12,6 +12,7 @@ import { Header } from "@/components/layout/Header";
 import { TourProvider } from "@/components/tour/TourProvider";
 import { HydrationErrorFilter } from "./hydration-error-filter";
 import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
+import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
 import { Toaster } from "sonner";
 import { validateEnv } from "@/lib/env";
 // import ErrorBoundary from "@/components/ui/error-boundary";
@@ -32,6 +33,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pokemondraftleague.com"),
   title: "Pokémon Draft League",
   description: "Real-time Pokémon drafting platform with VGC 2024 Regulation H compliance, supporting competitive snake and auction formats",
   applicationName: "Pokémon Draft League",
@@ -48,11 +50,13 @@ export const metadata: Metadata = {
     siteName: "Pokémon Draft League",
     title: "Pokémon Draft League",
     description: "Real-time Pokémon drafting platform with VGC 2024 compliance",
+    images: [{ url: "/og-image", width: 1200, height: 630, alt: "Pokémon Draft League" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Pokémon Draft League",
     description: "Real-time Pokémon drafting platform",
+    images: ["/og-image"],
   },
   manifest: "/manifest.json",
 };
@@ -82,6 +86,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <HydrationErrorFilter />
+        <AnalyticsProvider>
         <PerformanceMonitorProvider>
           <ErrorBoundaryProvider>
             <HydrationFixProvider>
@@ -97,10 +102,11 @@ export default function RootLayout({
                       <TourProvider />
                       <main className="min-h-[calc(100vh-3rem)]">{children}</main>
                       <footer className="border-t py-4 text-center text-xs text-muted-foreground px-4">
-                        <div className="flex items-center justify-center gap-4">
+                        <div className="flex items-center justify-center gap-4 flex-wrap">
                           <a href="/terms" className="hover:text-foreground transition-colors">Terms</a>
                           <a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a>
-                          <span className="text-muted-foreground/50">Pokémon is &copy; Nintendo/Game Freak</span>
+                          <span className="text-muted-foreground/40">v0.1.1</span>
+                          <span className="text-muted-foreground/40">&copy; {new Date().getFullYear()} Poké Draft League</span>
                         </div>
                       </footer>
                     </QueryProvider>
@@ -110,6 +116,7 @@ export default function RootLayout({
             </HydrationFixProvider>
           </ErrorBoundaryProvider>
         </PerformanceMonitorProvider>
+        </AnalyticsProvider>
       </body>
     </html>
   );

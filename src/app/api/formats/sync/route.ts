@@ -4,8 +4,9 @@
  * Allows syncing format data from Pokémon Showdown
  */
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { syncShowdownData } from '@/services/showdown-sync'
+import { createClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('FormatsSyncRoute')
@@ -13,12 +14,41 @@ const log = createLogger('FormatsSyncRoute')
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
+async function verifyAdmin(request: NextRequest): Promise<{ authorized: boolean; error?: string }> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey) return { authorized: false, error: 'Service unavailable' }
+
+  const token = request.headers.get('authorization')?.replace('Bearer ', '')
+  if (!token) return { authorized: false, error: 'Authentication required' }
+
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } }
+  })
+
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) return { authorized: false, error: 'Invalid session' }
+
+  const { data: profile } = await supabase
+    .from('user_profiles')
+    .select('is_admin')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!profile?.is_admin) return { authorized: false, error: 'Admin access required' }
+  return { authorized: true }
+}
+
 /**
  * POST /api/formats/sync
- * Trigger a sync with Pokémon Showdown data
+ * Trigger a sync with Pokémon Showdown data (admin only)
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyAdmin(request)
+    if (!auth.authorized) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.error === 'Admin access required' ? 403 : 401 })
+    }
     const result = await syncShowdownData()
 
     if (result.success) {

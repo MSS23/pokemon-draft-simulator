@@ -13,6 +13,7 @@ import { AIAnalysisService } from '@/lib/ai-analysis-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { analyzeTeamSchema, validateRequestBody } from '@/lib/schemas'
 import { createLogger } from '@/lib/logger'
 import type { Pick } from '@/types'
@@ -21,6 +22,21 @@ const log = createLogger('AnalyzeTeamAPI')
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract authenticated user if available
+    let authenticatedUserId: string | undefined
+    const token = request.headers.get('authorization')?.replace('Bearer ', '')
+    if (token) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      if (supabaseUrl && supabaseKey) {
+        const authClient = createClient(supabaseUrl, supabaseKey, {
+          global: { headers: { Authorization: `Bearer ${token}` } }
+        })
+        const { data: { user } } = await authClient.auth.getUser(token)
+        if (user) authenticatedUserId = user.id
+      }
+    }
+
     const body = await request.json()
     const validation = validateRequestBody(analyzeTeamSchema, body)
 
@@ -33,10 +49,11 @@ export async function POST(request: NextRequest) {
 
     const { teamId, leagueId } = validation.data
 
-    // Check authorization
+    // Check authorization with explicit user ID
     const accessCheck = await AIAccessControl.canAnalyzeTeam({
       teamId,
-      leagueId
+      leagueId,
+      userId: authenticatedUserId,
     })
 
     if (!accessCheck.allowed) {

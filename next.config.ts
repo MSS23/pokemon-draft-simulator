@@ -122,7 +122,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://raw.githubusercontent.com https://pokeapi.co data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://pokeapi.co; frame-ancestors 'self'"
+            value: "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https://raw.githubusercontent.com https://pokeapi.co https://play.pokemonshowdown.com https://lh3.googleusercontent.com https://cdn.discordapp.com data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://pokeapi.co https://*.sentry.io https://us.i.posthog.com https://accounts.google.com https://discord.com; frame-src 'self' https://accounts.google.com https://discord.com; frame-ancestors 'self'"
           },
         ],
       },

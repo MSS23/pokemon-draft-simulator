@@ -11,9 +11,7 @@ import {
   Swords,
   Settings,
   LogOut,
-  UserCircle,
 } from 'lucide-react'
-import Link from 'next/link'
 import { SidebarSection } from './SidebarSection'
 import { SidebarLink } from './SidebarLink'
 import { supabase } from '@/lib/supabase'
@@ -106,19 +104,6 @@ export function Sidebar() {
 
   return (
     <aside className="w-56 bg-card border-r flex flex-col h-full">
-      {/* Brand */}
-      <div className="px-4 py-3 border-b">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="h-5 w-5 rounded-full overflow-hidden relative flex-shrink-0">
-            <div className="absolute inset-0 top-0 h-1/2 bg-primary" />
-            <div className="absolute inset-0 top-1/2 h-1/2 bg-white dark:bg-zinc-200" />
-            <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-foreground/30 -translate-y-1/2" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[7px] w-[7px] rounded-full border-[1px] border-foreground/30 bg-background" />
-          </div>
-          <span className="font-semibold text-sm">Poké Draft</span>
-        </Link>
-      </div>
-
       {/* User */}
       <div className="px-3 py-3 border-b">
         {user ? (
@@ -147,7 +132,12 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav role="navigation" aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        <SidebarSection title="Draft">
+        <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+        <SidebarLink href="/history" icon={History} label="History" />
+
+        <Separator className="my-1.5" />
+
+        <SidebarSection title="Drafts">
           <SidebarLink href="/create-draft" icon={Plus} label="Create Draft" />
           <SidebarLink href="/join-draft" icon={UserPlus} label="Join Draft" />
           <SidebarLink href="/watch-drafts" icon={Eye} label="Watch Live" />
@@ -155,17 +145,9 @@ export function Sidebar() {
 
         <Separator className="my-1.5" />
 
-        <SidebarSection title="Tournament">
+        <SidebarSection title="Tournaments">
           <SidebarLink href="/create-tournament" icon={Swords} label="Create Tournament" />
           <SidebarLink href="/join-tournament" icon={UserPlus} label="Join Tournament" />
-        </SidebarSection>
-
-        <Separator className="my-1.5" />
-
-        <SidebarSection title="Activity">
-          <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
-          <SidebarLink href="/profile" icon={UserCircle} label="Profile" />
-          <SidebarLink href="/history" icon={History} label="History" />
         </SidebarSection>
 
         {leagues.length > 0 && (

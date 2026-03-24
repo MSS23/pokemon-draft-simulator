@@ -34,7 +34,8 @@ export const env = {
     auctionDraft: true,
     wishlistAutopick: true,
     teamChat: false, // Future feature
-    analytics: false, // Future feature
+    analytics: !!process.env.NEXT_PUBLIC_POSTHOG_KEY,
+    pushNotifications: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
   },
 
   // App Config

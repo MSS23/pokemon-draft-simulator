@@ -4,6 +4,9 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('LeagueError')
 
 export default function LeagueError({
   error,
@@ -13,7 +16,7 @@ export default function LeagueError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('League error:', error)
+    log.error('League error:', error)
   }, [error])
 
   return (

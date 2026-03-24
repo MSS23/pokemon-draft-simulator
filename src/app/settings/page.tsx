@@ -12,11 +12,19 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { User, Shield, Bell, Eye, Trash2, Download, MapPin } from 'lucide-react'
+import { User, Shield, Bell, Eye, Trash2, Download, MapPin, Smartphone } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { toast } from 'sonner'
+import { createLogger } from '@/lib/logger'
+import {
+  isPushSupported,
+  getPushPermissionStatus,
+  subscribeToPush,
+  unsubscribeFromPush,
+  hasActiveSubscription,
+} from '@/lib/push-notifications'
 
 interface UserProfile {
   user_id: string
@@ -52,6 +60,45 @@ export default function SettingsPage() {
     showOnlineStatus: true,
   })
   const [savingPrefs, setSavingPrefs] = useState(false)
+  const [pushSupported, setPushSupported] = useState(false)
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('default')
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+
+  // Check push notification status on mount
+  useEffect(() => {
+    const supported = isPushSupported()
+    setPushSupported(supported)
+    setPushPermission(getPushPermissionStatus())
+
+    if (supported) {
+      hasActiveSubscription().then(active => setPushEnabled(active))
+    }
+  }, [])
+
+  const handlePushToggle = useCallback(async (enable: boolean) => {
+    if (!user) return
+    setPushLoading(true)
+    try {
+      if (enable) {
+        await subscribeToPush(user.id)
+        setPushEnabled(true)
+        setPushPermission(getPushPermissionStatus())
+        toast.success('Push notifications enabled')
+      } else {
+        await unsubscribeFromPush()
+        setPushEnabled(false)
+        toast.success('Push notifications disabled')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update push notifications'
+      toast.error(message)
+      // Revert toggle on error
+      setPushEnabled(!enable)
+    } finally {
+      setPushLoading(false)
+    }
+  }, [user])
 
   const loadProfile = useCallback(async (userId: string) => {
     if (!supabase) return
@@ -120,7 +167,7 @@ export default function SettingsPage() {
 
       toast.success('Profile saved!')
     } catch (err) {
-      console.error('Save profile error:', err)
+      createLogger('SettingsPage').error('Save profile error:', err)
       toast.error(err instanceof Error ? err.message : 'Failed to save profile')
     } finally {
       setSaving(false)
@@ -183,7 +230,7 @@ export default function SettingsPage() {
         </div>
 
         <Tabs defaultValue="profile">
-          <TabsList className="grid grid-cols-4 w-full">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full">
             <TabsTrigger value="profile" className="flex items-center gap-1.5 text-xs sm:text-sm">
               <User className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden sm:inline">Profile</span>
@@ -519,12 +566,76 @@ export default function SettingsPage() {
           </TabsContent>
 
           {/* ── Notifications Tab ── */}
-          <TabsContent value="notifications" className="mt-6">
+          <TabsContent value="notifications" className="mt-6 space-y-4">
+            {/* Push Notifications Card */}
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Smartphone className="h-4 w-4" />
+                    Push Notifications
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Receive browser push notifications even when the app is in the background.
+                  </p>
+                </div>
+
+                {!pushSupported ? (
+                  <div className="rounded-md bg-muted p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Push notifications are not supported in your current browser. Try using Chrome, Edge, or Firefox on desktop.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">Enable Push Notifications</p>
+                        <p className="text-xs text-muted-foreground">
+                          {pushPermission === 'denied'
+                            ? 'Notifications are blocked. Please enable them in your browser settings.'
+                            : pushEnabled
+                              ? 'You will receive push notifications for important events.'
+                              : 'Turn on to get notified about turns, trades, and matches.'}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={pushEnabled}
+                        onCheckedChange={handlePushToggle}
+                        disabled={pushLoading || pushPermission === 'denied'}
+                      />
+                    </div>
+
+                    {pushPermission === 'denied' && (
+                      <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
+                        <p className="text-sm text-destructive">
+                          Notifications are blocked by your browser. To re-enable, click the lock icon in your address bar and allow notifications for this site.
+                        </p>
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    <div>
+                      <p className="text-sm font-medium mb-2">What you will be notified about:</p>
+                      <ul className="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
+                        <li>Your turn to pick in a draft</li>
+                        <li>Incoming trade proposals and responses</li>
+                        <li>Upcoming match reminders</li>
+                        <li>Outbid alerts in auction drafts</li>
+                      </ul>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* In-App Notification Preferences */}
             <Card>
               <CardContent className="p-6 space-y-6">
                 <div>
-                  <h3 className="font-semibold">Notification Preferences</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Control which alerts you receive.</p>
+                  <h3 className="font-semibold">In-App Alert Preferences</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Control which in-app alerts you receive.</p>
                 </div>
 
                 <div className="space-y-4">

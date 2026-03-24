@@ -37,7 +37,10 @@ import {
   ChevronDown,
   ChevronUp,
   HelpCircle,
+  Coins,
+  Gavel,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { notify } from "@/lib/notifications";
 import {
   POKEMON_FORMATS,
@@ -69,19 +72,29 @@ const STEPS = [
 ] as const
 
 // ─── Draft type cards ───────────────────────────────────────────────────
-const DRAFT_TYPES = [
+const DRAFT_TYPES: {
+  value: string;
+  icon: LucideIcon;
+  title: string;
+  subtitle: string;
+  badge?: string;
+  desc: string;
+  example: string;
+  bestFor: string;
+}[] = [
   {
     value: "tiered",
-    icon: "🏆",
+    icon: Trophy,
     title: "Tiered Draft",
     subtitle: "Most popular",
+    badge: "Most popular",
     desc: "Pokemon are split into tiers (S, A, B, C...) based on strength. Each tier costs a set amount of points. You pick one from each tier — or mix and match within your budget.",
     example: "Example: Pick 1 S-tier (20 pts), 2 B-tier (10 pts each), and fill the rest with D/E-tier picks.",
     bestFor: "Best for balanced, competitive leagues where every team feels fair.",
   },
   {
     value: "points",
-    icon: "💰",
+    icon: Coins,
     title: "Points Draft",
     subtitle: "Classic snake",
     desc: "Every Pokemon has a point cost based on how strong it is. Teams take turns picking in a snake order (1-2-3-4, then 4-3-2-1). Spend your budget wisely across all your picks.",
@@ -90,7 +103,7 @@ const DRAFT_TYPES = [
   },
   {
     value: "auction",
-    icon: "🔨",
+    icon: Gavel,
     title: "Auction Draft",
     subtitle: "Live bidding",
     desc: "Players take turns nominating a Pokemon, then everyone bids in real-time. Highest bidder wins that Pokemon. Budget management is everything.",
@@ -396,7 +409,7 @@ export default function CreateDraftPage() {
                 onClick={() => handleInputChange("draftType", opt.value)}
                 className={`relative flex flex-col gap-2 p-4 rounded-xl border-2 transition-all text-left ${
                   isSelected
-                    ? "border-primary bg-primary/5 shadow-sm"
+                    ? "border-primary ring-2 ring-primary bg-primary/5 shadow-sm"
                     : "border-border bg-card hover:border-primary/40 hover:bg-muted/50"
                 }`}
               >
@@ -409,10 +422,22 @@ export default function CreateDraftPage() {
                 )}
 
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">{opt.icon}</span>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    isSelected ? "bg-primary/15" : "bg-primary/10"
+                  }`}>
+                    <opt.icon className={`h-5 w-5 ${isSelected ? "text-primary" : "text-primary/70"}`} />
+                  </div>
                   <div>
                     <div className="font-semibold">{opt.title}</div>
-                    <div className="text-xs text-muted-foreground">{opt.subtitle}</div>
+                    <div className="flex items-center gap-2">
+                      {opt.badge ? (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {opt.badge}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">{opt.subtitle}</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -788,7 +813,7 @@ export default function CreateDraftPage() {
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">Draft Type</div>
               <div className="font-medium flex items-center gap-1.5">
-                <span>{draftTypeInfo?.icon}</span>
+                {draftTypeInfo?.icon && <draftTypeInfo.icon className="h-4 w-4 text-primary" />}
                 {draftTypeInfo?.title}
               </div>
             </div>

@@ -4,6 +4,9 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('DraftError')
 
 export default function DraftError({
   error,
@@ -13,7 +16,7 @@ export default function DraftError({
   reset: () => void
 }) {
   useEffect(() => {
-    console.error('Draft error:', error)
+    log.error('Draft error:', error)
   }, [error])
 
   return (

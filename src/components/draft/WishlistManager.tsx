@@ -16,7 +16,14 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
-import { useDragAndDrop } from '@/hooks/useDragAndDrop'
+import {
+  useDragAndDrop,
+  DndContext,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@/hooks/useDragAndDrop'
+import { CSS } from '@dnd-kit/utilities'
 import { useWishlistSync } from '@/hooks/useWishlistSync'
 import { useBudgetValidation } from '@/hooks/useBudgetValidation'
 import BudgetWarnings from './BudgetWarnings'
@@ -73,17 +80,14 @@ export default function WishlistManager({
     // Handled automatically by real-time sync when Pokemon are drafted
   }
 
-  // Drag and drop functionality
+  // Drag and drop functionality via dnd-kit
   const {
-    draggedItem,
-    dragOverIndex,
+    sensors,
+    itemIds,
     handleDragStart,
     handleDragEnd,
-    handleDragEnter,
-    handleDragLeave,
-    handleDragOver,
-    handleDrop,
-    isDragging: _isDragging
+    collisionDetection,
+    activeId,
   } = useDragAndDrop<WishlistItem>({
     items: userWishlist,
     onReorder: (reorderedItems) => {
@@ -207,88 +211,86 @@ export default function WishlistManager({
 
         {userWishlist.length === 0 ? (
           <div className="text-center py-4 text-muted-foreground">
-            <p className="text-sm">No Pokémon in wishlist</p>
-            <p className="text-xs mt-0.5">Click the heart on any Pokémon card to add them</p>
+            <p className="text-sm">No Pokemon in wishlist</p>
+            <p className="text-xs mt-0.5">Click the heart on any Pokemon card to add them</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-            {userWishlist.map((item: WishlistItem, index: number) => (
-              <WishlistItemCard
-                key={item.id}
-                item={item}
-                index={index}
-                isNext={item.id === nextPick?.id}
-                isDragging={draggedItem?.id === item.id}
-                isDragOver={dragOverIndex === index}
-                onRemove={() => handleRemoveItem(item.pokemonId)}
-                onToggleAvailability={(available) =>
-                  handleToggleAvailability(item.id, available)
-                }
-                onDragStart={(e) => handleDragStart(e, item, index)}
-                onDragEnd={handleDragEnd}
-                onDragEnter={(e) => handleDragEnter(e, index)}
-                onDragLeave={handleDragLeave}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, index)}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+                {userWishlist.map((item: WishlistItem, index: number) => (
+                  <SortableWishlistItemCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    isNext={item.id === nextPick?.id}
+                    isDragging={activeId === item.id}
+                    onRemove={() => handleRemoveItem(item.pokemonId)}
+                    onToggleAvailability={(available) =>
+                      handleToggleAvailability(item.id, available)
+                    }
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </CardContent>
     </Card>
   )
 }
 
-// Individual wishlist item component
-interface WishlistItemCardProps {
+// Sortable wrapper for individual wishlist items
+interface SortableWishlistItemCardProps {
   item: WishlistItem
   index: number
   isNext: boolean
   isDragging?: boolean
-  isDragOver?: boolean
   onRemove: () => void
   onToggleAvailability: (available: boolean) => void
-  onDragStart: (e: React.DragEvent) => void
-  onDragEnd: (e: React.DragEvent) => void
-  onDragEnter: (e: React.DragEvent) => void
-  onDragLeave: (e: React.DragEvent) => void
-  onDragOver: (e: React.DragEvent) => void
-  onDrop: (e: React.DragEvent) => void
 }
 
-function WishlistItemCard({
+function SortableWishlistItemCard({
   item,
   index,
   isNext,
   isDragging = false,
-  isDragOver = false,
   onRemove,
   onToggleAvailability,
-  onDragStart,
-  onDragEnd,
-  onDragEnter,
-  onDragLeave,
-  onDragOver,
-  onDrop
-}: WishlistItemCardProps) {
+}: SortableWishlistItemCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortableDragging,
+  } = useSortable({ id: item.id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  const dragging = isDragging || isSortableDragging
+
   return (
     <div
-      draggable
+      ref={setNodeRef}
+      style={style}
       className={cn(
         "relative flex items-center gap-3 p-2 rounded-lg border transition-all duration-200",
-        "hover:shadow-md hover:scale-[1.02] cursor-move",
+        "hover:shadow-md hover:scale-[1.02]",
         isNext && "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700",
         !item.isAvailable && "opacity-75 bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700",
         item.isAvailable && !isNext && "bg-white dark:bg-slate-800 border-gray-200 dark:border-gray-700",
-        isDragging && "opacity-50 scale-95 rotate-2 shadow-xl",
-        isDragOver && "scale-105 border-purple-400 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+        dragging && "opacity-50 scale-95 shadow-xl z-50",
       )}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragEnter={onDragEnter}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
     >
       {/* Red X Overlay for Drafted Pokemon */}
       {!item.isAvailable && (
@@ -304,10 +306,15 @@ function WishlistItemCard({
         </div>
       )}
 
-      {/* Drag Handle */}
-      <div className="cursor-move">
+      {/* Drag Handle - only this element activates drag */}
+      <button
+        className="cursor-grab active:cursor-grabbing touch-none"
+        aria-label={`Reorder ${item.pokemonName}`}
+        {...attributes}
+        {...listeners}
+      >
         <GripVertical className="h-4 w-4 text-gray-400" />
-      </div>
+      </button>
 
       {/* Priority Number */}
       <div className={cn(

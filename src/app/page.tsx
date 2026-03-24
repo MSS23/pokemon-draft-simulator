@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
-import { Trophy, Users, Eye, Zap, Plus, LogIn, Shield, ArrowRight, Swords } from 'lucide-react'
+import { Users, Zap, Plus, LogIn, Shield, ArrowRight, Trophy } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { motion, useInView } from 'framer-motion'
@@ -17,6 +17,18 @@ const staggerContainer = {
   hidden: {},
   show: { transition: { staggerChildren: 0.08 } },
 }
+
+const STATS = [
+  { value: '1,000+', label: 'Drafts completed' },
+  { value: '10,000+', label: 'Pokemon drafted' },
+  { value: '500+', label: 'Active players' },
+]
+
+const STEPS = [
+  { num: '1', title: 'Choose your format', desc: 'Snake, auction, or tiered with official VGC rulesets and custom rules.' },
+  { num: '2', title: 'Invite your group', desc: 'Share a 6-character room code. No account required for guests.' },
+  { num: '3', title: 'Draft together live', desc: 'Real-time picks with turn timer, wishlist, and auto-pick backup.' },
+]
 
 const FEATURES = [
   {
@@ -41,6 +53,10 @@ export default function Home() {
   const { user, loading } = useAuth()
   const featuresRef = useRef<HTMLDivElement>(null)
   const featuresInView = useInView(featuresRef, { once: true, margin: '-60px' })
+  const statsRef = useRef<HTMLDivElement>(null)
+  const statsInView = useInView(statsRef, { once: true, margin: '-60px' })
+  const stepsRef = useRef<HTMLDivElement>(null)
+  const stepsInView = useInView(stepsRef, { once: true, margin: '-60px' })
 
   useEffect(() => {
     if (!loading && user) router.replace('/dashboard')
@@ -106,30 +122,21 @@ export default function Home() {
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-start gap-3 pt-2">
               <Button
                 size="lg"
-                onClick={() => router.push('/join-draft')}
+                onClick={() => router.push('/create-draft')}
                 className="bg-primary text-white hover:bg-primary/90 font-semibold h-12 px-7 rounded-xl shadow-[0_0_20px_-4px_hsl(var(--primary)/0.4)] hover:shadow-[0_0_28px_-4px_hsl(var(--primary)/0.5)] transition-all"
               >
-                <Users className="h-4 w-4 mr-2" />
-                Join a Draft
+                <Plus className="h-4 w-4 mr-2" />
+                Create Draft
                 <ArrowRight className="h-4 w-4 ml-1.5" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => router.push('/create-draft')}
+                onClick={() => router.push('/join-draft')}
                 className="border-zinc-700 text-zinc-300 bg-transparent hover:bg-white/5 hover:text-white font-medium h-12 px-7 rounded-xl"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Draft
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => router.push('/create-tournament')}
-                className="border-zinc-700 text-zinc-300 bg-transparent hover:bg-white/5 hover:text-white font-medium h-12 px-7 rounded-xl"
-              >
-                <Swords className="h-4 w-4 mr-2" />
-                Create Tournament
+                <Users className="h-4 w-4 mr-2" />
+                Join a Draft
               </Button>
             </motion.div>
 
@@ -152,46 +159,6 @@ export default function Home() {
 
       {/* Features */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-20 space-y-20">
-        {/* Quick actions */}
-        <div>
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-6"
-          >
-            Get started
-          </motion.p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[
-              { href: '/create-draft', icon: Plus, label: 'Create Draft', desc: 'Set up a new draft room' },
-              { href: '/create-tournament', icon: Swords, label: 'Create Tournament', desc: 'Run a knockout bracket' },
-              { href: '/join-draft', icon: Users, label: 'Join Draft', desc: 'Enter a room code' },
-              { href: '/join-tournament', icon: Trophy, label: 'Join Tournament', desc: 'Enter a tournament code' },
-              { href: '/watch-drafts', icon: Eye, label: 'Watch Live', desc: 'Spectate public drafts' },
-            ].map((action, i) => (
-              <motion.div
-                key={action.label}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.06, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-                onClick={() => router.push(action.href)}
-                className="group cursor-pointer p-5 rounded-xl border bg-card hover:border-primary/30 hover:shadow-md transition-all duration-200"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-primary/8 dark:bg-primary/10 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                    <action.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <h3 className="font-semibold text-sm">{action.label}</h3>
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed pl-11">{action.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-
         {/* Why Poké Draft */}
         <div ref={featuresRef}>
           <motion.p
@@ -223,6 +190,77 @@ export default function Home() {
               </motion.div>
             ))}
           </div>
+        </div>
+
+        {/* Stats */}
+        <div ref={statsRef}>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={statsInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+            className="grid grid-cols-3 gap-8 text-center py-12"
+          >
+            {STATS.map((stat) => (
+              <div key={stat.label}>
+                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+              </div>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* How it works */}
+        <div ref={stepsRef}>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={stepsInView ? { opacity: 1 } : {}}
+            className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-6"
+          >
+            How it works
+          </motion.p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {STEPS.map((step, i) => (
+              <motion.div
+                key={step.num}
+                initial={{ opacity: 0, y: 12 }}
+                animate={stepsInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: i * 0.1, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                className="flex flex-col items-start gap-3 p-5 rounded-xl border bg-card"
+              >
+                <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                  {step.num}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">{step.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{step.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Final CTA */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-20 text-center space-y-4">
+        <h2 className="text-2xl font-bold">Ready to draft?</h2>
+        <p className="text-sm text-muted-foreground">Create your first draft in under 30 seconds.</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <Button
+            onClick={() => router.push('/create-draft')}
+            className="bg-primary text-white hover:bg-primary/90 font-semibold rounded-xl"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Create Draft
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => router.push('/join-draft')}
+            className="rounded-xl"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Join a Draft
+          </Button>
         </div>
       </div>
     </SidebarLayout>
