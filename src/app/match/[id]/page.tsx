@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Trophy, Users, Calendar, Crown, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+import { LoadingScreen } from '@/components/ui/loading-states'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -100,14 +101,7 @@ export default function MatchDetailPage() {
   }, [matchId, router])
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-600 dark:text-slate-400">Loading match details...</p>
-        </div>
-      </div>
-    )
+    return <LoadingScreen title="Loading Match..." description="Fetching match details." />
   }
 
   if (!match) {
@@ -282,17 +276,17 @@ export default function MatchDetailPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b">
+                      <tr className="border-b bg-muted/50">
                         <th className="text-left py-2 px-3">Rank</th>
                         <th className="text-left py-2 px-3">Team</th>
-                        <th className="text-center py-2 px-3">W</th>
-                        <th className="text-center py-2 px-3">L</th>
-                        <th className="text-center py-2 px-3">D</th>
-                        <th className="text-center py-2 px-3">PF</th>
-                        <th className="text-center py-2 px-3">PA</th>
-                        <th className="text-center py-2 px-3">Diff</th>
+                        <th className="text-right py-2 px-3">W</th>
+                        <th className="text-right py-2 px-3">L</th>
+                        <th className="text-right py-2 px-3">D</th>
+                        <th className="text-right py-2 px-3 hidden sm:table-cell">PF</th>
+                        <th className="text-right py-2 px-3 hidden sm:table-cell">PA</th>
+                        <th className="text-right py-2 px-3 hidden sm:table-cell">Diff</th>
                         {standings.some(s => s.currentStreak) && (
-                          <th className="text-center py-2 px-3">Streak</th>
+                          <th className="text-center py-2 px-3 hidden sm:table-cell">Streak</th>
                         )}
                       </tr>
                     </thead>
@@ -306,21 +300,21 @@ export default function MatchDetailPage() {
                               isCurrentTeam ? 'bg-blue-50 dark:bg-blue-950/20' : ''
                             }`}
                           >
-                            <td className="py-3 px-3 text-center font-semibold">{standing.rank || index + 1}</td>
+                            <td className="py-3 px-3 text-left font-semibold">{standing.rank || index + 1}</td>
                             <td className="py-3 px-3 font-medium">{standing.team.name}</td>
-                            <td className="py-3 px-3 text-center">{standing.wins}</td>
-                            <td className="py-3 px-3 text-center">{standing.losses}</td>
-                            <td className="py-3 px-3 text-center">{standing.draws}</td>
-                            <td className="py-3 px-3 text-center">{standing.pointsFor}</td>
-                            <td className="py-3 px-3 text-center">{standing.pointsAgainst}</td>
-                            <td className={`py-3 px-3 text-center font-semibold ${
+                            <td className="py-3 px-3 text-right tabular-nums">{standing.wins}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">{standing.losses}</td>
+                            <td className="py-3 px-3 text-right tabular-nums">{standing.draws}</td>
+                            <td className="py-3 px-3 text-right tabular-nums hidden sm:table-cell">{standing.pointsFor}</td>
+                            <td className="py-3 px-3 text-right tabular-nums hidden sm:table-cell">{standing.pointsAgainst}</td>
+                            <td className={`py-3 px-3 text-right tabular-nums font-semibold hidden sm:table-cell ${
                               standing.pointDifferential > 0 ? 'text-green-600' :
                               standing.pointDifferential < 0 ? 'text-red-600' : ''
                             }`}>
                               {standing.pointDifferential > 0 ? '+' : ''}{standing.pointDifferential}
                             </td>
                             {standings.some(s => s.currentStreak) && (
-                              <td className="py-3 px-3 text-center">
+                              <td className="py-3 px-3 text-center hidden sm:table-cell">
                                 {standing.currentStreak && (
                                   <Badge variant={standing.currentStreak.startsWith('W') ? 'default' : 'destructive'}>
                                     {standing.currentStreak}

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LeagueService } from '@/lib/league-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, Trophy, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react'
 import type { League, Match, Team } from '@/types'
 import { getTeamColor } from '@/utils/team-colors'
 import { createLogger } from '@/lib/logger'
@@ -28,35 +28,40 @@ export default function SchedulePage() {
   const [schedule, setSchedule] = useState<WeekGroup[]>([])
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadData = async () => {
+    setError(null)
+    setIsLoading(true)
+    try {
+      const [leagueData, scheduleData] = await Promise.all([
+        LeagueService.getLeague(leagueId),
+        LeagueService.getFullSchedule(leagueId),
+      ])
+
+      if (!leagueData) {
+        router.push('/dashboard')
+        return
+      }
+
+      setLeague(leagueData)
+      setSchedule(scheduleData)
+
+      // Auto-expand current week and its neighbors
+      const currentWeek = leagueData.currentWeek || 1
+      setExpandedWeeks(new Set([currentWeek - 1, currentWeek, currentWeek + 1].filter(w => w >= 1)))
+    } catch (err) {
+      log.error('Failed to load schedule:', err)
+      setError('Failed to load schedule')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [leagueData, scheduleData] = await Promise.all([
-          LeagueService.getLeague(leagueId),
-          LeagueService.getFullSchedule(leagueId),
-        ])
-
-        if (!leagueData) {
-          router.push('/dashboard')
-          return
-        }
-
-        setLeague(leagueData)
-        setSchedule(scheduleData)
-
-        // Auto-expand current week and its neighbors
-        const currentWeek = leagueData.currentWeek || 1
-        setExpandedWeeks(new Set([currentWeek - 1, currentWeek, currentWeek + 1].filter(w => w >= 1)))
-      } catch (err) {
-        log.error('Failed to load schedule:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    load()
-  }, [leagueId, router])
+    loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId])
 
   const toggleWeek = (week: number) => {
     setExpandedWeeks(prev => {
@@ -104,6 +109,25 @@ export default function SchedulePage() {
             </p>
           </div>
         </div>
+
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-destructive font-medium">{error}</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={loadData}>Try Again</Button>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!error && schedule.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+              <CalendarDays className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <p className="font-semibold">No weeks scheduled yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Matches will appear here once the schedule is generated.</p>
+          </div>
+        )}
 
         {/* Schedule */}
         <div className="space-y-3">
@@ -164,8 +188,11 @@ export default function SchedulePage() {
                       return (
                         <div
                           key={match.id}
-                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          role="button"
+                          tabIndex={0}
                           onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/league/${leagueId}/matchup/${match.id}`) } }}
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <div className={`w-1 h-8 rounded-full ${homeColors.bg}`} />

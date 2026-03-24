@@ -13,6 +13,7 @@ import { TourProvider } from "@/components/tour/TourProvider";
 import { HydrationErrorFilter } from "./hydration-error-filter";
 import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
+import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import { validateEnv } from "@/lib/env";
 // import ErrorBoundary from "@/components/ui/error-boundary";
@@ -117,6 +118,7 @@ export default function RootLayout({
           </ErrorBoundaryProvider>
         </PerformanceMonitorProvider>
         </AnalyticsProvider>
+        <Analytics />
       </body>
     </html>
   );

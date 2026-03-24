@@ -32,27 +32,32 @@ export default function StatsPage() {
   const [filter, setFilter] = useState<FilterMode>('all')
   const [teamFilter, setTeamFilter] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadData = async () => {
+    setError(null)
+    setIsLoading(true)
+    try {
+      const [leagueData, statsData] = await Promise.all([
+        LeagueService.getLeague(leagueId),
+        LeagueStatsService.getLeaguePokemonStats(leagueId),
+      ])
+
+      if (!leagueData) { router.push('/dashboard'); return }
+      setLeague(leagueData)
+      setStats(statsData)
+    } catch (err) {
+      log.error('Failed to load stats:', err)
+      setError('Failed to load stats')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const [leagueData, statsData] = await Promise.all([
-          LeagueService.getLeague(leagueId),
-          LeagueStatsService.getLeaguePokemonStats(leagueId),
-        ])
-
-        if (!leagueData) { router.push('/dashboard'); return }
-        setLeague(leagueData)
-        setStats(statsData)
-      } catch (err) {
-        log.error('Failed to load stats:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    load()
-  }, [leagueId, router])
+    loadData()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId])
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -127,6 +132,14 @@ export default function StatsPage() {
           </div>
         </div>
 
+        {/* Error State */}
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-destructive font-medium">{error}</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={loadData}>Try Again</Button>
+          </div>
+        )}
+
         {/* MVP Highlights */}
         {(mvpKO || mvpWinRate) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -146,6 +159,7 @@ export default function StatsPage() {
                     </div>
                     <div className="font-bold capitalize">{mvpKO.pokemonName}</div>
                     <div className="text-xs text-muted-foreground">{mvpKO.teamName} &middot; {mvpKO.totalKOs} KOs</div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">(min. 3 matches)</p>
                   </div>
                 </CardContent>
               </Card>
@@ -168,6 +182,7 @@ export default function StatsPage() {
                     <div className="text-xs text-muted-foreground">
                       {mvpWinRate.teamName} &middot; {(mvpWinRate.winRate * 100).toFixed(0)}% ({mvpWinRate.matchesWon}W-{mvpWinRate.matchesLost}L)
                     </div>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">(min. 3 matches)</p>
                   </div>
                 </CardContent>
               </Card>
@@ -226,7 +241,7 @@ export default function StatsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="border-b bg-muted/50">
                     <th className="text-left py-2 pr-2">
                       <SortHeader label="Pokemon" field="pokemonName" />
                     </th>
@@ -290,7 +305,7 @@ export default function StatsPage() {
                             {stat.teamName}
                           </span>
                         </td>
-                        <td className="py-2 px-2 text-right tabular-nums">{stat.cost}</td>
+                        <td className="py-2 px-2 text-right tabular-nums">{stat.cost.toLocaleString()}</td>
                         <td className="py-2 px-2 text-right tabular-nums hidden md:table-cell">{stat.matchesPlayed}</td>
                         <td className="py-2 px-2 text-right tabular-nums hidden md:table-cell">{stat.matchesWon}</td>
                         <td className="py-2 px-2 text-right tabular-nums hidden md:table-cell">{stat.matchesLost}</td>
@@ -303,7 +318,7 @@ export default function StatsPage() {
                           {stat.kdRatio.toFixed(1)}
                         </td>
                         <td className="py-2 px-2 text-right tabular-nums">
-                          {stat.matchesPlayed > 0 ? `${(stat.winRate * 100).toFixed(0)}%` : '-'}
+                          {stat.matchesPlayed >= 3 ? `${(stat.winRate * 100).toFixed(0)}%` : stat.matchesPlayed > 0 ? 'N/A' : '-'}
                         </td>
                       </tr>
                     )

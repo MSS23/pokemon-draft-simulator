@@ -47,6 +47,7 @@ export default function FreeAgentsPage() {
   const [isClaiming, setIsClaiming] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const deferredSearch = useDeferredValue(searchQuery)
 
@@ -57,80 +58,81 @@ export default function FreeAgentsPage() {
     !!formatId || !!customFormatId
   )
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        let userId = user?.id
-        if (!userId) {
-          try {
-            const session = await UserSessionService.getOrCreateSession()
-            userId = session.userId
-          } catch { /* guest */ }
-        }
-
-        const leagueData = await LeagueService.getLeague(leagueId)
-        if (!leagueData) { router.push('/dashboard'); return }
-        setLeague(leagueData)
-        setDraftId(leagueData.draftId)
-
-        // Get draft settings for format
-        if (supabase) {
-          const { data: draft } = await supabase
-            .from('drafts')
-            .select('settings, custom_format_id, ruleset')
-            .eq('id', leagueData.draftId)
-            .single()
-
-          if (draft) {
-            const settings = draft.settings as Record<string, unknown>
-            setFormatId((settings.formatId as string) || draft.ruleset || undefined)
-            setCustomFormatId(draft.custom_format_id || undefined)
-          }
-        }
-
-        // Get drafted Pokemon IDs
-        const drafted = await WaiverService.getDraftedPokemonIds(leagueData.draftId)
-        setDraftedIds(drafted)
-
-        // Find user's team
-        if (userId) {
-          const userTeam = leagueData.teams.find(t => t.ownerId === userId)
-          if (userTeam) {
-            setUserTeamId(userTeam.id)
-            setUserBudget(userTeam.budgetRemaining)
-
-            // Load team picks for drop selection
-            const picks = await WaiverService.getTeamPicks(userTeam.id)
-            setUserTeamPicks(picks)
-
-            // Load claims count
-            const claims = await WaiverService.getTeamClaimsThisSeason(userTeam.id, leagueId)
-            setClaimsUsed(claims)
-          }
-        }
-
-        // Check if free agent claims are locked (first game played)
-        const locked = await WaiverService.hasFirstGameBeenPlayed(leagueId)
-        setIsLocked(locked)
-
-        // Load waiver settings
-        const settings = await LeagueService.getLeagueSettings(leagueId)
-        setMaxClaims(settings.freeAgentPicksAllowed ?? settings.maxWaiverClaimsPerSeason ?? 3)
-
-        // Load waiver history
+  const loadData = useCallback(async () => {
+    setError(null)
+    setIsLoading(true)
+    try {
+      let userId = user?.id
+      if (!userId) {
         try {
-          const history = await WaiverService.getWaiverHistory(leagueId)
-          setWaiverHistory(history)
-        } catch { /* table might not exist yet */ }
-      } catch (err) {
-        log.error('Failed to load free agents:', err)
-      } finally {
-        setIsLoading(false)
+          const session = await UserSessionService.getOrCreateSession()
+          userId = session.userId
+        } catch { /* guest */ }
       }
-    }
 
-    load()
+      const leagueData = await LeagueService.getLeague(leagueId)
+      if (!leagueData) { router.push('/dashboard'); return }
+      setLeague(leagueData)
+      setDraftId(leagueData.draftId)
+
+      // Get draft settings for format
+      if (supabase) {
+        const { data: draft } = await supabase
+          .from('drafts')
+          .select('settings, custom_format_id, ruleset')
+          .eq('id', leagueData.draftId)
+          .single()
+
+        if (draft) {
+          const settings = draft.settings as Record<string, unknown>
+          setFormatId((settings.formatId as string) || draft.ruleset || undefined)
+          setCustomFormatId(draft.custom_format_id || undefined)
+        }
+      }
+
+      // Get drafted Pokemon IDs
+      const drafted = await WaiverService.getDraftedPokemonIds(leagueData.draftId)
+      setDraftedIds(drafted)
+
+      // Find user's team
+      if (userId) {
+        const userTeam = leagueData.teams.find(t => t.ownerId === userId)
+        if (userTeam) {
+          setUserTeamId(userTeam.id)
+          setUserBudget(userTeam.budgetRemaining)
+
+          // Load team picks for drop selection
+          const picks = await WaiverService.getTeamPicks(userTeam.id)
+          setUserTeamPicks(picks)
+
+          // Load claims count
+          const claims = await WaiverService.getTeamClaimsThisSeason(userTeam.id, leagueId)
+          setClaimsUsed(claims)
+        }
+      }
+
+      // Check if free agent claims are locked (first game played)
+      const locked = await WaiverService.hasFirstGameBeenPlayed(leagueId)
+      setIsLocked(locked)
+
+      // Load waiver settings
+      const settings = await LeagueService.getLeagueSettings(leagueId)
+      setMaxClaims(settings.freeAgentPicksAllowed ?? settings.maxWaiverClaimsPerSeason ?? 3)
+
+      // Load waiver history
+      try {
+        const history = await WaiverService.getWaiverHistory(leagueId)
+        setWaiverHistory(history)
+      } catch { /* table might not exist yet */ }
+    } catch (err) {
+      log.error('Failed to load free agents:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load free agents')
+    } finally {
+      setIsLoading(false)
+    }
   }, [leagueId, router, user?.id])
+
+  useEffect(() => { loadData() }, [loadData])
 
   // Filter to only available (undrafted) Pokemon
   const availablePokemon = useMemo(() => {
@@ -213,6 +215,14 @@ export default function FreeAgentsPage() {
   }, [league])
 
   if (isLoading) return <LoadingScreen title="Loading Free Agents..." description="Scanning available Pokemon." />
+  if (error && !league) return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <p className="text-destructive font-medium">{error}</p>
+        <Button onClick={loadData}>Retry</Button>
+      </div>
+    </div>
+  )
   if (!league) return null
 
   const canClaim = userTeamId && claimsUsed < maxClaims && !isLocked
@@ -377,6 +387,10 @@ export default function FreeAgentsPage() {
             {pokemonLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading Pokemon data...</div>
             ) : (
+              <>
+              <p className="text-xs text-muted-foreground mb-2">
+                Showing {Math.min(filteredPokemon.length, 100)} of {filteredPokemon.length} available
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
                 {filteredPokemon.slice(0, 100).map(pokemon => (
                   <Card
@@ -408,6 +422,7 @@ export default function FreeAgentsPage() {
                   </Card>
                 ))}
               </div>
+              </>
             )}
 
             {filteredPokemon.length > 100 && (
@@ -416,10 +431,11 @@ export default function FreeAgentsPage() {
               </p>
             )}
 
-            {filteredPokemon.length === 0 && !pokemonLoading && (
-              <div className="text-center py-12 text-muted-foreground">
-                {searchQuery ? 'No Pokemon match your search.' : 'No free agents available.'}
-              </div>
+            {filteredPokemon.length === 0 && !pokemonLoading && searchQuery && (
+              <p className="text-center py-8 text-muted-foreground">No Pokemon matching &ldquo;{searchQuery}&rdquo;</p>
+            )}
+            {filteredPokemon.length === 0 && !pokemonLoading && !searchQuery && (
+              <p className="text-center py-8 text-muted-foreground">All Pokemon have been drafted!</p>
             )}
           </TabsContent>
 

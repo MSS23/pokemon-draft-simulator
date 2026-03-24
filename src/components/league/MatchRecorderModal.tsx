@@ -683,6 +683,18 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
                 Track kills and deaths for each Pokemon. Use the <span className="text-green-600 dark:text-green-400 font-medium">+/-</span> buttons to adjust.
               </p>
 
+              <p className="text-sm text-muted-foreground mb-2">
+                Best of {totalGames} — Game {activeGame} of {totalGames}
+              </p>
+
+              <details className="text-xs text-muted-foreground mb-3 border rounded-lg p-2">
+                <summary className="cursor-pointer font-medium">How KO tracking works</summary>
+                <p className="mt-1.5 leading-relaxed">
+                  Each team brings their drafted Pokemon to battle. Record which Pokemon were knocked out (KO&apos;d) in each game.
+                  A Pokemon marked as KO&apos;d in all games they participated in is considered &ldquo;fainted&rdquo; for the season.
+                </p>
+              </details>
+
               {/* Game tabs */}
               {playedGames.length > 1 && (
                 <div className="flex gap-1.5">

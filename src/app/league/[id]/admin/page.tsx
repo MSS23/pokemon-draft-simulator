@@ -11,6 +11,10 @@ import { CommissionerService, type Announcement } from '@/lib/commissioner-servi
 import { TradeService, type TradeWithDetails } from '@/lib/trade-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import {
   ArrowLeft, Swords, Repeat, Megaphone, Trophy, AlertTriangle,
   Check, X, Pin, PinOff, Trash2, Edit2, SkipForward
 } from 'lucide-react'
@@ -259,6 +263,7 @@ export default function CommissionerPage() {
                               min={0}
                               value={editHomeScore}
                               onChange={e => setEditHomeScore(Number(e.target.value))}
+                              aria-label="Home team score"
                               className="w-full mt-1 px-3 py-2 border rounded-md bg-background text-sm"
                             />
                           </div>
@@ -270,6 +275,7 @@ export default function CommissionerPage() {
                               min={0}
                               value={editAwayScore}
                               onChange={e => setEditAwayScore(Number(e.target.value))}
+                              aria-label="Away team score"
                               className="w-full mt-1 px-3 py-2 border rounded-md bg-background text-sm"
                             />
                           </div>
@@ -461,15 +467,30 @@ export default function CommissionerPage() {
                       This will cancel any incomplete matches for Week {league.currentWeek} and advance to Week {league.currentWeek + 1}.
                       This action cannot be undone.
                     </p>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={handleForceAdvance}
-                      disabled={league.currentWeek >= league.totalWeeks}
-                    >
-                      <SkipForward className="h-3 w-3 mr-1" />
-                      Force Advance to Week {league.currentWeek + 1}
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={league.currentWeek >= league.totalWeeks}
+                        >
+                          <SkipForward className="h-3 w-3 mr-1" />
+                          Force Advance to Week {league.currentWeek + 1}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Force Advance Week?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will mark all incomplete matches in the current week as cancelled and advance to the next week. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleForceAdvance}>Advance Week</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
 
                   <div className="text-sm text-muted-foreground">
