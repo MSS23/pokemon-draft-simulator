@@ -10,7 +10,8 @@ import { LeagueService } from '@/lib/league-service'
 import { WaiverService } from '@/lib/waiver-service'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Search, UserPlus, History, Coins, Lock } from 'lucide-react'
+import { Search, UserPlus, History, Coins, Lock } from 'lucide-react'
+import { LeagueNav } from '@/components/league/LeagueNav'
 import type { League, Team, Pick, WaiverClaim } from '@/types'
 import type { Pokemon } from '@/types'
 import { PokemonSprite } from '@/components/ui/pokemon-sprite'
@@ -228,20 +229,20 @@ export default function FreeAgentsPage() {
   const canClaim = userTeamId && claimsUsed < maxClaims && !isLocked
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold">Free Agents</h1>
+    <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
+      <LeagueNav
+        leagueName={league?.name || 'Free Agents'}
+        currentWeek={league?.currentWeek}
+        totalWeeks={league?.totalWeeks}
+        teamCount={league?.teams?.length}
+      />
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
+        {/* Budget & claims summary */}
+        {userTeamId && (
+          <div className="flex items-center justify-between mb-4">
             <p className="text-sm text-muted-foreground">
-              {league.name} &middot; {availablePokemon.length} available
+              {availablePokemon.length} available Pokemon
             </p>
-          </div>
-          {userTeamId && (
             <div className="text-right">
               <div className="text-sm font-medium">
                 <Coins className="h-4 w-4 inline mr-1" />
@@ -251,8 +252,8 @@ export default function FreeAgentsPage() {
                 Claims: {claimsUsed}/{maxClaims}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <Tabs defaultValue="browse" className="space-y-4">
           <TabsList>

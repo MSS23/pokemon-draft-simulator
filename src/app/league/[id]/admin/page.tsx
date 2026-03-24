@@ -18,10 +18,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 import {
-  ArrowLeft, Swords, Megaphone, Trophy, AlertTriangle,
+  Swords, Megaphone, Trophy, AlertTriangle,
   Check, X, Pin, PinOff, Trash2, Edit2, SkipForward,
   Lock, Unlock, CalendarX2, Timer, ShieldX, Settings
 } from 'lucide-react'
+import { LeagueNav } from '@/components/league/LeagueNav'
 import type { League, Team, Standing } from '@/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
@@ -271,19 +272,14 @@ export default function CommissionerPage() {
   if (!league || !isCommissioner) return null
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold">Commissioner Dashboard</h1>
-            <p className="text-sm text-muted-foreground">{league.name}</p>
-          </div>
-        </div>
-
+    <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
+      <LeagueNav
+        leagueName={league.name || 'Commissioner'}
+        currentWeek={league.currentWeek}
+        totalWeeks={league.totalWeeks}
+        isCommissioner={true}
+      />
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
         <Tabs defaultValue="matches" className="space-y-4">
           <TabsList className="flex w-full overflow-x-auto">
             <TabsTrigger value="matches" className="flex-1 text-xs sm:text-sm">Matches</TabsTrigger>

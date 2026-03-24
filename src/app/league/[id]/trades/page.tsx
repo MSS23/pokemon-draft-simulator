@@ -11,7 +11,7 @@ import { TradeService } from '@/lib/trade-service'
 import type { TradeWithDetails, LeagueActivityItem } from '@/lib/trade-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import {
-  ArrowLeft, ArrowLeftRight, Clock, CheckCircle, XCircle, Send, Inbox, History,
+  ArrowLeftRight, Clock, CheckCircle, XCircle, Send, Inbox, History,
   Shield, Activity, Repeat, Swords, UserPlus,
 } from 'lucide-react'
 import type { League, Team, Pick, ExtendedLeagueSettings } from '@/types'
@@ -23,6 +23,7 @@ import { UserSessionService } from '@/lib/user-session'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
 import { canTrade, formatTradeDeadline } from '@/lib/trade-deadline'
+import { LeagueNav } from '@/components/league/LeagueNav'
 
 const log = createLogger('TradesPage')
 
@@ -485,26 +486,21 @@ export default function TradesPage() {
   const hijackTargetPicks = hijackTargetTeamId ? (picksByTeam.get(hijackTargetTeamId) || []) : []
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold">Trade Center</h1>
-            <p className="text-sm text-muted-foreground">
-              {league.name}
-              {!tradeEligibility.allowed && tradeEligibility.reason && (
-                <span className="text-destructive"> ({tradeEligibility.reason})</span>
-              )}
-              {tradeDeadlineDisplay && tradeEligibility.allowed && (
-                <span className="text-muted-foreground"> &middot; {tradeDeadlineDisplay}</span>
-              )}
-            </p>
-          </div>
-        </div>
+    <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
+      <LeagueNav
+        leagueName={league?.name || 'Trade Center'}
+        currentWeek={league?.currentWeek}
+        totalWeeks={league?.totalWeeks}
+        teamCount={league?.teams?.length}
+        isCommissioner={isCommissioner}
+      />
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
+        {!tradeEligibility.allowed && tradeEligibility.reason && (
+          <p className="text-sm text-destructive mb-3">Trade deadline: {tradeEligibility.reason}</p>
+        )}
+        {tradeDeadlineDisplay && tradeEligibility.allowed && (
+          <p className="text-sm text-muted-foreground mb-3">{tradeDeadlineDisplay}</p>
+        )}
 
         <Tabs defaultValue="activity" className="space-y-4">
           <TabsList className="flex-wrap">

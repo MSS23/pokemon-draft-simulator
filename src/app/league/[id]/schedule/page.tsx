@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { LeagueService } from '@/lib/league-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react'
+import { LeagueNav } from '@/components/league/LeagueNav'
+import { Trophy, ChevronDown, ChevronUp, CalendarDays } from 'lucide-react'
 import type { League, Match, Team } from '@/types'
 import { getTeamColor } from '@/utils/team-colors'
 import { createLogger } from '@/lib/logger'
@@ -95,21 +96,14 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold">Schedule</h1>
-            <p className="text-sm text-muted-foreground">
-              {league.name} &middot; {league.totalWeeks} weeks
-            </p>
-          </div>
-        </div>
-
+    <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
+      <LeagueNav
+        leagueName={league.name}
+        currentWeek={league.currentWeek || 1}
+        totalWeeks={league.totalWeeks}
+        teamCount={league.teams.length}
+      />
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
         {/* Error State */}
         {error && (
           <div className="text-center py-8">

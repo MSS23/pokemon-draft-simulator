@@ -20,11 +20,10 @@ import { PlayoffBracket } from '@/components/league/PlayoffBracket'
 import { TeamIcon } from '@/components/league/TeamIcon'
 import { importTournament, type Tournament } from '@/lib/tournament-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
+import { LeagueNav } from '@/components/league/LeagueNav'
 import {
   ArrowLeft, Trophy, TrendingUp, Loader2,
-  ChevronLeft, ChevronRight, Settings, Copy, Check,
-  CalendarDays, BarChart3, ShieldCheck, UserPlus,
-  Megaphone, ArrowLeftRight,
+  ChevronLeft, ChevronRight, CalendarDays, Megaphone,
 } from 'lucide-react'
 import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import type { League, Match, Standing, Team, Pick, ExtendedLeagueSettings } from '@/types'
@@ -51,8 +50,6 @@ export default function LeaguePage() {
   const [homeTeamPicks, setHomeTeamPicks] = useState<Pick[]>([])
   const [awayTeamPicks, setAwayTeamPicks] = useState<Pick[]>([])
   const [viewingWeek, setViewingWeek] = useState<number | null>(null)
-  const [copiedInvite, setCopiedInvite] = useState(false)
-  const [draftRoomCode, setDraftRoomCode] = useState<string | null>(null)
   const [isCommissioner, setIsCommissioner] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -182,16 +179,6 @@ export default function LeaguePage() {
         setAnnouncements(anns)
       } catch { /* ignore */ }
 
-      // Draft room code for invite
-      if (supabase && leagueData.teams.length > 0) {
-        const { data: draft } = await supabase
-          .from('drafts')
-          .select('room_code, host_id')
-          .eq('id', leagueData.draftId)
-          .single()
-        if (draft) setDraftRoomCode(draft.room_code)
-      }
-
       // Playoff state
       try {
         const playoffState = await LeagueService.getPlayoffState(leagueId)
@@ -239,23 +226,6 @@ export default function LeaguePage() {
     } catch (err) {
       log.error('Error loading week fixtures:', err)
     }
-  }
-
-  const handleCopyInvite = async () => {
-    const url = `${window.location.origin}/league/${leagueId}`
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: league?.name || 'Pokemon Draft League',
-          text: `Check out our draft league${draftRoomCode ? ` (Code: ${draftRoomCode})` : ''}!`,
-          url,
-        })
-        return
-      } catch { /* fall through to clipboard */ }
-    }
-    await navigator.clipboard.writeText(url)
-    setCopiedInvite(true)
-    setTimeout(() => setCopiedInvite(false), 2000)
   }
 
   const handleRecordMatch = async (match: Match & { homeTeam: Team; awayTeam: Team }) => {
@@ -306,34 +276,21 @@ export default function LeaguePage() {
 
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <LeagueNav
+        leagueName={league.name}
+        currentWeek={league.currentWeek}
+        totalWeeks={league.totalWeeks}
+        teamCount={league.teams.length}
+        isCommissioner={isCommissioner}
+        enableWaivers={leagueSettings.enableWaivers !== false}
+        onSettingsClick={() => setSettingsOpen(true)}
+      />
 
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-2">
-          <Button variant="ghost" size="icon" className="shrink-0" onClick={() => router.push('/')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">{league.name}</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Week {league.currentWeek} of {league.totalWeeks} &middot; {league.teams.length} teams
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {isCommissioner && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSettingsOpen(true)} title="League Settings">
-                <Settings className="h-4 w-4" />
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopyInvite} title={copiedInvite ? 'Copied!' : 'Share invite link'}>
-              {copiedInvite ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-            </Button>
-          </div>
-        </div>
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
 
         {/* Announcements */}
         {announcements.filter(a => a.pinned).length > 0 && (
-          <div className="mb-3 ml-11">
+          <div className="mb-4">
             {announcements.filter(a => a.pinned).map(ann => (
               <div key={ann.id} className="flex items-start gap-2.5 p-2.5 rounded-lg border border-blue-500/30 bg-blue-500/5">
                 <Megaphone className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
@@ -345,35 +302,6 @@ export default function LeaguePage() {
             ))}
           </div>
         )}
-
-        {/* Tab Navigation */}
-        <nav className="flex items-center gap-1 mb-6 border-b border-border overflow-x-auto pb-px -mx-4 px-4 sm:mx-0 sm:px-0">
-          {[
-            { label: 'Overview', active: true },
-            { label: 'Schedule', href: `/league/${leagueId}/schedule`, icon: CalendarDays },
-            { label: 'Stats', href: `/league/${leagueId}/stats`, icon: BarChart3 },
-            { label: 'Trades', href: `/league/${leagueId}/trades`, icon: ArrowLeftRight },
-            ...(leagueSettings.enableWaivers !== false ? [{ label: 'Free Agents', href: `/league/${leagueId}/free-agents`, icon: UserPlus }] : []),
-            ...(isCommissioner ? [
-              { label: 'Admin', href: `/league/${leagueId}/admin`, icon: ShieldCheck },
-            ] : []),
-          ].map((tab) => (
-            <button
-              key={tab.label}
-              onClick={() => {
-                if ('href' in tab && tab.href) router.push(tab.href)
-              }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                'active' in tab && tab.active
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
-              }`}
-            >
-              {'icon' in tab && tab.icon && <tab.icon className="h-3.5 w-3.5" />}
-              {tab.label}
-            </button>
-          ))}
-        </nav>
 
         {/* Main Content: Standings + Fixtures side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -389,7 +317,11 @@ export default function LeaguePage() {
               </CardHeader>
               <CardContent>
                 {standings.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4">No standings data yet</p>
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <TrendingUp className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                    <p className="text-sm font-medium">No standings yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Rankings appear after matches are played</p>
+                  </div>
                 ) : (
                   <div role="list" className="space-y-1.5">
                     {standings.map((standing, index) => {
@@ -516,9 +448,11 @@ export default function LeaguePage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {weekFixtures.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-4 text-sm">
-                    No fixtures this week
-                  </p>
+                  <div className="flex flex-col items-center py-8 text-center">
+                    <CalendarDays className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                    <p className="text-sm font-medium">No fixtures this week</p>
+                    <p className="text-xs text-muted-foreground mt-1">Check other weeks using the arrows above</p>
+                  </div>
                 ) : (
                   weekFixtures.map(match => {
                     const homeColors = teamColorMap.get(match.homeTeamId)

@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { TeamIcon } from '@/components/league/TeamIcon'
+import { LeagueNav } from '@/components/league/LeagueNav'
 import {
   ArrowLeft,
   TrendingUp,
@@ -55,6 +56,8 @@ export default function PowerRankingsPage() {
   const [showVoting, setShowVoting] = useState(false)
   const [voteSubmitted, setVoteSubmitted] = useState(false)
   const [currentWeek, setCurrentWeek] = useState<number>(1)
+  const [leagueName, setLeagueName] = useState('')
+  const [totalWeeks, setTotalWeeks] = useState(0)
 
   const loadRankings = useCallback(async () => {
     try {
@@ -67,16 +70,18 @@ export default function PowerRankingsPage() {
       // Get league to find draft_id and current week
       const leagueResponse = await supabase
         .from('leagues')
-        .select('draft_id, current_week')
+        .select('draft_id, current_week, name, total_weeks')
         .eq('id', leagueId)
         .maybeSingle()
 
       if (leagueResponse.error) throw leagueResponse.error
-      const league = leagueResponse.data as { draft_id: string; current_week: number } | null
+      const league = leagueResponse.data as { draft_id: string; current_week: number; name: string; total_weeks: number } | null
       if (!league) throw new Error('League not found')
 
       const draftId = league.draft_id
       setCurrentWeek(league.current_week || 1)
+      setLeagueName(league.name || 'League')
+      setTotalWeeks(league.total_weeks || 0)
 
       // Get all teams
       const teamsResponse = await supabase
@@ -208,17 +213,17 @@ export default function PowerRankingsPage() {
 
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold">Power Rankings</h1>
-            <p className="text-sm text-muted-foreground">
-              Ranked by performance and form
-            </p>
+      <LeagueNav
+        leagueName={leagueName}
+        currentWeek={currentWeek}
+        totalWeeks={totalWeeks}
+      />
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
+        {/* Page-specific header */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold">Power Rankings</h2>
+            <p className="text-xs text-muted-foreground">Ranked by performance and form</p>
           </div>
           {rankings.length > 0 && (
             <Button
@@ -227,7 +232,6 @@ export default function PowerRankingsPage() {
               onClick={() => {
                 setShowVoting(!showVoting)
                 if (!showVoting && Object.keys(userVotes).length === 0) {
-                  // Pre-fill with current ranking positions
                   const initial: Record<string, number> = {}
                   rankings.forEach((r) => { initial[r.team.id] = r.rank })
                   setUserVotes(initial)
@@ -235,160 +239,138 @@ export default function PowerRankingsPage() {
               }}
             >
               <VoteUp className="h-4 w-4 mr-1.5" />
-              {showVoting ? 'Cancel Voting' : 'Vote on Rankings'}
+              {showVoting ? 'Cancel' : 'Vote'}
             </Button>
           )}
         </div>
 
         {/* Vote submitted banner */}
         {voteSubmitted && !showVoting && (
-          <div className="text-center py-3 mb-4 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-900">
+          <div className="text-center py-2 mb-3 text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-900">
             Your power rankings vote has been recorded for Week {currentWeek}!
           </div>
         )}
 
         {/* Rankings */}
-        <div className="space-y-3">
-          {rankings.map((ranking, index) => (
-            <Card
-              key={ranking.team.id}
-              className={`cursor-pointer hover:shadow-lg transition-all ${
-                index === 0 ? 'border-2 border-yellow-500' : ''
-              }`}
-              onClick={() => router.push(`/league/${leagueId}/team/${ranking.team.id}`)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-center gap-6">
-                  {/* Rank */}
-                  <div className="flex flex-col items-center min-w-[80px]">
-                    <div className={`text-4xl font-bold ${
-                      index === 0 ? 'text-yellow-500' :
-                      index === 1 ? 'text-gray-400 dark:text-gray-500' :
-                      index === 2 ? 'text-orange-600 dark:text-orange-400' :
-                      'text-muted-foreground'
-                    }`}>
-                      {ranking.rank}
-                    </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      {getTrendIcon(ranking.trend)}
-                      <span className="text-xs text-muted-foreground">
-                        {ranking.previousRank !== ranking.rank ?
-                          `${Math.abs(ranking.previousRank - ranking.rank)}` :
-                          '-'
-                        }
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Vote input */}
-                  {showVoting && (
-                    <div className="flex flex-col items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Your Rank</span>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={rankings.length}
-                        value={userVotes[ranking.team.id] || index + 1}
-                        onChange={(e) => setUserVotes(prev => ({
-                          ...prev,
-                          [ranking.team.id]: parseInt(e.target.value) || index + 1
-                        }))}
-                        className="w-14 h-8 text-sm text-center font-semibold"
-                        aria-label={`Your rank for ${ranking.team.name}`}
-                      />
-                    </div>
-                  )}
-
-                  {/* Trophy for #1 */}
-                  {index === 0 && (
-                    <Trophy className="h-12 w-12 text-yellow-500" />
-                  )}
-
-                  {/* Team Info */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <TeamIcon teamName={ranking.team.name} teamIndex={index} size="lg" />
-                      <h3 className="text-xl font-bold">{ranking.team.name}</h3>
-                      {getFormIcon(ranking.form.formType)}
-                    </div>
-
-                    <div className="flex items-center gap-4 text-sm">
-                      <Badge variant="outline">
-                        {ranking.stats.wins}-{ranking.stats.losses}-{ranking.stats.draws}
-                      </Badge>
-
-                      <div className="flex items-center gap-1">
-                        <span className="text-muted-foreground">Form:</span>
-                        <div className="flex gap-1">
-                          {ranking.form.form.map((result, idx) => (
-                            <Badge
-                              key={idx}
-                              variant={result === 'W' ? 'default' : result === 'L' ? 'destructive' : 'secondary'}
-                              className="text-xs px-2 py-0"
-                            >
-                              {result}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      <span className="text-muted-foreground">
-                        Streak: <span className="font-semibold">{ranking.form.streak.displayText}</span>
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-6 mt-3 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Power Score:</span>
-                        <span className="ml-2 font-semibold">{ranking.powerScore.toFixed(1)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Off Rating:</span>
-                        <span className="ml-2 font-semibold">{ranking.stats.offensiveRating.toFixed(1)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Def Rating:</span>
-                        <span className="ml-2 font-semibold">{ranking.stats.defensiveRating.toFixed(1)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Point Diff:</span>
-                        <span className={`ml-2 font-semibold ${
-                          ranking.stats.pointDifferential >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {ranking.stats.pointDifferential > 0 ? '+' : ''}{ranking.stats.pointDifferential}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Arrow */}
-                  <ArrowLeft className="h-5 w-5 text-muted-foreground rotate-180" />
+        <div className="space-y-1.5">
+          {rankings.map((ranking, index) => {
+            const isFirst = index === 0
+            return (
+              <div
+                key={ranking.team.id}
+                className={`flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer ${
+                  isFirst ? 'border-yellow-500/50 bg-yellow-500/5' : ''
+                }`}
+                onClick={() => router.push(`/league/${leagueId}/team/${ranking.team.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/league/${leagueId}/team/${ranking.team.id}`) } }}
+              >
+                {/* Rank */}
+                <div className={`text-xl font-bold w-8 text-center shrink-0 ${
+                  index === 0 ? 'text-yellow-500' :
+                  index === 1 ? 'text-gray-400 dark:text-gray-500' :
+                  index === 2 ? 'text-orange-600 dark:text-orange-400' :
+                  'text-muted-foreground'
+                }`}>
+                  {ranking.rank}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                {/* Trend */}
+                <div className="shrink-0">
+                  {getTrendIcon(ranking.trend)}
+                </div>
+
+                {/* Vote input */}
+                {showVoting && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={rankings.length}
+                      value={userVotes[ranking.team.id] || index + 1}
+                      onChange={(e) => setUserVotes(prev => ({
+                        ...prev,
+                        [ranking.team.id]: parseInt(e.target.value) || index + 1
+                      }))}
+                      className="w-12 h-7 text-xs text-center"
+                      aria-label={`Your rank for ${ranking.team.name}`}
+                    />
+                  </div>
+                )}
+
+                {/* Team icon + name */}
+                <TeamIcon teamName={ranking.team.name} teamIndex={index} size="md" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm truncate">{ranking.team.name}</span>
+                    {isFirst && <Trophy className="h-3.5 w-3.5 text-yellow-500 shrink-0" />}
+                    {getFormIcon(ranking.form.formType)}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-muted-foreground">
+                      {ranking.stats.wins}-{ranking.stats.losses}-{ranking.stats.draws}
+                    </span>
+                    <div className="hidden sm:flex gap-0.5">
+                      {ranking.form.form.map((result, idx) => (
+                        <Badge
+                          key={idx}
+                          variant={result === 'W' ? 'default' : result === 'L' ? 'destructive' : 'secondary'}
+                          className="text-[10px] px-1.5 py-0 h-4"
+                        >
+                          {result}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Stats -- desktop only */}
+                <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
+                  <div className="text-center">
+                    <div className="font-semibold text-foreground">{ranking.powerScore.toFixed(0)}</div>
+                    <div>PWR</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-foreground">{ranking.stats.offensiveRating.toFixed(1)}</div>
+                    <div>OFF</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-foreground">{ranking.stats.defensiveRating.toFixed(1)}</div>
+                    <div>DEF</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`font-semibold ${
+                      ranking.stats.pointDifferential >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {ranking.stats.pointDifferential > 0 ? '+' : ''}{ranking.stats.pointDifferential}
+                    </div>
+                    <div>DIFF</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Submit vote panel */}
         {showVoting && rankings.length > 0 && (
-          <Card className="mt-4">
-            <CardContent className="py-4 flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Rank each team from 1 (best) to {rankings.length} (worst)
-              </p>
-              <Button
-                size="sm"
-                onClick={() => {
-                  const voteKey = `power-rankings-vote-${leagueId}-${currentWeek}`
-                  localStorage.setItem(voteKey, JSON.stringify(userVotes))
-                  setVoteSubmitted(true)
-                  setShowVoting(false)
-                }}
-              >
-                Submit Vote
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="mt-3 p-3 rounded-lg border flex items-center justify-between bg-muted/30">
+            <p className="text-xs text-muted-foreground">
+              Rank each team from 1 (best) to {rankings.length} (worst)
+            </p>
+            <Button
+              size="sm"
+              onClick={() => {
+                const voteKey = `power-rankings-vote-${leagueId}-${currentWeek}`
+                localStorage.setItem(voteKey, JSON.stringify(userVotes))
+                setVoteSubmitted(true)
+                setShowVoting(false)
+              }}
+            >
+              Submit Vote
+            </Button>
+          </div>
         )}
 
         {rankings.length === 0 && (

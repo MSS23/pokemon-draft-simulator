@@ -9,7 +9,8 @@ import { LeagueService } from '@/lib/league-service'
 import { LeagueStatsService, type LeaguePokemonStat } from '@/lib/league-stats-service'
 import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, ArrowUpDown, Trophy, Skull, Target, Crown } from 'lucide-react'
+import { ArrowUpDown, Trophy, Skull, Target, Crown } from 'lucide-react'
+import { LeagueNav } from '@/components/league/LeagueNav'
 import type { League, Team } from '@/types'
 import { buildTeamColorMap } from '@/utils/team-colors'
 import { PokemonSprite } from '@/components/ui/pokemon-sprite'
@@ -119,19 +120,14 @@ export default function StatsPage() {
   )
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold">Season Stats</h1>
-            <p className="text-sm text-muted-foreground">{league.name}</p>
-          </div>
-        </div>
-
+    <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
+      <LeagueNav
+        leagueName={league.name}
+        currentWeek={league.currentWeek}
+        totalWeeks={league.totalWeeks}
+        teamCount={league.teams?.length}
+      />
+      <div className="container mx-auto px-4 py-4 max-w-6xl">
         {/* Error State */}
         {error && (
           <div className="text-center py-8">
