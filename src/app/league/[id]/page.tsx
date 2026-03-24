@@ -304,305 +304,310 @@ export default function LeaguePage() {
           </div>
         )}
 
-        {/* Main Content: Standings + Fixtures side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-
-          {/* Standings - takes more space */}
-          <div className="lg:col-span-3 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-4 w-4" />
-                  {isConference ? conferenceName : 'Standings'}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {standings.length === 0 ? (
-                  <div className="flex flex-col items-center py-8 text-center">
-                    <TrendingUp className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                    <p className="text-sm font-medium">No standings yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">Rankings appear after matches are played</p>
-                  </div>
-                ) : (
-                  <div role="list" className="space-y-1.5">
-                    {standings.map((standing, index) => {
-                      const colors = teamColorMap.get(standing.teamId)
-                      const teamIndex = allTeamIds.indexOf(standing.teamId)
-                      return (
-                        <div
-                          key={standing.id}
-                          className={`flex items-center gap-3 p-2.5 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border-l-[3px] ${colors?.border || ''}`}
-                          onClick={() => router.push(`/league/${leagueId}/team/${standing.teamId}`)}
-                        >
-                          <div className={`text-lg font-bold w-6 text-center ${
-                            index === 0 ? 'text-yellow-500' :
-                            index === 1 ? 'text-gray-400 dark:text-gray-500' :
-                            index === 2 ? 'text-orange-600 dark:text-orange-400' :
-                            'text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <TeamIcon teamName={standing.team.name} teamIndex={teamIndex >= 0 ? teamIndex : index} size="md" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm truncate">{standing.team.name}</div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
-                                {standing.wins}W-{standing.losses}L-{standing.draws}D
-                              </span>
-                              {standing.currentStreak && (
-                                <Badge
-                                  variant={standing.currentStreak.startsWith('W') ? 'default' : 'destructive'}
-                                  size="sm"
-                                >
-                                  {standing.currentStreak}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right hidden sm:block">
-                            <div className="text-sm font-medium tabular-nums">{standing.pointsFor} pts</div>
-                            <div className={`text-xs ${
-                              standing.pointDifferential > 0 ? 'text-green-600 dark:text-green-400' :
-                              standing.pointDifferential < 0 ? 'text-red-600 dark:text-red-400' :
-                              'text-muted-foreground'
-                            }`}>
-                              {standing.pointDifferential > 0 ? '+' : ''}{standing.pointDifferential}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+        {/* This Week's Match */}
+        {weekFixtures.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Previous week" disabled={currentViewWeek <= 1} onClick={() => handleChangeWeek(currentViewWeek - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <h2 className="text-base font-semibold">Week {currentViewWeek}</h2>
+                <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Next week" disabled={currentViewWeek >= league.totalWeeks} onClick={() => handleChangeWeek(currentViewWeek + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                {currentViewWeek === league.currentWeek && (
+                  <Badge variant="default" size="sm">Current</Badge>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+              {completedThisWeek > 0 && (
+                <span className="text-xs text-muted-foreground">{completedThisWeek}/{weekFixtures.length} done</span>
+              )}
+            </div>
 
-            {/* Sibling conference standings */}
-            {isConference && siblingLeague && siblingStandings.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between text-base">
-                    <span className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4" />
-                      {siblingConferenceName}
-                    </span>
-                    <Button variant="ghost" size="sm" onClick={() => router.push(`/league/${siblingLeague.id}`)}>
-                      View
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-1.5">
-                    {siblingStandings.map((standing, index) => {
-                      const colors = teamColorMap.get(standing.teamId)
-                      const teamIndex = allTeamIds.indexOf(standing.teamId)
-                      return (
-                        <div
-                          key={standing.id}
-                          className={`flex items-center gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer border-l-[3px] ${colors?.border || ''}`}
-                          onClick={() => router.push(`/league/${siblingLeague.id}/team/${standing.teamId}`)}
-                        >
-                          <div className={`text-lg font-bold w-6 text-center ${
-                            index === 0 ? 'text-yellow-500' : 'text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <TeamIcon teamName={standing.team.name} teamIndex={teamIndex >= 0 ? teamIndex : index} size="md" />
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-sm truncate">{standing.team.name}</div>
-                            <span className="text-xs text-muted-foreground">
-                              {standing.wins}W-{standing.losses}L-{standing.draws}D
-                            </span>
+            <div className="grid gap-4">
+              {weekFixtures.map(match => {
+                const homeColors = teamColorMap.get(match.homeTeamId)
+                const awayColors = teamColorMap.get(match.awayTeamId)
+                const rosters = fixtureRosters[match.id]
+                const canRecord = (match.status === 'scheduled' || match.status === 'in_progress')
+
+                return (
+                  <Card
+                    key={match.id}
+                    className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
+                  >
+                    {/* Match header — teams + score */}
+                    <div className="px-4 py-3 border-b bg-muted/20">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <div className={`w-2 h-8 rounded-full shrink-0 ${homeColors?.bg || 'bg-muted'}`} />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm truncate">{match.homeTeam.name}</div>
+                            <div className="text-[11px] text-muted-foreground">Home</div>
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Fixtures - right column */}
-          <div className="lg:col-span-2 space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Previous week" disabled={currentViewWeek <= 1} onClick={() => handleChangeWeek(currentViewWeek - 1)}>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <CardTitle className="text-base whitespace-nowrap">
-                      Week {currentViewWeek}
-                    </CardTitle>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Next week" disabled={currentViewWeek >= league.totalWeeks} onClick={() => handleChangeWeek(currentViewWeek + 1)}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    {currentViewWeek === league.currentWeek && (
-                      <Badge variant="default" size="sm">Current</Badge>
-                    )}
-                  </div>
-                  {completedThisWeek > 0 && (
-                    <span className="text-xs text-muted-foreground">{completedThisWeek}/{weekFixtures.length} done</span>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {weekFixtures.length === 0 ? (
-                  <div className="flex flex-col items-center py-8 text-center">
-                    <CalendarDays className="h-8 w-8 text-muted-foreground/50 mb-2" />
-                    <p className="text-sm font-medium">No fixtures this week</p>
-                    <p className="text-xs text-muted-foreground mt-1">Check other weeks using the arrows above</p>
-                  </div>
-                ) : (
-                  weekFixtures.map(match => {
-                    const homeColors = teamColorMap.get(match.homeTeamId)
-                    const awayColors = teamColorMap.get(match.awayTeamId)
-                    const rosters = fixtureRosters[match.id]
-                    const canRecord = (match.status === 'scheduled' || match.status === 'in_progress')
-
-                    return (
-                      <div
-                        key={match.id}
-                        className="border rounded-lg overflow-hidden hover:border-foreground/20 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
-                      >
-                        {/* Score / Status bar */}
-                        <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className={`w-1.5 h-6 rounded-full shrink-0 ${homeColors?.bg || 'bg-muted'}`} />
-                            <span className="font-semibold text-sm truncate">{match.homeTeam.name}</span>
-                          </div>
-                          <div className="px-3 text-center shrink-0 flex items-center gap-2">
-                            {match.status === 'completed' ? (
-                              <>
-                                <span className={`text-lg font-bold tabular-nums ${match.winnerTeamId === match.homeTeamId ? 'text-green-500' : ''}`}>{match.homeScore}</span>
-                                <span className="text-xs text-muted-foreground">-</span>
-                                <span className={`text-lg font-bold tabular-nums ${match.winnerTeamId === match.awayTeamId ? 'text-green-500' : ''}`}>{match.awayScore}</span>
-                                {match.winnerTeamId && <Trophy className="h-3 w-3 text-yellow-500" />}
-                              </>
-                            ) : (
-                              <Badge variant="outline" size="sm">Upcoming</Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                            <span className="font-semibold text-sm truncate">{match.awayTeam.name}</span>
-                            <div className={`w-1.5 h-6 rounded-full shrink-0 ${awayColors?.bg || 'bg-muted'}`} />
-                          </div>
+                        <div className="px-4 text-center shrink-0">
+                          {match.status === 'completed' ? (
+                            <div className="flex items-center gap-2">
+                              <span className={`text-2xl font-bold tabular-nums ${match.winnerTeamId === match.homeTeamId ? 'text-green-500' : 'text-muted-foreground'}`}>{match.homeScore}</span>
+                              <span className="text-muted-foreground">—</span>
+                              <span className={`text-2xl font-bold tabular-nums ${match.winnerTeamId === match.awayTeamId ? 'text-green-500' : 'text-muted-foreground'}`}>{match.awayScore}</span>
+                            </div>
+                          ) : (
+                            <div className="text-lg font-semibold text-muted-foreground">vs</div>
+                          )}
                         </div>
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0 justify-end">
+                          <div className="min-w-0 text-right">
+                            <div className="font-semibold text-sm truncate">{match.awayTeam.name}</div>
+                            <div className="text-[11px] text-muted-foreground">Away</div>
+                          </div>
+                          <div className={`w-2 h-8 rounded-full shrink-0 ${awayColors?.bg || 'bg-muted'}`} />
+                        </div>
+                      </div>
+                    </div>
 
-                        {/* Rosters side-by-side */}
-                        <div className="grid grid-cols-2 gap-0 divide-x">
-                          {/* Home roster */}
-                          <div className="px-2.5 py-2 space-y-0.5">
-                            {rosters ? (
-                              rosters.home.length > 0 ? (
-                                rosters.home.map(pick => (
-                                  <div key={pick.id} className="flex items-center gap-1.5">
-                                    <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-6 h-6 object-contain" lazy />
-                                    <span className="text-xs capitalize truncate">{pick.pokemonName}</span>
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-xs text-muted-foreground py-1">No Pokemon</p>
-                              )
-                            ) : (
-                              <div className="flex items-center justify-center py-3">
-                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    {/* Rosters side-by-side */}
+                    <div className="grid grid-cols-2 divide-x">
+                      <div className="p-3 space-y-1">
+                        {rosters ? (
+                          rosters.home.length > 0 ? (
+                            rosters.home.map(pick => (
+                              <div key={pick.id} className="flex items-center gap-2">
+                                <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-7 h-7 object-contain" lazy />
+                                <span className="text-xs font-medium capitalize truncate">{pick.pokemonName}</span>
                               </div>
-                            )}
-                          </div>
-                          {/* Away roster */}
-                          <div className="px-2.5 py-2 space-y-0.5">
-                            {rosters ? (
-                              rosters.away.length > 0 ? (
-                                rosters.away.map(pick => (
-                                  <div key={pick.id} className="flex items-center gap-1.5 justify-end">
-                                    <span className="text-xs capitalize truncate">{pick.pokemonName}</span>
-                                    <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-6 h-6 object-contain" lazy />
-                                  </div>
-                                ))
-                              ) : (
-                                <p className="text-xs text-muted-foreground py-1 text-right">No Pokemon</p>
-                              )
-                            ) : (
-                              <div className="flex items-center justify-center py-3">
-                                <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Action bar */}
-                        {canRecord && (
-                          <div className="border-t px-3 py-1.5 bg-muted/10">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="text-xs w-full h-7"
-                              onClick={(e) => { e.stopPropagation(); handleRecordMatch(match) }}
-                            >
-                              Record Result
-                            </Button>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground py-2">No Pokemon drafted</p>
+                          )
+                        ) : (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                           </div>
                         )}
                       </div>
-                    )
-                  })
-                )}
-
-                {/* Advance week button for commissioner */}
-                {isCommissioner && canAdvance && currentViewWeek === league.currentWeek && (
-                  <Button
-                    onClick={handleAdvanceWeek}
-                    disabled={isAdvancing}
-                    size="sm"
-                    variant="outline"
-                    className="w-full mt-2"
-                  >
-                    {isAdvancing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : league.currentWeek === league.totalWeeks ? (
-                      <>
-                        <Trophy className="mr-1.5 h-3.5 w-3.5" />End Season
-                      </>
-                    ) : (
-                      `Advance to Week ${league.currentWeek + 1}`
-                    )}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Sibling conference fixtures */}
-            {isConference && siblingLeague && siblingFixtures.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between text-base">
-                    <span>{siblingConferenceName}</span>
-                    <Button variant="ghost" size="sm" onClick={() => router.push(`/league/${siblingLeague.id}`)}>
-                      View
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {siblingFixtures.map(match => (
-                    <div key={match.id} className="flex items-center justify-between p-2.5 border rounded-lg text-sm">
-                      <span className="font-medium truncate flex-1">{match.homeTeam.name}</span>
-                      <span className="px-2 text-center shrink-0">
-                        {match.status === 'completed'
-                          ? <span className="font-bold tabular-nums">{match.homeScore} - {match.awayScore}</span>
-                          : <span className="text-xs text-muted-foreground">vs</span>
-                        }
-                      </span>
-                      <span className="font-medium truncate flex-1 text-right">{match.awayTeam.name}</span>
+                      <div className="p-3 space-y-1">
+                        {rosters ? (
+                          rosters.away.length > 0 ? (
+                            rosters.away.map(pick => (
+                              <div key={pick.id} className="flex items-center gap-2 justify-end">
+                                <span className="text-xs font-medium capitalize truncate">{pick.pokemonName}</span>
+                                <PokemonSprite pokemonId={pick.pokemonId} pokemonName={pick.pokemonName} className="w-7 h-7 object-contain" lazy />
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground py-2 text-right">No Pokemon drafted</p>
+                          )
+                        ) : (
+                          <div className="flex items-center justify-center py-4">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
+
+                    {/* Action bar */}
+                    {canRecord && (
+                      <div className="border-t px-4 py-2 bg-muted/10">
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          onClick={(e) => { e.stopPropagation(); handleRecordMatch(match) }}
+                        >
+                          Record Result
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                )
+              })}
+            </div>
+
+            {/* Advance week */}
+            {isCommissioner && canAdvance && currentViewWeek === league.currentWeek && (
+              <Button
+                onClick={handleAdvanceWeek}
+                disabled={isAdvancing}
+                size="sm"
+                variant="outline"
+                className="w-full mt-3"
+              >
+                {isAdvancing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : league.currentWeek === league.totalWeeks ? (
+                  <><Trophy className="mr-1.5 h-3.5 w-3.5" />End Season</>
+                ) : (
+                  `Advance to Week ${league.currentWeek + 1}`
+                )}
+              </Button>
             )}
           </div>
+        )}
+
+        {weekFixtures.length === 0 && (
+          <Card className="mb-6">
+            <CardContent className="py-8">
+              <div className="flex flex-col items-center text-center">
+                <CalendarDays className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                <p className="font-medium">No fixtures this week</p>
+                <p className="text-sm text-muted-foreground mt-1">Use the week arrows to browse the schedule</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Standings */}
+        <div className="mb-6">
+          <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            {isConference ? conferenceName : 'Standings'}
+          </h2>
+
+          {standings.length === 0 ? (
+            <Card>
+              <CardContent className="py-8">
+                <div className="flex flex-col items-center text-center">
+                  <TrendingUp className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                  <p className="font-medium">No standings yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">Rankings appear after matches are played</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                {/* Table header */}
+                <div className="grid grid-cols-[2rem_1fr_5rem_4rem] sm:grid-cols-[2rem_1fr_6rem_5rem_5rem] items-center gap-3 px-4 py-2 border-b text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  <div>#</div>
+                  <div>Team</div>
+                  <div className="text-center">Record</div>
+                  <div className="text-right hidden sm:block">Pts</div>
+                  <div className="text-right">+/-</div>
+                </div>
+
+                {standings.map((standing, index) => {
+                  const colors = teamColorMap.get(standing.teamId)
+                  const teamIndex = allTeamIds.indexOf(standing.teamId)
+                  return (
+                    <div
+                      key={standing.id}
+                      role="button"
+                      tabIndex={0}
+                      className={`grid grid-cols-[2rem_1fr_5rem_4rem] sm:grid-cols-[2rem_1fr_6rem_5rem_5rem] items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer border-l-[3px] ${colors?.border || 'border-transparent'} ${index < standings.length - 1 ? 'border-b' : ''}`}
+                      onClick={() => router.push(`/league/${leagueId}/team/${standing.teamId}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/league/${leagueId}/team/${standing.teamId}`) } }}
+                    >
+                      <div className={`text-sm font-bold text-center ${
+                        index === 0 ? 'text-yellow-500' :
+                        index === 1 ? 'text-gray-400 dark:text-gray-500' :
+                        index === 2 ? 'text-orange-600 dark:text-orange-400' :
+                        'text-muted-foreground'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <TeamIcon teamName={standing.team.name} teamIndex={teamIndex >= 0 ? teamIndex : index} size="md" />
+                        <div className="min-w-0">
+                          <div className="font-semibold text-sm truncate">{standing.team.name}</div>
+                          {standing.currentStreak && (
+                            <Badge
+                              variant={standing.currentStreak.startsWith('W') ? 'default' : 'destructive'}
+                              className="text-[10px] px-1.5 py-0 h-4 mt-0.5"
+                            >
+                              {standing.currentStreak}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-center text-sm font-medium tabular-nums">
+                        {standing.wins}-{standing.losses}-{standing.draws}
+                      </div>
+                      <div className="text-right text-sm font-medium tabular-nums hidden sm:block">
+                        {standing.pointsFor}
+                      </div>
+                      <div className={`text-right text-sm font-medium tabular-nums ${
+                        standing.pointDifferential > 0 ? 'text-green-600 dark:text-green-400' :
+                        standing.pointDifferential < 0 ? 'text-red-600 dark:text-red-400' :
+                        'text-muted-foreground'
+                      }`}>
+                        {standing.pointDifferential > 0 ? '+' : ''}{standing.pointDifferential}
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          )}
         </div>
+
+        {/* Sibling conference */}
+        {isConference && siblingLeague && siblingStandings.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                {siblingConferenceName}
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => router.push(`/league/${siblingLeague.id}`)}>
+                View
+              </Button>
+            </div>
+            <Card>
+              <CardContent className="p-0">
+                {siblingStandings.map((standing, index) => {
+                  const colors = teamColorMap.get(standing.teamId)
+                  const teamIndex = allTeamIds.indexOf(standing.teamId)
+                  return (
+                    <div
+                      key={standing.id}
+                      className={`flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 cursor-pointer border-l-[3px] ${colors?.border || 'border-transparent'} ${index < siblingStandings.length - 1 ? 'border-b' : ''}`}
+                      onClick={() => router.push(`/league/${siblingLeague.id}/team/${standing.teamId}`)}
+                    >
+                      <div className={`text-sm font-bold w-6 text-center ${
+                        index === 0 ? 'text-yellow-500' : 'text-muted-foreground'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <TeamIcon teamName={standing.team.name} teamIndex={teamIndex >= 0 ? teamIndex : index} size="md" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm truncate">{standing.team.name}</div>
+                        <span className="text-xs text-muted-foreground">
+                          {standing.wins}W-{standing.losses}L-{standing.draws}D
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Sibling conference fixtures */}
+        {isConference && siblingLeague && siblingFixtures.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-base font-semibold mb-3">{siblingConferenceName} Fixtures</h2>
+            <Card>
+              <CardContent className="p-0">
+                {siblingFixtures.map((match, index) => (
+                  <div key={match.id} className={`flex items-center justify-between px-4 py-2.5 text-sm ${index < siblingFixtures.length - 1 ? 'border-b' : ''}`}>
+                    <span className="font-medium truncate flex-1">{match.homeTeam.name}</span>
+                    <span className="px-3 text-center shrink-0">
+                      {match.status === 'completed'
+                        ? <span className="font-bold tabular-nums">{match.homeScore} - {match.awayScore}</span>
+                        : <span className="text-xs text-muted-foreground">vs</span>
+                      }
+                    </span>
+                    <span className="font-medium truncate flex-1 text-right">{match.awayTeam.name}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Playoffs section */}
         {playoffTournament ? (
