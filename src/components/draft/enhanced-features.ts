@@ -8,7 +8,7 @@
 // Components
 export { default as DraftStatistics } from './DraftStatistics'
 export { default as TeamBuilderView } from './TeamBuilderView'
-export { default as DraftReplay } from './DraftReplay'
+export { DraftReplay } from './DraftReplay'
 export { default as MobileDraftView } from './MobileDraftView'
 export { default as HelpOverlay } from './HelpOverlay'
 

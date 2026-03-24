@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Home, Trophy, ChevronRight, Shield, Swords } from 'lucide-react'
+import { ArrowLeft, Home, Trophy, ChevronRight, Shield, Swords, ClipboardCopy } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { useAuth } from '@/contexts/AuthContext'
 import { LeagueService } from '@/lib/league-service'
@@ -15,7 +15,7 @@ import { CreateTournamentModal } from '@/components/league/CreateTournamentModal
 import { notify } from '@/lib/notifications'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import Link from 'next/link'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName, generateShowdownPaste } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('DraftResultsPage')
@@ -296,6 +296,23 @@ export default function DraftResultsPage() {
                 <CardDescription>
                   {userPicks.length} Pokemon &middot; {totalCost} pts spent &middot; {userTeam.budgetRemaining ?? 0} pts remaining
                 </CardDescription>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const paste = generateShowdownPaste({
+                        pokemonNames: userPicks.map(p => p.pokemon_name),
+                        teamName: userTeam.name
+                      })
+                      navigator.clipboard.writeText(paste)
+                      notify.success('Copied to Clipboard!', 'Paste this into Pokemon Showdown\'s teambuilder')
+                    }}
+                  >
+                    <ClipboardCopy className="h-3.5 w-3.5 mr-1.5" />
+                    Export to Showdown
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">

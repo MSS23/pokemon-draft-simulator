@@ -12,6 +12,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { TeamIcon } from '@/components/league/TeamIcon'
@@ -23,7 +24,8 @@ import {
   Trophy,
   Flame,
   Snowflake,
-  Target
+  Target,
+  ChevronUp as VoteUp
 } from 'lucide-react'
 import type { AdvancedTeamStats, TeamFormIndicator } from '@/lib/league-stats-service'
 import type { Team } from '@/types'
@@ -49,6 +51,10 @@ export default function PowerRankingsPage() {
   const [rankings, setRankings] = useState<PowerRanking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userVotes, setUserVotes] = useState<Record<string, number>>({})
+  const [showVoting, setShowVoting] = useState(false)
+  const [voteSubmitted, setVoteSubmitted] = useState(false)
+  const [currentWeek, setCurrentWeek] = useState<number>(1)
 
   const loadRankings = useCallback(async () => {
     try {
@@ -58,18 +64,19 @@ export default function PowerRankingsPage() {
       const { supabase } = await import('@/lib/supabase')
       if (!supabase) throw new Error('Supabase not available')
 
-      // Get league to find draft_id
+      // Get league to find draft_id and current week
       const leagueResponse = await supabase
         .from('leagues')
-        .select('draft_id')
+        .select('draft_id, current_week')
         .eq('id', leagueId)
         .maybeSingle()
 
       if (leagueResponse.error) throw leagueResponse.error
-      const league = leagueResponse.data as { draft_id: string } | null
+      const league = leagueResponse.data as { draft_id: string; current_week: number } | null
       if (!league) throw new Error('League not found')
 
       const draftId = league.draft_id
+      setCurrentWeek(league.current_week || 1)
 
       // Get all teams
       const teamsResponse = await supabase
@@ -145,6 +152,20 @@ export default function PowerRankingsPage() {
     loadRankings()
   }, [loadRankings])
 
+  // Load previously submitted votes from localStorage
+  useEffect(() => {
+    if (leagueId) {
+      const voteKey = `power-rankings-vote-${leagueId}-${currentWeek}`
+      const saved = localStorage.getItem(voteKey)
+      if (saved) {
+        try {
+          setUserVotes(JSON.parse(saved))
+          setVoteSubmitted(true)
+        } catch { /* ignore malformed data */ }
+      }
+    }
+  }, [leagueId, currentWeek])
+
   if (isLoading) {
     return (
       <LoadingScreen
@@ -193,13 +214,38 @@ export default function PowerRankingsPage() {
           <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Power Rankings</h1>
             <p className="text-sm text-muted-foreground">
               Ranked by performance and form
             </p>
           </div>
+          {rankings.length > 0 && (
+            <Button
+              size="sm"
+              variant={showVoting ? 'default' : 'outline'}
+              onClick={() => {
+                setShowVoting(!showVoting)
+                if (!showVoting && Object.keys(userVotes).length === 0) {
+                  // Pre-fill with current ranking positions
+                  const initial: Record<string, number> = {}
+                  rankings.forEach((r) => { initial[r.team.id] = r.rank })
+                  setUserVotes(initial)
+                }
+              }}
+            >
+              <VoteUp className="h-4 w-4 mr-1.5" />
+              {showVoting ? 'Cancel Voting' : 'Vote on Rankings'}
+            </Button>
+          )}
         </div>
+
+        {/* Vote submitted banner */}
+        {voteSubmitted && !showVoting && (
+          <div className="text-center py-3 mb-4 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-900">
+            Your power rankings vote has been recorded for Week {currentWeek}!
+          </div>
+        )}
 
         {/* Rankings */}
         <div className="space-y-3">
@@ -233,6 +279,25 @@ export default function PowerRankingsPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Vote input */}
+                  {showVoting && (
+                    <div className="flex flex-col items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Your Rank</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={rankings.length}
+                        value={userVotes[ranking.team.id] || index + 1}
+                        onChange={(e) => setUserVotes(prev => ({
+                          ...prev,
+                          [ranking.team.id]: parseInt(e.target.value) || index + 1
+                        }))}
+                        className="w-14 h-8 text-sm text-center font-semibold"
+                        aria-label={`Your rank for ${ranking.team.name}`}
+                      />
+                    </div>
+                  )}
 
                   {/* Trophy for #1 */}
                   {index === 0 && (
@@ -303,6 +368,28 @@ export default function PowerRankingsPage() {
             </Card>
           ))}
         </div>
+
+        {/* Submit vote panel */}
+        {showVoting && rankings.length > 0 && (
+          <Card className="mt-4">
+            <CardContent className="py-4 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Rank each team from 1 (best) to {rankings.length} (worst)
+              </p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  const voteKey = `power-rankings-vote-${leagueId}-${currentWeek}`
+                  localStorage.setItem(voteKey, JSON.stringify(userVotes))
+                  setVoteSubmitted(true)
+                  setShowVoting(false)
+                }}
+              >
+                Submit Vote
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {rankings.length === 0 && (
           <Card>

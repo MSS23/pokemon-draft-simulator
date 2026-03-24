@@ -5,12 +5,14 @@ import {
   Plus,
   UserPlus,
   Eye,
+  Globe,
   LayoutDashboard,
   History,
   Trophy,
   Swords,
   Settings,
   LogOut,
+  Heart,
 } from 'lucide-react'
 import { SidebarSection } from './SidebarSection'
 import { SidebarLink } from './SidebarLink'
@@ -133,6 +135,7 @@ export function Sidebar() {
       {/* Nav */}
       <nav role="navigation" aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
         <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
+        <SidebarLink href="/lobby" icon={Globe} label="Lobby" />
         <SidebarLink href="/history" icon={History} label="History" />
 
         <Separator className="my-1.5" />
@@ -168,18 +171,21 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      {user && (
-        <div className="px-2 py-2 border-t space-y-0.5">
-          <SidebarLink href="/settings" icon={Settings} label="Settings" />
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] w-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      )}
+      <div className="px-2 py-2 border-t space-y-0.5">
+        <SidebarLink href="/about" icon={Heart} label="About" />
+        {user && (
+          <>
+            <SidebarLink href="/settings" icon={Settings} label="Settings" />
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] w-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Sign Out</span>
+            </button>
+          </>
+        )}
+      </div>
 
       <AuthModal
         isOpen={authModalOpen}

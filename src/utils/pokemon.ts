@@ -209,3 +209,31 @@ export const getPokemonRarityClass = (cost: number): string => {
 export const isPokemonShiny = (pokemon: Pokemon): boolean => {
   return pokemon.cost >= 25 || pokemon.stats.total >= 600
 }
+
+/**
+ * Generate a Pokemon Showdown compatible paste for a team.
+ * Since we only have Pokemon names from the draft (not full sets),
+ * we export the names in Showdown paste format so users can import
+ * and then customize their movesets in Showdown.
+ */
+export const generateShowdownPaste = (team: {
+  pokemonNames: string[]
+  teamName?: string
+}): string => {
+  const lines: string[] = []
+  if (team.teamName) {
+    lines.push(`=== ${team.teamName} ===`)
+    lines.push('')
+  }
+  for (const name of team.pokemonNames) {
+    // Format name for Showdown (capitalize properly)
+    const formattedName = formatPokemonName(name)
+    lines.push(formattedName)
+    lines.push('Ability: ')
+    lines.push('EVs: 252 HP / 252 Atk / 4 Spe')
+    lines.push('Adamant Nature')
+    lines.push('- ')
+    lines.push('')
+  }
+  return lines.join('\n')
+}

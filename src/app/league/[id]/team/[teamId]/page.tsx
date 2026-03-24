@@ -11,7 +11,7 @@
  * - Form indicators
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,6 +46,8 @@ import type {
 } from '@/lib/league-stats-service'
 import type { Pick, Team } from '@/types'
 import { createLogger } from '@/lib/logger'
+import { PokePasteImport } from '@/components/league/PokePasteImport'
+import { formatEVs, type PokemonSet } from '@/lib/pokepaste-parser'
 
 const log = createLogger('LeagueTeamPage')
 
@@ -72,6 +74,8 @@ export default function TeamDetailPage() {
   const [accessChecked, setAccessChecked] = useState(false)
   const [viewerRole, setViewerRole] = useState<ViewerRole>('spectator')
   const { data: allPokemon } = usePokemonList()
+
+  const [importedSets, setImportedSets] = useState<PokemonSet[]>([])
 
   const [matchHistory, setMatchHistory] = useState<Array<{
     matchId: string
@@ -258,6 +262,15 @@ export default function TeamDetailPage() {
       setIsAnalyzing(false)
     }
   }
+
+  // Map imported sets to team Pokemon by name
+  const importedSetsMap = useMemo(() => {
+    const map = new Map<string, PokemonSet>()
+    for (const set of importedSets) {
+      map.set(set.name.toLowerCase(), set)
+    }
+    return map
+  }, [importedSets])
 
   if (isLoading) {
     return (
@@ -529,6 +542,102 @@ export default function TeamDetailPage() {
                     )
                   })}
                 </div>
+
+                {/* PokePaste Import - owner only */}
+                {viewerRole === 'owner' && (
+                  <div className="mt-6 pt-4 border-t">
+                    <PokePasteImport
+                      onImport={(sets) => setImportedSets(sets)}
+                      existingPokemonNames={picks.map(p => p.pokemonName)}
+                    />
+                  </div>
+                )}
+
+                {/* Imported Sets Display */}
+                {importedSets.length > 0 && (
+                  <div className="mt-6 pt-4 border-t space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">Imported Sets ({importedSets.length})</h3>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setImportedSets([])}
+                        className="h-7 text-xs text-muted-foreground"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <div className="grid gap-2">
+                      {picks.map(pick => {
+                        const set = importedSetsMap.get(pick.pokemonName.toLowerCase())
+                        if (!set) return null
+                        return (
+                          <div key={pick.id} className="p-3 rounded-lg bg-muted/50 border text-xs">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <span className="font-semibold text-sm">{pick.pokemonName}</span>
+                              {set.item && (
+                                <Badge variant="outline" className="text-[10px] h-4">
+                                  {set.item}
+                                </Badge>
+                              )}
+                              {set.teraType && (
+                                <Badge variant="secondary" className="text-[10px] h-4">
+                                  Tera: {set.teraType}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-muted-foreground space-y-0.5">
+                              {set.ability && <div>Ability: {set.ability}</div>}
+                              {Object.keys(set.evs).length > 0 && (
+                                <div>EVs: {formatEVs(set.evs)}</div>
+                              )}
+                              {set.nature && <div>{set.nature} Nature</div>}
+                              {set.moves.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {set.moves.map((m, j) => (
+                                    <Badge key={j} variant="secondary" className="text-[10px] h-4">
+                                      {m}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {/* Show unmatched imported sets */}
+                      {importedSets
+                        .filter(set => !picks.some(p => p.pokemonName.toLowerCase() === set.name.toLowerCase()))
+                        .map((set, i) => (
+                          <div key={`unmatched-${i}`} className="p-3 rounded-lg bg-muted/30 border border-dashed text-xs opacity-70">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <span className="font-semibold text-sm">{set.name}</span>
+                              <Badge variant="outline" className="text-[10px] h-4 text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-700">
+                                Not on team
+                              </Badge>
+                              {set.item && (
+                                <Badge variant="outline" className="text-[10px] h-4">
+                                  {set.item}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-muted-foreground space-y-0.5">
+                              {set.ability && <div>Ability: {set.ability}</div>}
+                              {set.moves.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {set.moves.map((m, j) => (
+                                    <Badge key={j} variant="secondary" className="text-[10px] h-4">
+                                      {m}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

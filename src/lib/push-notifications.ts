@@ -191,3 +191,126 @@ async function syncSubscriptionToServer(
 
   log.info('Push subscription synced to server')
 }
+
+// ---------------------------------------------------------------------------
+// Browser Notification API helpers (no push server required)
+// These use the Notification constructor directly for in-app turn reminders.
+// ---------------------------------------------------------------------------
+
+const NOTIFICATION_TAG_TURN = 'draft-turn'
+const NOTIFICATION_TAG_TIMER = 'draft-timer'
+
+export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported'
+
+/**
+ * Check if notifications are supported and get current permission state.
+ * Lighter-weight than `getPushPermissionStatus` (does not require Service Worker).
+ */
+export function getNotificationPermission(): NotificationPermissionState {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'unsupported'
+  }
+  return Notification.permission as NotificationPermissionState
+}
+
+/**
+ * Request notification permission from the user (browser Notification API).
+ */
+export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'unsupported'
+  }
+
+  if (Notification.permission === 'granted') return 'granted'
+  if (Notification.permission === 'denied') return 'denied'
+
+  const result = await Notification.requestPermission()
+  return result as NotificationPermissionState
+}
+
+/**
+ * Send a "Your turn to pick" browser notification.
+ * Only fires when the tab is not focused so it does not duplicate in-app toasts.
+ */
+export function notifyTurnToPick(opts: {
+  draftName: string
+  roomCode: string
+  timeLimit?: number
+}): void {
+  if (getNotificationPermission() !== 'granted') return
+  if (document.hasFocus()) return
+
+  const body = opts.timeLimit
+    ? `It's your turn to pick! You have ${opts.timeLimit}s.`
+    : `It's your turn to pick!`
+
+  try {
+    const notification = new Notification(opts.draftName, {
+      body,
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-192x192.png',
+      tag: NOTIFICATION_TAG_TURN,
+      requireInteraction: true,
+    } as NotificationOptions)
+
+    notification.onclick = () => {
+      window.focus()
+      notification.close()
+    }
+  } catch {
+    // Silently fail if notification creation fails
+  }
+}
+
+/**
+ * Send a timer warning notification (e.g., 10 seconds left).
+ */
+export function notifyTimerWarning(opts: {
+  draftName: string
+  secondsLeft: number
+}): void {
+  if (getNotificationPermission() !== 'granted') return
+  if (document.hasFocus()) return
+
+  try {
+    const notification = new Notification(opts.draftName, {
+      body: `Only ${opts.secondsLeft}s left to make your pick!`,
+      icon: '/icons/icon-192x192.png',
+      tag: NOTIFICATION_TAG_TIMER,
+    })
+
+    notification.onclick = () => {
+      window.focus()
+      notification.close()
+    }
+
+    setTimeout(() => notification.close(), 5000)
+  } catch {
+    // Silently fail
+  }
+}
+
+/**
+ * Send a generic draft notification.
+ */
+export function notifyDraftEvent(title: string, body: string): void {
+  if (getNotificationPermission() !== 'granted') return
+  if (document.hasFocus()) return
+
+  try {
+    const notification = new Notification(title, {
+      body,
+      icon: '/icons/icon-192x192.png',
+      tag: 'draft-event',
+    })
+
+    notification.onclick = () => {
+      window.focus()
+      notification.close()
+    }
+
+    setTimeout(() => notification.close(), 8000)
+  } catch {
+    // Silently fail
+  }
+}

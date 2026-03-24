@@ -13,6 +13,7 @@
 import { useState, useEffect, useMemo, memo } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,6 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LeagueService } from '@/lib/league-service'
 import { MatchKOService } from '@/lib/match-ko-service'
+import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('MatchRecorderModal')
@@ -74,6 +76,7 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   // Per-game KO tracking: gameNumber -> { home: KO[], away: KO[] }
   const [gameKOs, setGameKOs] = useState<Record<number, GameKOData>>({})
   const [activeGame, setActiveGame] = useState<number>(1)
+  const [replayUrls, setReplayUrls] = useState<Record<number, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submissionResult, setSubmissionResult] = useState<'pending' | 'confirmed' | 'disputed' | null>(null)
@@ -258,6 +261,32 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
     return total
   }
 
+  /** Save replay URLs into the match notes JSON */
+  const saveReplayUrls = async () => {
+    const filteredUrls = Object.fromEntries(
+      Object.entries(replayUrls).filter(([, url]) => url.trim())
+    )
+    if (Object.keys(filteredUrls).length === 0 || !supabase) return
+
+    try {
+      const { data: matchRow } = await supabase
+        .from('matches')
+        .select('notes')
+        .eq('id', match.id)
+        .single()
+
+      const notes = matchRow?.notes ? JSON.parse(matchRow.notes) : {}
+      notes.replayUrls = filteredUrls
+
+      await supabase
+        .from('matches')
+        .update({ notes: JSON.stringify(notes) })
+        .eq('id', match.id)
+    } catch (err) {
+      log.error('Failed to save replay URLs:', err)
+    }
+  }
+
   const handleSubmit = async () => {
     setError(null)
     setIsSubmitting(true)
@@ -274,6 +303,9 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
           awayScore,
           winnerTeamId: matchWinner,
         })
+
+        // Save replay URLs regardless of confirmation status
+        await saveReplayUrls()
 
         setSubmissionResult(result.status)
 
@@ -301,6 +333,7 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
           winnerTeamId: matchWinner,
           status: 'completed',
         })
+        await saveReplayUrls()
         await recordKOs(matchWinner)
         onSuccess()
         onClose()
@@ -644,6 +677,15 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
                             <Trophy className="ml-2 h-4 w-4" />
                           )}
                         </Button>
+                      </div>
+                      <div className="mt-2">
+                        <Label className="text-xs text-muted-foreground">Showdown Replay (optional)</Label>
+                        <Input
+                          placeholder="https://replay.pokemonshowdown.com/..."
+                          value={replayUrls[game.gameNumber] || ''}
+                          onChange={(e) => setReplayUrls(prev => ({ ...prev, [game.gameNumber]: e.target.value }))}
+                          className="mt-1 text-xs h-8"
+                        />
                       </div>
                     </CardContent>
                   )}

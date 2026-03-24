@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Trophy, Users, Calendar, Crown, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Trophy, Users, Calendar, Crown, Clock, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -198,6 +198,32 @@ export default function MatchDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Showdown Replays */}
+            {(() => {
+              const notes = match.notes ? (typeof match.notes === 'string' ? JSON.parse(match.notes) : match.notes) : null
+              const urls = notes?.replayUrls as Record<string, string> | undefined
+              if (!urls || Object.keys(urls).length === 0) return null
+              return (
+                <div className="flex flex-col items-center gap-1 mt-3">
+                  <span className="text-xs font-medium text-muted-foreground">Showdown Replays</span>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(urls).map(([game, url]) => (
+                      <a
+                        key={game}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Game {game} Replay
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Match Date */}
             {match.scheduledDate && (

@@ -54,6 +54,7 @@ import DraftProgress from '@/components/team/DraftProgress'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { NotificationPrompt } from '@/components/draft/NotificationPrompt'
 import { createLogger } from '@/lib/logger'
 import { useDraftStore } from '@/stores/draftStore'
 
@@ -617,7 +618,10 @@ export default function DraftRoomPage() {
     warningThreshold: 10,
     isConnected: connectionStatus === 'online',
     currentTurn: draftState?.currentTurn,
-    onAutoSkip: handleAutoSkip
+    onAutoSkip: handleAutoSkip,
+    draftName: `Draft ${roomCode}`,
+    roomCode,
+    timeLimit: draftState?.draftSettings?.timeLimit
   })
 
   // Auto-skip effect: ANY connected client can trigger the skip when the timer hits 0.
@@ -2052,6 +2056,13 @@ export default function DraftRoomPage() {
                 {isStarting ? 'Starting...' : 'All Teams Ready — Start Draft'}
               </Button>
             )}
+          </div>
+        )}
+
+        {/* Notification permission prompt */}
+        {draftState?.status === 'drafting' && !isSpectator && draftState?.userTeamId && (
+          <div className="mb-3">
+            <NotificationPrompt />
           </div>
         )}
 

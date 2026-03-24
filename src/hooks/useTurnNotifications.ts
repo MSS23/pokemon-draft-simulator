@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
+import { notifyTurnToPick, notifyTimerWarning } from '@/lib/push-notifications'
 
 const log = createLogger('UseTurnNotifications')
 
@@ -13,6 +14,9 @@ interface TurnNotificationOptions {
   onAutoSkip?: () => void
   isConnected?: boolean // Only auto-skip if connected to prevent auto-skip during connection issues
   currentTurn?: number // Current turn number to detect draft start
+  draftName?: string // Draft display name for push notifications
+  roomCode?: string // Room code for push notifications
+  timeLimit?: number // Total time limit per pick (seconds)
 }
 
 /**
@@ -26,7 +30,10 @@ export function useTurnNotifications({
   warningThreshold = 10,
   onAutoSkip,
   isConnected = true,
-  currentTurn
+  currentTurn,
+  draftName = 'Pokemon Draft',
+  roomCode = '',
+  timeLimit
 }: TurnNotificationOptions) {
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission>('default')
   const hasShownWarning = useRef(false)
@@ -59,28 +66,10 @@ export function useTurnNotifications({
     hasShownTurnNotification.current = true
 
     // Show browser notification if tab is not focused
-    if (
-      enableBrowserNotifications &&
-      browserNotificationPermission === 'granted' &&
-      document.hidden
-    ) {
-      const notification = new Notification("It's Your Turn!", {
-        body: 'Select a Pokémon to draft',
-        icon: '/favicon.ico',
-        tag: 'draft-turn',
-        requireInteraction: true, // Keeps notification visible until user interacts
-      })
-
-      // Focus window when notification is clicked
-      notification.onclick = () => {
-        window.focus()
-        notification.close()
-      }
-
-      // Auto-close after 10 seconds
-      setTimeout(() => notification.close(), 10000)
+    if (enableBrowserNotifications) {
+      notifyTurnToPick({ draftName, roomCode, timeLimit })
     }
-  }, [isUserTurn, draftStatus, enableBrowserNotifications, browserNotificationPermission])
+  }, [isUserTurn, draftStatus, enableBrowserNotifications, browserNotificationPermission, draftName, roomCode, timeLimit])
 
   // Show warning when time is running out
   useEffect(() => {
@@ -100,24 +89,8 @@ export function useTurnNotifications({
       )
 
       // Show browser notification as well
-      if (
-        enableBrowserNotifications &&
-        browserNotificationPermission === 'granted' &&
-        document.hidden
-      ) {
-        const notification = new Notification('Time Running Out!', {
-          body: `${warningThreshold} seconds left to make your pick`,
-          icon: '/favicon.ico',
-          tag: 'draft-warning',
-          requireInteraction: false,
-        })
-
-        notification.onclick = () => {
-          window.focus()
-          notification.close()
-        }
-
-        setTimeout(() => notification.close(), 5000)
+      if (enableBrowserNotifications) {
+        notifyTimerWarning({ draftName, secondsLeft: warningThreshold })
       }
     }
 
@@ -131,7 +104,8 @@ export function useTurnNotifications({
     draftStatus,
     warningThreshold,
     enableBrowserNotifications,
-    browserNotificationPermission
+    browserNotificationPermission,
+    draftName
   ])
 
   // Handle auto-skip when time expires with grace period for disconnected users

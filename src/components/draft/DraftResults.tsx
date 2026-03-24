@@ -12,6 +12,8 @@ import {
   BarChart3,
   Download,
   Share2,
+  Camera,
+  Play,
   ChevronDown,
   ChevronUp
 } from 'lucide-react'
@@ -20,6 +22,9 @@ import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName }
 import { TEAM_COLORS, buildTeamColorMap } from '@/utils/team-colors'
 import { PokeballIcon } from '@/components/ui/pokeball-icon'
 import TournamentSchedule from '@/components/tournament/TournamentSchedule'
+import { ShareableRecapCard } from './ShareableRecapCard'
+import { DraftReplay } from './DraftReplay'
+import { DraftRecapAnimation } from './DraftRecapAnimation'
 
 interface Team {
   id: string
@@ -101,6 +106,7 @@ export default function DraftResults({
 }: DraftResultsProps) {
   const [activeTab, setActiveTab] = useState('recap')
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null)
+  const [showRecapAnimation, setShowRecapAnimation] = useState(false)
 
   const teamColorMap = useMemo(() => {
     const teamIds = teams
@@ -182,16 +188,26 @@ export default function DraftResults({
                 Export Data
               </Button>
             )}
+            <Button variant="outline" onClick={() => setShowRecapAnimation(true)}>
+              <Play className="h-4 w-4 mr-2" />
+              Play Recap
+            </Button>
+            <Button variant="outline" onClick={() => setActiveTab('sharecard')}>
+              <Camera className="h-4 w-4 mr-2" />
+              Share Card
+            </Button>
           </div>
         </CardHeader>
       </Card>
 
       <div className="w-full">
-        <div className="grid w-full grid-cols-3 mb-6 gap-1">
+        <div className="grid w-full grid-cols-5 mb-6 gap-1">
           {[
             { id: 'recap', label: 'Draft Recap' },
+            { id: 'replay', label: 'Replay' },
             { id: 'rosters', label: 'Team Rosters' },
             { id: 'tournament', label: 'Tournament' },
+            { id: 'sharecard', label: 'Share Card' },
           ].map((tab) => (
             <Button
               key={tab.id}
@@ -282,6 +298,28 @@ export default function DraftResults({
               ))
             }
           </div>
+        )}
+
+        {/* Draft Replay */}
+        {activeTab === 'replay' && (
+          <DraftReplay
+            picks={picks.map(p => {
+              const team = teams.find(t => t.id === p.team_id)
+              return {
+                id: p.id,
+                team_id: p.team_id,
+                team_name: team?.name || 'Unknown',
+                user_name: team?.userName || 'Unknown',
+                pokemon_id: p.pokemon_id,
+                pokemon_name: p.pokemon_name,
+                cost: p.cost,
+                pick_order: p.pick_order,
+                round: p.round
+              }
+            })}
+            teams={teams}
+            draftName={draftName}
+          />
         )}
 
         {/* Team Rosters */}
@@ -412,7 +450,53 @@ export default function DraftResults({
             }))}
           />
         )}
+
+        {/* Share Card */}
+        {activeTab === 'sharecard' && (
+          <div className="space-y-6">
+            <p className="text-center text-sm text-muted-foreground">
+              Screenshot this card and share it on social media!
+            </p>
+            {analytics.teamStats.map((team) => (
+              <ShareableRecapCard
+                key={team.id}
+                teamName={team.name}
+                userName={team.userName}
+                draftName={draftName}
+                pokemon={team.picks.map(p => ({
+                  id: p.pokemon_id,
+                  name: p.pokemon_name,
+                  cost: p.cost
+                }))}
+                totalCost={team.totalCost}
+                budgetRemaining={team.budgetRemaining}
+              />
+            ))}
+          </div>
+        )}
       </div>
+
+      {showRecapAnimation && (
+        <DraftRecapAnimation
+          picks={picks.map(p => {
+            const team = teams.find(t => t.id === p.team_id)
+            return {
+              id: p.id,
+              team_id: p.team_id,
+              team_name: team?.name || 'Unknown',
+              user_name: team?.userName || 'Unknown',
+              pokemon_id: p.pokemon_id,
+              pokemon_name: p.pokemon_name,
+              cost: p.cost,
+              pick_order: p.pick_order,
+              round: p.round
+            }
+          })}
+          teams={teams}
+          draftName={draftName}
+          onClose={() => setShowRecapAnimation(false)}
+        />
+      )}
     </div>
   )
 }

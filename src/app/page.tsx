@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
-import { Users, Zap, Plus, LogIn, Shield, ArrowRight, Trophy } from 'lucide-react'
+import { Users, Zap, Plus, LogIn, Shield, ArrowRight, Trophy, UserCheck, Heart } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { motion, useInView } from 'framer-motion'
@@ -18,10 +18,22 @@ const staggerContainer = {
   show: { transition: { staggerChildren: 0.08 } },
 }
 
-const STATS = [
-  { value: '1,000+', label: 'Drafts completed' },
-  { value: '10,000+', label: 'Pokemon drafted' },
-  { value: '500+', label: 'Active players' },
+const TRUST_PROPS = [
+  {
+    icon: UserCheck,
+    title: 'No signup required',
+    desc: 'Jump straight into a draft as a guest. Create an account later if you want.',
+  },
+  {
+    icon: Shield,
+    title: 'VGC & Smogon ready',
+    desc: 'Official format rulesets with automatic ban lists and cost calculation.',
+  },
+  {
+    icon: Heart,
+    title: 'Completely free',
+    desc: 'No paywalls, no premium tiers. Every feature is available to everyone.',
+  },
 ]
 
 const STEPS = [
@@ -53,8 +65,8 @@ export default function Home() {
   const { user, loading } = useAuth()
   const featuresRef = useRef<HTMLDivElement>(null)
   const featuresInView = useInView(featuresRef, { once: true, margin: '-60px' })
-  const statsRef = useRef<HTMLDivElement>(null)
-  const statsInView = useInView(statsRef, { once: true, margin: '-60px' })
+  const trustRef = useRef<HTMLDivElement>(null)
+  const trustInView = useInView(trustRef, { once: true, margin: '-60px' })
   const stepsRef = useRef<HTMLDivElement>(null)
   const stepsInView = useInView(stepsRef, { once: true, margin: '-60px' })
 
@@ -98,7 +110,7 @@ export default function Home() {
             <motion.div variants={fadeIn} className="flex items-center gap-2">
               <div className="h-px w-8 bg-primary/60" />
               <p className="text-primary text-sm font-semibold tracking-wide uppercase">
-                Draft League
+                Free & Open Source
               </p>
             </motion.div>
 
@@ -115,8 +127,8 @@ export default function Home() {
               variants={fadeIn}
               className="text-zinc-400 text-base sm:text-lg max-w-md leading-relaxed"
             >
-              Live multiplayer drafts with snake and auction formats.
-              Full VGC regulation support out of the box.
+              The free drafting tool built for competitive Pokemon communities.
+              Snake drafts, auctions, full league seasons — no spreadsheets required.
             </motion.p>
 
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-start gap-3 pt-2">
@@ -192,21 +204,37 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Stats */}
-        <div ref={statsRef}>
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={statsInView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-            className="grid grid-cols-3 gap-8 text-center py-12"
+        {/* Trusted by trainers */}
+        <div ref={trustRef}>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={trustInView ? { opacity: 1 } : {}}
+            className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-6"
           >
-            {STATS.map((stat) => (
-              <div key={stat.label}>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-              </div>
+            Trusted by trainers
+          </motion.p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {TRUST_PROPS.map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 12 }}
+                animate={trustInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: i * 0.1, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                className="flex gap-4 p-5 rounded-xl border bg-card hover:shadow-sm transition-shadow"
+              >
+                <div className="mt-0.5 shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-primary/8 dark:bg-primary/10 flex items-center justify-center">
+                    <item.icon className="h-4 w-4 text-primary/70" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm mb-1">{item.title}</h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                </div>
+              </motion.div>
             ))}
-          </motion.div>
+          </div>
         </div>
 
         {/* How it works */}
@@ -243,6 +271,9 @@ export default function Home() {
 
       {/* Final CTA */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-20 text-center space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Built by a Pokemon player, for Pokemon players. Open source on GitHub.
+        </p>
         <h2 className="text-2xl font-bold">Ready to draft?</h2>
         <p className="text-sm text-muted-foreground">Create your first draft in under 30 seconds.</p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -261,6 +292,11 @@ export default function Home() {
             <Users className="h-4 w-4 mr-2" />
             Join a Draft
           </Button>
+        </div>
+        <div className="flex justify-center gap-4 pt-4 text-xs">
+          <a href="/about" className="text-muted-foreground hover:text-foreground transition-colors">About</a>
+          <a href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">Terms</a>
+          <a href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">Privacy</a>
         </div>
       </div>
     </SidebarLayout>
