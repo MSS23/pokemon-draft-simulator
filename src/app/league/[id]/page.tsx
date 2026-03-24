@@ -275,7 +275,7 @@ export default function LeaguePage() {
   const completedThisWeek = weekFixtures.filter(m => m.status === 'completed').length
 
   return (
-    <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">
+    <div className="min-h-screen bg-background">
       <LeagueNav
         leagueName={league.name}
         currentWeek={league.currentWeek}

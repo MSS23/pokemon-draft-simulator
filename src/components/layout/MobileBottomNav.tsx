@@ -2,21 +2,21 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, FileText, Trophy, Settings } from 'lucide-react'
+import { LayoutDashboard, Plus, Trophy, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
-  { href: '/create-draft', label: 'Drafts', icon: FileText },
-  { href: '/dashboard', label: 'Leagues', icon: Trophy },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/lobby', label: 'Browse', icon: Globe },
+  { href: '/create-draft', label: 'New', icon: Plus },
+  { href: '/history', label: 'Leagues', icon: Trophy },
 ] as const
 
 export function MobileBottomNav() {
   const pathname = usePathname()
 
-  // Hide bottom nav on draft/match/tournament active pages where it would interfere
-  const hideOnPaths = ['/draft/', '/match/', '/spectate/']
+  // Hide on pages where bottom nav would interfere with the experience
+  const hideOnPaths = ['/draft/', '/match/', '/spectate/', '/league/']
   if (hideOnPaths.some((p) => pathname.startsWith(p))) {
     return null
   }
@@ -30,13 +30,12 @@ export function MobileBottomNav() {
       {navItems.map(({ href, label, icon: Icon }) => {
         const isActive =
           pathname === href ||
-          (href === '/create-draft' && pathname.startsWith('/create-draft')) ||
-          (href === '/create-draft' && pathname.startsWith('/join-draft')) ||
-          (label === 'Leagues' && pathname.startsWith('/league'))
+          (href === '/dashboard' && pathname === '/') ||
+          (href === '/history' && pathname.startsWith('/history'))
 
         return (
           <Link
-            key={href}
+            key={label}
             href={href}
             className={cn(
               'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[11px] font-medium transition-colors',
@@ -45,7 +44,7 @@ export function MobileBottomNav() {
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            <Icon className="h-5 w-5" aria-hidden="true" />
+            <Icon className={cn('h-5 w-5', label === 'New' && 'h-6 w-6')} aria-hidden="true" />
             <span>{label}</span>
           </Link>
         )

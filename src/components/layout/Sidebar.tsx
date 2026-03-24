@@ -4,15 +4,14 @@ import { useEffect, useState } from 'react'
 import {
   Plus,
   UserPlus,
-  Eye,
   Globe,
   LayoutDashboard,
   History,
   Trophy,
-  Swords,
   Settings,
   LogOut,
-  Heart,
+  Info,
+  Swords,
 } from 'lucide-react'
 import { SidebarSection } from './SidebarSection'
 import { SidebarLink } from './SidebarLink'
@@ -24,16 +23,18 @@ import { useRouter } from 'next/navigation'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { useAuth } from '@/contexts/AuthContext'
 
-interface League {
+interface LeagueInfo {
   id: string
   name: string
-  team_id: string
+  status: string
+  currentWeek: number | null
+  totalWeeks: number | null
 }
 
 export function Sidebar() {
   const router = useRouter()
   const { user, signOut, loading: authLoading } = useAuth()
-  const [leagues, setLeagues] = useState<League[]>([])
+  const [leagues, setLeagues] = useState<LeagueInfo[]>([])
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authRedirectTo, setAuthRedirectTo] = useState<string>('/dashboard')
 
@@ -53,7 +54,7 @@ export function Sidebar() {
       team_id: string
       league_id: string
       teams: { id: string; name: string; owner_id: string | null } | null
-      leagues: { id: string; name: string; status: string } | null
+      leagues: { id: string; name: string; status: string; current_week: number | null; total_weeks: number | null } | null
     }
 
     const leagueTeamsResponse = await supabase
@@ -70,20 +71,26 @@ export function Sidebar() {
         leagues!inner (
           id,
           name,
-          status
+          status,
+          current_week,
+          total_weeks
         )
       `)
       .eq('teams.owner_id', userId) as unknown as { data: LeagueTeamJoin[] | null; error: unknown }
 
     if (leagueTeamsResponse?.data) {
       const userLeagues = leagueTeamsResponse.data
-        .filter((item) => item.leagues && (item.leagues.status === 'active' || item.leagues.status === 'upcoming'))
+        .filter((item) => item.leagues && (item.leagues.status === 'active' || item.leagues.status === 'upcoming' || item.leagues.status === 'scheduled'))
         .map((item) => ({
           id: item.leagues!.id,
           name: item.leagues!.name,
-          team_id: item.team_id
+          status: item.leagues!.status,
+          currentWeek: item.leagues!.current_week,
+          totalWeeks: item.leagues!.total_weeks,
         }))
-      setLeagues(userLeagues)
+      // Deduplicate by league id
+      const unique = Array.from(new Map(userLeagues.map(l => [l.id, l])).values())
+      setLeagues(unique)
     }
   }
 
@@ -93,7 +100,6 @@ export function Sidebar() {
   }
 
   const _handleProtectedClick = (e: React.MouseEvent, href: string) => {
-    // Don't block navigation while auth is still loading
     if (authLoading) return
     if (!user) {
       e.preventDefault()
@@ -135,34 +141,33 @@ export function Sidebar() {
       {/* Nav */}
       <nav role="navigation" aria-label="Main navigation" className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
         <SidebarLink href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
-        <SidebarLink href="/lobby" icon={Globe} label="Lobby" />
+        <SidebarLink href="/lobby" icon={Globe} label="Browse" />
         <SidebarLink href="/history" icon={History} label="History" />
 
-        <Separator className="my-1.5" />
+        <Separator className="my-2" />
 
-        <SidebarSection title="Drafts">
-          <SidebarLink href="/create-draft" icon={Plus} label="Create Draft" />
+        {/* Quick actions */}
+        <SidebarSection title="Play">
+          <SidebarLink href="/create-draft" icon={Plus} label="New Draft" />
           <SidebarLink href="/join-draft" icon={UserPlus} label="Join Draft" />
-          <SidebarLink href="/watch-drafts" icon={Eye} label="Watch Live" />
+          <SidebarLink href="/create-tournament" icon={Swords} label="New Tournament" />
         </SidebarSection>
 
-        <Separator className="my-1.5" />
-
-        <SidebarSection title="Tournaments">
-          <SidebarLink href="/create-tournament" icon={Swords} label="Create Tournament" />
-          <SidebarLink href="/join-tournament" icon={UserPlus} label="Join Tournament" />
-        </SidebarSection>
-
+        {/* Active leagues — the most important section */}
         {leagues.length > 0 && (
           <>
-            <Separator className="my-1.5" />
-            <SidebarSection title="Leagues">
+            <Separator className="my-2" />
+            <SidebarSection title="My Leagues">
               {leagues.map((league) => (
                 <SidebarLink
                   key={league.id}
                   href={`/league/${league.id}`}
                   icon={Trophy}
                   label={league.name}
+                  badge={league.currentWeek && league.totalWeeks
+                    ? `W${league.currentWeek}`
+                    : undefined
+                  }
                 />
               ))}
             </SidebarSection>
@@ -172,7 +177,7 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div className="px-2 py-2 border-t space-y-0.5">
-        <SidebarLink href="/about" icon={Heart} label="About" />
+        <SidebarLink href="/about" icon={Info} label="About" />
         {user && (
           <>
             <SidebarLink href="/settings" icon={Settings} label="Settings" />
