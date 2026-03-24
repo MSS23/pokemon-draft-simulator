@@ -63,6 +63,7 @@ export default function LeaguePage() {
   const [showStartPlayoffs, setShowStartPlayoffs] = useState(false)
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [fixtureRosters, setFixtureRosters] = useState<Record<string, { home: Pick[]; away: Pick[] }>>({})
+  const [fullSchedule, setFullSchedule] = useState<{ weekNumber: number; matches: (Match & { homeTeam: Team; awayTeam: Team })[] }[]>([])
 
   const { user } = useAuth()
 
@@ -158,6 +159,12 @@ export default function LeaguePage() {
 
       const canAdvanceWeek = await LeagueService.canAdvanceWeek(leagueId, leagueData.currentWeek || 1)
       setCanAdvance(canAdvanceWeek)
+
+      // Full season schedule
+      try {
+        const schedule = await LeagueService.getFullSchedule(leagueId)
+        setFullSchedule(schedule)
+      } catch { /* non-critical */ }
 
       // Sibling conference
       if (leagueData.leagueType !== 'single') {
@@ -457,6 +464,69 @@ export default function LeaguePage() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {/* Season Schedule — all weeks at a glance */}
+        {fullSchedule.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-base font-semibold mb-3 flex items-center gap-2">
+              <CalendarDays className="h-4 w-4" />
+              Season Schedule
+            </h2>
+            <Card>
+              <CardContent className="p-0">
+                {fullSchedule.map((week, weekIdx) => {
+                  const isCurrent = week.weekNumber === league.currentWeek
+                  const isPast = week.weekNumber < (league.currentWeek || 1)
+                  const allDone = week.matches.every(m => m.status === 'completed')
+
+                  return (
+                    <div
+                      key={week.weekNumber}
+                      className={`${weekIdx < fullSchedule.length - 1 ? 'border-b' : ''} ${isCurrent ? 'bg-primary/5' : ''}`}
+                    >
+                      {/* Week header row */}
+                      <div className="flex items-center gap-2 px-4 py-2">
+                        <span className={`text-sm font-semibold ${isCurrent ? 'text-primary' : isPast && allDone ? 'text-muted-foreground' : ''}`}>
+                          Week {week.weekNumber}
+                        </span>
+                        {isCurrent && <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">Now</Badge>}
+                        {isPast && allDone && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">Done</Badge>}
+                        {isPast && !allDone && <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">Partial</Badge>}
+                      </div>
+
+                      {/* Matches */}
+                      <div className="px-4 pb-2 space-y-1">
+                        {week.matches.map(match => (
+                          <div
+                            key={match.id}
+                            className="flex items-center text-sm py-1 cursor-pointer hover:bg-muted/50 rounded px-2 -mx-2 transition-colors"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => router.push(`/league/${leagueId}/matchup/${match.id}`)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/league/${leagueId}/matchup/${match.id}`) } }}
+                          >
+                            <span className={`flex-1 truncate font-medium ${match.winnerTeamId === match.homeTeamId ? 'text-green-600 dark:text-green-400' : ''}`}>
+                              {match.homeTeam.name}
+                            </span>
+                            <span className="px-3 text-center shrink-0 tabular-nums text-xs">
+                              {match.status === 'completed'
+                                ? <span className="font-bold">{match.homeScore} - {match.awayScore}</span>
+                                : <span className="text-muted-foreground">vs</span>
+                              }
+                            </span>
+                            <span className={`flex-1 truncate font-medium text-right ${match.winnerTeamId === match.awayTeamId ? 'text-green-600 dark:text-green-400' : ''}`}>
+                              {match.awayTeam.name}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Standings */}
