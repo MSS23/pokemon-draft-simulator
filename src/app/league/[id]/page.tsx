@@ -283,6 +283,7 @@ export default function LeaguePage() {
         teamCount={league.teams.length}
         isCommissioner={isCommissioner}
         enableWaivers={leagueSettings.enableWaivers !== false}
+        hasMatchResults={standings.some(s => s.wins > 0 || s.losses > 0 || s.draws > 0)}
         onSettingsClick={() => setSettingsOpen(true)}
       />
 

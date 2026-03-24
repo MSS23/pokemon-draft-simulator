@@ -15,15 +15,21 @@ interface LeagueNavProps {
   teamCount?: number
   isCommissioner?: boolean
   enableWaivers?: boolean
+  hasMatchResults?: boolean
   onSettingsClick?: () => void
 }
 
-const TABS = [
+// Base tabs always visible
+const BASE_TABS = [
   { id: 'overview', label: 'Overview', path: '', icon: TrendingUp },
   { id: 'schedule', label: 'Schedule', path: '/schedule', icon: CalendarDays },
+  { id: 'trades', label: 'Trades', path: '/trades', icon: ArrowLeftRight },
+]
+
+// Tabs that only appear once matches have been played
+const MATCH_TABS = [
   { id: 'rankings', label: 'Rankings', path: '/rankings', icon: Trophy },
   { id: 'stats', label: 'Stats', path: '/stats', icon: BarChart3 },
-  { id: 'trades', label: 'Trades', path: '/trades', icon: ArrowLeftRight },
 ]
 
 export function LeagueNav({
@@ -33,6 +39,7 @@ export function LeagueNav({
   teamCount,
   isCommissioner = false,
   enableWaivers = true,
+  hasMatchResults = false,
   onSettingsClick,
 }: LeagueNavProps) {
   const params = useParams()
@@ -43,23 +50,25 @@ export function LeagueNav({
 
   const basePath = `/league/${leagueId}`
 
+  // Build tab list based on league state
+  const allTabs = [
+    ...BASE_TABS,
+    ...(hasMatchResults ? MATCH_TABS : []),
+    ...(enableWaivers ? [{ id: 'free-agents', label: 'Free Agents', path: '/free-agents', icon: UserPlus }] : []),
+    ...(isCommissioner ? [{ id: 'admin', label: 'Admin', path: '/admin', icon: ShieldCheck }] : []),
+  ]
+
   // Determine active tab from current pathname
   const getActiveTab = () => {
     const sub = pathname.replace(basePath, '')
     if (sub === '' || sub === '/') return 'overview'
-    for (const tab of [...TABS, { id: 'free-agents', path: '/free-agents' }, { id: 'admin', path: '/admin' }]) {
+    for (const tab of [...allTabs, { id: 'free-agents', path: '/free-agents' }, { id: 'admin', path: '/admin' }]) {
       if (sub.startsWith(tab.path) && tab.path !== '') return tab.id
     }
     return 'overview'
   }
 
   const activeTab = getActiveTab()
-
-  const allTabs = [
-    ...TABS,
-    ...(enableWaivers ? [{ id: 'free-agents', label: 'Free Agents', path: '/free-agents', icon: UserPlus }] : []),
-    ...(isCommissioner ? [{ id: 'admin', label: 'Admin', path: '/admin', icon: ShieldCheck }] : []),
-  ]
 
   const handleCopy = useCallback(() => {
     const url = `${window.location.origin}/league/${leagueId}`
