@@ -19,7 +19,7 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ['var(--font-outfit)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sora)', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'JetBrains Mono', 'monospace'],
       },
       colors: {
@@ -87,12 +87,18 @@ const config: Config = {
         "type-dark": "hsl(var(--type-dark))",
         "type-steel": "hsl(var(--type-steel))",
         "type-fairy": "hsl(var(--type-fairy))",
+        energy: {
+          DEFAULT: "hsl(var(--energy))",
+          foreground: "hsl(var(--energy-foreground))",
+        },
       },
       boxShadow: {
         "sm": "var(--shadow-sm)",
         "md": "var(--shadow-md)",
         "lg": "var(--shadow-lg)",
+        "xl": "var(--shadow-xl)",
         "glow": "var(--shadow-glow)",
+        "energy": "var(--shadow-energy)",
       },
       borderRadius: {
         lg: "var(--radius)",

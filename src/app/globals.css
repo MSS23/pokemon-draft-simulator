@@ -18,32 +18,32 @@
   }
 
   :root {
-    /* Zinc + Crimson — clean, restrained, professional */
-    --background: 0 0% 98.5%;
-    --foreground: 240 6% 10%;
+    /* Refined Crimson + Slate — Championship Arena palette */
+    --background: 220 14% 96%;
+    --foreground: 220 20% 10%;
     --card: 0 0% 100%;
-    --card-foreground: 240 6% 10%;
+    --card-foreground: 220 20% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 10%;
+    --popover-foreground: 220 20% 10%;
     --primary: 347 77% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
+    --secondary: 220 14% 93%;
+    --secondary-foreground: 220 20% 10%;
+    --muted: 220 14% 93%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 93%;
+    --accent-foreground: 220 20% 10%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
     --ring: 347 77% 50%;
     --chart-1: 347 77% 50%;
     --chart-2: 221 83% 53%;
     --chart-3: 48 96% 53%;
     --chart-4: 142 71% 45%;
     --chart-5: 280 65% 60%;
-    --radius: 0.5rem;
+    --radius: 0.625rem;
 
     /* Semantic */
     --success: 142 71% 45%;
@@ -53,16 +53,22 @@
     --info: 221 83% 53%;
     --info-foreground: 0 0% 100%;
 
-    /* Brand — solid crimson, no gradient */
+    /* Brand accent — energetic crimson */
     --brand-from: 347 77% 50%;
-    --brand-via: 347 77% 50%;
-    --brand-to: 347 77% 50%;
+    --brand-via: 340 82% 55%;
+    --brand-to: 330 85% 60%;
 
-    /* Shadows — softer, warmer */
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.03), 0 1px 2px -1px rgb(0 0 0 / 0.02);
-    --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.03);
-    --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.08), 0 4px 8px -4px rgb(0 0 0 / 0.03);
+    /* Energy accent — electric blue for highlights */
+    --energy: 217 91% 60%;
+    --energy-foreground: 0 0% 100%;
+
+    /* Refined shadows with color tinting */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px -1px rgb(0 0 0 / 0.03);
+    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.04);
+    --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.12), 0 6px 12px -6px rgb(0 0 0 / 0.04);
+    --shadow-xl: 0 24px 50px -12px rgb(0 0 0 / 0.18);
     --shadow-glow: 0 0 0 3px hsl(347 77% 50% / 0.12);
+    --shadow-energy: 0 0 20px -4px hsl(347 77% 50% / 0.25);
 
     /* Pokemon type colors */
     --type-normal: 60 5% 57%;
@@ -86,24 +92,24 @@
   }
 
   .dark {
-    --background: 240 6% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 5% 10%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 5% 10%;
-    --popover-foreground: 0 0% 98%;
+    --background: 225 15% 6%;
+    --foreground: 210 20% 95%;
+    --card: 225 14% 10%;
+    --card-foreground: 210 20% 95%;
+    --popover: 225 14% 10%;
+    --popover-foreground: 210 20% 95%;
     --primary: 347 77% 56%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
+    --secondary: 225 12% 14%;
+    --secondary-foreground: 210 20% 95%;
+    --muted: 225 12% 14%;
+    --muted-foreground: 220 10% 55%;
+    --accent: 225 12% 14%;
+    --accent-foreground: 210 20% 95%;
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
+    --border: 225 12% 16%;
+    --input: 225 12% 16%;
     --ring: 347 77% 56%;
     --chart-1: 347 77% 56%;
     --chart-2: 217 91% 60%;
@@ -119,13 +125,18 @@
     --info-foreground: 0 0% 100%;
 
     --brand-from: 347 77% 56%;
-    --brand-via: 347 77% 56%;
-    --brand-to: 347 77% 56%;
+    --brand-via: 340 82% 58%;
+    --brand-to: 330 85% 62%;
 
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.2);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+    --energy: 217 91% 65%;
+    --energy-foreground: 0 0% 100%;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.4), 0 2px 6px -2px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 16px 40px -8px rgb(0 0 0 / 0.5), 0 6px 12px -6px rgb(0 0 0 / 0.3);
+    --shadow-xl: 0 24px 50px -12px rgb(0 0 0 / 0.6);
     --shadow-glow: 0 0 0 3px hsl(347 77% 56% / 0.15);
+    --shadow-energy: 0 0 24px -4px hsl(347 77% 56% / 0.3);
 
     --type-normal: 60 5% 67%;
     --type-fire: 17 88% 66%;
@@ -175,14 +186,17 @@
 }
 
 @layer components {
-  /* Brand text — solid color, no gradient */
+  /* Brand text — gradient sweep */
   .brand-gradient-text {
-    color: hsl(var(--primary));
+    background: linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-via)), hsl(var(--brand-to)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  /* Brand background — solid */
+  /* Brand background — gradient */
   .brand-gradient-bg {
-    background-color: hsl(var(--primary));
+    background: linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
   }
 
   /* Pokeball watermark — very subtle */
@@ -192,19 +206,23 @@
     opacity: 0.02;
   }
 
-  /* Dot pattern */
+  /* Dot pattern — refined */
   .dot-pattern {
     background-image:
-      radial-gradient(circle at 1px 1px, hsl(var(--foreground) / 0.06) 1px, transparent 0);
-    background-size: 24px 24px;
+      radial-gradient(circle at 1px 1px, hsl(var(--foreground) / 0.05) 1px, transparent 0);
+    background-size: 20px 20px;
   }
 
-  /* Interactive card */
+  /* Interactive card — premium hover */
   .card-interactive {
-    @apply cursor-pointer transition-all duration-150 hover:shadow-md hover:border-border;
-  }
-  .dark .card-interactive {
-    @apply hover:border-muted-foreground/20;
+    @apply cursor-pointer transition-all duration-200;
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
+    &:active {
+      transform: translateY(0);
+    }
   }
 
   /* Section title */
@@ -220,6 +238,30 @@
   /* Stat card hover */
   .stat-card {
     @apply relative overflow-hidden;
+  }
+
+  /* Glass surface — frosted glass effect */
+  .glass-surface {
+    background: hsl(var(--card) / 0.7);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+  .dark .glass-surface {
+    background: hsl(var(--card) / 0.6);
+  }
+
+  /* Surface layers for depth hierarchy */
+  .surface-0 {
+    background: hsl(var(--background));
+  }
+  .surface-1 {
+    background: hsl(var(--card));
+  }
+  .surface-2 {
+    background: hsl(var(--secondary));
+  }
+  .surface-3 {
+    background: hsl(var(--muted));
   }
 
   /* Pokemon card type gradients — warm radial for softer card feel */
@@ -288,29 +330,29 @@
     background-size: 24px 24px;
   }
 
-  /* Pokemon animations — simplified, purposeful */
+  /* Pokemon animations — purposeful, polished */
   .pokemon-entrance {
-    animation: pokemonEntrance 0.4s ease-out;
+    animation: pokemonEntrance 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   @keyframes pokemonEntrance {
-    from { opacity: 0; transform: scale(0.9) translateY(8px); }
+    from { opacity: 0; transform: scale(0.85) translateY(12px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
   }
 
   .pokemon-hover {
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
   }
   .pokemon-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: var(--shadow-lg);
   }
 
   .pokemon-selected {
-    animation: pokemonSelected 0.3s ease-out;
+    animation: pokemonSelected 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
   @keyframes pokemonSelected {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.03); }
+    50% { transform: scale(1.06); }
   }
 
   .pokemon-float {
@@ -318,7 +360,7 @@
   }
   @keyframes pokemonFloat {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
+    50% { transform: translateY(-6px); }
   }
 
   .type-glow {
@@ -326,7 +368,7 @@
   }
   @keyframes typeGlow {
     0% { box-shadow: 0 0 4px currentColor; }
-    100% { box-shadow: 0 0 12px currentColor; }
+    100% { box-shadow: 0 0 16px currentColor; }
   }
 
   .pokemon-sparkle {
@@ -360,7 +402,7 @@
   }
 
   .stat-reveal {
-    animation: statReveal 0.5s ease-out;
+    animation: statReveal 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
   }
   @keyframes statReveal {
     from { opacity: 0; transform: translateX(-8px); }
@@ -372,7 +414,7 @@
     image-rendering: auto;
   }
 
-  /* Gradient border on hover */
+  /* Gradient border on hover — refined */
   .gradient-border {
     position: relative;
     border-radius: var(--radius);
@@ -383,48 +425,49 @@
     position: absolute;
     inset: -1px;
     border-radius: inherit;
-    background: hsl(var(--primary));
+    background: linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
     z-index: -1;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.3s ease;
   }
   .gradient-border:hover::before {
     opacity: 1;
   }
 
-  /* Badge glow */
+  /* Badge glow — refined pulse */
   .badge-glow {
     animation: badgeGlow 2.5s ease-in-out infinite;
   }
   @keyframes badgeGlow {
     0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.25); }
-    50% { box-shadow: 0 0 0 4px hsl(var(--primary) / 0); }
+    50% { box-shadow: 0 0 0 6px hsl(var(--primary) / 0); }
   }
 
-  /* Mesh gradient — simplified */
+  /* Mesh gradient — richer */
   .mesh-gradient {
     background-image:
-      radial-gradient(at 30% 20%, hsl(var(--primary) / 0.06) 0px, transparent 50%),
-      radial-gradient(at 70% 60%, hsl(var(--info) / 0.04) 0px, transparent 50%);
+      radial-gradient(at 20% 20%, hsl(var(--primary) / 0.08) 0px, transparent 50%),
+      radial-gradient(at 80% 40%, hsl(var(--energy) / 0.06) 0px, transparent 50%),
+      radial-gradient(at 40% 80%, hsl(var(--chart-5) / 0.04) 0px, transparent 50%);
   }
 
-  /* Hero section — clean dark */
+  /* Hero section — immersive dark arena */
   .hero-dark {
-    background: #0C0C0F;
+    background: linear-gradient(180deg, #08080c 0%, #0c0c14 50%, #0e0e18 100%);
   }
   .dark .hero-dark {
-    background: #060608;
+    background: linear-gradient(180deg, #040408 0%, #06060c 50%, #080810 100%);
   }
 
-  /* Grid pattern for hero */
+  /* Grid pattern for hero — refined lines */
   .hero-lines {
     background-image:
-      linear-gradient(rgba(255 255 255 / 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255 255 255 / 0.03) 1px, transparent 1px);
-    background-size: 64px 64px;
+      linear-gradient(rgba(255 255 255 / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255 255 255 / 0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
   }
 
-  /* Noise texture */
+  /* Noise texture overlay */
   .noise-overlay::before {
     content: '';
     position: absolute;
@@ -434,14 +477,14 @@
     z-index: 1;
   }
 
-  /* Accent line */
+  /* Accent line — gradient */
   .accent-line {
     height: 2px;
-    background: hsl(var(--primary));
+    background: linear-gradient(90deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
     border-radius: 1px;
   }
 
-  /* Card with top accent */
+  /* Card with top accent — gradient */
   .card-accent-top {
     @apply relative overflow-hidden;
   }
@@ -452,7 +495,7 @@
     left: 0;
     right: 0;
     height: 2px;
-    background: hsl(var(--primary));
+    background: linear-gradient(90deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
   }
 
   /* Tour highlight */
@@ -522,6 +565,78 @@
   /* Stat number — bold tabular */
   .stat-number {
     @apply text-3xl font-bold tracking-tight tabular-nums leading-none;
+  }
+
+  /* Glow button — premium CTA */
+  .glow-button {
+    position: relative;
+    overflow: hidden;
+  }
+  .glow-button::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    filter: blur(8px);
+  }
+  .glow-button:hover::before {
+    opacity: 0.6;
+  }
+
+  /* Ambient glow — for hero sections */
+  .ambient-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+
+  /* Diagonal slash accent — for headings */
+  .slash-accent::after {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 0.8em;
+    background: linear-gradient(180deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+    margin-left: 0.3em;
+    transform: skewX(-12deg);
+    border-radius: 1px;
+  }
+
+  /* Gradient text utility */
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Energy pulse — for live/active states */
+  .energy-pulse {
+    animation: energyPulse 2s ease-in-out infinite;
+  }
+  @keyframes energyPulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(var(--energy) / 0.3); }
+    50% { box-shadow: 0 0 0 8px hsl(var(--energy) / 0); }
+  }
+
+  /* Subtle scan line effect for arena feel */
+  .scan-lines::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.015) 2px,
+      rgba(0, 0, 0, 0.015) 4px
+    );
+    pointer-events: none;
   }
 }
 

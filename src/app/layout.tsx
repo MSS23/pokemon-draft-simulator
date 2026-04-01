@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit, JetBrains_Mono } from "next/font/google";
+import { Sora, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import QueryProvider from "@/components/providers/QueryProvider";
@@ -21,8 +21,8 @@ import { validateEnv } from "@/lib/env";
 // Validate environment variables at startup
 validateEnv();
 
-const outfit = Outfit({
-  variable: "--font-outfit",
+const sora = Sora({
+  variable: "--font-sora",
   subsets: ["latin"],
   display: "swap",
 });
@@ -82,8 +82,8 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased`}
-        style={{ fontFamily: 'var(--font-outfit), system-ui, sans-serif' }}
+        className={`${sora.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        style={{ fontFamily: 'var(--font-sora), system-ui, sans-serif' }}
         suppressHydrationWarning
       >
         <HydrationErrorFilter />
@@ -102,12 +102,12 @@ export default function RootLayout({
                       <Header />
                       <TourProvider />
                       <main className="min-h-[calc(100vh-3rem)]">{children}</main>
-                      <footer className="border-t py-4 text-center text-xs text-muted-foreground px-4">
-                        <div className="flex items-center justify-center gap-4 flex-wrap">
-                          <a href="/terms" className="hover:text-foreground transition-colors">Terms</a>
-                          <a href="/privacy" className="hover:text-foreground transition-colors">Privacy</a>
-                          <span className="text-muted-foreground/40">v0.1.1</span>
-                          <span className="text-muted-foreground/40">&copy; {new Date().getFullYear()} Poké Draft League</span>
+                      <footer className="border-t border-border/50 py-5 text-center text-xs text-muted-foreground/60 px-4">
+                        <div className="flex items-center justify-center gap-5 flex-wrap">
+                          <a href="/terms" className="hover:text-foreground transition-colors duration-150">Terms</a>
+                          <a href="/privacy" className="hover:text-foreground transition-colors duration-150">Privacy</a>
+                          <span className="text-muted-foreground/30">v0.1.1</span>
+                          <span className="text-muted-foreground/30">&copy; {new Date().getFullYear()} Poke Draft League</span>
                         </div>
                       </footer>
                     </QueryProvider>

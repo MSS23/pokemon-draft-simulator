@@ -34,16 +34,24 @@ export function SidebarLink({ href, icon: Icon, label, badge, onClick, isProtect
       onClick={handleClick}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors',
+        'flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all duration-150 group',
         isActive
-          ? 'bg-muted text-foreground font-medium'
+          ? 'bg-primary/10 text-primary font-semibold shadow-sm'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      <Icon className={cn(
+        "h-4 w-4 shrink-0 transition-colors",
+        isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+      )} />
       <span className="flex-1 truncate">{label}</span>
       {badge && (
-        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium tabular-nums">
+        <span className={cn(
+          "ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold tabular-nums",
+          isActive
+            ? "bg-primary/20 text-primary"
+            : "bg-muted text-muted-foreground"
+        )}>
           {badge}
         </span>
       )}
