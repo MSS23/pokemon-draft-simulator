@@ -89,6 +89,8 @@ export default function RootLayout({
       >
         <HydrationErrorFilter />
         <ClerkProvider
+          signInFallbackRedirectUrl="/dashboard"
+          signUpFallbackRedirectUrl="/dashboard"
           appearance={{
             variables: {
               colorPrimary: '#dc2855',

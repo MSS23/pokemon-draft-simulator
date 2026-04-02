@@ -93,6 +93,8 @@ const isProtectedRoute = createRouteMatcher([
 // Spectator pages, landing page, draft pages, join pages, leagues, matches, etc.
 const isPublicRoute = createRouteMatcher([
   '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
   '/spectate(.*)',
   '/watch-drafts(.*)',
   '/draft/(.*)',
