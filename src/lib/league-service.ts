@@ -679,7 +679,7 @@ export class LeagueService {
     // Fetch current match
     const { data: match } = await supabase
       .from('matches')
-      .select('*')
+      .select('id, league_id, week_number, match_number, home_team_id, away_team_id, scheduled_date, status, home_score, away_score, winner_team_id, battle_format, youtube_url, notes, created_at, updated_at, completed_at')
       .eq('id', matchId)
       .single()
 
@@ -1124,7 +1124,7 @@ export class LeagueService {
     for (const team of league.teams) {
       const { data: picks } = await supabase
         .from('picks')
-        .select('*')
+        .select('id, draft_id, team_id, pokemon_id, pokemon_name, cost, pick_order, round, created_at')
         .eq('team_id', team.id)
 
       if (picks && picks.length > 0) {
@@ -1207,7 +1207,7 @@ export class LeagueService {
 
     const { data: league } = await supabase
       .from('leagues')
-      .select('*')
+      .select('id, draft_id, name, league_type, battle_type, season_number, status, start_date, end_date, current_week, total_weeks, settings, created_at, updated_at')
       .eq('draft_id', draftId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -1455,7 +1455,7 @@ export class LeagueService {
     // Get all completed matches
     const { data: matches } = await supabase
       .from('matches')
-      .select('*')
+      .select('id, home_team_id, away_team_id, status, home_score, away_score, winner_team_id, completed_at')
       .eq('league_id', leagueId)
       .eq('status', 'completed')
       .order('completed_at', { ascending: true })

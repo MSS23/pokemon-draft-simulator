@@ -145,7 +145,7 @@ export class WaiverService {
     // Get claim details
     const { data: rawClaim } = await supabase
       .from('waiver_claims')
-      .select('*')
+      .select('id, league_id, team_id, claimed_pokemon_id, claimed_pokemon_name, dropped_pick_id, status, waiver_priority, claimed_at, processed_at, notes, created_at')
       .eq('id', claimId)
       .single()
 
@@ -235,7 +235,7 @@ export class WaiverService {
 
     const { data, error } = await supabase
       .from('waiver_claims')
-      .select('*')
+      .select('id, league_id, team_id, claimed_pokemon_id, claimed_pokemon_name, dropped_pick_id, status, waiver_priority, claimed_at, processed_at, notes, created_at')
       .eq('league_id', leagueId)
       .order('created_at', { ascending: false })
 
@@ -270,7 +270,7 @@ export class WaiverService {
 
     const { data, error } = await supabase
       .from('picks')
-      .select('*')
+      .select('id, draft_id, team_id, pokemon_id, pokemon_name, cost, pick_order, round, created_at')
       .eq('team_id', teamId)
       .order('pick_order', { ascending: true })
 

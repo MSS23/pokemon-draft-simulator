@@ -208,7 +208,7 @@ export class WishlistService {
 
       const { data, error } = await supabase
         .from('wishlist_items')
-        .select('*')
+        .select('id, draft_id, participant_id, pokemon_id, pokemon_name, priority, is_available, cost, created_at, updated_at')
         .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .order('priority', { ascending: true })
@@ -293,7 +293,7 @@ export class WishlistService {
 
       const { data, error } = await supabase
         .from('wishlist_items')
-        .select('*')
+        .select('id, draft_id, participant_id, pokemon_id, pokemon_name, priority, is_available, cost, created_at, updated_at')
         .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .eq('is_available', true)
@@ -370,7 +370,7 @@ export class WishlistService {
 
       const { data, error } = await supabase
         .from('wishlist_items')
-        .select('*')
+        .select('id, draft_id, participant_id, pokemon_id, pokemon_name, priority, is_available, cost, created_at, updated_at')
         .eq('draft_id', actualDraftId)
         .order('priority', { ascending: true })
 
@@ -412,7 +412,7 @@ export class WishlistService {
 
       const { data, error } = await supabase
         .from('wishlist_items')
-        .select('*')
+        .select('id, draft_id, participant_id, pokemon_id, pokemon_name, priority, is_available, cost, created_at, updated_at')
         .eq('draft_id', actualDraftId)
         .eq('participant_id', participantId)
         .order('priority', { ascending: true })

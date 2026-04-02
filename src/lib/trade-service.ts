@@ -53,7 +53,7 @@ export class TradeService {
 
     const { data, error } = await (supabase as SupabaseAny)
       .from('trades')
-      .select('*')
+      .select('id, league_id, week_number, team_a_id, team_b_id, team_a_gives, team_b_gives, status, proposed_by, proposed_at, responded_at, completed_at, notes, commissioner_approved, commissioner_id, commissioner_notes, counter_to_id')
       .eq('league_id', leagueId)
       .order('proposed_at', { ascending: false })
 
@@ -211,7 +211,7 @@ export class TradeService {
 
     const { data: trade, error } = await (supabase as SupabaseAny)
       .from('trades')
-      .select('*')
+      .select('id, league_id, team_a_id, team_b_id, team_a_gives, team_b_gives, status')
       .eq('id', tradeId)
       .single()
 
@@ -297,7 +297,7 @@ export class TradeService {
 
     const { data, error } = await (supabase as SupabaseAny)
       .from('trades')
-      .select('*')
+      .select('id, league_id, week_number, team_a_id, team_b_id, team_a_gives, team_b_gives, status, proposed_by, proposed_at, responded_at, completed_at, notes, commissioner_approved, commissioner_id, commissioner_notes, counter_to_id')
       .eq('league_id', leagueId)
       .eq('status', 'accepted')
       .is('commissioner_approved', null)
@@ -506,7 +506,7 @@ export class TradeService {
     // Get all trades
     const { data: trades } = await (supabase as SupabaseAny)
       .from('trades')
-      .select('*')
+      .select('id, team_a_id, team_b_id, status, proposed_at, responded_at, completed_at, notes, counter_to_id')
       .eq('league_id', leagueId)
       .order('proposed_at', { ascending: false })
       .limit(50)
@@ -523,7 +523,7 @@ export class TradeService {
     // Get waiver claims
     const { data: claims } = await supabase
       .from('waiver_claims')
-      .select('*')
+      .select('id, team_id, status, claimed_pokemon_name, dropped_pick_id, claimed_at, created_at')
       .eq('league_id', leagueId)
       .order('created_at', { ascending: false })
       .limit(50)

@@ -200,13 +200,9 @@ export function analyzeTeamTypeCoverage(
   teamPokemon: Array<{ types: Array<{ name: string }> }>
 ): TypeCoverage[] {
   const allTypes = Object.keys(TYPE_CHART) as PokemonTypeName[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const coverage: Record<PokemonTypeName, number> = {} as any
-
-  // Initialize
-  allTypes.forEach(type => {
-    coverage[type] = 0
-  })
+  const coverage = Object.fromEntries(
+    allTypes.map(type => [type, 0])
+  ) as Record<PokemonTypeName, number>
 
   // Count how many Pokemon on team can hit each type effectively
   teamPokemon.forEach(pokemon => {

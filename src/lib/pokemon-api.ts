@@ -713,9 +713,8 @@ export const fetchPokemonForCustomFormat = async (customFormatId: string): Promi
 
   try {
     // Fetch the custom format from database
-    const { data: customFormat, error } = await (supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .from('custom_formats' as any))
+    const { data: customFormat, error } = await supabase
+      .from('custom_formats')
       .select('pokemon_pricing')
       .eq('id', customFormatId)
       .single()
@@ -725,8 +724,7 @@ export const fetchPokemonForCustomFormat = async (customFormatId: string): Promi
       throw new Error('Custom format not found')
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pokemonPricing: Record<string, number> = (customFormat as any).pokemon_pricing || {}
+    const pokemonPricing: Record<string, number> = customFormat.pokemon_pricing || {}
     const pokemonList: Pokemon[] = []
 
     // Helper to normalize Pokemon names for matching

@@ -36,8 +36,8 @@ export class SoundService {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      this.audioContext = new AudioContextClass()
       this.loadSettings()
     }
   }

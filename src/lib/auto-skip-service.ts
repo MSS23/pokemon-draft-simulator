@@ -129,7 +129,7 @@ export class AutoSkipService {
 
     const { data: wishlistItems, error: wishlistError } = await supabase
       .from('wishlist_items')
-      .select('*')
+      .select('id, draft_id, participant_id, pokemon_id, pokemon_name, priority, is_available, cost, created_at, updated_at')
       .eq('draft_id', draftId)
       .eq('participant_id', participant.id)
       .eq('is_available', true)
@@ -313,7 +313,7 @@ export class AutoSkipService {
 
     const { data: wishlistItems } = await supabase
       .from('wishlist_items')
-      .select('*')
+      .select('id, draft_id, participant_id, pokemon_id, pokemon_name, priority, is_available, cost, created_at, updated_at')
       .eq('draft_id', draftId)
       .eq('participant_id', participantId)
       .order('priority', { ascending: true })

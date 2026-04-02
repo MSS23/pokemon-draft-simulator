@@ -177,7 +177,7 @@ describe('AdminService', () => {
       expect(result.host).toEqual(hostParticipant)
       expect(result.admins).toEqual([adminParticipant])
       expect(mockSupabase.from).toHaveBeenCalledWith('participants')
-      expect(mockSelect).toHaveBeenCalledWith('*')
+      expect(mockSelect).toHaveBeenCalledWith('id, draft_id, user_id, display_name, team_id, is_host, is_admin, last_seen')
       expect(mockEq).toHaveBeenCalledWith('draft_id', 'draft-1')
       expect(mockOr).toHaveBeenCalledWith('is_host.eq.true,is_admin.eq.true')
     })

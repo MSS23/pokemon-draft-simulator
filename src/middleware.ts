@@ -37,6 +37,10 @@ const inMemoryLimiter = new InMemoryRateLimiter()
 // Upstash Redis rate limiters (per route pattern)
 const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
 
+if (!hasRedis) {
+  console.warn('[RateLimit] Upstash Redis not configured — rate limiting is degraded. Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for production.')
+}
+
 const redis = hasRedis
   ? new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -105,10 +109,12 @@ export async function middleware(request: NextRequest) {
         isAllowed = result.success
       } catch {
         // Redis unavailable — fall back to in-memory
-        isAllowed = inMemoryLimiter.isAllowed(clientId, limit, windowMs)
+        // Use 3x the limit since in-memory state resets between serverless invocations
+        isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
       }
     } else {
-      isAllowed = inMemoryLimiter.isAllowed(clientId, limit, windowMs)
+      // Use 3x the limit since in-memory state resets between serverless invocations
+      isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
     }
 
     if (!isAllowed) {

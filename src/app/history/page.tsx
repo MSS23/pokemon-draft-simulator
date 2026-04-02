@@ -189,6 +189,7 @@ export default function HistoryPage() {
       .eq('draft.status', 'completed')
       .is('draft.deleted_at', null)
       .order('draft(updated_at)', { ascending: false })
+      .limit(50)
 
     if (error) {
       log.error('Error loading completed drafts:', error)
@@ -251,7 +252,8 @@ export default function HistoryPage() {
       .order('end_date', {
         ascending: false,
         nullsFirst: false,
-      })) as unknown as {
+      })
+      .limit(50)) as unknown as {
       data: LeagueHistory[] | null
       error: { message: string } | null
     }

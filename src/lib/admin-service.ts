@@ -84,10 +84,13 @@ export class AdminService {
   }
 
   /**
-   * Checks if a user has admin privileges in a draft
+   * Checks if a user has admin privileges in a draft.
+   * Returns false on any error (safe default — denies access).
+   * All error paths are logged via log.error().
    */
   static async isAdmin(draftId: string, userId: string): Promise<boolean> {
     if (!supabase) {
+      log.error('isAdmin: Supabase not available')
       return false
     }
 
@@ -99,7 +102,13 @@ export class AdminService {
         .eq('user_id', userId)
         .single()
 
-      if (error || !data) {
+      if (error) {
+        log.error('Error checking admin status:', error)
+        return false
+      }
+
+      if (!data) {
+        log.error(`No participant found for user ${userId} in draft ${draftId}`)
         return false
       }
 
@@ -111,17 +120,20 @@ export class AdminService {
   }
 
   /**
-   * Gets all admins and the host for a draft
+   * Gets all admins and the host for a draft.
+   * Returns { host: null, admins: [] } on any error (safe default).
+   * All error paths are logged via log.error().
    */
   static async getDraftAdmins(draftId: string) {
     if (!supabase) {
+      log.error('getDraftAdmins: Supabase not available')
       return { host: null, admins: [] }
     }
 
     try {
       const { data, error } = await supabase
         .from('participants')
-        .select('*')
+        .select('id, draft_id, user_id, display_name, team_id, is_host, is_admin, last_seen')
         .eq('draft_id', draftId)
         .or('is_host.eq.true,is_admin.eq.true')
 

@@ -198,8 +198,8 @@ class NotificationService {
 
     try {
       // Create audio context for notification sounds
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      const audioContext = new AudioContextClass()
 
       if (urgent) {
         // Urgent sound (higher pitch, multiple beeps)

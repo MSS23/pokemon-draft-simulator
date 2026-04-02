@@ -206,7 +206,7 @@ class AuctionService {
     try {
       const { data, error } = await supabase
         .from('bid_history')
-        .select('*')
+        .select('id, auction_id, draft_id, team_id, team_name, bid_amount, created_at')
         .eq('auction_id', auctionId)
         .order('created_at', { ascending: true })
 

@@ -174,7 +174,7 @@ export class KnockoutService {
     // Find the league
     const { data: leagueRow, error: leagueErr } = await supabase
       .from('leagues')
-      .select('*')
+      .select('id, draft_id, name, league_type, battle_type, season_number, status, start_date, end_date, current_week, total_weeks, settings, created_at, updated_at')
       .eq('draft_id', draftRow.id)
       .single()
 
@@ -230,7 +230,7 @@ export class KnockoutService {
     // Fetch league
     const { data: leagueRow } = await supabase
       .from('leagues')
-      .select('*')
+      .select('id, draft_id, name, league_type, battle_type, season_number, status, start_date, end_date, current_week, total_weeks, settings, created_at, updated_at')
       .eq('id', leagueId)
       .single()
 
@@ -243,7 +243,7 @@ export class KnockoutService {
     // Get teams
     const { data: teamRows } = await supabase
       .from('teams')
-      .select('*')
+      .select('id, draft_id, name, owner_id, budget_remaining, draft_order, undos_remaining, created_at')
       .eq('draft_id', leagueRow.draft_id)
       .order('draft_order')
 
@@ -328,7 +328,7 @@ export class KnockoutService {
 
     const { data: leagueRow } = await supabase
       .from('leagues')
-      .select('*')
+      .select('id, draft_id, name, league_type, battle_type, season_number, status, start_date, end_date, current_week, total_weeks, settings, created_at, updated_at')
       .eq('draft_id', draftRow.id)
       .single()
 
@@ -541,7 +541,7 @@ export class KnockoutService {
     // Get matches
     const { data: rawMatchRows } = await supabase
       .from('matches')
-      .select('*')
+      .select('id, league_id, week_number, match_number, home_team_id, away_team_id, scheduled_date, status, home_score, away_score, winner_team_id, battle_format, youtube_url, notes, created_at, updated_at, completed_at')
       .eq('league_id', leagueId)
       .order('week_number')
       .order('match_number')
@@ -578,7 +578,7 @@ export class KnockoutService {
     // Find the tournament match that corresponds to this DB match
     const { data: dbMatch } = await supabase
       .from('matches')
-      .select('*')
+      .select('id, league_id, week_number, match_number, home_team_id, away_team_id, scheduled_date, status, home_score, away_score, winner_team_id, battle_format, youtube_url, notes, created_at, updated_at, completed_at')
       .eq('id', matchId)
       .single()
 
@@ -765,7 +765,7 @@ export class KnockoutService {
 
     const { data } = await supabase
       .from('picks')
-      .select('*')
+      .select('id, draft_id, team_id, pokemon_id, pokemon_name, cost, pick_order, round, created_at')
       .in('team_id', teamIds)
       .order('pick_order')
 

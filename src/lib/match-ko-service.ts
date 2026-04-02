@@ -156,7 +156,7 @@ export class MatchKOService {
 
     const { data, error } = await supabase
       .from('team_pokemon_status')
-      .select('*')
+      .select('id, pick_id, pokemon_id, pokemon_name, team_id, league_id, status, total_kos, matches_played, matches_won, death_match_id, death_date, death_details, notes, created_at, updated_at')
       .eq('pick_id', pickId)
       .eq('league_id', leagueId)
       .single()
@@ -184,7 +184,7 @@ export class MatchKOService {
 
     const { data, error } = await supabase
       .from('match_pokemon_kos')
-      .select('*')
+      .select('id, match_id, game_number, pokemon_id, pick_id, ko_count, is_death, ko_details, created_at, updated_at')
       .eq('match_id', matchId)
       .order('game_number', { ascending: true })
       .order('created_at', { ascending: true })
@@ -263,7 +263,7 @@ export class MatchKOService {
 
     const { data, error } = await supabase
       .from('team_pokemon_status')
-      .select('*')
+      .select('id, pick_id, pokemon_id, pokemon_name, team_id, league_id, status, total_kos, matches_played, matches_won, death_match_id, death_date, death_details, notes, created_at, updated_at')
       .eq('team_id', teamId)
       .eq('league_id', leagueId)
       .order('created_at', { ascending: true })
@@ -498,7 +498,7 @@ export class MatchKOService {
 
     const { data, error } = await supabase
       .from('team_pokemon_status')
-      .select('*')
+      .select('id, pick_id, pokemon_id, pokemon_name, team_id, league_id, status, total_kos, matches_played, matches_won, death_match_id, death_date, death_details, notes, created_at, updated_at')
       .eq('league_id', leagueId)
       .eq('status', 'dead')
       .order('death_date', { ascending: false })

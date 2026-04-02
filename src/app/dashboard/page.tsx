@@ -212,6 +212,7 @@ export default function DashboardPage() {
           `)
           .eq('owner_id', user.id)
           .is('drafts.deleted_at', null)
+          .limit(50)
 
         if (teamsError) {
           setFetchError(`Failed to load your drafts: ${teamsError.message}`)

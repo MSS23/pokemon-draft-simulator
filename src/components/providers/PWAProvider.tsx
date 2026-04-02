@@ -147,8 +147,7 @@ export function useIsPWA() {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches
 
       // Check iOS standalone
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const isIOSStandalone = (window.navigator as any).standalone === true
+      const isIOSStandalone = 'standalone' in window.navigator && (window.navigator as Navigator & { standalone?: boolean }).standalone === true
 
       // Check if launched from home screen (Android)
       const isInStandaloneMode = isStandalone || isIOSStandalone
