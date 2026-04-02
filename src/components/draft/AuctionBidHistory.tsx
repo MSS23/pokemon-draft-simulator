@@ -78,7 +78,7 @@ export default function AuctionBidHistory({
   if (bidHistory.length === 0) {
     return (
       <div className={cn('text-center py-4', className)}>
-        <p className="text-xs text-gray-500">No bids yet - be the first!</p>
+        <p className="text-xs text-muted-foreground">No bids yet - be the first!</p>
       </div>
     )
   }
@@ -95,12 +95,12 @@ export default function AuctionBidHistory({
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Bid History
         </h4>
         <Badge
           variant="outline"
-          className="text-xs border-gray-700 text-gray-400"
+          className="text-xs border-border text-muted-foreground"
         >
           {bidHistory.length} bids
         </Badge>
@@ -126,7 +126,7 @@ export default function AuctionBidHistory({
                     'flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-sm',
                     isWinning
                       ? 'bg-amber-900/20 border border-amber-800/50'
-                      : 'bg-gray-900/50'
+                      : 'bg-muted/50'
                   )}
                 >
                   {/* Winning crown */}
@@ -143,7 +143,7 @@ export default function AuctionBidHistory({
                   >
                     {bid.teamName}
                     {isUserBid && (
-                      <span className="text-gray-500 ml-1">(you)</span>
+                      <span className="text-muted-foreground ml-1">(you)</span>
                     )}
                   </span>
 
@@ -162,14 +162,14 @@ export default function AuctionBidHistory({
                         ? 'text-amber-400'
                         : isUserBid
                         ? 'text-blue-400'
-                        : 'text-gray-300'
+                        : 'text-muted-foreground'
                     )}
                   >
                     ${bid.bidAmount}
                   </span>
 
                   {/* Timestamp */}
-                  <span className="text-xs text-gray-600 flex-shrink-0 flex items-center gap-0.5">
+                  <span className="text-xs text-muted-foreground/70 flex-shrink-0 flex items-center gap-0.5">
                     <Clock className="h-2.5 w-2.5" />
                     {formatTime(bid.timestamp)}
                   </span>

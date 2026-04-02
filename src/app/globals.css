@@ -451,9 +451,9 @@
       radial-gradient(at 40% 80%, hsl(var(--chart-5) / 0.04) 0px, transparent 50%);
   }
 
-  /* Hero section — immersive dark arena */
+  /* Hero section — adapts to light/dark mode */
   .hero-dark {
-    background: linear-gradient(180deg, #08080c 0%, #0c0c14 50%, #0e0e18 100%);
+    background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--secondary)) 50%, hsl(var(--background)) 100%);
   }
   .dark .hero-dark {
     background: linear-gradient(180deg, #040408 0%, #06060c 50%, #080810 100%);

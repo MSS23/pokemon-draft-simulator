@@ -26,22 +26,21 @@ export const ShareableRecapCard = memo<ShareableRecapCardProps>(({
 }) => {
   return (
     <div
-      className="w-full max-w-lg mx-auto rounded-2xl overflow-hidden shadow-2xl"
-      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)' }}
+      className="w-full max-w-lg mx-auto rounded-2xl overflow-hidden shadow-2xl bg-gradient-to-br from-background to-card"
     >
       {/* Header */}
       <div className="px-6 pt-6 pb-3">
         <div className="flex items-center gap-2 mb-1">
           <div className="h-6 w-6 rounded-full overflow-hidden relative flex-shrink-0">
             <div className="absolute inset-0 top-0 h-1/2 bg-red-500" />
-            <div className="absolute inset-0 top-1/2 h-1/2 bg-white" />
-            <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-gray-800 -translate-y-1/2" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-2 w-2 rounded-full border border-gray-800 bg-white" />
+            <div className="absolute inset-0 top-1/2 h-1/2 bg-background" />
+            <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-border -translate-y-1/2" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-2 w-2 rounded-full border border-border bg-background" />
           </div>
           <span className="text-red-400 text-xs font-bold uppercase tracking-wider">Poke Draft</span>
         </div>
-        <h2 className="text-white text-xl font-bold">{teamName}</h2>
-        <p className="text-slate-400 text-sm">{userName} &middot; {draftName}</p>
+        <h2 className="text-foreground text-xl font-bold">{teamName}</h2>
+        <p className="text-muted-foreground text-sm">{userName} &middot; {draftName}</p>
       </div>
 
       {/* Pokemon Grid */}
@@ -50,7 +49,7 @@ export const ShareableRecapCard = memo<ShareableRecapCardProps>(({
           {pokemon.map((mon) => (
             <div
               key={mon.id}
-              className="flex flex-col items-center gap-1 p-3 rounded-xl bg-white/5 border border-white/10"
+              className="flex flex-col items-center gap-1 p-3 rounded-xl bg-foreground/5 border border-foreground/10"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -66,10 +65,10 @@ export const ShareableRecapCard = memo<ShareableRecapCardProps>(({
                   }
                 }}
               />
-              <span className="text-white text-[11px] font-semibold text-center truncate w-full">
+              <span className="text-foreground text-[11px] font-semibold text-center truncate w-full">
                 {formatPokemonName(mon.name)}
               </span>
-              <span className="text-slate-400 text-[10px]">{mon.cost} pts</span>
+              <span className="text-muted-foreground text-[10px]">{mon.cost} pts</span>
             </div>
           ))}
         </div>
@@ -79,21 +78,21 @@ export const ShareableRecapCard = memo<ShareableRecapCardProps>(({
       <div className="px-6 pb-5 flex items-center justify-between">
         <div className="flex gap-4">
           <div>
-            <div className="text-white text-sm font-bold">{totalCost}</div>
-            <div className="text-slate-500 text-[10px]">Points Spent</div>
+            <div className="text-foreground text-sm font-bold">{totalCost}</div>
+            <div className="text-muted-foreground text-[10px]">Points Spent</div>
           </div>
           {budgetRemaining !== undefined && (
             <div>
-              <div className="text-white text-sm font-bold">{budgetRemaining}</div>
-              <div className="text-slate-500 text-[10px]">Remaining</div>
+              <div className="text-foreground text-sm font-bold">{budgetRemaining}</div>
+              <div className="text-muted-foreground text-[10px]">Remaining</div>
             </div>
           )}
           <div>
-            <div className="text-white text-sm font-bold">{pokemon.length}</div>
-            <div className="text-slate-500 text-[10px]">Pokemon</div>
+            <div className="text-foreground text-sm font-bold">{pokemon.length}</div>
+            <div className="text-muted-foreground text-[10px]">Pokemon</div>
           </div>
         </div>
-        <div className="text-slate-600 text-[10px]">pokemondraftleague.com</div>
+        <div className="text-muted-foreground/60 text-[10px]">pokemondraftleague.com</div>
       </div>
     </div>
   )

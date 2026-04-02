@@ -94,7 +94,7 @@ export default function AuctionTimer({
 
   if (!isActive) {
     return (
-      <div className={cn('flex items-center justify-center py-3 text-gray-500', className)}>
+      <div className={cn('flex items-center justify-center py-3 text-muted-foreground', className)}>
         <Clock className="h-4 w-4 mr-2" />
         <span className="text-sm">No active auction</span>
       </div>
@@ -116,7 +116,7 @@ export default function AuctionTimer({
               fill="none"
               stroke="currentColor"
               strokeWidth="6"
-              className="text-gray-800"
+              className="text-muted"
             />
             {/* Progress ring */}
             <motion.circle
@@ -152,7 +152,7 @@ export default function AuctionTimer({
               {formatTime(timeRemaining)}
             </motion.span>
             {!hasExpired && (
-              <span className="text-xs text-gray-500 mt-0.5">remaining</span>
+              <span className="text-xs text-muted-foreground mt-0.5">remaining</span>
             )}
           </div>
         </div>
@@ -194,14 +194,14 @@ export default function AuctionTimer({
         {/* Host controls */}
         {isHost && onExtendTime && !hasExpired && (
           <div className="flex gap-1.5 pt-2">
-            <span className="text-xs text-gray-500 self-center mr-1">Host:</span>
+            <span className="text-xs text-muted-foreground self-center mr-1">Host:</span>
             {[15, 30, 60].map((sec) => (
               <Button
                 key={sec}
                 variant="outline"
                 size="sm"
                 onClick={() => onExtendTime(sec)}
-                className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-400 hover:text-white"
+                className="text-xs h-7 border-border bg-muted text-muted-foreground hover:text-foreground"
               >
                 +{sec}s
               </Button>

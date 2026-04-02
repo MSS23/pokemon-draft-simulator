@@ -79,12 +79,12 @@ export default function AdminManagement({
   const regularParticipants = participants.filter(p => !p.isHost && !p.isAdmin)
 
   return (
-    <Card className="p-4 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+    <Card className="p-4 bg-card border-border">
       <div className="space-y-4">
         {/* Header */}
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center gap-2 pb-3 border-b border-border">
           <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-          <h3 className="font-semibold text-slate-800 dark:text-slate-100">
+          <h3 className="font-semibold text-foreground">
             Admin Management
           </h3>
         </div>
@@ -92,7 +92,7 @@ export default function AdminManagement({
         {/* Host */}
         {host && (
           <div className="space-y-2">
-            <div className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1">
+            <div className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <Crown className="h-4 w-4 text-yellow-600" />
               Host
             </div>
@@ -100,10 +100,10 @@ export default function AdminManagement({
               <div className="flex items-center gap-2">
                 <PokeballIcon size="md" color="#ca8a04" />
                 <div>
-                  <div className="font-medium text-slate-800 dark:text-slate-100">
+                  <div className="font-medium text-foreground">
                     {host.displayName}
                     {host.userId === currentUserId && (
-                      <span className="text-xs text-slate-600 dark:text-slate-400 ml-2">(You)</span>
+                      <span className="text-xs text-muted-foreground ml-2">(You)</span>
                     )}
                   </div>
                   <Badge variant="outline" className="text-xs bg-yellow-100 dark:bg-yellow-900 border-yellow-300 dark:border-yellow-700">
@@ -119,7 +119,7 @@ export default function AdminManagement({
         {/* Admins */}
         {admins.length > 0 && (
           <div className="space-y-2">
-            <div className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1">
+            <div className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <ShieldCheck className="h-4 w-4 text-purple-600" />
               Admins ({admins.length})
             </div>
@@ -132,10 +132,10 @@ export default function AdminManagement({
                   <div className="flex items-center gap-2">
                     <PokeballIcon size="md" color="#9333ea" />
                     <div>
-                      <div className="font-medium text-slate-800 dark:text-slate-100">
+                      <div className="font-medium text-foreground">
                         {admin.displayName}
                         {admin.userId === currentUserId && (
-                          <span className="text-xs text-slate-600 dark:text-slate-400 ml-2">(You)</span>
+                          <span className="text-xs text-muted-foreground ml-2">(You)</span>
                         )}
                       </div>
                       <Badge variant="outline" className="text-xs bg-purple-100 dark:bg-purple-900 border-purple-300 dark:border-purple-700">
@@ -165,7 +165,7 @@ export default function AdminManagement({
         {/* Regular Participants */}
         {regularParticipants.length > 0 && (
           <div className="space-y-2">
-            <div className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-1">
+            <div className="text-sm font-medium text-muted-foreground flex items-center gap-1">
               <Users className="h-4 w-4" />
               Participants ({regularParticipants.length})
             </div>
@@ -173,14 +173,14 @@ export default function AdminManagement({
               {regularParticipants.map((participant) => (
                 <div
                   key={participant.id}
-                  className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600"
+                  className="flex items-center justify-between p-2 bg-muted/50 rounded-lg border border-border"
                 >
                   <div className="flex items-center gap-2">
                     <PokeballIcon size="md" color="#94a3b8" />
-                    <div className="font-medium text-slate-800 dark:text-slate-100">
+                    <div className="font-medium text-foreground">
                       {participant.displayName}
                       {participant.userId === currentUserId && (
-                        <span className="text-xs text-slate-600 dark:text-slate-400 ml-2">(You)</span>
+                        <span className="text-xs text-muted-foreground ml-2">(You)</span>
                       )}
                     </div>
                   </div>
@@ -203,7 +203,7 @@ export default function AdminManagement({
         )}
 
         {/* Info */}
-        <div className="text-xs text-slate-600 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <div className="text-xs text-muted-foreground pt-2 border-t border-border">
           <p>💡 Admins can manage draft settings and control the draft flow</p>
         </div>
       </div>

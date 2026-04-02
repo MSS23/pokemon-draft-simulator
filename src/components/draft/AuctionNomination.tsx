@@ -113,13 +113,13 @@ export default function AuctionNomination({
   }
 
   return (
-    <Card className={cn('w-full bg-gray-950 border-gray-800', className)}>
+    <Card className={cn('w-full bg-card border-border', className)}>
       <CardContent className="p-4 md:p-6 space-y-4">
         {/* Header with status */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Gavel className="h-5 w-5 text-amber-500" />
-            <h3 className="text-lg font-bold text-white">Nominate</h3>
+            <h3 className="text-lg font-bold text-foreground">Nominate</h3>
           </div>
           {canNominate ? (
             <Badge className="bg-emerald-600 text-white border-0">
@@ -128,7 +128,7 @@ export default function AuctionNomination({
           ) : currentNominatingTeam ? (
             <Badge
               variant="outline"
-              className="border-gray-700 text-gray-400"
+              className="border-border text-muted-foreground"
             >
               <Clock className="h-3 w-3 mr-1" />
               {currentNominatingTeam.name}&apos;s Turn
@@ -136,7 +136,7 @@ export default function AuctionNomination({
           ) : (
             <Badge
               variant="outline"
-              className="border-gray-700 text-gray-400"
+              className="border-border text-muted-foreground"
             >
               Waiting
             </Badge>
@@ -169,7 +169,7 @@ export default function AuctionNomination({
         {/* Waiting for other team */}
         {!canNominate && currentNominatingTeam && (
           <div className="text-center py-4">
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-muted-foreground">
               Waiting for{' '}
               <span className="font-semibold text-amber-400">
                 {currentNominatingTeam.name}
@@ -193,8 +193,8 @@ export default function AuctionNomination({
               className="space-y-4"
             >
               {/* Pokemon preview */}
-              <div className="flex items-center gap-4 bg-gray-900 rounded-xl p-3">
-                <div className="w-20 h-20 rounded-xl bg-gray-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+              <div className="flex items-center gap-4 bg-muted rounded-xl p-3">
+                <div className="w-20 h-20 rounded-xl bg-muted/80 flex items-center justify-center overflow-hidden flex-shrink-0">
                   <img
                     src={getBestPokemonImageUrl(
                       selectedPokemon.id,
@@ -206,7 +206,7 @@ export default function AuctionNomination({
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-lg font-bold text-white capitalize truncate">
+                  <h4 className="text-lg font-bold text-foreground capitalize truncate">
                     {selectedPokemon.name}
                   </h4>
                   <div className="flex flex-wrap gap-1 mt-1">
@@ -220,7 +220,7 @@ export default function AuctionNomination({
                       </Badge>
                     ))}
                   </div>
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
                     <span>Cost: ${selectedPokemon.cost}</span>
                     <span>BST: {selectedPokemon.stats.total}</span>
                   </div>
@@ -230,11 +230,11 @@ export default function AuctionNomination({
               {/* Auction settings */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-gray-400">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Starting Bid
                   </label>
                   <div className="relative">
-                    <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                    <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="number"
                       value={startingBid}
@@ -242,24 +242,24 @@ export default function AuctionNomination({
                       placeholder={getMinimumBid().toString()}
                       min={getMinimumBid()}
                       max={userTeam?.budgetRemaining || 100}
-                      className="pl-8 h-10 bg-gray-900 border-gray-700 text-white"
+                      className="pl-8 h-10 bg-background border-border text-foreground"
                     />
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     Min: ${getMinimumBid()} | Budget: $
                     {userTeam?.budgetRemaining || 0}
                   </p>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-gray-400">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Duration
                   </label>
                   <Select
                     value={auctionDuration}
                     onValueChange={setAuctionDuration}
                   >
-                    <SelectTrigger className="h-10 bg-gray-900 border-gray-700 text-white">
+                    <SelectTrigger className="h-10 bg-background border-border text-foreground">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -270,7 +270,7 @@ export default function AuctionNomination({
                       <SelectItem value="120">2 min</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Bidding time
                   </p>
@@ -285,7 +285,7 @@ export default function AuctionNomination({
                   onClick={() =>
                     setStartingBid(getMinimumBid().toString())
                   }
-                  className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                  className="text-xs h-7 border-border bg-muted text-muted-foreground"
                 >
                   Min (${getMinimumBid()})
                 </Button>
@@ -295,7 +295,7 @@ export default function AuctionNomination({
                   onClick={() =>
                     setStartingBid((getMinimumBid() + 2).toString())
                   }
-                  className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                  className="text-xs h-7 border-border bg-muted text-muted-foreground"
                 >
                   +$2
                 </Button>
@@ -305,7 +305,7 @@ export default function AuctionNomination({
                   onClick={() =>
                     setStartingBid((getMinimumBid() + 5).toString())
                   }
-                  className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                  className="text-xs h-7 border-border bg-muted text-muted-foreground"
                 >
                   +$5
                 </Button>
@@ -318,7 +318,7 @@ export default function AuctionNomination({
                         Math.ceil(selectedPokemon.cost * 1.5).toString()
                       )
                     }
-                    className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                    className="text-xs h-7 border-border bg-muted text-muted-foreground"
                   >
                     1.5x (${Math.ceil(selectedPokemon.cost * 1.5)})
                   </Button>
@@ -333,7 +333,7 @@ export default function AuctionNomination({
                   'w-full h-12 text-base font-bold',
                   canNominate && isValidBid()
                     ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                    : 'bg-gray-800 text-gray-500'
+                    : 'bg-muted text-muted-foreground'
                 )}
               >
                 {isNominating ? (
@@ -365,18 +365,18 @@ export default function AuctionNomination({
 
         {/* No Pokemon selected + can nominate */}
         {!selectedPokemon && canNominate && (
-          <div className="text-center py-2 text-gray-500 text-sm">
+          <div className="text-center py-2 text-muted-foreground text-sm">
             Pick a Pokemon from the grid below
           </div>
         )}
 
         {/* User budget */}
         {userTeam && (
-          <div className="flex items-center justify-between bg-gray-900 rounded-lg px-3 py-2 border border-gray-800">
-            <span className="text-xs font-medium text-gray-400">
+          <div className="flex items-center justify-between bg-muted rounded-lg px-3 py-2 border border-border">
+            <span className="text-xs font-medium text-muted-foreground">
               {userTeam.name} Budget
             </span>
-            <span className="text-sm font-mono font-semibold text-white">
+            <span className="text-sm font-mono font-semibold text-foreground">
               ${userTeam.budgetRemaining}
             </span>
           </div>

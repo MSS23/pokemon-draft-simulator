@@ -81,7 +81,7 @@ export default function AutoPickIndicator({
                 variant="ghost"
                 size="sm"
                 onClick={onCancel}
-                className="text-white hover:bg-white/20 h-8 w-8 p-0"
+                className="text-white hover:bg-foreground/20 h-8 w-8 p-0"
                 title="Cancel auto-pick"
               >
                 <X className="h-4 w-4" />
@@ -90,10 +90,10 @@ export default function AutoPickIndicator({
 
             {/* Pokemon Preview */}
             {nextPokemon && (
-              <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+              <div className="bg-foreground/10 rounded-lg p-3 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-foreground/20 rounded-lg flex items-center justify-center">
                       <Crown className="h-6 w-6 text-yellow-300" />
                     </div>
                   </div>
@@ -102,7 +102,7 @@ export default function AutoPickIndicator({
                       <span className="font-semibold text-white truncate">
                         {nextPokemon.pokemonName}
                       </span>
-                      <Badge className="bg-white/20 text-white text-xs">
+                      <Badge className="bg-foreground/20 text-white text-xs">
                         #{nextPokemon.priority}
                       </Badge>
                     </div>
@@ -132,7 +132,7 @@ export default function AutoPickIndicator({
               <Progress
                 value={progress}
                 className={cn(
-                  "h-2 bg-white/20",
+                  "h-2 bg-foreground/20",
                   isUrgent && "bg-red-500/20"
                 )}
               />
@@ -157,7 +157,7 @@ export default function AutoPickIndicator({
               <Button
                 variant="outline"
                 onClick={onCancel}
-                className="px-4 text-white border-white/30 hover:bg-white/10"
+                className="px-4 text-white border-white/30 hover:bg-foreground/10"
               >
                 Cancel
               </Button>
@@ -180,10 +180,10 @@ export default function AutoPickIndicator({
 
             {/* Next Pokemon Preview */}
             {nextPokemon && (
-              <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+              <div className="bg-foreground/10 rounded-lg p-3 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                    <div className="w-12 h-12 bg-foreground/20 rounded-lg flex items-center justify-center">
                       <Crown className="h-6 w-6 text-yellow-300" />
                     </div>
                   </div>
@@ -192,7 +192,7 @@ export default function AutoPickIndicator({
                       <span className="font-semibold text-white truncate">
                         {nextPokemon.pokemonName}
                       </span>
-                      <Badge className="bg-white/20 text-white text-xs">
+                      <Badge className="bg-foreground/20 text-white text-xs">
                         #{nextPokemon.priority}
                       </Badge>
                     </div>
@@ -216,7 +216,7 @@ export default function AutoPickIndicator({
               <Button
                 onClick={onManualPick}
                 variant="outline"
-                className="px-4 text-white border-white/30 hover:bg-white/10"
+                className="px-4 text-white border-white/30 hover:bg-foreground/10"
               >
                 <Play className="h-4 w-4 mr-2" />
                 Pick Now

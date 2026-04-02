@@ -222,7 +222,7 @@ export const TournamentMatchView = memo(function TournamentMatchView({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl w-[95vw] p-0 gap-0 border-white/[0.08] bg-[#0c0e14] overflow-hidden max-h-[95vh]">
+      <DialogContent className="max-w-2xl w-[95vw] p-0 gap-0 border-border bg-card overflow-hidden max-h-[95vh]">
         {/* ──── Header Bar ──── */}
         <div className="relative px-4 sm:px-5 py-3 border-b border-white/[0.06] bg-gradient-to-r from-white/[0.02] to-transparent">
           {/* Decorative line */}

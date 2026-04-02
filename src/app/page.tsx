@@ -125,9 +125,9 @@ export default function Home() {
           <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-8">
             {/* Tag */}
             <motion.div variants={fadeIn} className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] backdrop-blur-sm">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground/[0.06] border border-foreground/[0.08] backdrop-blur-sm">
                 <Sparkles className="h-3 w-3 text-primary" />
-                <span className="text-[11px] font-semibold text-zinc-300 uppercase tracking-wider">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                   Free & Open Source
                 </span>
               </div>
@@ -136,7 +136,7 @@ export default function Home() {
             {/* Headline */}
             <motion.h1
               variants={fadeIn}
-              className="text-4xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.05] tracking-tight"
+              className="text-4xl sm:text-6xl lg:text-7xl font-bold text-foreground leading-[1.05] tracking-tight"
             >
               Draft your team.
               <br />
@@ -146,7 +146,7 @@ export default function Home() {
             {/* Subtitle */}
             <motion.p
               variants={fadeIn}
-              className="text-zinc-400 text-base sm:text-lg max-w-md leading-relaxed"
+              className="text-muted-foreground text-base sm:text-lg max-w-md leading-relaxed"
             >
               The free drafting tool built for competitive Pokemon communities.
               Snake drafts, auctions, full league seasons — no spreadsheets required.
@@ -168,7 +168,7 @@ export default function Home() {
                 size="lg"
                 variant="outline"
                 onClick={() => router.push('/join-draft')}
-                className="border-zinc-700 text-zinc-300 bg-transparent hover:bg-white/5 hover:text-white hover:border-zinc-500 font-medium rounded-2xl"
+                className="border-border text-muted-foreground bg-transparent hover:bg-foreground/5 hover:text-foreground hover:border-foreground/30 font-medium rounded-2xl"
               >
                 <Users className="h-4 w-4 mr-2" />
                 Join a Draft
@@ -176,11 +176,11 @@ export default function Home() {
             </motion.div>
 
             {/* Sign in link */}
-            <motion.div variants={fadeIn} className="flex items-center gap-2 text-sm text-zinc-500">
+            <motion.div variants={fadeIn} className="flex items-center gap-2 text-sm text-muted-foreground">
               <LogIn className="h-3.5 w-3.5" />
               <span>Already have an account?</span>
               <button
-                className="text-zinc-300 hover:text-white font-medium transition-colors duration-150"
+                className="text-foreground/80 hover:text-foreground font-medium transition-colors duration-150"
                 onClick={() => router.push('/dashboard')}
               >
                 Sign in

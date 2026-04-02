@@ -88,7 +88,22 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <HydrationErrorFilter />
-        <ClerkProvider>
+        <ClerkProvider
+          appearance={{
+            variables: {
+              colorPrimary: '#dc2855',
+            },
+            elements: {
+              formButtonPrimary: 'bg-primary hover:bg-primary/90 text-primary-foreground',
+              card: 'bg-card border border-border shadow-lg',
+              headerTitle: 'text-foreground',
+              headerSubtitle: 'text-muted-foreground',
+              socialButtonsBlockButton: 'bg-card border border-border text-foreground hover:bg-muted',
+              formFieldInput: 'bg-background border-border text-foreground',
+              footerActionLink: 'text-primary hover:text-primary/80',
+            }
+          }}
+        >
         <AnalyticsProvider>
         <PerformanceMonitorProvider>
           <ErrorBoundaryProvider>

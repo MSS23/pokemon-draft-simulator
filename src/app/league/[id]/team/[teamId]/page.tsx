@@ -775,7 +775,7 @@ export default function TeamDetailPage() {
                           <span className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                             m.result === 'W' ? 'bg-green-500 text-white' :
                             m.result === 'L' ? 'bg-red-500 text-white' :
-                            'bg-gray-400 text-white'
+                            'bg-muted text-muted-foreground'
                           }`}>{m.result}</span>
                           <div>
                             <div className="font-medium text-sm">vs {m.opponentName}</div>

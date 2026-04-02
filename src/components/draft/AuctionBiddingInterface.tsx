@@ -109,12 +109,12 @@ function SoldOverlay({
         className="text-center"
       >
         <Gavel className="h-12 w-12 mx-auto mb-3 text-amber-400" />
-        <h2 className="text-3xl md:text-4xl font-black text-white mb-2">SOLD!</h2>
-        <p className="text-lg text-gray-300 mb-1">
+        <h2 className="text-3xl md:text-4xl font-black text-foreground mb-2">SOLD!</h2>
+        <p className="text-lg text-muted-foreground mb-1">
           {pokemonName}
         </p>
         <div className="flex items-center justify-center gap-2 mb-3">
-          <span className="text-sm text-gray-400">to</span>
+          <span className="text-sm text-muted-foreground">to</span>
           <Badge
             className="text-sm px-3 py-1"
             style={{ backgroundColor: winnerColor, color: 'white' }}
@@ -310,12 +310,12 @@ export default function AuctionBiddingInterface({
   // No active auction - waiting for nomination
   if (!currentAuction) {
     return (
-      <Card className={cn('w-full bg-gray-950 border-gray-800', className)}>
+      <Card className={cn('w-full bg-card border-border', className)}>
         <CardContent className="p-6">
           <div className="flex items-center gap-2 mb-6">
             <Gavel className="h-5 w-5 text-amber-500" />
-            <h3 className="text-lg font-bold text-white">Auction Draft</h3>
-            <Badge variant="outline" className="text-xs border-gray-700 text-gray-400">
+            <h3 className="text-lg font-bold text-foreground">Auction Draft</h3>
+            <Badge variant="outline" className="text-xs border-border text-muted-foreground">
               Waiting for Nomination
             </Badge>
           </div>
@@ -328,20 +328,20 @@ export default function AuctionBiddingInterface({
                 animate="animate"
               >
                 <Trophy className="h-14 w-14 mx-auto mb-3 text-amber-400" />
-                <h3 className="text-xl font-bold text-white mb-2">
+                <h3 className="text-xl font-bold text-foreground mb-2">
                   Your Turn to Nominate
                 </h3>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-muted-foreground">
                   Select a Pokemon from the grid below to start the auction
                 </p>
               </motion.div>
             ) : (
               <div>
-                <Gavel className="h-14 w-14 mx-auto mb-3 text-gray-600" />
-                <h3 className="text-xl font-bold text-gray-300 mb-2">
+                <Gavel className="h-14 w-14 mx-auto mb-3 text-muted-foreground/60" />
+                <h3 className="text-xl font-bold text-muted-foreground mb-2">
                   Waiting for Nomination
                 </h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground/70">
                   Another team will nominate a Pokemon for auction
                 </p>
               </div>
@@ -350,7 +350,7 @@ export default function AuctionBiddingInterface({
 
           {/* Team budgets as horizontal bars */}
           <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Team Budgets
             </h4>
             {teams
@@ -364,7 +364,7 @@ export default function AuctionBiddingInterface({
                     className={cn(
                       'flex items-center gap-3 p-2 rounded-lg',
                       team.id === userTeamId
-                        ? 'bg-white/5 ring-1 ring-white/10'
+                        ? 'bg-foreground/5 ring-1 ring-foreground/10'
                         : ''
                     )}
                   >
@@ -374,10 +374,10 @@ export default function AuctionBiddingInterface({
                     >
                       {team.name}
                       {team.id === userTeamId && (
-                        <span className="text-xs text-gray-500 ml-1">(you)</span>
+                        <span className="text-xs text-muted-foreground ml-1">(you)</span>
                       )}
                     </span>
-                    <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                       <motion.div
                         className="h-full rounded-full"
                         style={{ backgroundColor: color.hex }}
@@ -386,7 +386,7 @@ export default function AuctionBiddingInterface({
                         transition={{ duration: 0.5, delay: idx * 0.05 }}
                       />
                     </div>
-                    <span className="text-sm font-mono text-gray-300 w-12 text-right">
+                    <span className="text-sm font-mono text-muted-foreground w-12 text-right">
                       ${team.budgetRemaining}
                     </span>
                   </div>
@@ -404,7 +404,7 @@ export default function AuctionBiddingInterface({
   return (
     <Card
       className={cn(
-        'w-full relative overflow-hidden bg-gray-950 border-gray-800',
+        'w-full relative overflow-hidden bg-card border-border',
         className
       )}
     >
@@ -420,10 +420,10 @@ export default function AuctionBiddingInterface({
 
       <CardContent className="p-0">
         {/* Top bar: timer + live badge */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
+        <div className="flex items-center justify-between px-4 py-3 bg-muted border-b border-border">
           <div className="flex items-center gap-2">
             <Gavel className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-semibold text-white">Live Auction</span>
+            <span className="text-sm font-semibold text-foreground">Live Auction</span>
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
@@ -451,7 +451,7 @@ export default function AuctionBiddingInterface({
         </div>
 
         {/* Timer progress bar */}
-        <div className="h-1 bg-gray-800">
+        <div className="h-1 bg-muted">
           <motion.div
             className="h-full"
             style={{ backgroundColor: timerColor }}
@@ -495,7 +495,7 @@ export default function AuctionBiddingInterface({
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-gray-900 border border-gray-700 flex items-center justify-center overflow-hidden">
+                <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-muted border border-border flex items-center justify-center overflow-hidden">
                   <img
                     src={getBestPokemonImageUrl(pokemon.id, pokemon.name)}
                     alt={pokemon.name}
@@ -506,7 +506,7 @@ export default function AuctionBiddingInterface({
               </motion.div>
             )}
             <div className="text-center sm:text-left">
-              <h2 className="text-2xl md:text-3xl font-black text-white capitalize">
+              <h2 className="text-2xl md:text-3xl font-black text-foreground capitalize">
                 {currentAuction.pokemon_name}
               </h2>
               {pokemon && (
@@ -520,7 +520,7 @@ export default function AuctionBiddingInterface({
                       {type.name}
                     </Badge>
                   ))}
-                  <Badge variant="outline" className="text-xs border-gray-700 text-gray-400">
+                  <Badge variant="outline" className="text-xs border-border text-muted-foreground">
                     BST {pokemon.stats.total}
                   </Badge>
                 </div>
@@ -530,14 +530,14 @@ export default function AuctionBiddingInterface({
 
           {/* Current bid display - big centered number */}
           <motion.div
-            className="text-center py-4 rounded-xl bg-gray-900/80 border border-gray-800"
+            className="text-center py-4 rounded-xl bg-muted/80 border border-border"
             layout
           >
-            <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
               Current Bid
             </div>
             <div
-              className="text-5xl md:text-6xl font-black text-white"
+              className="text-5xl md:text-6xl font-black text-foreground"
               aria-live="polite"
               aria-atomic="true"
             >
@@ -551,7 +551,7 @@ export default function AuctionBiddingInterface({
                 animate={{ opacity: 1, y: 0 }}
               >
                 <Crown className="h-3.5 w-3.5 text-amber-400" />
-                <span className="text-sm text-gray-400">
+                <span className="text-sm text-muted-foreground">
                   {currentBidder.name}
                   {isUserWinning && (
                     <span className="text-emerald-400 ml-1">(You)</span>
@@ -598,12 +598,12 @@ export default function AuctionBiddingInterface({
                     }}
                     disabled={disabled}
                     className={cn(
-                      'h-12 text-sm font-bold border-gray-700 bg-gray-900 hover:bg-gray-800 text-white',
+                      'h-12 text-sm font-bold border-border bg-muted hover:bg-muted/80 text-foreground',
                       disabled && 'opacity-40'
                     )}
                     title={`Bid $${quickBidValue}`}
                   >
-                    <span className="text-gray-500 text-xs">+{increment}</span>
+                    <span className="text-muted-foreground text-xs">+{increment}</span>
                     <span className="ml-1">${quickBidValue}</span>
                   </Button>
                 )
@@ -634,7 +634,7 @@ export default function AuctionBiddingInterface({
             {/* Custom bid row */}
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="number"
                   value={bidAmount}
@@ -642,7 +642,7 @@ export default function AuctionBiddingInterface({
                   placeholder="Custom bid"
                   min={currentAuction.current_bid + 1}
                   max={userTeam?.budgetRemaining || 100}
-                  className="pl-9 h-12 text-lg font-semibold text-center bg-gray-900 border-gray-700 text-white"
+                  className="pl-9 h-12 text-lg font-semibold text-center bg-background border-border text-foreground"
                 />
               </div>
               <Button
@@ -652,7 +652,7 @@ export default function AuctionBiddingInterface({
                   'h-12 px-8 text-base font-bold',
                   canBid()
                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                    : 'bg-gray-800 text-gray-500'
+                    : 'bg-muted text-muted-foreground'
                 )}
               >
                 {isPlacingBid ? (
@@ -667,7 +667,7 @@ export default function AuctionBiddingInterface({
             </div>
 
             {/* Budget info */}
-            <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
                 Min bid: ${currentAuction.current_bid + 1}
               </span>
@@ -695,7 +695,7 @@ export default function AuctionBiddingInterface({
 
           {/* Budget bars for all teams */}
           <div className="space-y-1.5">
-            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Team Budgets
             </h4>
             {teams
@@ -717,7 +717,7 @@ export default function AuctionBiddingInterface({
                       {isBidder && <Crown className="h-3 w-3 text-amber-400 flex-shrink-0" />}
                       {team.name}
                     </span>
-                    <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                       <motion.div
                         className="h-full rounded-full"
                         style={{ backgroundColor: color.hex }}
@@ -725,7 +725,7 @@ export default function AuctionBiddingInterface({
                         transition={{ duration: 0.5 }}
                       />
                     </div>
-                    <span className="text-xs font-mono text-gray-400 w-10 text-right">
+                    <span className="text-xs font-mono text-muted-foreground w-10 text-right">
                       ${team.budgetRemaining}
                     </span>
                   </div>

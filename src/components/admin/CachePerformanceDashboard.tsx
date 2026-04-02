@@ -66,13 +66,13 @@ export default function CachePerformanceDashboard({
   const getHealthColor = (health: string) => {
     switch (health) {
       case 'healthy':
-        return 'text-green-600 bg-green-100'
+        return 'text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-950'
       case 'degraded':
-        return 'text-yellow-600 bg-yellow-100'
+        return 'text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-950'
       case 'critical':
-        return 'text-red-600 bg-red-100'
+        return 'text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-950'
       default:
-        return 'text-gray-600 bg-gray-100'
+        return 'text-muted-foreground bg-muted'
     }
   }
 
@@ -257,13 +257,13 @@ export default function CachePerformanceDashboard({
                         )}
                         <span className="font-medium">{log.action}</span>
                       </div>
-                      <div className="text-gray-500">
+                      <div className="text-muted-foreground">
                         {formatDuration(log.duration)}
                       </div>
                     </div>
                   ))}
                   {performanceLog.length === 0 && (
-                    <div className="text-gray-500 text-xs text-center py-4">
+                    <div className="text-muted-foreground text-xs text-center py-4">
                       No performance data yet
                     </div>
                   )}
@@ -274,7 +274,7 @@ export default function CachePerformanceDashboard({
         </div>
 
         {/* Cache Management Actions */}
-        <div className="flex gap-2 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex gap-2 pt-4 border-t border-border">
           <Button
             variant="outline"
             size="sm"
@@ -308,7 +308,7 @@ export default function CachePerformanceDashboard({
 
         {/* Detailed View */}
         {showDetails && (
-          <Card className="bg-gray-50 dark:bg-gray-900">
+          <Card className="bg-muted">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm">Detailed Performance Metrics</CardTitle>
             </CardHeader>
@@ -332,7 +332,7 @@ export default function CachePerformanceDashboard({
                 </div>
                 <div>
                   <h4 className="font-medium mb-2">Recommendations</h4>
-                  <div className="space-y-1 text-gray-600 dark:text-gray-400">
+                  <div className="space-y-1 text-muted-foreground">
                     {cacheStats.hitRate < 0.7 && <div>• Consider preloading popular items</div>}
                     {healthMetrics.memoryUsage > 0.8 && <div>• Memory usage high, consider cleanup</div>}
                     {healthMetrics.errors > 5 && <div>• Error rate elevated, check network</div>}
