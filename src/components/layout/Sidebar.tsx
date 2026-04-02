@@ -12,6 +12,7 @@ import {
   LogOut,
   Info,
   Swords,
+  MessageSquareText,
 } from 'lucide-react'
 import { SidebarSection } from './SidebarSection'
 import { SidebarLink } from './SidebarLink'
@@ -178,6 +179,7 @@ export function Sidebar() {
 
       {/* Bottom */}
       <div className="px-2 py-2.5 border-t border-border/50 space-y-0.5">
+        <SidebarLink href="/feedback" icon={MessageSquareText} label="Feedback" />
         <SidebarLink href="/about" icon={Info} label="About" />
         {user && (
           <>

@@ -386,6 +386,7 @@ export default function Home() {
             </Button>
           </div>
           <div className="flex justify-center gap-5 pt-5 text-xs">
+            <a href="/feedback" className="text-muted-foreground/60 hover:text-foreground transition-colors duration-150">Feedback</a>
             <a href="/about" className="text-muted-foreground/60 hover:text-foreground transition-colors duration-150">About</a>
             <a href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors duration-150">Terms</a>
             <a href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors duration-150">Privacy</a>
