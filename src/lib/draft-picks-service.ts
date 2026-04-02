@@ -10,7 +10,7 @@ import { getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { createFormatRulesEngine as createNewFormatRulesEngine } from '@/domain/rules'
 import { Team as AppTeam } from '@/types'
 import { fetchPokemon } from '@/lib/pokemon-api'
-import type { DraftRow, TeamRow, PickRow, ParticipantRow } from '@/types/supabase-helpers'
+import type { DraftRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 import type { DraftState } from './draft-service'
 

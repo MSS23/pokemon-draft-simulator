@@ -12,8 +12,7 @@
  *  - draft-history-service.ts   — History & results (getDraftHistory, getPublicDrafts)
  */
 import { supabase } from './supabase'
-import { getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
-import { Team as AppTeam } from '@/types'
+import { DEFAULT_FORMAT } from '@/lib/formats'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { generateRoomCode } from '@/lib/room-utils'
 import type {
@@ -23,7 +22,6 @@ import type {
   PickRow,
   AuctionRow,
   CustomFormatInsert,
-  DraftSettings as DraftSettingsJson,
 } from '@/types/supabase-helpers'
 import bcrypt from 'bcryptjs'
 import { createLogger } from '@/lib/logger'

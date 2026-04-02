@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     // Securely compare passwords using bcrypt on the server
     const valid = await bcrypt.compare(password, draft.password)
     return NextResponse.json({ valid })
-  } catch (err) {
+  } catch (_err) {
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
