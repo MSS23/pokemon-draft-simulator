@@ -1,6 +1,7 @@
 'use client'
 
-import React from 'react'
+import React, { useCallback, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Pokemon } from '@/types'
 import {
   Dialog,
@@ -14,6 +15,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Sparkles, Zap, Crown, AlertTriangle, Loader2 } from 'lucide-react'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
+import { draftSounds } from '@/lib/draft-sounds'
+import { pickConfirmVariants, useReducedMotion, REDUCED_MOTION_VARIANTS } from '@/lib/draft-animations'
 
 interface DraftConfirmationModalProps {
   pokemon: Pokemon | null
@@ -36,6 +39,9 @@ export default function DraftConfirmationModal({
   maxDrafts = 6,
   isLoading = false,
 }: DraftConfirmationModalProps) {
+  const reducedMotion = useReducedMotion()
+  const [showFlash, setShowFlash] = useState(false)
+
   const {
     imageUrl,
     isLoading: imageLoading,
@@ -48,6 +54,15 @@ export default function DraftConfirmationModal({
     preferOfficialArt: false // Use animated GIF
   })
 
+  const handleConfirmWithSound = useCallback((p: Pokemon) => {
+    draftSounds.play('pick-confirm')
+    setShowFlash(true)
+    setTimeout(() => {
+      setShowFlash(false)
+      onConfirm(p)
+    }, 350)
+  }, [onConfirm])
+
   if (!pokemon) return null
 
   const remainingBudget = currentBudget - pokemon.cost
@@ -58,7 +73,12 @@ export default function DraftConfirmationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md w-[95vw] sm:w-full max-h-[90dvh] overflow-y-auto p-0 border-0 shadow-2xl">
+      <DialogContent className="max-w-md w-[calc(100%-1rem)] sm:w-[95vw] max-h-[90dvh] overflow-y-auto p-0 border-0 shadow-2xl sm:rounded-2xl">
+        <motion.div
+          variants={reducedMotion ? REDUCED_MOTION_VARIANTS : pickConfirmVariants}
+          initial="initial"
+          animate="animate"
+        >
         {/* Modern gradient background */}
         <div className="relative bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
           {/* Header with Pokemon Image */}
@@ -86,6 +106,18 @@ export default function DraftConfirmationModal({
 
                   {/* Image container */}
                   <div className="relative bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-700 rounded-full p-4 sm:p-6 md:p-8 border-2 border-slate-200 dark:border-slate-600 shadow-xl">
+                    {/* Confirm flash burst */}
+                    <AnimatePresence>
+                      {showFlash && (
+                        <motion.div
+                          className="absolute inset-0 rounded-full bg-white dark:bg-yellow-200 z-20"
+                          initial={{ opacity: 0.9 }}
+                          animate={{ opacity: 0 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.35 }}
+                        />
+                      )}
+                    </AnimatePresence>
                     {!imageError ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -228,21 +260,21 @@ export default function DraftConfirmationModal({
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 sm:gap-3 p-3 sm:p-4 md:p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700">
+        {/* Action Buttons — sticky at bottom on mobile for thumb reach */}
+        <div className="flex gap-2 sm:gap-3 p-3 sm:p-4 md:p-6 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 sticky bottom-0 z-10" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <Button
             variant="outline"
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 h-10 sm:h-11 md:h-12 text-sm sm:text-base font-semibold border-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="flex-1 h-12 sm:h-11 md:h-12 text-sm sm:text-base font-semibold border-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             Cancel
           </Button>
           <Button
-            onClick={() => onConfirm(pokemon)}
-            disabled={isOverBudget || isLoading}
+            onClick={() => handleConfirmWithSound(pokemon)}
+            disabled={isOverBudget || isLoading || showFlash}
             className={cn(
-              "flex-1 h-10 sm:h-11 md:h-12 text-sm sm:text-base font-bold shadow-lg transition-all duration-200",
+              "flex-1 h-12 sm:h-11 md:h-12 text-sm sm:text-base font-bold shadow-lg transition-all duration-200",
               isOverBudget || isLoading
                 ? "bg-slate-400 hover:bg-slate-400 cursor-not-allowed opacity-60"
                 : "brand-gradient-bg text-white hover:brightness-110 hover:shadow-xl hover:scale-[1.02]"
@@ -256,6 +288,7 @@ export default function DraftConfirmationModal({
             <span className="truncate">{isLoading ? "Drafting..." : isOverBudget ? "Over Budget" : `Draft ${pokemon.name}`}</span>
           </Button>
         </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   )

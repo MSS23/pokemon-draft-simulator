@@ -3,6 +3,7 @@ import { DraftService } from '@/lib/draft-service'
 import { AutoSkipService } from '@/lib/auto-skip-service'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
+import { draftSounds } from '@/lib/draft-sounds'
 
 const log = createLogger('useDraftTimers')
 
@@ -52,6 +53,45 @@ export function useDraftTimers({
 
     return () => clearInterval(interval)
   }, [turnStartedAt, timeLimit, isDrafting])
+
+  // Timer sound effects
+  const lastSoundTimeRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!isDrafting || timeLimit <= 0 || pickTimeRemaining <= 0) {
+      lastSoundTimeRef.current = null
+      return
+    }
+
+    // Buzzer at 0 is handled by the auto-skip effect (pickTimeRemaining === 0)
+    // Play tick at 30s
+    if (pickTimeRemaining === 30 && lastSoundTimeRef.current !== 30) {
+      lastSoundTimeRef.current = 30
+      draftSounds.play('tick')
+    }
+    // Play rapid-tick every second under 10s
+    else if (pickTimeRemaining <= 10 && pickTimeRemaining > 0) {
+      if (lastSoundTimeRef.current !== pickTimeRemaining) {
+        lastSoundTimeRef.current = pickTimeRemaining
+        draftSounds.play('rapid-tick')
+      }
+    }
+  }, [pickTimeRemaining, isDrafting, timeLimit])
+
+  // Buzzer when timer hits 0
+  const buzzerFiredRef = useRef(false)
+  useEffect(() => {
+    if (!isDrafting || timeLimit <= 0) {
+      buzzerFiredRef.current = false
+      return
+    }
+    if (pickTimeRemaining === 0 && !buzzerFiredRef.current) {
+      buzzerFiredRef.current = true
+      draftSounds.play('buzzer')
+    }
+    if (pickTimeRemaining > 0) {
+      buzzerFiredRef.current = false
+    }
+  }, [pickTimeRemaining, isDrafting, timeLimit])
 
   // Server time synchronization
   useEffect(() => {

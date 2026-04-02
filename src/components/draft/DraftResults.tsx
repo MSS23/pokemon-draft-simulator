@@ -25,6 +25,7 @@ import TournamentSchedule from '@/components/tournament/TournamentSchedule'
 import { ShareableRecapCard } from './ShareableRecapCard'
 import { DraftReplay } from './DraftReplay'
 import { DraftRecapAnimation } from './DraftRecapAnimation'
+import { PokePasteExport } from '@/components/pokemon/PokePasteExport'
 
 interface Team {
   id: string
@@ -430,6 +431,15 @@ export default function DraftResults({
                               <span className="font-semibold text-foreground">{team.budgetRemaining} pts</span>
                             </div>
                           )}
+                          <div className="pt-2">
+                            <PokePasteExport
+                              teamName={team.name}
+                              pokemon={team.picks.map(p => ({
+                                name: p.pokemon_name,
+                                pokemonId: p.pokemon_id,
+                              }))}
+                            />
+                          </div>
                         </div>
                       )}
                     </CardContent>

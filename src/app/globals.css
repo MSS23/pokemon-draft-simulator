@@ -624,6 +624,12 @@
     50% { box-shadow: 0 0 0 8px hsl(var(--energy) / 0); }
   }
 
+  /* Your-turn flash overlay */
+  @keyframes turnFlashFade {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
   /* Subtle scan line effect for arena feel */
   .scan-lines::after {
     content: '';
@@ -637,6 +643,13 @@
       rgba(0, 0, 0, 0.015) 4px
     );
     pointer-events: none;
+  }
+}
+
+/* Mobile draft room utilities */
+@media (max-width: 767px) {
+  .draft-room-mobile {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

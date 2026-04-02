@@ -1,18 +1,32 @@
 'use client'
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useEffect } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Pokemon } from '@/types'
 import { createLogger } from '@/lib/logger'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const log = createLogger('AuctionNomination')
 import { Gavel, Clock, DollarSign, Zap, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import PokemonCard from '@/components/pokemon/PokemonCard'
+import { getBestPokemonImageUrl } from '@/utils/pokemon'
+import { draftSounds } from '@/lib/draft-sounds'
+import {
+  fadeInUpVariants,
+  pulseVariants,
+  useReducedMotion,
+  REDUCED_MOTION_VARIANTS,
+} from '@/lib/draft-animations'
 
 interface AuctionNominationProps {
   selectedPokemon: Pokemon | null
@@ -27,7 +41,11 @@ interface AuctionNominationProps {
     draftOrder: number
   } | null
   canNominate: boolean
-  onNominate: (pokemon: Pokemon, startingBid: number, duration: number) => Promise<void>
+  onNominate: (
+    pokemon: Pokemon,
+    startingBid: number,
+    duration: number
+  ) => Promise<void>
   defaultAuctionDuration?: number
   className?: string
 }
@@ -39,11 +57,34 @@ export default function AuctionNomination({
   canNominate,
   onNominate,
   defaultAuctionDuration = 60,
-  className
+  className,
 }: AuctionNominationProps) {
   const [startingBid, setStartingBid] = useState('')
-  const [auctionDuration, setAuctionDuration] = useState(defaultAuctionDuration.toString())
+  const [auctionDuration, setAuctionDuration] = useState(
+    defaultAuctionDuration.toString()
+  )
   const [isNominating, setIsNominating] = useState(false)
+  const reducedMotion = useReducedMotion()
+
+  // Play your-turn sound when it becomes the user's turn
+  useEffect(() => {
+    if (canNominate) {
+      draftSounds.play('your-turn')
+    }
+  }, [canNominate])
+
+  // Auto-suggest starting bid based on Pokemon BST tier
+  useEffect(() => {
+    if (selectedPokemon && !startingBid) {
+      const bst = selectedPokemon.stats.total
+      let suggested = selectedPokemon.cost || 1
+      // Suggest a slight premium for high-BST picks
+      if (bst >= 580) suggested = Math.max(suggested, 8)
+      else if (bst >= 500) suggested = Math.max(suggested, 5)
+      else if (bst >= 450) suggested = Math.max(suggested, 3)
+      setStartingBid(suggested.toString())
+    }
+  }, [selectedPokemon, startingBid])
 
   const handleNominate = async () => {
     if (!selectedPokemon || !canNominate || isNominating) return
@@ -72,229 +113,272 @@ export default function AuctionNomination({
   }
 
   return (
-    <Card className={cn('w-full', className)}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 flex-wrap">
-          <Gavel className="h-5 w-5 text-orange-600" />
-          Nominate for Auction
+    <Card className={cn('w-full bg-gray-950 border-gray-800', className)}>
+      <CardContent className="p-4 md:p-6 space-y-4">
+        {/* Header with status */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gavel className="h-5 w-5 text-amber-500" />
+            <h3 className="text-lg font-bold text-white">Nominate</h3>
+          </div>
           {canNominate ? (
-            <Badge variant="default" className="bg-green-600">
+            <Badge className="bg-emerald-600 text-white border-0">
               Your Turn
             </Badge>
           ) : currentNominatingTeam ? (
-            <Badge variant="outline" className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
+            <Badge
+              variant="outline"
+              className="border-gray-700 text-gray-400"
+            >
+              <Clock className="h-3 w-3 mr-1" />
               {currentNominatingTeam.name}&apos;s Turn
             </Badge>
           ) : (
-            <Badge variant="outline">
+            <Badge
+              variant="outline"
+              className="border-gray-700 text-gray-400"
+            >
               Waiting
             </Badge>
           )}
-        </CardTitle>
+        </div>
+
+        {/* "Your Turn" banner */}
+        <AnimatePresence>
+          {canNominate && !selectedPokemon && (
+            <motion.div
+              variants={
+                reducedMotion ? REDUCED_MOTION_VARIANTS : pulseVariants
+              }
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="bg-amber-900/30 border border-amber-700/50 rounded-xl p-4 text-center"
+            >
+              <Gavel className="h-10 w-10 mx-auto mb-2 text-amber-400" />
+              <h3 className="text-lg font-bold text-amber-300">
+                Your Turn to Nominate!
+              </h3>
+              <p className="text-sm text-amber-400/70 mt-1">
+                Select a Pokemon from the grid to put it up for auction
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Waiting for other team */}
         {!canNominate && currentNominatingTeam && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-            Waiting for <span className="font-semibold text-orange-600 dark:text-orange-400">{currentNominatingTeam.name}</span> to nominate a Pokémon for auction...
-          </p>
-        )}
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Selected Pokemon display */}
-        {selectedPokemon ? (
-          <div className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-shrink-0">
-                <PokemonCard
-                  pokemon={selectedPokemon}
-                  size="sm"
-                  showCost={true}
-                  showStats={false}
-                  className="w-32"
-                />
-              </div>
-
-              <div className="flex-1 space-y-3">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">
-                    {selectedPokemon.name}
-                  </h3>
-                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                    <span>Base Cost: <strong>${selectedPokemon.cost}</strong></span>
-                    <span>•</span>
-                    <span>BST: <strong>{selectedPokemon.stats.total}</strong></span>
-                  </div>
-                </div>
-
-                {/* Auction settings */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Starting Bid
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        type="number"
-                        value={startingBid}
-                        onChange={(e) => setStartingBid(e.target.value)}
-                        placeholder={getMinimumBid().toString()}
-                        min={getMinimumBid()}
-                        max={userTeam?.budgetRemaining || 100}
-                        className="pl-10"
-                      />
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Min: ${getMinimumBid()} | Budget: ${userTeam?.budgetRemaining || 0}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Auction Duration
-                    </label>
-                    <Select value={auctionDuration} onValueChange={setAuctionDuration}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="30">30 seconds</SelectItem>
-                        <SelectItem value="45">45 seconds</SelectItem>
-                        <SelectItem value="60">1 minute</SelectItem>
-                        <SelectItem value="90">90 seconds</SelectItem>
-                        <SelectItem value="120">2 minutes</SelectItem>
-                        <SelectItem value="180">3 minutes</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <div className="text-xs text-gray-500 flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Time for bidding
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quick bid presets */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Quick Bid Presets
-                  </label>
-                  <div className="flex gap-1 flex-wrap">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setStartingBid(getMinimumBid().toString())}
-                      className="text-xs"
-                    >
-                      Min (${getMinimumBid()})
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setStartingBid((getMinimumBid() + 2).toString())}
-                      className="text-xs"
-                    >
-                      +$2
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setStartingBid((getMinimumBid() + 5).toString())}
-                      className="text-xs"
-                    >
-                      +$5
-                    </Button>
-                    {selectedPokemon.cost >= 10 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setStartingBid(Math.ceil(selectedPokemon.cost * 1.5).toString())}
-                        className="text-xs"
-                      >
-                        1.5x Cost (${Math.ceil(selectedPokemon.cost * 1.5)})
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Action button */}
-                <div className="pt-2">
-                  <Button
-                    onClick={handleNominate}
-                    disabled={!canNominate || !isValidBid() || isNominating}
-                    className={cn(
-                      'w-full',
-                      canNominate && isValidBid()
-                        ? 'bg-orange-600 hover:bg-orange-700'
-                        : 'bg-gray-400'
-                    )}
-                  >
-                    {isNominating ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                        Nominating...
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4" />
-                        Start Auction
-                      </div>
-                    )}
-                  </Button>
-
-                  {/* Validation messages */}
-                  {!canNominate && (
-                    <div className="flex items-center gap-1 text-xs text-red-600 mt-2">
-                      <AlertCircle className="h-3 w-3" />
-                      Cannot nominate at this time
-                    </div>
-                  )}
-                  {canNominate && !isValidBid() && startingBid && (
-                    <div className="flex items-center gap-1 text-xs text-red-600 mt-2">
-                      <AlertCircle className="h-3 w-3" />
-                      Starting bid must be at least ${getMinimumBid()}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Nomination strategy tips */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
-                💡 Auction Strategy Tips
-              </h4>
-              <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                <li>• Higher starting bids can deter early bidders</li>
-                <li>• Longer auctions allow more competitive bidding</li>
-                <li>• Consider nominating Pokemon others want to drive up prices</li>
-                <li>• Save your budget for Pokemon you really want</li>
-              </ul>
-            </div>
-          </div>
-        ) : (
-          // No Pokemon selected
-          <div className="text-center py-8">
-            <Gavel className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Select a Pokémon to Nominate
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Choose a Pokémon from the grid below to start an auction
+          <div className="text-center py-4">
+            <p className="text-sm text-gray-400">
+              Waiting for{' '}
+              <span className="font-semibold text-amber-400">
+                {currentNominatingTeam.name}
+              </span>{' '}
+              to nominate...
             </p>
           </div>
         )}
 
-        {/* Team budget display */}
+        {/* Selected Pokemon display */}
+        <AnimatePresence mode="wait">
+          {selectedPokemon && canNominate && (
+            <motion.div
+              key={selectedPokemon.id}
+              variants={
+                reducedMotion ? REDUCED_MOTION_VARIANTS : fadeInUpVariants
+              }
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              className="space-y-4"
+            >
+              {/* Pokemon preview */}
+              <div className="flex items-center gap-4 bg-gray-900 rounded-xl p-3">
+                <div className="w-20 h-20 rounded-xl bg-gray-800 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <img
+                    src={getBestPokemonImageUrl(
+                      selectedPokemon.id,
+                      selectedPokemon.name
+                    )}
+                    alt={selectedPokemon.name}
+                    className="w-16 h-16 object-contain"
+                    loading="eager"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-lg font-bold text-white capitalize truncate">
+                    {selectedPokemon.name}
+                  </h4>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {selectedPokemon.types.map((type) => (
+                      <Badge
+                        key={type.name}
+                        className="text-xs px-2 py-0 text-white border-0"
+                        style={{ backgroundColor: type.color }}
+                      >
+                        {type.name}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                    <span>Cost: ${selectedPokemon.cost}</span>
+                    <span>BST: {selectedPokemon.stats.total}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Auction settings */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-400">
+                    Starting Bid
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                    <Input
+                      type="number"
+                      value={startingBid}
+                      onChange={(e) => setStartingBid(e.target.value)}
+                      placeholder={getMinimumBid().toString()}
+                      min={getMinimumBid()}
+                      max={userTeam?.budgetRemaining || 100}
+                      className="pl-8 h-10 bg-gray-900 border-gray-700 text-white"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Min: ${getMinimumBid()} | Budget: $
+                    {userTeam?.budgetRemaining || 0}
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-400">
+                    Duration
+                  </label>
+                  <Select
+                    value={auctionDuration}
+                    onValueChange={setAuctionDuration}
+                  >
+                    <SelectTrigger className="h-10 bg-gray-900 border-gray-700 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="30">30s</SelectItem>
+                      <SelectItem value="45">45s</SelectItem>
+                      <SelectItem value="60">1 min</SelectItem>
+                      <SelectItem value="90">90s</SelectItem>
+                      <SelectItem value="120">2 min</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Bidding time
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick bid presets */}
+              <div className="flex gap-1.5 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setStartingBid(getMinimumBid().toString())
+                  }
+                  className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                >
+                  Min (${getMinimumBid()})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setStartingBid((getMinimumBid() + 2).toString())
+                  }
+                  className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                >
+                  +$2
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setStartingBid((getMinimumBid() + 5).toString())
+                  }
+                  className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                >
+                  +$5
+                </Button>
+                {selectedPokemon.cost >= 10 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setStartingBid(
+                        Math.ceil(selectedPokemon.cost * 1.5).toString()
+                      )
+                    }
+                    className="text-xs h-7 border-gray-700 bg-gray-900 text-gray-300"
+                  >
+                    1.5x (${Math.ceil(selectedPokemon.cost * 1.5)})
+                  </Button>
+                )}
+              </div>
+
+              {/* Nominate button */}
+              <Button
+                onClick={handleNominate}
+                disabled={!canNominate || !isValidBid() || isNominating}
+                className={cn(
+                  'w-full h-12 text-base font-bold',
+                  canNominate && isValidBid()
+                    ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                    : 'bg-gray-800 text-gray-500'
+                )}
+              >
+                {isNominating ? (
+                  <div className="flex items-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                    Nominating...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5" />
+                    Start Auction for{' '}
+                    <span className="capitalize">
+                      {selectedPokemon.name}
+                    </span>
+                  </div>
+                )}
+              </Button>
+
+              {/* Validation */}
+              {canNominate && !isValidBid() && startingBid && (
+                <div className="flex items-center gap-1 text-xs text-red-400">
+                  <AlertCircle className="h-3 w-3" />
+                  Starting bid must be at least ${getMinimumBid()}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* No Pokemon selected + can nominate */}
+        {!selectedPokemon && canNominate && (
+          <div className="text-center py-2 text-gray-500 text-sm">
+            Pick a Pokemon from the grid below
+          </div>
+        )}
+
+        {/* User budget */}
         {userTeam && (
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {userTeam.name} Budget
-              </span>
-              <Badge variant="outline" className="font-mono">
-                ${userTeam.budgetRemaining}
-              </Badge>
-            </div>
+          <div className="flex items-center justify-between bg-gray-900 rounded-lg px-3 py-2 border border-gray-800">
+            <span className="text-xs font-medium text-gray-400">
+              {userTeam.name} Budget
+            </span>
+            <span className="text-sm font-mono font-semibold text-white">
+              ${userTeam.budgetRemaining}
+            </span>
           </div>
         )}
       </CardContent>

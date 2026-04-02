@@ -312,7 +312,7 @@ export default function PokemonGrid({
   )
 
   const gridCols = {
-    sm: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8',
+    sm: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8',
     md: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7',
     lg: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
   }
@@ -351,7 +351,7 @@ export default function PokemonGrid({
                 className="pl-10 h-12 text-base"
               />
             </div>
-            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex gap-2 overflow-x-auto sm:overflow-visible flex-nowrap sm:flex-nowrap">
               <Select value={sortValue} onValueChange={handleSortChange}>
                 <SelectTrigger className="h-12 w-full sm:w-[180px]">
                   <SelectValue placeholder="Sort by..." />

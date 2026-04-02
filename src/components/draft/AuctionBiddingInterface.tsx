@@ -1,21 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Pokemon } from '@/types'
 import { createLogger } from '@/lib/logger'
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
 
 const log = createLogger('AuctionBiddingInterface')
-import { Clock, DollarSign, Gavel, Trophy, AlertCircle, History } from 'lucide-react'
+import { DollarSign, Gavel, Trophy, AlertCircle, Crown, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import PokemonCard from '@/components/pokemon/PokemonCard'
 import AuctionBidHistory, { BidHistoryEntry } from './AuctionBidHistory'
 import { toast } from 'sonner'
 import { auctionService } from '@/lib/auction-service'
 import { notificationService } from '@/lib/notification-service'
+import { draftSounds } from '@/lib/draft-sounds'
+import {
+  fadeInUpVariants,
+  celebrationVariants,
+  useReducedMotion,
+  REDUCED_MOTION_VARIANTS,
+  getTimerColor,
+} from '@/lib/draft-animations'
+import { getBestPokemonImageUrl } from '@/utils/pokemon'
+import { getTeamColor } from '@/utils/team-colors'
 
 interface AuctionBiddingInterfaceProps {
   currentAuction: {
@@ -45,6 +55,86 @@ interface AuctionBiddingInterfaceProps {
   className?: string
 }
 
+// Animated number that counts up/down
+function AnimatedBidNumber({ value }: { value: number }) {
+  const motionValue = useMotionValue(value)
+  const rounded = useTransform(motionValue, (v) => Math.round(v))
+  const display = useTransform(rounded, (v) => `$${v}`)
+  const prevValue = useRef(value)
+
+  useEffect(() => {
+    const controls = animate(motionValue, value, {
+      duration: 0.4,
+      ease: 'easeOut',
+    })
+    prevValue.current = value
+    return controls.stop
+  }, [value, motionValue])
+
+  return <motion.span>{display}</motion.span>
+}
+
+// "SOLD!" overlay animation
+function SoldOverlay({
+  winnerName,
+  pokemonName,
+  finalPrice,
+  winnerColor,
+  onComplete,
+}: {
+  winnerName: string
+  pokemonName: string
+  finalPrice: number
+  winnerColor: string
+  onComplete: () => void
+}) {
+  useEffect(() => {
+    draftSounds.play('auction-sold')
+    const timer = setTimeout(onComplete, 3000)
+    return () => clearTimeout(timer)
+  }, [onComplete])
+
+  return (
+    <motion.div
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 rounded-xl"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <motion.div
+        variants={celebrationVariants}
+        initial="initial"
+        animate="animate"
+        className="text-center"
+      >
+        <Gavel className="h-12 w-12 mx-auto mb-3 text-amber-400" />
+        <h2 className="text-3xl md:text-4xl font-black text-white mb-2">SOLD!</h2>
+        <p className="text-lg text-gray-300 mb-1">
+          {pokemonName}
+        </p>
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <span className="text-sm text-gray-400">to</span>
+          <Badge
+            className="text-sm px-3 py-1"
+            style={{ backgroundColor: winnerColor, color: 'white' }}
+          >
+            {winnerName}
+          </Badge>
+        </div>
+        <motion.div
+          className="text-4xl font-black text-emerald-400"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.3, type: 'spring', stiffness: 200 }}
+        >
+          ${finalPrice}
+        </motion.div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 export default function AuctionBiddingInterface({
   currentAuction,
   pokemon,
@@ -55,20 +145,39 @@ export default function AuctionBiddingInterface({
   onPlaceBid,
   onNominatePokemon: _onNominatePokemon,
   draftId,
-  className
+  className,
 }: AuctionBiddingInterfaceProps) {
   const [bidAmount, setBidAmount] = useState('')
   const [isPlacingBid, setIsPlacingBid] = useState(false)
-  const [showBidHistory, setShowBidHistory] = useState(false)
   const [bidHistory, setBidHistory] = useState<BidHistoryEntry[]>([])
+  const [showSold, setShowSold] = useState(false)
+  const [soldInfo, setSoldInfo] = useState<{
+    winnerName: string
+    pokemonName: string
+    finalPrice: number
+    winnerColor: string
+  } | null>(null)
+  const reducedMotion = useReducedMotion()
 
-  const userTeam = teams.find(team => team.id === userTeamId)
+  const userTeam = teams.find((team) => team.id === userTeamId)
   const currentBidder = currentAuction?.current_bidder
-    ? teams.find(team => team.id === currentAuction.current_bidder)
+    ? teams.find((team) => team.id === currentAuction.current_bidder)
     : null
-  const nominator = currentAuction?.nominated_by
-    ? teams.find(team => team.id === currentAuction.nominated_by)
-    : null
+  const isUserWinning = currentAuction?.current_bidder === userTeamId
+
+  // Compute max budget for the timer bar
+  const maxBudget = Math.max(...teams.map((t) => t.budgetRemaining), 1)
+
+  // Total duration estimate for color helper
+  const totalDuration = useRef(0)
+  useEffect(() => {
+    if (timeRemaining > 0 && totalDuration.current === 0) {
+      totalDuration.current = timeRemaining
+    }
+    if (!currentAuction) {
+      totalDuration.current = 0
+    }
+  }, [timeRemaining, currentAuction])
 
   // Auto-set bid amount to minimum valid bid
   useEffect(() => {
@@ -85,20 +194,17 @@ export default function AuctionBiddingInterface({
       return
     }
 
-    // Load initial bid history
     auctionService.getBidHistory(currentAuction.id).then(setBidHistory)
 
-    // Subscribe to real-time updates
     const unsubscribe = auctionService.subscribeToBidHistory(
       currentAuction.id,
       (updatedHistory) => {
         setBidHistory(updatedHistory)
-        
-        // Notify if someone else placed a bid
+
         if (updatedHistory.length > 0) {
           const latestBid = updatedHistory[updatedHistory.length - 1]
           const isUserBid = latestBid.teamId === userTeamId
-          
+
           if (!isUserBid) {
             notificationService.notifyBidPlaced(
               latestBid.teamName,
@@ -114,26 +220,35 @@ export default function AuctionBiddingInterface({
     return unsubscribe
   }, [currentAuction, userTeamId])
 
-  const handlePlaceBid = async () => {
+  // Detect auction completion for SOLD overlay
+  useEffect(() => {
+    if (currentAuction?.status === 'completed' && currentBidder) {
+      const teamIndex = teams.findIndex((t) => t.id === currentBidder.id)
+      const color = getTeamColor(teamIndex >= 0 ? teamIndex : 0)
+      setSoldInfo({
+        winnerName: currentBidder.name,
+        pokemonName: currentAuction.pokemon_name,
+        finalPrice: currentAuction.current_bid,
+        winnerColor: color.hex,
+      })
+      setShowSold(true)
+    }
+  }, [currentAuction?.status, currentBidder, currentAuction?.pokemon_name, currentAuction?.current_bid, teams])
+
+  const handlePlaceBid = useCallback(async () => {
     if (!currentAuction || !userTeam || isPlacingBid) return
 
     const amount = parseInt(bidAmount)
-    if (isNaN(amount) || amount <= currentAuction.current_bid) {
-      return
-    }
-
-    if (amount > userTeam.budgetRemaining) {
-      return
-    }
+    if (isNaN(amount) || amount <= currentAuction.current_bid) return
+    if (amount > userTeam.budgetRemaining) return
 
     try {
       setIsPlacingBid(true)
-
-      // Use DraftService.placeBid (via onPlaceBid) for the validated auction update
-      // This validates auction status, expiry, and budget server-side
       await onPlaceBid(amount)
 
-      // Record bid in history table (separate from auction update)
+      // Play bid sound
+      draftSounds.play('bid-placed')
+
       try {
         await auctionService.recordBidHistory({
           auctionId: currentAuction.id,
@@ -143,11 +258,9 @@ export default function AuctionBiddingInterface({
           draftId: draftId,
         })
       } catch (historyErr) {
-        // Non-critical - bid succeeded even if history recording fails
         log.warn('Failed to record bid history:', historyErr)
       }
 
-      // Notify user of successful bid
       notificationService.notifyBidPlaced(
         userTeam.name,
         amount,
@@ -155,15 +268,17 @@ export default function AuctionBiddingInterface({
         true
       )
 
-      // Auto-increment for next potential bid
       setBidAmount((amount + 1).toString())
     } catch (error) {
       log.error('Error placing bid:', error)
-      const msg = error instanceof Error ? error.message : 'Failed to place bid'
+      const msg =
+        error instanceof Error ? error.message : 'Failed to place bid'
       toast.error(msg)
 
-      // If outbid, auto-update bid input to current_bid + 1 so user can re-bid quickly
-      if (msg.includes('Current bid is now') || msg.includes('higher than current bid')) {
+      if (
+        msg.includes('Current bid is now') ||
+        msg.includes('higher than current bid')
+      ) {
         const match = msg.match(/\$(\d+)/)
         if (match) {
           setBidAmount((parseInt(match[1]) + 1).toString())
@@ -172,86 +287,111 @@ export default function AuctionBiddingInterface({
     } finally {
       setIsPlacingBid(false)
     }
-  }
+  }, [currentAuction, userTeam, isPlacingBid, bidAmount, onPlaceBid, draftId])
 
-  const canBid = () => {
-    if (!currentAuction || !userTeam || currentAuction.status !== 'active') return false
-    if (currentAuction.current_bidder === userTeamId) return false // Already highest bidder
+  const canBid = useCallback(() => {
+    if (
+      !currentAuction ||
+      !userTeam ||
+      currentAuction.status !== 'active'
+    )
+      return false
+    if (currentAuction.current_bidder === userTeamId) return false
 
     const amount = parseInt(bidAmount)
     if (isNaN(amount) || amount <= currentAuction.current_bid) return false
     if (amount > userTeam.budgetRemaining) return false
 
     return true
-  }
+  }, [currentAuction, userTeam, userTeamId, bidAmount])
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+  const quickBidAmounts = [1, 5, 10]
 
   // No active auction - waiting for nomination
   if (!currentAuction) {
     return (
-      <Card className={cn('w-full', className)}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Gavel className="h-5 w-5 text-orange-600" />
-            Auction Draft
-            <Badge variant="outline" className="text-xs">
+      <Card className={cn('w-full bg-gray-950 border-gray-800', className)}>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Gavel className="h-5 w-5 text-amber-500" />
+            <h3 className="text-lg font-bold text-white">Auction Draft</h3>
+            <Badge variant="outline" className="text-xs border-gray-700 text-gray-400">
               Waiting for Nomination
             </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-center py-8">
-            <div className="text-gray-500 dark:text-gray-400 mb-4">
-              {isUserTurn ? (
-                <>
-                  <Trophy className="h-12 w-12 mx-auto mb-2 text-yellow-500" />
-                  <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Your Turn to Nominate
-                  </h3>
-                  <p className="text-sm">
-                    Select a Pokémon from the grid below to start the auction
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Clock className="h-12 w-12 mx-auto mb-2 text-blue-500" />
-                  <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Waiting for Nomination
-                  </h3>
-                  <p className="text-sm">
-                    Another team will nominate a Pokémon for auction
-                  </p>
-                </>
-              )}
-            </div>
           </div>
 
-          {/* Team budgets overview */}
+          <div className="text-center py-8 mb-6">
+            {isUserTurn ? (
+              <motion.div
+                variants={reducedMotion ? REDUCED_MOTION_VARIANTS : fadeInUpVariants}
+                initial="initial"
+                animate="animate"
+              >
+                <Trophy className="h-14 w-14 mx-auto mb-3 text-amber-400" />
+                <h3 className="text-xl font-bold text-white mb-2">
+                  Your Turn to Nominate
+                </h3>
+                <p className="text-sm text-gray-400">
+                  Select a Pokemon from the grid below to start the auction
+                </p>
+              </motion.div>
+            ) : (
+              <div>
+                <Gavel className="h-14 w-14 mx-auto mb-3 text-gray-600" />
+                <h3 className="text-xl font-bold text-gray-300 mb-2">
+                  Waiting for Nomination
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Another team will nominate a Pokemon for auction
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Team budgets as horizontal bars */}
           <div className="space-y-2">
-            <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300">Team Budgets</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {teams.map(team => (
-                <div
-                  key={team.id}
-                  className={cn(
-                    'flex justify-between items-center p-2 rounded',
-                    team.id === userTeamId
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-                      : 'bg-gray-50 dark:bg-gray-800'
-                  )}
-                >
-                  <span className="text-sm font-medium">{team.name}</span>
-                  <Badge variant="outline" className="text-xs">
-                    ${team.budgetRemaining}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Team Budgets
+            </h4>
+            {teams
+              .sort((a, b) => b.budgetRemaining - a.budgetRemaining)
+              .map((team, idx) => {
+                const color = getTeamColor(teams.indexOf(team))
+                const pct = (team.budgetRemaining / maxBudget) * 100
+                return (
+                  <div
+                    key={team.id}
+                    className={cn(
+                      'flex items-center gap-3 p-2 rounded-lg',
+                      team.id === userTeamId
+                        ? 'bg-white/5 ring-1 ring-white/10'
+                        : ''
+                    )}
+                  >
+                    <span
+                      className="text-sm font-medium w-28 truncate"
+                      style={{ color: color.hex }}
+                    >
+                      {team.name}
+                      {team.id === userTeamId && (
+                        <span className="text-xs text-gray-500 ml-1">(you)</span>
+                      )}
+                    </span>
+                    <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: color.hex }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.5, delay: idx * 0.05 }}
+                      />
+                    </div>
+                    <span className="text-sm font-mono text-gray-300 w-12 text-right">
+                      ${team.budgetRemaining}
+                    </span>
+                  </div>
+                )
+              })}
           </div>
         </CardContent>
       </Card>
@@ -259,195 +399,341 @@ export default function AuctionBiddingInterface({
   }
 
   // Active auction
+  const timerColor = getTimerColor(timeRemaining, totalDuration.current || 60)
+
   return (
-    <Card className={cn('w-full border-orange-200 shadow-lg', className)}>
-      <CardHeader className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20">
-        <CardTitle className="flex items-center justify-between">
+    <Card
+      className={cn(
+        'w-full relative overflow-hidden bg-gray-950 border-gray-800',
+        className
+      )}
+    >
+      {/* SOLD overlay */}
+      <AnimatePresence>
+        {showSold && soldInfo && (
+          <SoldOverlay
+            {...soldInfo}
+            onComplete={() => setShowSold(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      <CardContent className="p-0">
+        {/* Top bar: timer + live badge */}
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
           <div className="flex items-center gap-2">
-            <Gavel className="h-5 w-5 text-orange-600" />
-            Live Auction
-            <Badge
-              variant="default"
-              className="bg-red-500 hover:bg-red-600 animate-pulse"
-            >
-              LIVE
-            </Badge>
-          </div>
-          <div className="flex items-center gap-2 text-lg font-mono">
-            <Clock className="h-4 w-4" />
-            <span className={cn(
-              'font-bold',
-              timeRemaining <= 10 ? 'text-red-600 animate-pulse' : 'text-orange-600'
-            )}>
-              {formatTime(timeRemaining)}
+            <Gavel className="h-4 w-4 text-amber-500" />
+            <span className="text-sm font-semibold text-white">Live Auction</span>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
             </span>
           </div>
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-6 pt-6">
-        {/* Pokemon being auctioned */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-shrink-0">
-            {pokemon && (
-              <PokemonCard
-                pokemon={pokemon}
-                size="md"
-                showCost={true}
-                showStats={true}
-                className="w-48"
-              />
-            )}
+          <div className="flex items-center gap-2">
+            <motion.span
+              className="text-2xl font-mono font-black"
+              style={{ color: timerColor }}
+              animate={
+                timeRemaining <= 10
+                  ? { scale: [1, 1.08, 1] }
+                  : { scale: 1 }
+              }
+              transition={
+                timeRemaining <= 10
+                  ? { duration: 0.6, repeat: Infinity }
+                  : {}
+              }
+            >
+              {Math.floor(timeRemaining / 60)}:
+              {(timeRemaining % 60).toString().padStart(2, '0')}
+            </motion.span>
           </div>
+        </div>
 
-          <div className="flex-1 space-y-4">
-            {/* Auction details */}
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
-                {currentAuction.pokemon_name}
-              </h3>
-              <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                <span>Nominated by: <strong>{nominator?.name || 'Unknown'}</strong></span>
-                <span>Base Cost: <strong>${pokemon?.cost || 1}</strong></span>
-              </div>
-            </div>
+        {/* Timer progress bar */}
+        <div className="h-1 bg-gray-800">
+          <motion.div
+            className="h-full"
+            style={{ backgroundColor: timerColor }}
+            animate={{
+              width: `${
+                totalDuration.current > 0
+                  ? (timeRemaining / totalDuration.current) * 100
+                  : 100
+              }%`,
+            }}
+            transition={{ duration: 1, ease: 'linear' }}
+          />
+        </div>
 
-            {/* Current bid info */}
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Current Bid
-                </span>
-                {currentBidder && (
-                  <Badge variant="outline" className="text-xs">
-                    {currentBidder.name}
-                  </Badge>
-                )}
-              </div>
-              <div className="text-3xl font-bold text-green-600 dark:text-green-400" aria-live="polite" aria-atomic="true">
-                ${currentAuction.current_bid}
-              </div>
-            </div>
+        {/* Going once / twice / SOLD overlay text */}
+        <AnimatePresence mode="wait">
+          {timeRemaining <= 5 && timeRemaining > 0 && (
+            <motion.div
+              key={timeRemaining <= 2 ? 'twice' : 'once'}
+              className="absolute top-14 left-0 right-0 z-10 text-center pointer-events-none"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <span className="text-2xl md:text-3xl font-black text-red-400 drop-shadow-lg">
+                {timeRemaining <= 2 ? 'Going twice...' : 'Going once...'}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            {/* Bidding interface */}
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Input
-                    type="number"
-                    value={bidAmount}
-                    onChange={(e) => setBidAmount(e.target.value)}
-                    placeholder="Enter bid amount"
-                    min={currentAuction.current_bid + 1}
-                    max={userTeam?.budgetRemaining || 100}
-                    className="text-lg font-semibold text-center"
+        {/* Main content: Pokemon + Bid area */}
+        <div className="p-4 md:p-6 space-y-5">
+          {/* Pokemon being auctioned */}
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            {pokemon && (
+              <motion.div
+                className="relative flex-shrink-0"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-gray-900 border border-gray-700 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={getBestPokemonImageUrl(pokemon.id, pokemon.name)}
+                    alt={pokemon.name}
+                    className="w-24 h-24 md:w-32 md:h-32 object-contain"
+                    loading="eager"
                   />
-                  <div className="text-xs text-gray-500 mt-1 text-center">
-                    Min: ${currentAuction.current_bid + 1} |
-                    Budget: ${userTeam?.budgetRemaining || 0}
-                  </div>
                 </div>
-                <Button
-                  onClick={handlePlaceBid}
-                  disabled={!canBid() || isPlacingBid}
-                  className={cn(
-                    'px-6 min-w-[100px]',
-                    canBid()
-                      ? 'bg-green-600 hover:bg-green-700'
-                      : 'bg-gray-400'
-                  )}
-                >
-                  {isPlacingBid ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                  ) : (
-                    <>
-                      <DollarSign className="h-4 w-4 mr-1" />
-                      Bid
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* Quick bid buttons */}
-              <div className="flex gap-1 flex-wrap">
-                {[1, 5, 10, 20, 50].map(increment => {
-                  const quickBid = currentAuction.current_bid + increment
-                  const canAfford = userTeam && quickBid <= userTeam.budgetRemaining
-
-                  return (
-                    <Button
-                      key={increment}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setBidAmount(quickBid.toString())}
-                      disabled={!canAfford}
-                      className="text-xs"
+              </motion.div>
+            )}
+            <div className="text-center sm:text-left">
+              <h2 className="text-2xl md:text-3xl font-black text-white capitalize">
+                {currentAuction.pokemon_name}
+              </h2>
+              {pokemon && (
+                <div className="flex flex-wrap gap-1.5 mt-2 justify-center sm:justify-start">
+                  {pokemon.types.map((type) => (
+                    <Badge
+                      key={type.name}
+                      className="text-xs px-2 py-0.5 text-white border-0"
+                      style={{ backgroundColor: type.color }}
                     >
-                      +${increment}
-                    </Button>
-                  )
-                })}
-                {userTeam && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setBidAmount(userTeam.budgetRemaining.toString())}
-                    disabled={userTeam.budgetRemaining <= currentAuction.current_bid}
-                    className="text-xs font-semibold text-red-600 border-red-200"
-                  >
-                    ALL IN (${userTeam.budgetRemaining})
-                  </Button>
-                )}
-              </div>
-
-              {/* Bid validation messages */}
-              {bidAmount && (
-                <div className="text-xs">
-                  {parseInt(bidAmount) <= currentAuction.current_bid && (
-                    <div className="flex items-center gap-1 text-red-600">
-                      <AlertCircle className="h-3 w-3" />
-                      Bid must be higher than current bid
-                    </div>
-                  )}
-                  {userTeam && parseInt(bidAmount) > userTeam.budgetRemaining && (
-                    <div className="flex items-center gap-1 text-red-600">
-                      <AlertCircle className="h-3 w-3" />
-                      Bid exceeds your remaining budget
-                    </div>
-                  )}
-                  {currentAuction.current_bidder === userTeamId && (
-                    <div className="flex items-center gap-1 text-green-600">
-                      <Trophy className="h-3 w-3" />
-                      You are the current highest bidder
-                    </div>
-                  )}
+                      {type.name}
+                    </Badge>
+                  ))}
+                  <Badge variant="outline" className="text-xs border-gray-700 text-gray-400">
+                    BST {pokemon.stats.total}
+                  </Badge>
                 </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Bid History Toggle */}
-        <div className="flex justify-between items-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowBidHistory(!showBidHistory)}
-            className="text-xs"
+          {/* Current bid display - big centered number */}
+          <motion.div
+            className="text-center py-4 rounded-xl bg-gray-900/80 border border-gray-800"
+            layout
           >
-            <History className="h-3 w-3 mr-1" />
-            {showBidHistory ? 'Hide' : 'Show'} Bid History ({bidHistory.length})
-          </Button>
-          
-          {bidHistory.length > 0 && (
-            <div className="text-xs text-gray-500">
-              Last bid: ${bidHistory[bidHistory.length - 1]?.bidAmount || 0}
+            <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">
+              Current Bid
             </div>
-          )}
-        </div>
+            <div
+              className="text-5xl md:text-6xl font-black text-white"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <AnimatedBidNumber value={currentAuction.current_bid} />
+            </div>
+            {currentBidder && (
+              <motion.div
+                className="mt-2 flex items-center justify-center gap-2"
+                key={currentBidder.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Crown className="h-3.5 w-3.5 text-amber-400" />
+                <span className="text-sm text-gray-400">
+                  {currentBidder.name}
+                  {isUserWinning && (
+                    <span className="text-emerald-400 ml-1">(You)</span>
+                  )}
+                </span>
+              </motion.div>
+            )}
+          </motion.div>
 
-        {/* Bid History Component */}
-        {showBidHistory && (
+          {/* User winning indicator */}
+          <AnimatePresence>
+            {isUserWinning && (
+              <motion.div
+                className="flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-900/30 border border-emerald-800"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <Trophy className="h-4 w-4 text-emerald-400" />
+                <span className="text-sm font-semibold text-emerald-400">
+                  You are the highest bidder
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Quick bid buttons + custom bid */}
+          <div className="space-y-3">
+            {/* Quick bid row */}
+            <div className="grid grid-cols-4 gap-2">
+              {quickBidAmounts.map((increment) => {
+                const quickBidValue = currentAuction.current_bid + increment
+                const canAfford =
+                  userTeam && quickBidValue <= userTeam.budgetRemaining
+                const disabled =
+                  !canAfford || isUserWinning || isPlacingBid
+
+                return (
+                  <Button
+                    key={increment}
+                    variant="outline"
+                    onClick={() => {
+                      setBidAmount(quickBidValue.toString())
+                    }}
+                    disabled={disabled}
+                    className={cn(
+                      'h-12 text-sm font-bold border-gray-700 bg-gray-900 hover:bg-gray-800 text-white',
+                      disabled && 'opacity-40'
+                    )}
+                    title={`Bid $${quickBidValue}`}
+                  >
+                    <span className="text-gray-500 text-xs">+{increment}</span>
+                    <span className="ml-1">${quickBidValue}</span>
+                  </Button>
+                )
+              })}
+              {/* Match + 1 button */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const matchPlusOne = currentAuction.current_bid + 1
+                  setBidAmount(matchPlusOne.toString())
+                }}
+                disabled={
+                  !userTeam ||
+                  currentAuction.current_bid + 1 > userTeam.budgetRemaining ||
+                  isUserWinning ||
+                  isPlacingBid
+                }
+                className={cn(
+                  'h-12 text-sm font-bold border-amber-700/50 bg-amber-900/20 hover:bg-amber-900/40 text-amber-400',
+                  (isUserWinning || isPlacingBid) && 'opacity-40'
+                )}
+              >
+                <Zap className="h-3.5 w-3.5 mr-1" />
+                +1
+              </Button>
+            </div>
+
+            {/* Custom bid row */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  type="number"
+                  value={bidAmount}
+                  onChange={(e) => setBidAmount(e.target.value)}
+                  placeholder="Custom bid"
+                  min={currentAuction.current_bid + 1}
+                  max={userTeam?.budgetRemaining || 100}
+                  className="pl-9 h-12 text-lg font-semibold text-center bg-gray-900 border-gray-700 text-white"
+                />
+              </div>
+              <Button
+                onClick={handlePlaceBid}
+                disabled={!canBid() || isPlacingBid}
+                className={cn(
+                  'h-12 px-8 text-base font-bold',
+                  canBid()
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    : 'bg-gray-800 text-gray-500'
+                )}
+              >
+                {isPlacingBid ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                ) : (
+                  <>
+                    <Gavel className="h-4 w-4 mr-2" />
+                    BID
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Budget info */}
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>
+                Min bid: ${currentAuction.current_bid + 1}
+              </span>
+              <span>
+                Your budget: ${userTeam?.budgetRemaining || 0}
+              </span>
+            </div>
+
+            {/* Validation messages */}
+            <AnimatePresence>
+              {bidAmount &&
+                parseInt(bidAmount) > (userTeam?.budgetRemaining || 0) && (
+                  <motion.div
+                    className="flex items-center gap-1.5 text-xs text-red-400 bg-red-900/20 p-2 rounded"
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <AlertCircle className="h-3 w-3" />
+                    Bid exceeds your remaining budget
+                  </motion.div>
+                )}
+            </AnimatePresence>
+          </div>
+
+          {/* Budget bars for all teams */}
+          <div className="space-y-1.5">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              Team Budgets
+            </h4>
+            {teams
+              .sort((a, b) => b.budgetRemaining - a.budgetRemaining)
+              .map((team) => {
+                const color = getTeamColor(teams.indexOf(team))
+                const pct = (team.budgetRemaining / maxBudget) * 100
+                const isBidder = team.id === currentAuction.current_bidder
+                return (
+                  <div
+                    key={team.id}
+                    className={cn(
+                      'flex items-center gap-2 py-1',
+                      team.id === userTeamId && 'opacity-100',
+                      team.id !== userTeamId && 'opacity-70'
+                    )}
+                  >
+                    <span className="text-xs w-24 truncate flex items-center gap-1" style={{ color: color.hex }}>
+                      {isBidder && <Crown className="h-3 w-3 text-amber-400 flex-shrink-0" />}
+                      {team.name}
+                    </span>
+                    <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: color.hex }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.5 }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono text-gray-400 w-10 text-right">
+                      ${team.budgetRemaining}
+                    </span>
+                  </div>
+                )
+              })}
+          </div>
+
+          {/* Bid history feed - always visible */}
           <AuctionBidHistory
             auctionId={currentAuction.id}
             bidHistory={bidHistory}
@@ -457,21 +743,8 @@ export default function AuctionBiddingInterface({
               currentBidder: currentAuction.current_bidder,
             }}
             userTeamId={userTeamId}
-            className="mt-4"
           />
-        )}
-
-        {/* Action status */}
-        {timeRemaining <= 10 && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-sm font-semibold">
-                Final seconds! Place your bid now!
-              </span>
-            </div>
-          </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   )

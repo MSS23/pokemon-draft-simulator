@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
-import { Users, Zap, Plus, LogIn, Shield, ArrowRight, Trophy, UserCheck, Heart, Sparkles } from 'lucide-react'
+import { Users, Zap, Plus, LogIn, Shield, ArrowRight, Trophy, UserCheck, Heart, Sparkles, Swords } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { motion, useInView } from 'framer-motion'
@@ -191,6 +191,46 @@ export default function Home() {
 
         {/* Bottom gradient fade */}
         <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-background to-transparent" />
+      </div>
+
+      {/* How It Works — quick 3-step overview */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 pb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {[
+            {
+              icon: Plus,
+              title: 'Create a Draft',
+              desc: 'Pick a template or customize your own. Choose snake, auction, or tiered format with official rulesets.',
+              accent: 'from-primary to-[hsl(var(--brand-to))]',
+            },
+            {
+              icon: Swords,
+              title: 'Pick Your Team',
+              desc: 'Take turns drafting Pokemon in real-time. Use the wishlist, auto-pick, and budget tracker to build your squad.',
+              accent: 'from-violet-500 to-purple-600',
+            },
+            {
+              icon: Trophy,
+              title: 'Battle & Win',
+              desc: 'Compete in a league season with standings, matchups, trades, and playoff brackets. Track KOs and stats.',
+              accent: 'from-amber-500 to-orange-600',
+            },
+          ].map((item, i) => (
+            <div
+              key={item.title}
+              className="relative p-5 rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border transition-all duration-200 group"
+            >
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${item.accent} flex items-center justify-center shadow-sm mb-3`}>
+                <item.icon className="h-4.5 w-4.5 text-white" />
+              </div>
+              <div className="absolute top-3 right-4 text-3xl font-black text-foreground/[0.04] select-none">
+                {String(i + 1).padStart(2, '0')}
+              </div>
+              <h3 className="font-bold text-sm mb-1.5">{item.title}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Features Section */}

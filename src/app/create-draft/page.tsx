@@ -67,6 +67,9 @@ import {
   getDefaultTierCost,
   type UsagePricingTemplate,
 } from '@/lib/usage-pricing-templates'
+import { DRAFT_TEMPLATE_PRESETS, type DraftTemplatePreset } from '@/lib/draft-template-presets'
+import { DraftTypeComparison } from '@/components/draft/DraftTypeComparison'
+import { FormatExplainer } from '@/components/draft/FormatExplainer'
 
 const log = createLogger('CreateDraftPage')
 
@@ -122,6 +125,7 @@ const DRAFT_TYPES: {
 export default function CreateDraftPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const [showTemplates, setShowTemplates] = useState(true);
   const [step, setStep] = useState<number>(0);
   const [isCreating, setIsCreating] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -161,6 +165,24 @@ export default function CreateDraftPage() {
       setFormData((prev) => ({ ...prev, userName: user.email?.split("@")[0] || "User" }));
     }
   }, [authLoading, user]);
+
+  const applyPresetTemplate = useCallback((preset: DraftTemplatePreset) => {
+    setFormData((prev) => ({
+      ...prev,
+      maxTeams: preset.settings.maxTeams,
+      draftType: preset.settings.draftType,
+      timeLimit: preset.settings.timeLimit,
+      pokemonPerTeam: preset.settings.pokemonPerTeam,
+      budgetPerTeam: preset.settings.budgetPerTeam ?? '100',
+      formatId: preset.settings.formatId ?? DEFAULT_FORMAT,
+      scoringSystem: preset.settings.scoringSystem ?? 'budget',
+      createLeague: preset.settings.createLeague ?? true,
+      leagueWeeks: preset.settings.leagueWeeks ?? '4',
+    }));
+    setShowTemplates(false);
+    setStep(1); // skip draft type step since template pre-fills it
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const handleInputChange = useCallback((field: string, value: string | boolean) => {
     setFormData((prev) => {
@@ -313,6 +335,9 @@ export default function CreateDraftPage() {
     if (step > 0) {
       setStep(step - 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      setShowTemplates(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -453,6 +478,17 @@ export default function CreateDraftPage() {
         </div>
       </div>
 
+      {/* Draft type comparison */}
+      <details className="group">
+        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
+          <HelpCircle className="h-3 w-3" />
+          Compare draft types side-by-side
+        </summary>
+        <div className="mt-3">
+          <DraftTypeComparison />
+        </div>
+      </details>
+
       {/* Draft type selection */}
       <div className="space-y-3">
         <h3 className="font-semibold text-foreground">Choose your draft format</h3>
@@ -485,7 +521,10 @@ export default function CreateDraftPage() {
                     <opt.icon className={`h-5 w-5 ${isSelected ? "text-primary" : "text-primary/70"}`} />
                   </div>
                   <div>
-                    <div className="font-semibold">{opt.title}</div>
+                    <div className="font-semibold flex items-center gap-1.5">
+                      {opt.title}
+                      <FormatExplainer formatKey={opt.value === 'points' ? 'points-budget' : opt.value === 'auction' ? 'auction-draft' : 'tiered'} />
+                    </div>
                     <div className="flex items-center gap-2">
                       {opt.badge ? (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -635,7 +674,10 @@ export default function CreateDraftPage() {
         {selectedFormat && !customPricing && (
           <div className="p-3 bg-muted/50 rounded-lg text-sm">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="font-medium">{selectedFormat.name}</span>
+              <span className="font-medium flex items-center gap-1.5">
+                {selectedFormat.name}
+                {selectedFormat.id.includes('reg-h') && <FormatExplainer formatKey="regulation-h" />}
+              </span>
               <Badge className={`text-xs ${getDifficultyColor(selectedFormat.meta.complexity)}`}>
                 {selectedFormat.meta.complexity <= 2 ? "Simple" : selectedFormat.meta.complexity <= 3 ? "Medium" : "Complex"}
               </Badge>
@@ -1158,7 +1200,76 @@ export default function CreateDraftPage() {
             </p>
           </div>
 
+          {/* Template Selection */}
+          {showTemplates && (
+            <div className="space-y-6 mb-8">
+              <div>
+                <h2 className="font-semibold text-foreground mb-1">Quick Start</h2>
+                <p className="text-xs text-muted-foreground">
+                  Pick a template to pre-fill your settings, or build a custom draft from scratch.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {DRAFT_TEMPLATE_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyPresetTemplate(preset)}
+                    className="relative flex flex-col gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-muted/50 hover:shadow-md transition-all text-left group"
+                  >
+                    {preset.recommended && (
+                      <Badge variant="default" className="absolute -top-2.5 right-3 text-[10px] px-2 py-0.5">
+                        Recommended
+                      </Badge>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl" role="img" aria-hidden="true">{preset.icon}</span>
+                      <div>
+                        <div className="font-semibold text-sm">{preset.name}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {preset.settings.maxTeams} teams
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {preset.settings.draftType}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                            {preset.settings.pokemonPerTeam} pokemon
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {preset.description}
+                    </p>
+                    <ChevronRight className="absolute top-1/2 -translate-y-1/2 right-3 h-4 w-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-background px-3 text-xs text-muted-foreground">or</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => { setShowTemplates(false); setStep(0); }}
+                className="w-full flex items-center justify-center gap-2 p-4 rounded-xl border border-dashed border-border bg-card hover:border-primary/40 hover:bg-muted/50 transition-all text-sm text-muted-foreground hover:text-foreground"
+              >
+                <Zap className="h-4 w-4" />
+                Custom Draft — full control over every setting
+              </button>
+            </div>
+          )}
+
           {/* Step indicator */}
+          {!showTemplates && (<>
           <div className="flex items-center gap-2 mb-6">
             {STEPS.map((s, i) => (
               <div key={s.id} className="flex items-center gap-2 flex-1">
@@ -1232,6 +1343,7 @@ export default function CreateDraftPage() {
               )}
             </CardFooter>
           </Card>
+          </>)}
         </div>
       </div>
     </SidebarLayout>

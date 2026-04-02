@@ -25,7 +25,8 @@ export interface PokemonSet {
   moves: string[]
   level?: number
   shiny?: boolean
-  gender?: string
+  happiness?: number
+  gender?: 'M' | 'F'
 }
 
 const STAT_NAMES: Record<string, string> = {
@@ -56,16 +57,24 @@ export function parsePokePaste(text: string): PokemonSet[] {
     const namePartRaw = itemSplit[0].trim()
     if (itemSplit.length > 1) set.item = itemSplit[1].trim()
 
-    // Check for nickname: "Nickname (Species)"
-    const parenMatch = namePartRaw.match(/^(.+?)\s*\(([^)]+)\)\s*$/)
-    if (parenMatch) {
-      const inner = parenMatch[2].trim()
+    // Check for nickname/species/gender combinations:
+    // "Nickname (Species) (F) " | "Nickname (Species)" | "Pokemon (F)" | "Pokemon"
+    const nickSpeciesGender = namePartRaw.match(/^(.+?)\s*\(([^)]+)\)\s*\((M|F)\)\s*$/)
+    const singleParen = namePartRaw.match(/^(.+?)\s*\(([^)]+)\)\s*$/)
+
+    if (nickSpeciesGender) {
+      // Nickname (Species) (Gender)
+      set.nickname = nickSpeciesGender[1].trim()
+      set.name = nickSpeciesGender[2].trim()
+      set.gender = nickSpeciesGender[3] as 'M' | 'F'
+    } else if (singleParen) {
+      const inner = singleParen[2].trim()
       // Could be gender "(M)" / "(F)" or species name
       if (inner === 'M' || inner === 'F') {
-        set.name = parenMatch[1].trim()
-        set.gender = inner
+        set.name = singleParen[1].trim()
+        set.gender = inner as 'M' | 'F'
       } else {
-        set.nickname = parenMatch[1].trim()
+        set.nickname = singleParen[1].trim()
         set.name = inner
       }
     } else {
@@ -84,6 +93,8 @@ export function parsePokePaste(text: string): PokemonSet[] {
         set.level = parseInt(line.replace('Level:', '').trim(), 10)
       } else if (line.startsWith('Shiny:')) {
         set.shiny = line.replace('Shiny:', '').trim().toLowerCase() === 'yes'
+      } else if (line.startsWith('Happiness:')) {
+        set.happiness = parseInt(line.replace('Happiness:', '').trim(), 10)
       } else if (line.startsWith('EVs:')) {
         const evStr = line.replace('EVs:', '').trim()
         for (const part of evStr.split('/')) {
@@ -158,4 +169,66 @@ export function formatIVs(ivs: Record<string, number>): string {
     .filter(([, v]) => v < 31)
     .map(([k, v]) => `${v} ${DISPLAY_NAMES[k] || k}`)
     .join(' / ')
+}
+
+/**
+ * Convert a PokemonSet back to PokePaste format string.
+ */
+export function toPokePaste(set: PokemonSet): string {
+  const lines: string[] = []
+
+  // First line: [Nickname (]Species[)] [(Gender)] [@ Item]
+  let firstLine = ''
+  if (set.nickname) {
+    firstLine = `${set.nickname} (${set.name})`
+  } else {
+    firstLine = set.name
+  }
+  if (set.gender) {
+    firstLine += ` (${set.gender})`
+  }
+  if (set.item) {
+    firstLine += ` @ ${set.item}`
+  }
+  lines.push(firstLine)
+
+  if (set.ability) lines.push(`Ability: ${set.ability}`)
+  if (set.level && set.level !== 100) lines.push(`Level: ${set.level}`)
+  if (set.shiny) lines.push('Shiny: Yes')
+  if (set.happiness !== undefined && set.happiness !== 255) lines.push(`Happiness: ${set.happiness}`)
+  if (set.teraType) lines.push(`Tera Type: ${set.teraType}`)
+
+  if (Object.keys(set.evs).length > 0) {
+    const evStr = formatEVs(set.evs)
+    if (evStr) lines.push(`EVs: ${evStr}`)
+  }
+
+  if (set.nature) lines.push(`${set.nature} Nature`)
+
+  if (Object.keys(set.ivs).length > 0) {
+    const ivStr = formatIVs(set.ivs)
+    if (ivStr) lines.push(`IVs: ${ivStr}`)
+  }
+
+  for (const move of set.moves) {
+    lines.push(`- ${move}`)
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Convert an array of PokemonSet to a full PokePaste team string,
+ * with blank lines separating each Pokemon.
+ */
+export function teamToPokePaste(team: PokemonSet[]): string {
+  return team.map(set => toPokePaste(set)).join('\n\n')
+}
+
+/**
+ * Generate a basic PokePaste template for a Pokemon that only has a name.
+ * Useful for exporting draft picks that don't have moveset data.
+ */
+export function toBasicPokePasteTemplate(name: string): string {
+  return `${name}\nAbility: \nEVs: \n- \n- \n- \n- `
 }

@@ -47,6 +47,7 @@ import type {
 import type { Pick, Team } from '@/types'
 import { createLogger } from '@/lib/logger'
 import { PokePasteImport } from '@/components/league/PokePasteImport'
+import { PokePasteExport } from '@/components/pokemon/PokePasteExport'
 import { formatEVs, type PokemonSet } from '@/lib/pokepaste-parser'
 
 const log = createLogger('LeagueTeamPage')
@@ -515,10 +516,19 @@ export default function TeamDetailPage() {
           <TabsContent value="roster" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Team Roster</CardTitle>
-                <CardDescription>
-                  {stats.activePokemon} active • {stats.faintedPokemon} fainted • {stats.deadPokemon} dead
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Team Roster</CardTitle>
+                    <CardDescription>
+                      {stats.activePokemon} active • {stats.faintedPokemon} fainted • {stats.deadPokemon} dead
+                    </CardDescription>
+                  </div>
+                  <PokePasteExport
+                    teamName={team.name}
+                    pokemon={picks.map(p => ({ name: p.pokemonName, pokemonId: p.pokemonId }))}
+                    sets={importedSets.length > 0 ? importedSets : undefined}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">

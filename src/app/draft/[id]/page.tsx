@@ -45,9 +45,12 @@ import DraftProgress from '@/components/team/DraftProgress'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
 import { AuthModal } from '@/components/auth/AuthModal'
+import SoundToggle from '@/components/draft/SoundToggle'
+import { DraftTour } from '@/components/draft/DraftTour'
 import { NotificationPrompt } from '@/components/draft/NotificationPrompt'
 import { createLogger } from '@/lib/logger'
 import { useDraftStore } from '@/stores/draftStore'
+import { draftSounds } from '@/lib/draft-sounds'
 
 const log = createLogger('DraftPage')
 
@@ -95,6 +98,8 @@ const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager
 
 const DraftOrderReveal = dynamic(() => import('@/components/draft/DraftOrderReveal'), { ssr: false })
 
+const ConfettiCelebration = dynamic(() => import('@/components/draft/ConfettiCelebration'), { ssr: false })
+
 interface DraftUIState {
   roomCode: string
   status: 'waiting' | 'drafting' | 'completed' | 'paused'
@@ -140,6 +145,8 @@ interface DraftUIState {
 // Stable empty array to prevent infinite re-renders (React #185)
 const EMPTY_ARRAY: never[] = []
 
+type MobileTab = 'pokemon' | 'team' | 'board'
+
 export default function DraftRoomPage() {
   const params = useParams()
   const searchParams = useSearchParams()
@@ -149,6 +156,9 @@ export default function DraftRoomPage() {
   const userName = searchParams.get('userName') || ''
   const isHostParam = searchParams.get('isHost') === 'true'
   const isSpectatorParam = searchParams.get('spectator') === 'true'
+
+  // Mobile tab state
+  const [activeTab, setActiveTab] = useState<MobileTab>('pokemon')
 
   // Real draft state from Supabase
   const [draftState, setDraftState] = useState<DraftUIState | null>(null)
@@ -447,6 +457,8 @@ export default function DraftRoomPage() {
     },
     onStatusChange: (newStatus) => {
       if (newStatus === 'completed') {
+        draftSounds.play('celebration')
+        setShowCelebration(true)
         notify.success('Draft Complete!', 'Redirecting to results...', { duration: 3000 })
         setTimeout(() => { router.push(`/draft/${roomCode}/results`) }, 3000)
       }
@@ -491,6 +503,11 @@ export default function DraftRoomPage() {
     roomCode,
     timeLimit: draftState?.draftSettings?.timeLimit
   })
+
+  // --- Your-turn flash overlay ---
+  const [showTurnFlash, setShowTurnFlash] = useState(false)
+  // --- Draft completion celebration ---
+  const [showCelebration, setShowCelebration] = useState(false)
 
   // --- Load initial draft state ---
   useEffect(() => {
@@ -590,6 +607,8 @@ export default function DraftRoomPage() {
         const latestPickId = pickingTeam.picks[pickingTeam.picks.length - 1]
         const pickedPokemon = pokemon.find(p => p.id === latestPickId)
         if (pickedPokemon) {
+          // Play pick sound at reduced volume for opponent picks
+          draftSounds.play('pick-confirm')
           notify.pickMade(pickedPokemon.name, pickingTeam.name, false)
 
           if (actions.preDraftPokemonId && latestPickId === actions.preDraftPokemonId) {
@@ -615,6 +634,9 @@ export default function DraftRoomPage() {
           lastTurnNotificationTime.current = now
 
           if (draftState.userTeamId === draftState.currentTeam) {
+            draftSounds.play('your-turn')
+            setShowTurnFlash(true)
+            setTimeout(() => setShowTurnFlash(false), 500)
             notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
 
             if (actions.preDraftPokemonId) {
@@ -788,8 +810,8 @@ export default function DraftRoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-500">
-      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 max-w-screen-2xl">
+    <div className="min-h-screen bg-background transition-colors duration-500 draft-room-mobile">
+      <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 max-w-screen-2xl">
         {/* Header */}
         <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 sm:gap-3 px-1">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -811,6 +833,7 @@ export default function DraftRoomPage() {
             />
           </div>
           <div className="flex items-center gap-1.5">
+            <SoundToggle className="flex-shrink-0" />
             <Button variant="ghost" size="icon" onClick={actions.copyRoomCode} className="h-8 w-8" title="Copy room code">
               <Copy className="h-4 w-4" />
             </Button>
@@ -823,7 +846,7 @@ export default function DraftRoomPage() {
                 size="icon"
                 onClick={() => setIsActivitySidebarOpen(true)}
                 className="h-8 w-8 relative"
-                title="Draft activity"
+                id="tour-activity-btn" title="Draft activity"
               >
                 <History className="h-4 w-4" />
                 {allDraftedIds.length > 0 && (
@@ -948,9 +971,9 @@ export default function DraftRoomPage() {
           </div>
         )}
 
-        {/* Draft Progress and Team Status */}
+        {/* Draft Progress — sticky on mobile */}
         {draftState?.status === 'drafting' && (
-          <div className="mb-4">
+          <div className="mb-2 md:mb-4 sticky top-0 z-30 bg-background/95 backdrop-blur-sm -mx-2 px-2 pt-1 pb-2 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 md:bg-transparent md:backdrop-blur-none" id="tour-draft-progress">
             <DraftProgress
               currentTurn={draftState?.currentTurn}
               totalTeams={draftState?.teams?.length || 0}
@@ -960,12 +983,55 @@ export default function DraftRoomPage() {
               userTeamId={draftState?.userTeamId ?? undefined}
               isUserTurn={isUserTurn}
               teams={draftState?.teams || []}
+              compact={true}
             />
           </div>
         )}
 
-        {/* Team Rosters */}
-        <div className="mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {/* Mobile Tab Bar — only on small screens during active draft */}
+        {draftState?.status === 'drafting' && (
+          <div className="flex md:hidden border-b border-border sticky top-[auto] z-20 bg-background mb-2">
+            <button
+              className={cn(
+                'flex-1 py-3 text-sm font-medium transition-colors min-h-[44px]',
+                activeTab === 'pokemon'
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-muted-foreground'
+              )}
+              onClick={() => setActiveTab('pokemon')}
+            >
+              Pokemon
+            </button>
+            <button
+              className={cn(
+                'flex-1 py-3 text-sm font-medium transition-colors min-h-[44px]',
+                activeTab === 'team'
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-muted-foreground'
+              )}
+              onClick={() => setActiveTab('team')}
+            >
+              My Team
+            </button>
+            <button
+              className={cn(
+                'flex-1 py-3 text-sm font-medium transition-colors min-h-[44px]',
+                activeTab === 'board'
+                  ? 'border-b-2 border-primary text-primary'
+                  : 'text-muted-foreground'
+              )}
+              onClick={() => setActiveTab('board')}
+            >
+              Board
+            </button>
+          </div>
+        )}
+
+        {/* Team Rosters — hidden on mobile unless "board" tab is active */}
+        <div id="tour-team-rosters" className={cn(
+          'mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3',
+          draftState?.status === 'drafting' && activeTab !== 'board' && 'hidden md:grid'
+        )}>
           {draftState ? (
             (draftState?.teams || []).map((team) => (
               <EnhancedErrorBoundary key={team.id}>
@@ -989,7 +1055,10 @@ export default function DraftRoomPage() {
 
         {/* Spectator Mode */}
         {draftState && (isSpectator || !draftState.userTeamId) && (
-          <div className="mb-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className={cn(
+            'mb-4 grid grid-cols-1 lg:grid-cols-3 gap-3',
+            draftState?.status === 'drafting' && activeTab !== 'board' && 'hidden md:grid'
+          )}>
             <div className="lg:col-span-2">
               <SpectatorMode
                 draftId={roomCode?.toLowerCase() || ''}
@@ -1061,7 +1130,10 @@ export default function DraftRoomPage() {
 
         {/* Draft Type Specific Controls - hidden for spectators */}
         {draftState && draftState.status === 'drafting' && !isSpectator && draftState.userTeamId && (
-          <div className="mb-3">
+          <div className={cn(
+            'mb-3',
+            activeTab !== 'pokemon' && 'hidden md:block'
+          )}>
             {isAuctionDraft ? (
               <div className="space-y-4">
                 {auction.currentAuction ? (
@@ -1141,6 +1213,9 @@ export default function DraftRoomPage() {
         )}
 
         {/* Wishlist Manager - Above Pokemon Grid */}
+        <div id="tour-wishlist" className={cn(
+          draftState?.status === 'drafting' && activeTab !== 'pokemon' && 'hidden md:block'
+        )}>
         {!isSpectator && draftState?.userTeamId && userId && (
           <EnhancedErrorBoundary>
             <WishlistManager
@@ -1153,14 +1228,18 @@ export default function DraftRoomPage() {
             />
           </EnhancedErrorBoundary>
         )}
+        </div>
 
         {/* Pre-draft Banner */}
         {actions.preDraftPokemonId && !isUserTurn && draftState?.status === 'drafting' && draftState?.userTeamId && !isSpectator && (
-          <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg text-sm">
+          <div className={cn(
+            'mb-2 flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg text-sm',
+            activeTab !== 'pokemon' && 'hidden md:flex'
+          )}>
             <span className="text-purple-500 flex-shrink-0">🔖</span>
             <span className="text-purple-800 dark:text-purple-200">
               Pre-drafted: <strong>{legalPokemon.find(p => p.id === actions.preDraftPokemonId)?.name ?? '...'}</strong>
-              {' '}— will auto-confirm when your turn starts
+              {' '}-- will auto-confirm when your turn starts
             </span>
             <Button
               variant="ghost"
@@ -1173,8 +1252,45 @@ export default function DraftRoomPage() {
           </div>
         )}
 
+        {/* Mobile: User's team summary — visible in "team" tab */}
+        {draftState?.status === 'drafting' && userTeam && (
+          <div className={cn(
+            'mb-3 md:hidden',
+            activeTab !== 'team' && 'hidden'
+          )}>
+            <TeamRoster
+              team={userTeam}
+              isCurrentTeam={userTeam.id === draftState?.currentTeam}
+              isUserTeam={true}
+              showTurnIndicator={true}
+              maxPokemonPerTeam={draftState?.draftSettings?.pokemonPerTeam}
+              scoringSystem={draftState?.draftSettings?.scoringSystem}
+              tierConfig={draftState?.draftSettings?.tierConfig}
+            />
+            {/* Other teams (collapsed) */}
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground px-1">Other Teams</p>
+              {(draftState?.teams || []).filter(t => t.id !== userTeam.id).map((team) => (
+                <TeamRoster
+                  key={team.id}
+                  team={team}
+                  isCurrentTeam={team.id === draftState?.currentTeam}
+                  isUserTeam={false}
+                  showTurnIndicator={true}
+                  maxPokemonPerTeam={draftState?.draftSettings?.pokemonPerTeam}
+                  scoringSystem={draftState?.draftSettings?.scoringSystem}
+                  tierConfig={draftState?.draftSettings?.tierConfig}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Pokemon Grid */}
-        <div className="bg-card rounded-lg shadow-sm border p-2 sm:p-4">
+        <div id="tour-pokemon-grid" className={cn(
+          'bg-card rounded-lg shadow-sm border p-2 sm:p-4',
+          draftState?.status === 'drafting' && activeTab !== 'pokemon' && 'hidden md:block'
+        )}>
           <EnhancedErrorBoundary>
             <PokemonGrid
               pokemon={legalPokemon}
@@ -1245,6 +1361,22 @@ export default function DraftRoomPage() {
 
       {/* Auth modal for join-from-link flow */}
       <AuthModal isOpen={showJoinAuthModal} onClose={() => setShowJoinAuthModal(false)} />
+
+      {/* Your-turn flash overlay */}
+      {showTurnFlash && (
+        <div
+          className="fixed inset-0 z-50 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle at center, rgba(74,222,128,0.25), transparent 70%)',
+            animation: 'turnFlashFade 0.5s ease-out forwards',
+          }}
+        />
+      )}
+
+      {/* Draft completion celebration */}
+      <ConfettiCelebration show={showCelebration} />
+      {/* Draft Room Tour */}
+      <DraftTour />
     </div>
   )
 }

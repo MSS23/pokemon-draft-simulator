@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Eye, RefreshCw } from "lucide-react";
+import { ArrowLeft, Eye, RefreshCw, Monitor } from "lucide-react";
 import { usePokemonList } from "@/hooks/usePokemon";
 import { useDraftStateWithRealtime } from "@/hooks/useDraftRealtime";
 import { DraftConnectionStatusBadge } from "@/components/draft/ConnectionStatus";
@@ -201,6 +201,26 @@ export default function SpectateRoomPage() {
                   : "Points Draft"}
               </Badge>
               <DraftConnectionStatusBadge status={connectionStatus} showLabel={false} />
+            </div>
+            {/* Broadcast View Link */}
+            <div className="flex flex-col items-center gap-1 mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+              >
+                <a
+                  href={`/spectate/${roomCode}/broadcast`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Monitor className="h-4 w-4 mr-2" />
+                  Open Broadcast View
+                </a>
+              </Button>
+              <span className="text-[10px] text-muted-foreground">
+                For OBS Browser Source &mdash; 1920&times;1080
+              </span>
             </div>
           </div>
 
