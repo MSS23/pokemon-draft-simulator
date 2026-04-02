@@ -1,5 +1,9 @@
-import AuthForm from '@/components/auth/AuthForm'
+import { SignIn } from '@clerk/nextjs'
 
 export default function LoginPage() {
-  return <AuthForm mode="login" />
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <SignIn routing="hash" fallbackRedirectUrl="/dashboard" />
+    </div>
+  )
 }

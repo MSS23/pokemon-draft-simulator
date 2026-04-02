@@ -1,4 +1,4 @@
-import { createServerClient } from '@supabase/ssr'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse, type NextRequest } from 'next/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
@@ -77,169 +77,123 @@ function getClientId(request: NextRequest): string {
 }
 
 // ============================================================================
+// ROUTE MATCHERS
+// ============================================================================
+
+// Routes that require authentication
+const isProtectedRoute = createRouteMatcher([
+  '/dashboard(.*)',
+  '/settings(.*)',
+  '/profile(.*)',
+  '/admin(.*)',
+  '/my-drafts(.*)',
+])
+
+// Routes that are ALWAYS public (no auth needed)
+// Spectator pages, landing page, draft pages, join pages, leagues, matches, etc.
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/spectate(.*)',
+  '/watch-drafts(.*)',
+  '/draft/(.*)',
+  '/join-draft(.*)',
+  '/join-tournament(.*)',
+  '/tournament/(.*)',
+  '/about(.*)',
+  '/terms(.*)',
+  '/privacy(.*)',
+  '/feedback(.*)',
+  '/auth(.*)',
+  '/api/(.*)',
+  '/league/(.*)',
+  '/match/(.*)',
+])
+
+// ============================================================================
 // MIDDLEWARE
 // ============================================================================
 
-export async function middleware(request: NextRequest) {
+async function applyRateLimit(request: NextRequest, requestId: string): Promise<NextResponse | null> {
   const { pathname } = request.nextUrl
 
+  if (!pathname.startsWith('/api/')) return null
+
+  const clientId = getClientId(request)
+
+  // Find matching rate limit config
+  let rateLimit = RATE_LIMITS['/api/']
+  for (const [path, config] of Object.entries(RATE_LIMITS)) {
+    if (pathname.startsWith(path) && path !== '/api/') {
+      rateLimit = config
+      break
+    }
+  }
+
+  const { limit, window: windowMs } = rateLimit
+  let isAllowed = true
+
+  // Use Upstash Redis if available, otherwise fall back to in-memory
+  if (upstashLimiters && rateLimit.key) {
+    try {
+      const result = await upstashLimiters[rateLimit.key].limit(clientId)
+      isAllowed = result.success
+    } catch {
+      // Redis unavailable — fall back to in-memory
+      // Use 3x the limit since in-memory state resets between serverless invocations
+      isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
+    }
+  } else {
+    // Use 3x the limit since in-memory state resets between serverless invocations
+    isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
+  }
+
+  if (!isAllowed) {
+    return NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        message: 'Too many requests. Please try again later.',
+        retryAfter: Math.ceil(windowMs / 1000),
+        requestId,
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil(windowMs / 1000)),
+          'X-RateLimit-Limit': String(limit),
+          'X-RateLimit-Remaining': '0',
+          'X-Request-Id': requestId,
+        },
+      }
+    )
+  }
+
+  return null
+}
+
+export default clerkMiddleware(async (auth, request) => {
   // Generate request ID for tracing
   const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
 
   // Apply rate limiting to API routes
-  if (pathname.startsWith('/api/')) {
-    const clientId = getClientId(request)
+  const rateLimitResponse = await applyRateLimit(request, requestId)
+  if (rateLimitResponse) return rateLimitResponse
 
-    // Find matching rate limit config
-    let rateLimit = RATE_LIMITS['/api/']
-    for (const [path, config] of Object.entries(RATE_LIMITS)) {
-      if (pathname.startsWith(path) && path !== '/api/') {
-        rateLimit = config
-        break
-      }
-    }
-
-    const { limit, window: windowMs } = rateLimit
-    let isAllowed = true
-
-    // Use Upstash Redis if available, otherwise fall back to in-memory
-    if (upstashLimiters && rateLimit.key) {
-      try {
-        const result = await upstashLimiters[rateLimit.key].limit(clientId)
-        isAllowed = result.success
-      } catch {
-        // Redis unavailable — fall back to in-memory
-        // Use 3x the limit since in-memory state resets between serverless invocations
-        isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
-      }
-    } else {
-      // Use 3x the limit since in-memory state resets between serverless invocations
-      isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
-    }
-
-    if (!isAllowed) {
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          message: 'Too many requests. Please try again later.',
-          retryAfter: Math.ceil(windowMs / 1000),
-          requestId,
-        },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(Math.ceil(windowMs / 1000)),
-            'X-RateLimit-Limit': String(limit),
-            'X-RateLimit-Remaining': '0',
-            'X-Request-Id': requestId,
-          },
-        }
-      )
-    }
+  // Protect routes that require authentication
+  // Public routes and unmatched routes pass through without auth
+  if (isProtectedRoute(request) && !isPublicRoute(request)) {
+    await auth.protect()
   }
 
   // Inject request ID header for downstream use
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-request-id', requestId)
-
-  let supabaseResponse = NextResponse.next({
-    request: { headers: requestHeaders },
+  const response = NextResponse.next({
+    request: {
+      headers: new Headers(request.headers),
+    },
   })
+  response.headers.set('x-request-id', requestId)
 
-  // Propagate request ID to response
-  supabaseResponse.headers.set('x-request-id', requestId)
-
-  // Check if we're in demo mode or if Supabase is not configured
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  // If demo mode or missing credentials, skip auth checks
-  if (isDemoMode || !supabaseUrl || !supabaseKey || 
-      supabaseUrl === 'your-supabase-project-url' || 
-      supabaseKey === 'your-supabase-anon-key') {
-    return supabaseResponse
-  }
-
-  let supabase
-  let user = null
-
-  try {
-    supabase = createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        },
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value)
-            )
-            supabaseResponse = NextResponse.next({
-              request,
-            })
-            supabaseResponse.headers.set('x-request-id', requestId)
-            cookiesToSet.forEach(({ name, value, options }) =>
-              supabaseResponse.cookies.set(name, value, options)
-            )
-          },
-        },
-      }
-    )
-
-    // Refreshing the auth token if expired
-    const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser()
-    user = authUser
-  } catch {
-    // Auth service unavailable - allow pages through since they handle auth client-side.
-    // Only block admin routes.
-    const adminPaths = ['/admin']
-    const needsAdmin = adminPaths.some(r => pathname.startsWith(r))
-
-    if (needsAdmin) {
-      return NextResponse.json(
-        { error: 'Authentication service unavailable' },
-        { status: 500 }
-      )
-    }
-    return supabaseResponse
-  }
-
-  // Admin routes require admin access
-  const adminRoutes = ['/admin']
-
-  const isAdminRoute = adminRoutes.some(route =>
-    request.nextUrl.pathname.startsWith(route)
-  )
-
-  // Check admin access for admin routes — verify is_admin flag, not just profile existence
-  if (isAdminRoute && user && supabase) {
-    try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id, is_admin')
-        .eq('user_id', user.id)
-        .single()
-
-      if (!profile || !profile.is_admin) {
-        return NextResponse.redirect(new URL('/unauthorized', request.url))
-      }
-    } catch {
-      return NextResponse.redirect(new URL('/unauthorized', request.url))
-    }
-  }
-
-  return supabaseResponse
-}
+  return response
+})
 
 export const config = {
   matcher: [

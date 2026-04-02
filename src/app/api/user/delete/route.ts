@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('UserDeleteAPI')
 
-export async function DELETE(request: Request) {
+export async function DELETE() {
+  const { userId } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -13,24 +19,8 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
   }
 
-  // Get auth token from request
-  const authHeader = request.headers.get('authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  if (!token) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-  }
-
-  // Verify user with anon key
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } }
-  })
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
-  }
-
-  const userId = user.id
+  // Use service role key if available for admin-level data cleanup, otherwise anon key
+  const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey)
 
   try {
     // Anonymize teams owned by this user (don't delete - preserves draft history)
@@ -50,14 +40,13 @@ export async function DELETE(request: Request) {
       log.warn('Some user data deletions failed', { userId, failureCount: failures.length })
     }
 
-    // Delete auth user if service role key is available
-    if (supabaseServiceKey) {
-      const adminClient = createClient(supabaseUrl, supabaseServiceKey)
-      const { error: deleteError } = await adminClient.auth.admin.deleteUser(userId)
-      if (deleteError) {
-        log.error('Failed to delete auth user:', deleteError)
-        // Continue anyway - data is already cleaned up
-      }
+    // Delete Clerk user account
+    try {
+      const clerk = await clerkClient()
+      await clerk.users.deleteUser(userId)
+    } catch (deleteError) {
+      log.error('Failed to delete Clerk user:', deleteError)
+      // Continue anyway - data is already cleaned up
     }
 
     return NextResponse.json({ success: true })

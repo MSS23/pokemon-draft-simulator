@@ -25,7 +25,7 @@ import { notify } from '@/lib/notifications'
 import Link from 'next/link'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
-import { AuthModal } from '@/components/auth/AuthModal'
+import { SignInButton } from '@clerk/nextjs'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
 import { createLogger } from '@/lib/logger'
 import { motion } from 'framer-motion'
@@ -157,7 +157,6 @@ export default function DashboardPage() {
   const [upcomingMatches, setUpcomingMatches] = useState<UpcomingMatch[]>([])
   const [leagueStandings, setLeagueStandings] = useState<LeagueStanding[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null)
-  const [authModalOpen, setAuthModalOpen] = useState(false)
   const [deletingLeagueId, setDeletingLeagueId] = useState<string | null>(null)
   const [deletingDraftId, setDeletingDraftId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'all'>('active')
@@ -328,12 +327,13 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-semibold">Sign in to continue</h2>
                 <p className="text-sm text-muted-foreground mt-1">View your drafts and league activity.</p>
               </div>
-              <Button variant="brand" className="w-full" onClick={() => setAuthModalOpen(true)}>
-                Sign In
-              </Button>
+              <SignInButton mode="modal">
+                <Button variant="brand" className="w-full">
+                  Sign In
+                </Button>
+              </SignInButton>
             </CardContent>
           </Card>
-          <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} redirectTo="/dashboard" />
         </div>
       </SidebarLayout>
     )

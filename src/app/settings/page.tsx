@@ -12,10 +12,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { User, Shield, Bell, Eye, Trash2, Download, MapPin, Smartphone } from 'lucide-react'
+import { User, Shield, Bell, Eye, Trash2, Download, MapPin, Smartphone, ExternalLink } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
-import { AuthModal } from '@/components/auth/AuthModal'
+import { SignInButton, useClerk } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import { createLogger } from '@/lib/logger'
 import {
@@ -40,13 +40,10 @@ interface UserProfile {
 export default function SettingsPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const clerk = useClerk()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [authModalOpen, setAuthModalOpen] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [changingPassword, setChangingPassword] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [notifications, setNotifications] = useState({
@@ -156,15 +153,6 @@ export default function SettingsPage() {
       })
       if (dbError) throw dbError
 
-      // Sync display_name + avatar into Supabase Auth user_metadata so the
-      // header/sidebar reflect the change without a full page reload
-      const metaUpdate: Record<string, string> = {}
-      if (profile.display_name) metaUpdate.display_name = profile.display_name
-      if (profile.avatar_url) metaUpdate.avatar_url = profile.avatar_url
-      if (Object.keys(metaUpdate).length > 0) {
-        await supabase.auth.updateUser({ data: metaUpdate })
-      }
-
       toast.success('Profile saved!')
     } catch (err) {
       createLogger('SettingsPage').error('Save profile error:', err)
@@ -205,13 +193,14 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">Sign in to manage your settings.</p>
             </CardHeader>
             <CardContent>
-              <Button variant="brand" className="w-full" onClick={() => setAuthModalOpen(true)}>
-                Sign In
-              </Button>
+              <SignInButton mode="modal">
+                <Button variant="brand" className="w-full">
+                  Sign In
+                </Button>
+              </SignInButton>
             </CardContent>
           </Card>
         </div>
-        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} redirectTo="/settings" />
       </SidebarLayout>
     )
   }
@@ -377,69 +366,25 @@ export default function SettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Password */}
+            {/* Security — managed by Clerk */}
             <Card>
               <CardContent className="p-6 space-y-4">
                 <div>
                   <h3 className="font-semibold flex items-center gap-2">
                     <Shield className="h-4 w-4" />
-                    Change Password
+                    Security Settings
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Choose a strong password with at least 6 characters.
+                    Password, two-factor authentication, and connected accounts are managed through your account security settings.
                   </p>
                 </div>
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      value={newPassword}
-                      onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Enter new password"
-                      autoComplete="new-password"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirm-password">Confirm Password</Label>
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={e => setConfirmPassword(e.target.value)}
-                      placeholder="Confirm new password"
-                      autoComplete="new-password"
-                    />
-                  </div>
-                  {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs text-destructive">Passwords do not match</p>
-                  )}
-                  {newPassword && newPassword.length > 0 && newPassword.length < 6 && (
-                    <p className="text-xs text-destructive">Password must be at least 6 characters</p>
-                  )}
-                  <Button
-                    variant="outline"
-                    disabled={changingPassword || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
-                    onClick={async () => {
-                      if (!supabase) return
-                      setChangingPassword(true)
-                      try {
-                        const { error } = await supabase.auth.updateUser({ password: newPassword })
-                        if (error) throw error
-                        toast.success('Password updated successfully')
-                        setNewPassword('')
-                        setConfirmPassword('')
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Failed to update password')
-                      } finally {
-                        setChangingPassword(false)
-                      }
-                    }}
-                  >
-                    {changingPassword ? 'Updating...' : 'Update Password'}
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => clerk.openUserProfile()}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Manage Security
+                </Button>
               </CardContent>
             </Card>
 
@@ -487,10 +432,7 @@ export default function SettingsPage() {
                   variant="outline"
                   onClick={async () => {
                     try {
-                      const session = await supabase.auth.getSession()
-                      const token = session.data.session?.access_token
-                      if (!token) { toast.error('You must be logged in'); return }
-                      const res = await fetch('/api/user/export', { headers: { Authorization: `Bearer ${token}` } })
+                      const res = await fetch('/api/user/export')
                       if (!res.ok) { toast.error('Export failed'); return }
                       const blob = await res.blob()
                       const url = URL.createObjectURL(blob)
@@ -538,18 +480,13 @@ export default function SettingsPage() {
                   onClick={async () => {
                     setIsDeleting(true)
                     try {
-                      const session = await supabase.auth.getSession()
-                      const token = session.data.session?.access_token
-                      if (!token) { toast.error('You must be logged in'); return }
                       const res = await fetch('/api/user/delete', {
                         method: 'DELETE',
-                        headers: { Authorization: `Bearer ${token}` },
                       })
                       if (!res.ok) {
                         const data = await res.json().catch(() => ({}))
                         throw new Error(data.error || 'Deletion failed')
                       }
-                      await supabase.auth.signOut()
                       toast.success('Account deleted. Goodbye!')
                       router.push('/')
                     } catch (err) {

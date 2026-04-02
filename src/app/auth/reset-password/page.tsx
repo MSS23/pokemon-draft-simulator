@@ -1,140 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useEffect } from 'react'
 
+/**
+ * Clerk handles password reset through its own UI.
+ * Redirect users to the sign-in page where they can use "Forgot password".
+ */
 export default function ResetPasswordPage() {
   const router = useRouter()
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    // Check if we have a valid session from the email link
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        setError('Invalid or expired reset link. Please request a new password reset.')
-      }
-    })
-  }, [])
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
-
-    setLoading(true)
-
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: password
-      })
-
-      if (error) throw error
-
-      setSuccess(true)
-      setTimeout(() => {
-        router.push('/')
-      }, 2000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="bg-white dark:bg-card p-8 rounded-lg shadow-lg max-w-md w-full">
-          <div className="text-center">
-            <div className="text-green-500 text-5xl mb-4">✓</div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground mb-2">
-              Password Reset Successful
-            </h1>
-            <p className="text-muted-foreground">
-              Redirecting you to the home page...
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+    router.replace('/auth/login')
+  }, [router])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="bg-white dark:bg-card p-8 rounded-lg shadow-lg max-w-md w-full">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground mb-6">
-          Reset Your Password
+      <div className="bg-white dark:bg-card p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground mb-4">
+          Password Reset
         </h1>
-
-        <form onSubmit={handleResetPassword} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">
-              New Password
-            </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter new password"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">
-              Confirm Password
-            </label>
-            <Input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-              required
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full brand-gradient-bg text-white hover:brightness-110"
-            disabled={loading}
-          >
-            {loading ? 'Resetting...' : 'Reset Password'}
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full"
-            onClick={() => router.push('/')}
-            disabled={loading}
-          >
-            Back to Home
-          </Button>
-        </form>
+        <p className="text-muted-foreground mb-4">
+          Password reset is now handled through the sign-in page. Redirecting...
+        </p>
       </div>
     </div>
   )

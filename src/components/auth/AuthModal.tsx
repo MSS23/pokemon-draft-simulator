@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { SignIn } from '@clerk/nextjs'
 import {
   Dialog,
   DialogContent,
@@ -10,11 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react'
-import { toast } from 'sonner'
 
 interface AuthModalProps {
   isOpen: boolean
@@ -24,72 +20,19 @@ interface AuthModalProps {
 
 export function AuthModal({ isOpen, onClose, redirectTo }: AuthModalProps) {
   const router = useRouter()
-  const { signIn, user } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   // Auto-close and redirect when user becomes authenticated
   useEffect(() => {
-    if (user && isOpen && !loading) {
-      // Close modal
+    if (user && isOpen) {
       onClose()
 
-      // Navigate if redirect specified
       if (redirectTo) {
         router.push(redirectTo)
         router.refresh()
       }
     }
-  }, [user, isOpen, loading, onClose, redirectTo, router])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
-
-    try {
-      const { error } = await signIn(email, password)
-
-      if (error) {
-        // Display user-friendly error messages
-        const errorMessage = error.message
-          .replace('Email not confirmed', 'Please check your email to confirm your account')
-          .replace('Invalid login credentials', 'Invalid email or password')
-
-        setError(errorMessage)
-      } else {
-        // Success - show toast notification
-        toast.success('Login Successful!', {
-          description: 'Welcome back! You are now signed in.',
-          duration: 3000,
-        })
-
-        // Small delay before closing and redirecting
-        setTimeout(() => {
-          onClose()
-
-          // Navigate to intended page if specified
-          if (redirectTo) {
-            router.push(redirectTo)
-            router.refresh()
-          }
-
-          // Reset form
-          setEmail('')
-          setPassword('')
-          setShowPassword(false)
-        }, 300)
-      }
-    } catch (err) {
-      const error = err as Error
-      setError(error.message || 'An error occurred. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user, isOpen, onClose, redirectTo, router])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,103 +46,11 @@ export function AuthModal({ isOpen, onClose, redirectTo }: AuthModalProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-4">
-
-          {/* Email/Password Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                  disabled={loading}
-                  autoComplete="email"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
-                  required
-                  minLength={6}
-                  disabled={loading}
-                  autoComplete="current-password"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" />
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3">
-                <p className="text-sm text-red-800 dark:text-red-200">
-                  {error}
-                </p>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign in
-            </Button>
-          </form>
-
-          {/* Forgot Password Link */}
-          <div className="text-center">
-            <button
-              type="button"
-              className="text-sm text-muted-foreground hover:text-primary"
-              disabled={loading}
-            >
-              Forgot your password?
-            </button>
-          </div>
-
-          {/* Sign Up Link */}
-          <div className="text-center text-sm">
-            <p>
-              Don&apos;t have an account?{' '}
-              <a
-                href="/auth/register"
-                className="font-medium text-primary hover:underline"
-                onClick={() => onClose()}
-              >
-                Sign up
-              </a>
-            </p>
-          </div>
+        <div className="flex justify-center mt-4">
+          <SignIn
+            routing="hash"
+            fallbackRedirectUrl={redirectTo || '/dashboard'}
+          />
         </div>
       </DialogContent>
     </Dialog>

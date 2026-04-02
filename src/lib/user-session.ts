@@ -1,8 +1,9 @@
 // User Session Management - Persistent sessions across browser restarts
 // Handles user identification, draft participation tracking, and session recovery
-// Now integrated with Supabase authentication
+// Auth is now handled by Clerk (via AuthContext). This service retains the guest
+// session fallback for unauthenticated draft participants. Authenticated user info
+// comes from Clerk's useUser() hook in AuthContext — Supabase is database-only.
 
-import { supabase } from './supabase'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('UserSession')
@@ -71,35 +72,12 @@ export class UserSessionService {
       }
     }
 
-    // Check if user is authenticated with Supabase
-    if (supabase) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const session: UserSession = {
-            userId: user.id,
-            displayName: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-            email: user.email,
-            createdAt: user.created_at,
-            lastActivity: new Date().toISOString(),
-            isAuthenticated: true
-          }
+    // Clerk is now the primary auth provider. Authenticated user info is managed
+    // by AuthContext (via Clerk's useUser hook) and cached in localStorage by
+    // components that call this service. This method checks localStorage for an
+    // existing session (either Clerk-sourced or guest).
 
-          // Store in localStorage for caching
-          try {
-            localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
-          } catch (error) {
-            log.warn('Failed to save authenticated session to localStorage:', error)
-          }
-
-          return session
-        }
-      } catch (error) {
-        log.warn('Failed to get authenticated user:', error)
-      }
-    }
-
-    // Fallback to localStorage session (no longer creates new guest sessions)
+    // Check localStorage for existing session (Clerk-authenticated or guest)
     try {
       const stored = localStorage.getItem(USER_SESSION_KEY)
       if (stored) {

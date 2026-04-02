@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { HydrationFixProvider } from "@/components/providers/HydrationFixProvider";
@@ -87,6 +88,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <HydrationErrorFilter />
+        <ClerkProvider>
         <AnalyticsProvider>
         <PerformanceMonitorProvider>
           <ErrorBoundaryProvider>
@@ -118,6 +120,7 @@ export default function RootLayout({
           </ErrorBoundaryProvider>
         </PerformanceMonitorProvider>
         </AnalyticsProvider>
+        </ClerkProvider>
         <Analytics />
       </body>
     </html>

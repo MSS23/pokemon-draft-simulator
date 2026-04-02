@@ -21,7 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useRouter } from 'next/navigation'
-import { AuthModal } from '@/components/auth/AuthModal'
+import { SignInButton } from '@clerk/nextjs'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface LeagueInfo {
@@ -34,10 +34,8 @@ interface LeagueInfo {
 
 export function Sidebar() {
   const router = useRouter()
-  const { user, signOut, loading: authLoading } = useAuth()
+  const { user, signOut } = useAuth()
   const [leagues, setLeagues] = useState<LeagueInfo[]>([])
-  const [authModalOpen, setAuthModalOpen] = useState(false)
-  const [authRedirectTo, setAuthRedirectTo] = useState<string>('/dashboard')
 
   useEffect(() => {
     if (user?.id) {
@@ -100,15 +98,6 @@ export function Sidebar() {
     router.push('/')
   }
 
-  const _handleProtectedClick = (e: React.MouseEvent, href: string) => {
-    if (authLoading) return
-    if (!user) {
-      e.preventDefault()
-      setAuthRedirectTo(href)
-      setAuthModalOpen(true)
-    }
-  }
-
   const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
 
   return (
@@ -129,14 +118,15 @@ export function Sidebar() {
             </div>
           </div>
         ) : (
-          <Button
-            onClick={() => setAuthModalOpen(true)}
-            className="w-full"
-            size="sm"
-            variant="brand"
-          >
-            Sign In
-          </Button>
+          <SignInButton mode="modal">
+            <Button
+              className="w-full"
+              size="sm"
+              variant="brand"
+            >
+              Sign In
+            </Button>
+          </SignInButton>
         )}
       </div>
 
@@ -195,11 +185,6 @@ export function Sidebar() {
         )}
       </div>
 
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        redirectTo={authRedirectTo}
-      />
     </aside>
   )
 }

@@ -17,7 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { createLogger } from '@/lib/logger'
 import { useAuth } from '@/contexts/AuthContext'
-import { AuthModal } from '@/components/auth/AuthModal'
+import { SignInButton } from '@clerk/nextjs'
 
 const log = createLogger('SpectatePage')
 
@@ -45,8 +45,6 @@ export default function SpectatePage() {
   const [searchCode, setSearchCode] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
   const [userDraftIds, setUserDraftIds] = useState<Set<string>>(new Set());
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authRedirectTo, setAuthRedirectTo] = useState<string | undefined>();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -101,19 +99,16 @@ export default function SpectatePage() {
         setDrafts(publicDrafts);
 
         // Check which of these drafts the current user is a participant in
-        if (publicDrafts.length > 0) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const draftIds = publicDrafts.map((d) => d.id);
-            const { data: userTeams } = await supabase
-              .from("teams")
-              .select("draft_id")
-              .eq("owner_id", user.id)
-              .in("draft_id", draftIds);
+        if (publicDrafts.length > 0 && user) {
+          const draftIds = publicDrafts.map((d) => d.id);
+          const { data: userTeams } = await supabase
+            .from("teams")
+            .select("draft_id")
+            .eq("owner_id", user.id)
+            .in("draft_id", draftIds);
 
-            if (userTeams) {
-              setUserDraftIds(new Set(userTeams.map((t) => t.draft_id)));
-            }
+          if (userTeams) {
+            setUserDraftIds(new Set(userTeams.map((t) => t.draft_id)));
           }
         }
       }
@@ -390,17 +385,15 @@ export default function SpectatePage() {
                             Rejoin
                           </Button>
                         ) : !user ? (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setAuthRedirectTo(`/draft/${draft.id}`);
-                              setAuthModalOpen(true);
-                            }}
-                            variant="outline"
-                          >
-                            <LogIn className="h-4 w-4 mr-1" />
-                            Join
-                          </Button>
+                          <SignInButton mode="modal">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                            >
+                              <LogIn className="h-4 w-4 mr-1" />
+                              Join
+                            </Button>
+                          </SignInButton>
                         ) : (
                           <Button
                             size="sm"
@@ -468,11 +461,6 @@ export default function SpectatePage() {
         </div>
       </div>
 
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        redirectTo={authRedirectTo}
-      />
     </SidebarLayout>
   );
 }

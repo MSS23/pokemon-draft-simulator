@@ -1,30 +1,30 @@
 import { NextResponse } from 'next/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
 
-export async function GET(request: Request) {
+export async function GET() {
+  const { userId } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
   }
 
-  // Get auth token from request
-  const authHeader = request.headers.get('authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  if (!token) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  const supabase = createClient(supabaseUrl, supabaseKey)
+
+  // Get user email from Clerk
+  let userEmail: string | undefined
+  try {
+    const clerk = await clerkClient()
+    const clerkUser = await clerk.users.getUser(userId)
+    userEmail = clerkUser.emailAddresses?.[0]?.emailAddress
+  } catch {
+    // Non-critical, continue without email
   }
-
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } }
-  })
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
-  }
-
-  const userId = user.id
 
   // Fetch all user data in parallel
   const [profile, participants, teams, picks, bids, wishlist] = await Promise.all([
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   const exportData = {
     exportedAt: new Date().toISOString(),
     userId,
-    email: user.email,
+    email: userEmail,
     profile: profile.data || [],
     participants: participants.data || [],
     teams: teams.data || [],
