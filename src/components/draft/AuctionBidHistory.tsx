@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Trophy, Clock, TrendingUp, Crown } from 'lucide-react'
+import { Clock, TrendingUp, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getTeamColor } from '@/utils/team-colors'
