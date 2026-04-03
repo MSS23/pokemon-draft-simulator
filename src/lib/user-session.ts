@@ -29,6 +29,9 @@ export interface DraftParticipation {
   joinedAt: string
 }
 
+// localStorage stores non-sensitive display data: displayName, lastActivity, draft history
+// The authoritative guest session ID is in an httpOnly cookie (SEC-06)
+// The userId in localStorage is a copy of the server-issued ID for client-side display only
 const USER_SESSION_KEY = 'pokemon-draft-user-session'
 const DRAFT_PARTICIPATION_KEY = 'pokemon-draft-participation'
 const SESSION_BACKUP_PREFIX = 'pokemon-draft-backup-'
@@ -58,11 +61,12 @@ function generateSecureGuestId(): string {
 export class UserSessionService {
   /**
    * Get or create a persistent user session
-   * Now prioritizes Supabase authenticated users
+   * Now uses server-issued httpOnly cookies for guest session IDs (SEC-06).
+   * Authenticated users continue to use Clerk — this method handles guests only.
    */
   static async getOrCreateSession(displayName?: string): Promise<UserSession> {
     if (typeof window === 'undefined') {
-      // Server-side fallback
+      // Server-side fallback — cannot set cookies here, return ephemeral ID
       return {
         userId: generateSecureGuestId(),
         displayName: displayName || 'Guest',
@@ -75,7 +79,7 @@ export class UserSessionService {
     // Clerk is now the primary auth provider. Authenticated user info is managed
     // by AuthContext (via Clerk's useUser hook) and cached in localStorage by
     // components that call this service. This method checks localStorage for an
-    // existing session (either Clerk-sourced or guest).
+    // existing session (either Clerk-sourced or previously fetched guest).
 
     // Check localStorage for existing session (Clerk-authenticated or guest)
     try {
@@ -83,12 +87,6 @@ export class UserSessionService {
       if (stored) {
         const session = JSON.parse(stored) as UserSession
         session.lastActivity = new Date().toISOString()
-
-        // Mark as not authenticated if it's a guest session
-        if (!session.isAuthenticated) {
-          session.isAuthenticated = false
-        }
-
         localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
         return session
       }
@@ -96,7 +94,36 @@ export class UserSessionService {
       log.warn('Failed to load user session from localStorage:', error)
     }
 
-    // No authenticated user and no stored session - create new guest session
+    // No existing session — request server-issued guest session (SEC-06)
+    // The server sets an httpOnly cookie; we receive the userId in the response body.
+    // The httpOnly cookie is the authoritative session; localStorage is a display cache.
+    try {
+      const response = await fetch('/api/guest/session', {
+        method: 'POST',
+        credentials: 'include', // Required for the httpOnly cookie to be set
+        headers: { 'Content-Type': 'application/json' }
+      })
+
+      if (response.ok) {
+        const data = await response.json() as { userId: string; isAuthenticated: boolean }
+        const session: UserSession = {
+          userId: data.userId,
+          displayName: displayName || 'Guest',
+          createdAt: new Date().toISOString(),
+          lastActivity: new Date().toISOString(),
+          isAuthenticated: data.isAuthenticated
+        }
+        // Cache in localStorage for display purposes (displayName, lastActivity)
+        // The authoritative session is the httpOnly cookie — this is just a display cache
+        localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session))
+        return session
+      }
+    } catch (error) {
+      log.warn('[SEC-06] Failed to fetch server-issued guest session, falling back to client-side ID:', error)
+    }
+
+    // Fallback: client-side generation if server is unreachable
+    // This maintains backward compatibility. The httpOnly cookie is preferred.
     const guestSession: UserSession = {
       userId: generateSecureGuestId(),
       displayName: displayName || 'Guest',
