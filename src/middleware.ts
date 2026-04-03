@@ -124,12 +124,17 @@ const upstashLimiters = redis
       export: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 h'), prefix: 'rl:export' }),
       ai: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:ai' }),
       user: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:user' }),
+      // RATE-05: Limit application-level join actions that trigger Supabase Realtime channel creation.
+      // Note: Supabase WS upgrades go directly to wss://*.supabase.co and bypass Next.js middleware.
+      // This rate limit covers /api/drafts/join as an indirect channel-creation guard.
+      wsConnect: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m'), prefix: 'rl:ws-connect' }),
       default: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '1 m'), prefix: 'rl:api' }),
     }
   : null
 
 const RATE_LIMITS: Record<string, { limit: number; window: number; key?: keyof NonNullable<typeof upstashLimiters> }> = {
   '/api/drafts': { limit: 10, window: 3600000, key: 'drafts' },
+  '/api/drafts/join': { limit: 10, window: 60000, key: 'wsConnect' }, // RATE-05: indirect WS channel creation guard
   '/api/picks': { limit: 60, window: 60000, key: 'picks' },
   '/api/bids': { limit: 120, window: 60000, key: 'bids' },
   '/api/user/export': { limit: 5, window: 3600000, key: 'export' },
