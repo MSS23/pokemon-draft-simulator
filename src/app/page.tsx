@@ -128,7 +128,7 @@ export default function Home() {
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground/[0.06] border border-foreground/[0.08] backdrop-blur-sm">
                 <Sparkles className="h-3 w-3 text-primary" />
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  The #1 Pokemon Draft Platform
+                  Built for VGC &amp; Draft League Communities
                 </span>
               </div>
             </motion.div>
@@ -138,9 +138,9 @@ export default function Home() {
               variants={fadeIn}
               className="text-4xl sm:text-6xl lg:text-7xl font-bold text-foreground leading-[1.05] tracking-tight"
             >
-              Where Pokemon
+              Draft leagues for
               <br />
-              <span className="bg-gradient-to-r from-primary to-[hsl(var(--brand-to))] bg-clip-text text-transparent">Champions</span> draft.
+              <span className="bg-gradient-to-r from-primary to-[hsl(var(--brand-to))] bg-clip-text text-transparent">competitive Pokemon</span>.
             </motion.h1>
 
             {/* Subtitle */}
@@ -148,8 +148,8 @@ export default function Home() {
               variants={fadeIn}
               className="text-muted-foreground text-base sm:text-lg max-w-md leading-relaxed"
             >
-              The free draft platform built for competitive Pokemon communities.
-              Snake drafts, auctions, full league seasons — any format, decided by you.
+              The free platform your VGC community actually needs. Run snake drafts, auctions,
+              and full league seasons — no spreadsheets, no signup walls.
             </motion.p>
 
             {/* CTAs */}
@@ -161,7 +161,7 @@ export default function Home() {
                 className="rounded-2xl font-bold"
               >
                 <Plus className="h-4 w-4 mr-1.5" />
-                Create Draft
+                Start a Draft
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
               <Button
