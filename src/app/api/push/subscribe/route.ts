@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
 import { z } from 'zod'
+import { auth } from '@clerk/nextjs/server'
 
 const log = createLogger('PushSubscribeAPI')
 
@@ -49,7 +50,19 @@ export async function POST(request: Request) {
     )
   }
 
-  const { endpoint, p256dh, auth, user_id, platform } = parsed.data
+  const { endpoint, p256dh, auth: authToken, user_id, platform } = parsed.data
+
+  // SEC-03: For authenticated (Clerk) users, verify the user_id in the body
+  // matches the session identity. This prevents a Clerk user from registering
+  // another user's push subscription.
+  // Guest users (no Clerk session) are allowed to pass their guest ID directly.
+  const { userId: clerkUserId } = await auth()
+  if (clerkUserId && clerkUserId !== user_id) {
+    return NextResponse.json(
+      { error: 'user_id does not match authenticated session' },
+      { status: 403 }
+    )
+  }
 
   try {
     // Upsert by endpoint (unique constraint) so re-subscribing updates the record
@@ -59,7 +72,7 @@ export async function POST(request: Request) {
         {
           endpoint,
           p256dh,
-          auth,
+          auth: authToken,
           user_id,
           platform,
           updated_at: new Date().toISOString(),

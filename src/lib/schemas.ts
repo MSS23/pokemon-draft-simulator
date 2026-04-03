@@ -59,6 +59,14 @@ export const joinDraftSchema = z.object({
   userId: z.string().optional(),
 })
 
+/** POST /api/feedback */
+export const feedbackSchema = z.object({
+  category: z.enum(['bug', 'feature', 'improvement', 'other']),
+  title: z.string().min(1).max(200).trim(),
+  description: z.string().min(1).max(2000).trim(),
+  contact: z.string().max(100).trim().optional(),
+})
+
 // ============================================================================
 // Validation Helper
 // ============================================================================

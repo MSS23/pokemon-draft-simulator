@@ -322,6 +322,10 @@ export async function validateUserCanPick(draftId: string, userId: string): Prom
     return { canPick: false, teamId: null, reason: 'Draft is not active' }
   }
 
+  // SEC-03: Server-side guest ID validation — the userId here comes from the
+  // client (localStorage for guests). If the ID does not exist in participants,
+  // canPick returns false and makePick returns an error. A fabricated guest ID
+  // that was never registered via joinDraft will have no participant record.
   // Get user's team (via DraftService so test spies intercept)
   const userTeamId = await getUserTeamViaService(draftId, userId)
   if (!userTeamId) {

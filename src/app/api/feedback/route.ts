@@ -1,12 +1,13 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { feedbackSchema, validateRequestBody } from '@/lib/schemas'
 
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_FEEDBACK_WEBHOOK_URL
 
 const CATEGORY_COLORS: Record<string, number> = {
-  bug: 0xef4444,      // red
-  feature: 0x3b82f6,  // blue
-  improvement: 0xf59e0b, // amber
-  other: 0x6b7280,    // gray
+  bug: 0xef4444,
+  feature: 0x3b82f6,
+  improvement: 0xf59e0b,
+  other: 0x6b7280,
 }
 
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -18,37 +19,27 @@ const CATEGORY_EMOJI: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { category, title, description, contact } = body as {
-      category: string
-      title: string
-      description: string
-      contact?: string
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
 
-    // Validate required fields
-    if (!category || !title || !description) {
-      return NextResponse.json(
-        { error: 'Missing required fields: category, title, description' },
-        { status: 400 }
-      )
+    const validation = validateRequestBody(feedbackSchema, body)
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
     }
 
-    if (title.length > 200 || description.length > 2000) {
-      return NextResponse.json(
-        { error: 'Title must be under 200 characters, description under 2000' },
-        { status: 400 }
-      )
-    }
+    const { category, title, description, contact } = validation.data
 
-    // Send to Discord webhook if configured
     if (DISCORD_WEBHOOK_URL) {
       const emoji = CATEGORY_EMOJI[category] || CATEGORY_EMOJI.other
       const color = CATEGORY_COLORS[category] || CATEGORY_COLORS.other
 
       const embed = {
         title: `${emoji} [${category.toUpperCase()}] ${title}`,
-        description: description,
+        description,
         color,
         fields: contact
           ? [{ name: 'Contact', value: contact, inline: true }]
@@ -66,9 +57,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (_err) {
-    return NextResponse.json(
-      { error: 'Failed to submit feedback' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to submit feedback' }, { status: 500 })
   }
 }
