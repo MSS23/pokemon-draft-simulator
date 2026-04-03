@@ -7,6 +7,47 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('AuctionService')
 
+/**
+ * Send a broadcast event for a bid to all subscribers on the draft channel.
+ * SUPA-04: Broadcast migration for bids.
+ * Replaces postgres_changes fan-out for bid events.
+ */
+async function sendBidBroadcast(
+  draftId: string,
+  auctionId: string,
+  teamId: string,
+  teamName: string,
+  bidAmount: number
+): Promise<void> {
+  if (!supabase) return
+
+  const payload = {
+    draftId,
+    auctionId,
+    teamId,
+    teamName,
+    bidAmount,
+    timestamp: Date.now()
+  }
+
+  const channel = supabase.channel(`draft:${draftId}`)
+
+  try {
+    await channel.send({
+      type: 'broadcast',
+      event: 'bid_placed',
+      payload
+    })
+    log.info('[SUPA-04] Broadcast bid_placed sent for draft:', draftId)
+  } catch (err) {
+    // Non-fatal — postgres_changes for auctions table still delivers updates
+    log.warn('[SUPA-04] Bid broadcast send failed (postgres_changes fallback active):', err)
+  } finally {
+    // Fire-and-forget channel — remove immediately to prevent accumulation
+    supabase.removeChannel(channel)
+  }
+}
+
 export interface PlaceBidParams {
   auctionId: string
   teamId: string
@@ -131,6 +172,15 @@ class AuctionService {
         log.error('Error updating auction:', auctionError)
         throw new Error('Failed to update auction')
       }
+
+      // SUPA-04: Broadcast bid to all subscribers on the draft channel
+      await sendBidBroadcast(
+        draftUuid,
+        auctionId,
+        teamId,
+        teamName,
+        bidAmount
+      ).catch(err => log.warn('Bid broadcast failed:', err))
 
       // Update local cache
       this.addBidToCache(auctionId, {
