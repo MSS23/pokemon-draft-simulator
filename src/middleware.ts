@@ -4,6 +4,68 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 // ============================================================================
+// CSP NONCE — Per-request nonce for script-src (SEC-02)
+// ============================================================================
+
+function generateNonce(): string {
+  // crypto.randomUUID() is available in Next.js Edge runtime
+  return Buffer.from(crypto.randomUUID()).toString('base64')
+}
+
+function buildCSP(nonce: string): string {
+  // Derive Clerk FAPI URL from environment — never hardcode.
+  // Format: https://<clerk-publishable-key-slug>.clerk.accounts.dev
+  const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || ''
+  const clerkSlug = clerkPublishableKey.startsWith('pk_')
+    ? clerkPublishableKey.split('_')[2]?.split('.')[0]
+    : ''
+  const clerkFapiUrl = clerkSlug
+    ? `https://${clerkSlug}.clerk.accounts.dev`
+    : 'https://*.clerk.accounts.dev'
+
+  // Custom Clerk domain if configured (e.g. clerk.draftpokemon.com)
+  const clerkDomain = process.env.NEXT_PUBLIC_CLERK_DOMAIN
+    ? `https://${process.env.NEXT_PUBLIC_CLERK_DOMAIN}`
+    : ''
+
+  const scriptSrc = [
+    "'self'",
+    `'nonce-${nonce}'`,
+    // NOTE: unsafe-eval REMOVED — framer-motion verified to not use eval()
+    // Clerk requires its own domain for FAPI calls and challenges
+    clerkFapiUrl,
+    clerkDomain,
+    'https://challenges.cloudflare.com',
+  ].filter(Boolean).join(' ')
+
+  const directives = [
+    "default-src 'self'",
+    `script-src ${scriptSrc}`,
+    // style-src keeps unsafe-inline — required by Radix UI + Tailwind (SEC-F02 deferred)
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' https://raw.githubusercontent.com https://pokeapi.co https://play.pokemonshowdown.com https://lh3.googleusercontent.com https://cdn.discordapp.com https://img.clerk.com https://img.clerkstatic.com data: blob:",
+    "font-src 'self' data:",
+    [
+      "connect-src 'self'",
+      "https://*.supabase.co wss://*.supabase.co",
+      "https://pokeapi.co",
+      "https://*.sentry.io",
+      "https://us.i.posthog.com",
+      "https://accounts.google.com",
+      "https://discord.com",
+      clerkFapiUrl,
+      clerkDomain,
+      "https://clerk.draftpokemon.com https://api.clerk.com",
+    ].filter(Boolean).join(' '),
+    "frame-src 'self' https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+    "frame-ancestors 'self'",
+    "worker-src 'self' blob:",
+  ]
+
+  return directives.join('; ')
+}
+
+// ============================================================================
 // RATE LIMITING — Upstash Redis (with in-memory fallback)
 // ============================================================================
 
@@ -59,6 +121,8 @@ const upstashLimiters = redis
       picks: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:picks' }),
       bids: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '1 m'), prefix: 'rl:bids' }),
       export: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 h'), prefix: 'rl:export' }),
+      ai: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:ai' }),
+      user: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:user' }),
       default: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '1 m'), prefix: 'rl:api' }),
     }
   : null
@@ -68,14 +132,21 @@ const RATE_LIMITS: Record<string, { limit: number; window: number; key?: keyof N
   '/api/picks': { limit: 60, window: 60000, key: 'picks' },
   '/api/bids': { limit: 120, window: 60000, key: 'bids' },
   '/api/user/export': { limit: 5, window: 3600000, key: 'export' },
+  '/api/user': { limit: 5, window: 60000, key: 'user' },   // 5/min — tight: delete, export are destructive
+  '/api/ai': { limit: 10, window: 3600000, key: 'ai' },    // 10/hr — AI analysis is expensive
   '/api/': { limit: 100, window: 60000, key: 'default' },
 }
 
 function getClientId(request: NextRequest): string {
-  const userId = request.cookies.get('user_id')?.value
-  if (userId) return `user:${userId}`
+  // Use Clerk-injected user ID (set by clerkMiddleware) for authenticated requests.
+  // This is not spoofable — it comes from the verified JWT, not client headers or cookies.
+  const clerkUserId = request.headers.get('x-clerk-user-id')
+  if (clerkUserId) return `user:${clerkUserId}`
 
-  const ip = request.headers.get('x-forwarded-for') ||
+  // IP-based fallback for unauthenticated requests (guests, public routes)
+  // x-forwarded-for may contain a comma-separated list — take the first (client) IP
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const ip = (forwardedFor ? forwardedFor.split(',')[0].trim() : null) ||
              request.headers.get('x-real-ip') ||
              'unknown'
   return `ip:${ip}`
@@ -188,6 +259,10 @@ export default clerkMiddleware(async (auth, request) => {
   // Generate request ID for tracing
   const requestId = requestHeaders.get('x-request-id') || crypto.randomUUID()
 
+  // SEC-02: Generate per-request nonce for CSP script-src
+  const nonce = generateNonce()
+  requestHeaders.set('x-nonce', nonce)
+
   // Apply rate limiting to API routes
   const rateLimitResponse = await applyRateLimit(request, requestId)
   if (rateLimitResponse) return rateLimitResponse
@@ -205,6 +280,8 @@ export default clerkMiddleware(async (auth, request) => {
     },
   })
   response.headers.set('x-request-id', requestId)
+  // SEC-02: Set nonce-based CSP on every response
+  response.headers.set('Content-Security-Policy', buildCSP(nonce))
 
   return response
 })
