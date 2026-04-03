@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse, type NextRequest } from 'next/server'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import { handleCorsPreflightIfNeeded } from '@/lib/cors'
 
 // ============================================================================
 // CSP NONCE — Per-request nonce for script-src (SEC-02)
@@ -269,6 +270,12 @@ async function applyRateLimit(request: NextRequest, requestId: string): Promise<
 
 export default clerkMiddleware(
   async (auth, request) => {
+  // SEC-04: Handle CORS preflight at edge — reject disallowed origins early
+  if (request.method === 'OPTIONS' && request.nextUrl.pathname.startsWith('/api/')) {
+    const preflightResponse = handleCorsPreflightIfNeeded(request)
+    if (preflightResponse) return preflightResponse
+  }
+
   // SEC-05: Strip CVE-2025-29927 exploitation vector at edge
   // The x-middleware-subrequest header is used by the Next.js middleware
   // bypass vulnerability. Strip it unconditionally before any auth checks.
