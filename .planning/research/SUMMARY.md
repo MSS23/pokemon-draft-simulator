@@ -1,184 +1,199 @@
 # Project Research Summary
 
-**Project:** Pokemon Draft — draftpokemon.com
-**Domain:** Security hardening and scalability audit for a production Next.js 15 + Supabase + Clerk real-time platform
+**Project:** Pokemon Draft — Draft UX Overhaul (Milestone 6)
+**Domain:** Real-time competitive draft platform UX — fantasy sports patterns applied to Pokemon drafting
 **Researched:** 2026-04-03
-**Confidence:** HIGH
+**Confidence:** HIGH (stack verified against npm/official docs; architecture derived from direct codebase analysis; features cross-referenced across 8 competitor platforms; pitfalls grounded in this app's actual bug history)
 
 ## Executive Summary
 
-This milestone targets security hardening and scalability for an existing, working product. The research revealed that the platform already has a strong foundation: Upstash Redis rate limiting, Zod validation, Supabase RLS, Clerk auth, Sentry, and most standard security headers are already in place. The gap is not missing infrastructure — it is incomplete application of existing infrastructure. Specific items like Clerk `authorizedParties` validation, guest user server-side verification, and CSP nonce adoption are partially or inconsistently implemented across the codebase. The most impactful work is plugging these gaps rather than adding new systems.
+The Draft UX Overhaul (Milestone 6) is a targeted UX refactor of an existing, functioning platform — not a greenfield build. The existing stack (Next.js 15, Supabase, Zustand, TanStack Query, Radix UI, framer-motion, @dnd-kit, Vitest) is validated and requires only four focused additions: `react-resizable-panels` for drag-to-resize panels, `nuqs` for URL-synced view state, the `motion` package rename from `framer-motion`, and `@tailwindcss/container-queries` for role-adaptive layouts. Net new bundle impact is approximately 28KB gzipped. No architectural rewrites are needed — the refactor is purely additive: extracting inline JSX from a 1,382-line page coordinator into named region components while all subscriptions and state remain anchored at the page level.
 
-The recommended approach prioritizes work in four sequential layers: (1) critical version fixes and cost safeguards that carry zero code risk, (2) application-layer security hardening that closes concrete exploit vectors, (3) scalability changes to Supabase Realtime that reduce cost and increase connection headroom, and (4) observability and cost optimization as independent cleanup. The ordering matters — CSP changes must precede guest session migration, and server-side auth hardening must precede the Realtime broadcast migration. Doing these out of order risks breaking working features or making correct security fixes that a later change undermines.
+The recommended approach follows a clear industry pattern established by Sleeper, ESPN Fantasy, Yahoo Fantasy, and FantasyPros: three-zone layout (available pool / team roster / activity feed), role-adaptive views derived from database state rather than URL parameters, and a maximum of 3-5 top-level navigation items. Competitor analysis reveals the current league hub's 7+ tabs exceed the cognitive load threshold documented by ESPN's 2025 redesign (which explicitly reduced to 4 tabs). No major fantasy platform implements a full-screen turn takeover; the differentiating approach is a decisive visual shift using CSS custom properties and compositor-only animations rather than layout-affecting modal overlays.
 
-The dominant risk in this milestone is not missing a security feature — it is breaking existing features while adding security. The codebase has a non-standard auth model (Clerk JWTs with Supabase RLS) where standard RLS patterns using `auth.uid()` silently fail. Any RLS audit that does not account for this will produce policies that look correct but block all mutations. Similarly, tightening CSP without first auditing which domains Clerk requires will silently break authentication in production. Every security change in this milestone has an adjacent breakage risk that must be tested before shipping.
+The highest risk in this milestone is restructuring `src/app/draft/[id]/page.tsx`: any refactor that causes `useDraftRealtime`'s subscription to tear down and remount during an active draft session can result in lost pick events — a class of bug this app has already encountered and fixed (the `pickInFlightRef` race condition). The mitigation is strict: subscriptions stay anchored at the page-level coordinator, region components are pure prop-receivers, and a `DraftRealtimeContext` must be established before any panel is moved. Three additional risks require early attention: Zustand inline selectors triggering infinite re-renders (already hit once in production), mount storms when converting slide-in panels to always-visible, and permission drift when unifying the participant/spectator view.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing stack requires no new major dependencies. Only three new npm packages are needed: `@upstash/ratelimit` and `@upstash/redis` (which may already be installed — the existing middleware already references Upstash), and `isomorphic-dompurify` for SSR-safe XSS sanitization. All other hardening tasks are configuration changes, SQL migrations, or code coverage improvements against already-installed packages. See [STACK.md](.planning/research/STACK.md) for full rationale and alternatives considered.
+The current stack requires no technology replacement — only four targeted additions and one rename. `react-resizable-panels@4.x` (via shadcn's `<Resizable>`) provides keyboard-accessible drag-to-resize for the split panel layout with cookie-based SSR persistence. `nuqs@2.x` provides a `useState`-like API that syncs with URL query params, solving view state loss on reload and enabling shareable draft and league URLs without manual router manipulation. The `framer-motion` → `motion` rename is a single import-path swap (`from 'motion/react'`); the old package is frozen and receives no further updates. `@tailwindcss/container-queries` (the official Tailwind Labs plugin for v3) enables the same `<PokemonGrid>` component to adapt its column count based on container width rather than viewport — prerequisite for role-adaptive layouts without markup duplication. Tailwind v4 migration is explicitly deferred; it is a standalone refactor, not a UX overhaul task.
 
-**Core technologies (additions only):**
-- `@upstash/ratelimit` + `@upstash/redis`: Persistent rate limiting across serverless instances — existing in-memory fallback is non-functional under Vercel scaling (resets per cold start)
-- `isomorphic-dompurify`: XSS sanitization that works in both Server Components and client — plain DOMPurify throws in SSR contexts (Next.js issue #46893)
-- `k6` (standalone binary, not npm): Load testing for pre-launch capacity validation — TypeScript-native, Supabase's own benchmark tool; keep test scripts in `tests/load/`
-
-**What to explicitly avoid:** Cloudflare WAF (complicates Clerk JWT distribution), Helmet.js (Node.js middleware incompatible with App Router), custom Redis session store (duplicates Clerk's JWT session layer), Prisma migration (rewrite risk with no security benefit), CAPTCHA on draft/pick actions (invite-based rooms, friction exceeds threat surface).
+**Core technology additions:**
+- `react-resizable-panels@4.x`: drag-to-resize split panel layout — 15KB gzipped, shadcn-native, keyboard-accessible
+- `nuqs@2.x`: URL-synced view state for league hub sections and draft sidebar state — 5.5KB gzipped, zero runtime deps
+- `motion@12.x` (rename from `framer-motion`): identical API, import from `motion/react` — neutral bundle swap
+- `@tailwindcss/container-queries`: container-responsive grid columns via `@container` classes — build-time only, zero runtime cost
+- shadcn `command` component: host command palette via existing `cmdk` dep — ~8KB gzipped (no new package install)
 
 ### Expected Features
 
-The features research identified what is already done versus what remains. This milestone is unusual in that most "table stakes" items are partially implemented — the question is whether they are correctly applied everywhere, not whether to build them. See [FEATURES.md](.planning/research/FEATURES.md) for the full prioritization matrix.
+Features are organized across seven UX areas researched against eight competitor platforms.
 
-**Must have (table stakes):**
-- CVE-2025-29927 patch verification + `x-middleware-subrequest` header strip — already at Next.js 15.5.12 (patched), add defense-in-depth header removal
-- Supabase spend cap enabled — dashboard verification only, zero code required
-- RLS index audit + SELECT subquery wrapper pattern — SQL changes only, prevents 100x query slowdowns at scale
-- Clerk `authorizedParties` validation across all server auth calls — low-complexity, high-security-value audit across every `auth()` call
-- Clerk webhook signature verification — prevents forged webhook events from bypassing auth flows
-- Upstash Redis confirmed configured in production — in-memory fallback is bypassable on Vercel (Pitfall 7)
-- RLS policy authenticated-role enforcement — add `TO authenticated` on non-public policies to eliminate anon query cost
+**Must have (table stakes — users expect these):**
+- Persistent sticky "whose turn / time remaining" header — every major platform shows this always-visible; currently scrolls off-screen
+- Host pause/resume accessible in one tap — all platforms require this emergency control; currently buried in a collapsible panel
+- Pick queue / wishlist visible before turn — standard on Yahoo, FantasyPros, Sleeper; currently hidden until sidebar opened
+- League hub with 3-5 top-level navigation items — ESPN reduced to 4 in 2025; current 7+ tabs exceed the cognitive load threshold
+- Post-draft board view available after completion — standard on all platforms; exists but needs clean presentation mode
+- Spectator can follow without picking — all platforms support passive viewing; currently requires a separate /spectate route
 
-**Should have (competitive hardening):**
-- Nonce-based CSP replacing static `unsafe-eval`/`unsafe-inline` in `next.config.ts`
-- Server-issued guest session IDs (httpOnly cookie) replacing localStorage-only guest IDs
-- Realtime broadcast migration for picks/bids — reduces RLS fan-out from O(subscribers) to O(1) per pick
-- `npm audit` CI gate blocking builds on critical/high CVEs
-- CORS explicit header on API routes
-- Rate limit event logging to Sentry for attack pattern detection
+**Should have (differentiators — competitive advantage):**
+- Decisive "your turn" visual shift (dim inactive panels, pulsing pick button, audio cue) — no competitor does full-screen takeover; this balance is the unoccupied design space
+- Persistent activity feed in main layout (not slide-in) — transforms draft from solitary to social; no competitor has this as a permanent panel
+- Unified `/draft/[id]` role-adaptive page (participant/spectator via DB role, not URL split) — cleaner than separate route; aligns with how all major platforms actually work
+- Host command bar — slim persistent strip visible only to host; all competitors bury controls in menus
+- Post-draft → league CTA with direct navigation — results feel like a dead end without a guided handoff to league infrastructure
 
-**Defer to post-beta:**
-- Full Postgres Changes to Broadcast migration (high refactor risk; needs production data to justify)
-- Nonce-based strict CSP removing all `unsafe-inline` for `style-src` (Radix UI + Tailwind require it)
-- Row-level encryption (Pokemon draft data contains no PII beyond display names)
-- Full WAF (Cloudflare Enterprise) — rate limiting at Vercel edge is sufficient at beta scale
-- Audit log table (useful for forensics but not launch-blocking)
+**Defer (v2+):**
+- Continuous scroll mobile (replacing tab-switching) — HIGH complexity, defer until mobile usage data shows tabs are the top complaint
+- Shareable draft recap OG image — requires server-side image rendering, high infrastructure cost
+- AI pick suggestions — deferred per PROJECT.md until post-beta
+- Soft timer option (no auto-advance) — Sleeper's most-praised feature; add when host feedback specifically requests it
 
 ### Architecture Approach
 
-The platform uses a five-layer security model: browser/PWA, Vercel Edge (CDN + middleware), Next.js App Router (API routes + Server Components), Supabase (PostgreSQL + RLS + Realtime), and Clerk (auth). Each layer has distinct security responsibilities and must not depend solely on the layer above for security guarantees. The current architecture violates this principle in one specific place: middleware-only auth enforcement for protected routes. Defense-in-depth requires redundant `auth()` checks inside every mutating API route handler independent of middleware. See [ARCHITECTURE.md](.planning/research/ARCHITECTURE.md) for the full component map, integration point details, and data flow diagrams.
+The architecture follows a "Thin Coordinator + Region Components" pattern. `page.tsx` remains the single owner of `DraftUIState`, all 5 domain hooks, and the Supabase subscription lifecycle. The 1,382-line JSX return block is extracted into 7 named region components that are pure prop-receivers — they do not subscribe to Supabase, do not call hooks that touch the database, and do not resolve `userId` independently. Turn state propagates via CSS custom properties on a `data-turn-state` attribute at the page root, avoiding React context overhead for frequently-changing values. The league hub restructure is navigation-only: `LeagueNav` is updated to group existing sub-routes under 3 primary labels; no sub-page files are merged or deleted. `DraftUIState` intentionally stays in page.tsx local state — lifting it to Zustand would break the hash-based comparison that prevents unnecessary re-renders from Supabase polling.
 
-The most architecturally significant change in this milestone is the Realtime hybrid model: switching high-frequency events (picks, bids, turn advances) from `postgres_changes` to server-controlled Broadcast. The current model has RLS fan-out on every pick — 8 subscribers means 8 RLS evaluations per pick INSERT. At 50 simultaneous drafts during a community tournament, this becomes the primary database load. The broadcast migration reduces this to a single DB write plus a server-side broadcast send, eliminating per-subscriber RLS cost entirely.
-
-**Major components and their changes:**
-1. **Edge Middleware (`src/middleware.ts`)** — Extend rate limiting key to use Clerk userId; add `x-middleware-subrequest` header strip; add rate limit patterns for `/spectate/` and `/join-draft`
-2. **RLS policies (SQL migrations)** — Wrap auth calls in `(SELECT auth.uid())` subqueries; verify custom JWT helper function (not raw `auth.uid()`) is used consistently across all tables; confirm indexes on all `USING` clause columns
-3. **DraftRealtimeManager (`src/lib/draft-realtime.ts`)** — Replace `picks` and `teams` postgres_changes subscriptions with broadcast listeners; keep postgres_changes only for `drafts` table (turn/status) and `wishlist_items` (private, per-user filtered)
-4. **Pick/auction services** — Add server-side broadcast send after successful DB write to drive the hybrid broadcast model
-5. **`next.config.ts` CSP** — Replace static CSP with nonce-based generation in middleware; add Clerk FAPI domain to `connect-src` dynamically from env var; remove `unsafe-eval` (audit Framer Motion dependency first)
-6. **Guest session (`src/lib/user-session.ts`)** — Add `/api/guest/session` endpoint for server-issued httpOnly cookie; keep localStorage for display convenience only; rate limit the new endpoint
+**Major components:**
+1. `DraftRoomPage (page.tsx)` — coordinator: owns DraftUIState, wires 5 hooks, never renders UI directly; outputs derived props to region components
+2. `HostCommandBar` — persistent host action strip in sticky header; replaces buried collapsible DraftControls
+3. `DraftActivityFeed` — always-visible inline panel (desktop: left column; mobile: bottom-sheet); replaces slide-in DraftActivitySidebar
+4. `TurnStateOverlay` — compositor-only turn transition (opacity + transform only, no layout properties); formalizes existing showTurnFlash div
+5. `DraftLayout + Left/Center/Right Panels` — three-panel responsive grid; resizable via react-resizable-panels
+6. `ViewerRole enum in useDraftSession` — derives `host | participant | spectator | lobby` from DB participants, not URL params
+7. `LeagueNav (modified)` — 3-view restructure (Overview / Matches / Management) grouping existing sub-routes without touching sub-page files
 
 ### Critical Pitfalls
 
-See [PITFALLS.md](.planning/research/PITFALLS.md) for full severity analysis. Top five pitfalls by impact:
+1. **Subscription teardown during restructuring** — moving or refactoring any component that calls `useDraftRealtime` causes WebSocket cleanup on unmount, with a 200–800ms gap where pick events are silently lost. This is the same bug class as the `pickInFlightRef` race condition already fixed. Prevention: hoist `useDraftRealtime` to the route-level page component before any panel extraction; establish `DraftRealtimeContext` in Phase 1 before touching any layout structure.
 
-1. **RLS tightening silently freezes Realtime** (CRITICAL) — Supabase checks RLS at the subscription layer. Adding per-user SELECT policies to `picks`, `teams`, or `drafts` will cause spectators and non-picking participants to stop receiving events with no error thrown — the WebSocket stays open but events are silently dropped. Prevention: keep SELECT policies draft-scoped (`USING (draft_id = $draft_id)`), not user-scoped. Always test by opening two browser tabs as different users after any RLS migration.
+2. **Zustand selector instability in new panel components** — this app hit this exact bug in production (`useWishlistSync.ts` infinite loop, React #185). Inline selectors like `useDraftStore(state => state.teams.find(...))` create new function references on every render, causing infinite re-render loops. Prevention: all selectors for new panel components must be named exports in `selectors.ts`; parameterized selectors use `useMemo` to maintain stable references between renders.
 
-2. **Clerk JWT + `auth.uid()` silent mismatch** (CRITICAL) — Clerk user IDs are strings (`user_abc123`), not UUIDs. Supabase's `auth.uid()` casts `sub` to UUID type and silently returns NULL for Clerk users. New RLS policies using `auth.uid()` look correct but block every mutation silently — no error is thrown, operations just return empty. Prevention: audit `FIX-RLS-POLICIES.md` to identify the existing custom JWT helper function, then use only that function across every new policy. Never mix `auth.uid()` and custom claim functions.
+3. **Mount storm from always-visible panels** — converting `DraftActivitySidebar` and `DraftControls` from conditionally-mounted to always-mounted causes all panel `useEffect` hooks to fire simultaneously on page load, including Supabase channel creation, which creates duplicate channels. Prevention: gate panels behind `draftState !== null` (render skeletons until first state load); add `enabled={draftState !== null && !!participantId}` to all panel hook subscriptions before removing conditional rendering.
 
-3. **CSP `connect-src` missing Clerk FAPI hostname** (CRITICAL) — Adding or tightening CSP without including Clerk's Frontend API hostname breaks token refresh. The CSP blocks Clerk's `fetch()` calls silently in production. Sessions expire and users cannot re-authenticate. The Clerk FAPI hostname differs between development and production instances. Prevention: derive Clerk FAPI URL from environment variable (not hardcoded); test full auth flow (sign-in + 60-second token refresh) after any CSP change; use `Content-Security-Policy-Report-Only` in staging first.
+4. **Permission drift in unified participant/spectator view** — `?spectator=true` URL param is not auth; any user can remove it to see pick controls. The Supabase RLS will block the actual DB mutation, but the UI will show confusing error messages. Prevention: derive `isSpectator` from database participants check (`!me?.team_id`), using the URL param only as an initial hint before state loads; introduce a single `userRole` derived value that all permission checks use.
 
-4. **Realtime channel count multiplication** (HIGH) — React StrictMode mounts components twice in development; client-side navigation does not always trigger full `useEffect` cleanup before new page mounts. If channels are not cleaned up on unmount, navigation patterns (leave draft, return) accumulate open channels against the Pro tier's 500-connection limit. Prevention: audit `supabase.getChannels().length` on mount in the draft page; add `supabase.removeAllChannels()` on `beforeunload` as safety net; grep all files calling `supabase.channel()` for cleanup on unmount.
-
-5. **Guest user IDs as rate limit keys are spoofable** (HIGH) — The rate limiter falls back to `request.cookies.get('user_id')` for guest users. Any client can rotate cookie values per request, bypassing per-user rate limits. The guest ID pattern (`guest-{timestamp}-{random}`) may also be predictable enough for enumeration. Prevention: use IP address (not cookie value) as the rate limit fallback for unauthenticated requests; if guest session tracking is needed, use server-issued signed cookies verified in middleware, not client-generated values.
+5. **Turn animation layout thrashing** — Framer Motion's `layout` prop on containers triggers full DOM reflow on every animation frame, causing visible jank during the "your turn" transition on mid-range Android devices. Prevention: drive all turn-state animations exclusively via `opacity` and `transform` (compositor-only); use CSS custom properties for visual theming; use `position: fixed` for the overlay; profile with Chrome DevTools at 4x CPU throttle before integrating into live draft state.
 
 ## Implications for Roadmap
 
-Based on the combined research, the milestone maps to four phases with clear internal dependency ordering. The build order is not arbitrary — CSP must stabilize before guest session migration, and server-side auth must be correct before Realtime broadcast migration.
+Based on the architecture's build order dependency graph and pitfall prevention requirements, the suggested phase structure is 8 phases. Phases 7 and 8 (league hub and post-draft continuity) are independent of the draft room phases and should be scheduled to run concurrently with Phases 1-4 to reduce total milestone duration.
 
-### Phase 1: Critical Fixes and Cost Safeguards
-**Rationale:** These items carry zero breakage risk (no app code changes), protect against the most severe outcomes, and establish the safe baseline that all subsequent phases depend on. The Next.js version is already patched per architecture research (15.5.12), so this phase focuses on the remaining critical gaps: confirming production environment configuration and adding defense-in-depth for the CVE.
-**Delivers:** Confirmed Supabase spend cap, verified production Upstash Redis configuration, `x-middleware-subrequest` defense-in-depth header strip, dependency audit baseline, Supabase billing alerts enabled.
-**Addresses:** CVE-2025-29927 defense-in-depth, spend cap verification, in-memory rate limiter production risk, `npm audit` CI gate setup.
-**Avoids:** Billing surprises (Pitfall 14, 15), in-memory rate limiter bypass (Pitfall 7).
+### Phase 1: Foundation — CSS Variables, ViewerRole, Turn Overlay
+**Rationale:** CSS custom properties and the `ViewerRole` enum are dependencies for every subsequent draft room phase. Establishing these first means no later phase is blocked waiting for core primitives. The `DraftRealtimeContext` provider must be created in this phase before any structural changes — this is the most important pitfall prevention action in the entire milestone.
+**Delivers:** Formalized turn-state theming system via `data-turn-state` attribute and CSS custom properties; `ViewerRole` type added to `useDraftSession`; `TurnStateOverlay` component replacing inline `showTurnFlash`; `DraftRealtimeContext` provider at page level.
+**Addresses:** Decisive "your turn" visual shift (P1 feature)
+**Avoids:** Subscription teardown (Pitfall 1), Turn animation layout thrashing (Pitfall 5)
 
-### Phase 2: Application Security Hardening
-**Rationale:** These changes close concrete, exploitable gaps in the existing auth and validation implementation. They depend on Phase 1 establishing the correct baseline but do not depend on each other — they can be parallelized within this phase. CSP changes must be validated and stable before the guest session migration in Phase 3, because the guest session API endpoint added in Phase 3 must be in the CSP allowlist.
-**Delivers:** Clerk `authorizedParties` enforcement across all server auth calls, webhook signature verification, CSP nonce migration with Clerk FAPI domain, guest write-path server validation, CORS hardening on API routes, input sanitization audit for `dangerouslySetInnerHTML` occurrences.
-**Uses:** `isomorphic-dompurify` (new install), `zod` (expand existing coverage), Clerk server SDK (expand existing usage)
-**Addresses:** Middleware-only auth reliance, CSP `unsafe-eval` removal, Clerk FAPI CSP breakage prevention, XSS via stored text fields.
-**Avoids:** Architecture Anti-Pattern 1 (middleware-only auth), Pitfall 3 (CSP Clerk FAPI), Pitfall 13 (XSS via team/draft names).
+### Phase 2: Host Command Bar
+**Rationale:** Depends on ViewerRole for permission gating (Phase 1). Self-contained: only modifies the header area and extracts buttons from `DraftControls` — does not touch the main panel layout. Safe to ship independently.
+**Delivers:** `HostCommandBar` component in sticky header (primary actions: pause/skip/ping/timer); `DraftControls` retained as overflow panel behind "•••" button; `cmdk`-based command palette via shadcn Command component.
+**Addresses:** Host command bar one-tap accessibility (P1 feature); replaces buried collapsible controls (table stakes)
+**Avoids:** Participant distraction — commander controls visible only to host via ViewerRole
 
-### Phase 3: Supabase Scalability and RLS Hardening
-**Rationale:** This is the highest-complexity phase with the highest breakage risk. It requires Phase 2 server-side auth to be correct before migrating Realtime to the broadcast model — the broadcast path requires verified server identity for the pick/bid services to send broadcast events. The RLS audit must use the correct Clerk JWT helper function confirmed in Phase 2. RLS index work and broadcast migration can be parallelized within this phase.
-**Delivers:** RLS policy audit with SELECT subquery wrapper pattern, missing index additions on `host_id`/`user_id`/`draft_id`/`team_id` columns, Realtime broadcast migration for picks and bids (eliminating per-subscriber RLS fan-out), Supavisor connection pooling confirmed, channel cleanup enforcement across all subscription sites.
-**Implements:** Hybrid broadcast architecture — server sends broadcast after DB write; clients listen on broadcast channel; postgres_changes retained only for `drafts` table and private tables
-**Addresses:** RLS fan-out cost, connection limit headroom, N+1 query elimination.
-**Avoids:** Pitfall 1 (RLS Realtime freeze), Pitfall 2 (Clerk/auth.uid() mismatch), Pitfall 8 (RLS index degradation), Pitfall 10 (channel count multiplication).
+### Phase 3: Activity Feed Integration
+**Rationale:** Depends only on the `useDraftActivity` hook rename (additive, no breaking changes). Can parallelize with Phase 2. The data shape is already correct; only rendering location changes.
+**Delivers:** `DraftActivityFeed` component always-visible in `DraftLeftPanel` slot (desktop); mobile bottom-sheet via existing `isActivitySidebarOpen` trigger; `DraftActivitySidebar` retained as mobile container.
+**Uses:** Existing `useDraftActivity` hook, `@tanstack/react-virtual` for list virtualization
+**Addresses:** Persistent activity feed (P1 feature)
+**Avoids:** Mount storm (Pitfall 3) — gate behind `draftState !== null`; Activity feed re-render regression — `React.memo` with `activities.length` comparison, incremental append model
 
-### Phase 4: Observability, Cost Optimization, and Load Testing
-**Rationale:** These changes are independent of phases 1-3 in terms of code dependencies, but benefit from the hardened foundation. Cache header additions and TanStack Query staleTime increases carry no security coordination risk. Load testing should run after Phase 3 is complete to validate the broadcast migration and channel cleanup under realistic concurrent draft scenarios — testing before Phase 3 would measure the old architecture.
-**Delivers:** PokeAPI CDN caching headers (`Cache-Control: s-maxage=86400`), ISR for landing/marketing pages, TanStack Query staleTime increases for immutable Pokemon/format data, Realtime subscription column filtering to reduce message payload, rate limit event logging to Sentry, Realtime connection peak monitoring, k6 load test scenarios for 8-player concurrent drafts.
-**Addresses:** Server compute cost reduction, Realtime message cost reduction, dependency vulnerability CI gate.
-**Avoids:** Pitfall 12 (security theater — no HTTPS redirect middleware, no IP allowlists), Pitfall 15 (over-engineering for non-existent scale).
+### Phase 4: Layout Region Extraction (Highest Risk Phase)
+**Rationale:** Depends on Phase 1 (CSS vars/context), Phase 2 (HostCommandBar exists), Phase 3 (ActivityFeed exists). This is the highest-risk phase. Must be done when all region components already exist so the page coordinator assembles pre-built, tested pieces rather than creating and restructuring simultaneously.
+**Delivers:** `DraftLayout`, `DraftLeftPanel`, `DraftCenterPanel`, `DraftRightPanel` components; `page.tsx` reduced from 1,382 lines to a thin coordinator; `react-resizable-panels` integration for user-draggable divider; `@tailwindcss/container-queries` for adaptive column counts.
+**Addresses:** Three-zone layout (table stakes); resizable split panels (stack addition)
+**Avoids:** Subscription teardown — page.tsx retains all hooks unchanged; Zustand selector instability — all new panel selectors must be named exports in `selectors.ts`; Anti-pattern: do not move DraftUIState to Zustand; do not give panels their own Supabase subscriptions
+
+### Phase 5: Spectator Unification
+**Rationale:** Depends on ViewerRole (Phase 1) and DraftLayout region composability (Phase 4). The unified view requires role-adaptive layout switching between `DraftSpectatorLayout` and `DraftParticipantLayout`.
+**Delivers:** `viewerRole`-gated layout variants; `/spectate/[id]` converted to 308 permanent redirect to `/draft/[id]?spectator=true`; `isSpectator` derived from DB participants (not URL param only); service worker cache version bumped in `public/sw.js`.
+**Addresses:** Unified participant/spectator page (P1 feature); broadcast mode at `/spectate/[id]?mode=broadcast` preserved for OBS users
+**Avoids:** Permission drift (Pitfall 7) — DB-derived roles supersede URL params; Spectator link breakage in Discord (Pitfall 6) — 308 redirect preserved indefinitely
+
+### Phase 6: Mobile Layout
+**Rationale:** Depends on Phase 4 (region components exist as separate, composable trees). Mobile-specific layout changes are isolated to the DraftLayout mobile breakpoint behavior.
+**Delivers:** Persistent bottom bar (search / team summary / progress); sticky timer visible at all scroll positions; tab-based panel switching on mobile (continuous scroll deferred to v2).
+**Addresses:** Mobile draft with persistent Pokemon search (table stakes)
+**Avoids:** iOS Safari scroll conflicts (Pitfall 4) — `h-[100dvh]` (not `h-screen`), `touch-action: pan-y` on drag handles, bounded WishlistManager container with `overscroll-behavior: contain`
+
+### Phase 7: League Hub Navigation Consolidation (Independent)
+**Rationale:** Fully independent of all draft room phases. Can start in parallel with Phase 1. `LeagueNav` is the only integration point — sub-page files are unchanged, sub-route URLs are preserved.
+**Delivers:** 3-view LeagueNav (Overview / Matches / Management); pending trade count badge preserved and promoted to Overview quick-link; deep-linkable `?tab=management&section=trades` anchor support; task-flow audit completed before implementation.
+**Addresses:** League hub 3-5 item maximum (table stakes per ESPN 2025 pattern)
+**Avoids:** Feature discoverability loss (Pitfall 8) — task-flow audit required; trades reachable in 2 taps from any league view
+
+### Phase 8: Post-Draft League Continuity (Independent)
+**Rationale:** Fully independent. Low complexity. Verify league auto-creation on draft completion before implementing the CTA link.
+**Delivers:** DraftResults CTA button linking to league hub; draft recap as league's first snapshot; `nuqs`-based shareable URL for active view state.
+**Addresses:** Post-draft → league CTA (P1 feature); post-draft shareable results (table stakes)
 
 ### Phase Ordering Rationale
 
-- Phase 1 before everything: establishes safe billing environment and confirms the production security baseline without touching any application code; zero breakage risk
-- Phase 2 before Phase 3: CSP nonce changes must be validated and stable before the guest session httpOnly cookie migration (which adds a new API endpoint the CSP must allow); server-side `auth()` checks in API routes must be confirmed correct before Realtime broadcast migration trusts server identity for broadcast sends
-- Phase 3 before Phase 4 load testing: load tests against the broadcast model will show meaningfully different results than against the postgres_changes model; testing Phase 3 changes under load validates the migration was correct
-- Phases 1 and 2 can be worked by parallel tracks; Phase 3 has internal step dependencies (RLS audit must precede broadcast migration so new RLS policies don't break the existing subscription pattern before the migration is complete)
+- Phases 1-3 establish primitives and low-risk components before the high-risk Phase 4 restructuring. When Phase 4 runs, it assembles already-tested pieces rather than building and moving simultaneously.
+- Phase 4 is the highest-risk phase; deferring it until Phases 1-3 are stable reduces the scope of what can go wrong during the dangerous restructuring window.
+- Phases 5-6 depend on Phase 4's region composability and are correctly sequenced after it.
+- Phases 7 and 8 have zero shared dependencies with the draft room phases and should be scheduled to overlap with Phases 1-4 to reduce total milestone wall-clock time.
+- The build order in ARCHITECTURE.md (CSS vars → ViewerRole → HostCommandBar → ActivityFeed → TurnStateOverlay → Layout Regions → Spectator Unification → Mobile Flow → League Hub → Results Continuity) matches this phase structure exactly.
 
 ### Research Flags
 
-Phases likely needing deeper implementation planning:
-- **Phase 2 (CSP unsafe-eval removal):** Framer Motion and some Radix UI internals may require `eval()`. Run `grep -r "eval(" node_modules/framer-motion/dist/` before committing to full `unsafe-eval` removal. Use `Content-Security-Policy-Report-Only` mode first to discover violations without blocking. This may need to be deferred if Framer Motion requires eval.
-- **Phase 3 (Clerk/Supabase JWT integration path):** Clerk deprecated its legacy Supabase JWT template in April 2025. The codebase's `FIX-RLS-POLICIES.md` documents a workaround, but which JWT integration path is currently active (legacy vs. native Supabase integration) needs confirmation before writing any new RLS policies — the correct custom JWT helper function depends on this.
-- **Phase 3 (Realtime broadcast migration blast radius):** The migration touches `DraftRealtimeManager`, `draft-picks-service`, `auction-service`, and potentially `useWishlistSync`. Precisely map which tables must stay on postgres_changes (private per-user filtered data like `wishlist_items`) before implementation. Mixing broadcast and postgres_changes in the same subscription code requires clear separation.
+Phases needing deeper attention during planning:
+- **Phase 4 (Layout Regions):** No additional domain research needed, but implementation must explicitly reference PITFALLS.md's five anti-patterns section during code review. These are the exact mistakes this phase will be tempted to make under time pressure.
+- **Phase 5 (Spectator Unification):** Security concern requiring a unit test: "isSpectator should be true when userId is not in participants list, regardless of URL param." Write this test before implementing the unified view.
+- **Phase 6 (Mobile Layout):** Physical iOS device testing is mandatory before shipping. The Simulator does not reproduce the `touch-action` scroll capture bug documented in Pitfall 4. Dynamic island models have different address bar behavior from older iPhones — test on both if possible.
 
-Phases with standard patterns (skip deeper research):
-- **Phase 1:** All tasks are dashboard configuration or standard npm commands — no domain research needed
-- **Phase 4 (caching headers):** Cache-Control patterns for Next.js API routes and TanStack Query staleTime are well-documented standard patterns
-- **Phase 4 (k6 load tests):** Standard k6 TypeScript test structure; all scenario types documented clearly in STACK.md research
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (Foundation):** CSS custom properties and TypeScript enum types are well-understood; no domain research needed.
+- **Phase 2 (Host Command Bar):** Extracting buttons from an existing component to a new location with identical callbacks is low complexity.
+- **Phase 3 (Activity Feed):** Data shape is already correct in `useDraftActivity`; only rendering location changes.
+- **Phase 7 (League Hub Nav):** Navigation restructure with unchanged sub-routes; task-flow audit is the only required planning step.
+- **Phase 8 (Post-Draft Continuity):** Low complexity CTA and URL state addition; standard Next.js link patterns.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All additions sourced from official Vercel, Upstash, and Next.js documentation. "No major new dependencies" conclusion is well-supported. |
-| Features | HIGH | Features research cross-referenced official Supabase, Clerk, and Next.js docs. The existing-vs-missing gap analysis is based on actual codebase file references confirmed in architecture research. |
-| Architecture | HIGH | Grounded in actual codebase file paths and confirmed current state (Next.js version 15.5.12, package.json dependencies, middleware implementation). Not inferred — verified against existing code. |
-| Pitfalls | HIGH for Supabase/Clerk integration (official docs + GitHub issues verified); MEDIUM for scalability thresholds (community-verified extrapolated load models, not measured production data) |
+| Stack | HIGH | All additions verified against npm registry, official changelogs, and compatibility matrices. Version-specific breaking changes (react-resizable-panels v4 API rename: `PanelResizeHandle` → `Separator`, `direction` → `orientation`) explicitly documented. |
+| Features | MEDIUM | Competitor UX derived from official docs and press releases (HIGH for Sleeper, ESPN, Drafty Sports). Visual specifics inferred from behavior documentation where screenshots were unavailable. The "no competitor does full-screen takeover" finding is based on documentation review, not direct UI observation of live platforms. |
+| Architecture | HIGH | Based on direct codebase analysis of all affected files with specific line numbers cited (page.tsx at 1,382 lines, line 1057 for SpectatorMode render, lines 1095-1129 for DraftControls block). Known bugs and their fixes directly inform the pitfall prevention strategy. |
+| Pitfalls | HIGH | All critical pitfalls grounded in this app's actual code, documented bug post-mortems (infinite loop fix 2026-03-04, pickInFlightRef race condition 2026-03-04), and verified iOS Safari behavior. These are documented failure modes with recovery strategies, not theoretical risks. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Clerk JWT integration path (legacy vs. native):** The pitfalls research identifies April 2025 as the deprecation date for Clerk's legacy Supabase JWT template. `FIX-RLS-POLICIES.md` documents a workaround, but whether the codebase has been migrated to native Supabase integration is not confirmed. Confirm this at the start of Phase 3 — the correct custom JWT helper function for new RLS policies depends on which path is active.
-- **`dangerouslySetInnerHTML` usage count:** The input sanitization pitfall identifies this as the primary XSS risk, but the actual count of occurrences is unknown. Run `grep -r "dangerouslySetInnerHTML" src/` at the start of Phase 2 to scope the work accurately.
-- **Framer Motion `eval()` dependency:** Whether the current Framer Motion version requires `eval()` is flagged as a potential blocker for full CSP tightening. Needs a targeted check before committing to the CSP nonce phase scope.
-- **Actual Supabase channel count per participant:** The connection limit math assumes ~1 channel per participant using the consolidated `DraftRealtimeManager`. If older subscription code in hooks creates additional channels, the math and the upgrade decision changes. Instrument `supabase.getChannels().length` in a staging test session before Phase 3 to establish the actual baseline.
-- **Upstash Redis already installed?:** The existing middleware references Upstash — run `npm ls @upstash/ratelimit @upstash/redis` before adding to package.json to avoid duplicate installs.
+- **"No competitor does full-screen takeover" claim:** Based on documentation review, not direct UI testing of live platforms. During Phase 1, prototype the CSS custom property approach (dim + pulse) in isolation before committing. If the visual effect feels insufficient compared to competitor "on the clock" states, revisit the takeover approach with explicit UX rationale before Phase 4.
+- **League hub 3-view task-flow audit:** PITFALLS.md explicitly requires completing a task-flow audit before implementing the league hub consolidation (Pitfall 8). For each existing tab, map the primary action and confirm it is reachable in 2 taps from the new structure. This is a required planning step for Phase 7, not skippable.
+- **Supabase channel count baseline:** The mount storm pitfall and always-visible panels create conditions for duplicate channel subscriptions. Instrument `supabase.getChannels().length` in a staging draft session before Phase 3 to establish the actual baseline. The Supabase dashboard should show exactly 1 channel per draft room after Phase 3 ships.
+- **`allDraftedIds.includes()` performance:** PITFALLS.md identifies an existing O(n) array scan in the always-visible grid that becomes critical when the Pokemon grid is no longer tab-switched. Convert to `Set`-based lookup (`new Set(allDraftedIds)` in a `useMemo`) before Phase 4 makes the grid permanently visible.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits) — connection quotas, fan-out behavior
-- [Supabase Realtime Pricing](https://supabase.com/docs/guides/realtime/pricing) — message cost model and fan-out math
-- [Supabase RLS Performance Best Practices](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv) — initPlan pattern, SELECT subquery wrapper
-- [Supabase Production Checklist](https://supabase.com/docs/guides/deployment/going-into-prod) — spend cap, billing alerts
-- [Supabase Broadcast docs](https://supabase.com/docs/guides/realtime/broadcast) — broadcast vs postgres_changes architecture
-- [Supabase Connection Management](https://supabase.com/docs/guides/database/connection-management) — Supavisor setup
-- [Supabase Performance Advisor](https://supabase.com/docs/guides/database/database-advisors) — RLS index lint warnings
-- [Next.js CSP with nonces (App Router)](https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy) — nonce generation pattern
-- [CVE-2025-29927 Next.js Advisory](https://nextjs.org/blog/cve-2025-29927) — middleware bypass details and patch version
-- [CVE-2025-55182 RSC RCE Advisory](https://snyk.io/blog/security-advisory-critical-rce-vulnerabilities-react-server-components/) — RSC vulnerability
-- [Clerk CSP Headers Guide](https://clerk.com/docs/guides/secure/best-practices/csp-headers) — FAPI domain requirements
-- [Clerk JWT Security / authorizedParties](https://clerk.com/docs/guides/sessions/manual-jwt-verification) — JWT validation
-- [Clerk Supabase Integration Docs](https://clerk.com/docs/guides/development/integrations/databases/supabase) — JWT template deprecation (April 2025)
-- [Upstash Rate Limiting for Vercel Edge](https://upstash.com/blog/edge-rate-limiting) — edge-compatible rate limiting
-- [Vercel Firewall Documentation](https://vercel.com/docs/vercel-firewall) — WAF bot filter configuration
+- Direct codebase analysis: `src/app/draft/[id]/page.tsx` (1,382 lines full analysis), `src/hooks/useDraftRealtime.ts`, `useDraftActivity.ts`, `useDraftActions.ts`, `useDraftSession.ts`
+- Direct codebase analysis: `src/components/draft/DraftControls.tsx`, `DraftActivitySidebar.tsx`, `ActivityFeed.tsx`, `src/stores/draftStore.ts`
+- App `MEMORY.md` — infinite loop post-mortem (2026-03-04), pickInFlightRef root cause and fix documented
+- [react-resizable-panels npm](https://www.npmjs.com/package/react-resizable-panels) — v4.8.0 confirmed, v4 breaking changes verified
+- [motion.dev docs](https://motion.dev/docs/react) — Motion 12.37.0, migration from framer-motion, layoutId and AnimatePresence patterns
+- [nuqs npm](https://www.npmjs.com/package/nuqs) — v2.8.9, Next.js Conf 2025 adoption confirmed
+- [Tailwind CSS container queries plugin](https://github.com/tailwindlabs/tailwindcss-container-queries) — official Tailwind Labs plugin for v3
+- [Sleeper draft timer mechanics](https://support.sleeper.com/en/articles/4029085-how-does-the-draft-timer-work) — soft timer pattern (official docs)
+- [Sleeper big screen mode](https://support.sleeper.com/en/articles/2083195-how-to-cast-your-draft-to-the-big-screen) — broadcast URL pattern (official docs)
+- [ESPN Fantasy 2025 redesign press release](https://espnpressroom.com/us/press-releases/2025/08/espn-fantasy-football-30th-anniversary-new-design-new-features-all-new-fantasy-app-for-2025/) — 4-tab navigation, swipe patterns
+- [Drafty Sports commissioner controls](https://draftysports.com/help/docs/commissioner-controls) — operational vs. structural control separation (official docs)
+- [Clicky Draft features](https://clickydraft.com/draftapp/page/features) — per-team connection status, timer controls (official feature page)
 
 ### Secondary (MEDIUM confidence)
-- [Supabase Realtime RLS Issue #35195](https://github.com/supabase/supabase/issues/35195) — RLS silently breaks Realtime subscriptions
-- [Supabase Discussion #33091](https://github.com/orgs/supabase/discussions/33091) — Clerk/auth.uid() UUID mismatch behavior
-- [localStorage vs httpOnly cookies security](https://design-code.tips/blog/2025-02-28-why-local-storage-is-vulnerable-to-xss-attacks-and-a-safer-alternative/) — guest ID security model rationale
-- [Vercel Edge Caching](https://vercel.com/blog/vercel-cache-api-nextjs-cache) — s-maxage and stale-while-revalidate patterns
-- [isomorphic-dompurify GitHub](https://github.com/kkomelin/isomorphic-dompurify) — SSR/CSR DOMPurify wrapper
+- [FantasyPros Draft Room Refresh](https://blog.fantasypros.com/draft-room-simulator-update/) — three-panel layout pattern (official blog)
+- [ESPN Fantasy new features 2024](https://www.espn.com/fantasy/football/story/_/id/40378418/2024-fantasy-football-draft-board-new-features-espn) — Draft Train, Draft Board view (official)
+- [UX case study: ESPN Fantasy App](https://usabilitygeek.com/ux-case-study-espn-fantasy-app/) — tab-switching mobile frustration analysis (third-party UX analysis)
+- [Unofficial Sleeper League Page analysis](https://medium.com/@n.melhado/unofficial-sleeper-fantasy-football-league-page-3566812727fe) — navigation burying critique (developer analysis)
+- [shadcn resizable v4 compatibility](https://github.com/shadcn-ui/ui/issues/9197) — API changes documented
 
 ### Tertiary (LOW confidence — validate during implementation)
-- Scalability threshold math (connections per concurrent draft, message fan-out estimates at 500 simultaneous drafts) — derived from official pricing models but based on projected load, not measured production data
-- Framer Motion eval() requirement — flagged in community issues but not verified against the specific installed version
+- [Fantasy Football App UX Dos and Don'ts](https://medium.com/@johnxaavier/the-dos-and-donts-of-fantasy-football-app-development-ui-ux-design-5576e571aca7) — general mobile patterns (single author, not platform-specific)
+- Visual specifics of competitor turn-state implementations (full-screen vs. highlight only) — inferred from behavior documentation, not direct UI observation
 
 ---
 *Research completed: 2026-04-03*
