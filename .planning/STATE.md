@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-04-03T08:33:25.072Z"
-last_activity: 2026-04-03 -- Phase 21 execution started
+last_updated: "2026-04-03T08:49:33.970Z"
+last_activity: 2026-04-03
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # STATE.md
@@ -17,15 +17,15 @@ progress:
 ## Current Milestone
 
 **Milestone 5:** Security Hardening & Scalability Audit
-**Status:** Executing Phase 21
+**Status:** Ready to execute
 **Next action:** `/gsd:plan-phase 23`
 
 ## Current Position
 
-Phase: 21 (Core Beta Features) — EXECUTING
-Plan: 1 of 3 (Plan 01 complete)
-Status: Executing Phase 21
-Last activity: 2026-04-03 -- Completed 21-01 mobile draft experience
+Phase: 23 (critical-fixes-cost-safeguards) — EXECUTING
+Plan: 2 of 2
+Status: Plan 1 complete, Plan 2 pending
+Last activity: 2026-04-03 -- Phase 23 Plan 01 complete (CVE header strip, Redis hardening, CI audit gate)
 
 ## Progress Bar
 
@@ -73,6 +73,9 @@ Phase 23 (zero-risk baseline)
 - Broadcast migration covers picks and bids only (not all tables) — full migration deferred to post-beta per SEC-F01
 - Guest session httpOnly cookie (Phase 25) deferred after CSP stabilization (Phase 24) — the new `/api/guest/session` endpoint must be in the CSP allowlist first
 - IP-based rate limiting for unauthenticated requests (RATE-04) in Phase 24 — guest cookie values are spoofable, IP is the correct fallback key
+- [23-01] Strip x-middleware-subrequest unconditionally at edge before any auth checks (CVE-2025-29927 defense)
+- [23-01] Upgrade Redis missing-config warning to console.error CRITICAL for Vercel log visibility
+- [23-01] CI npm audit gate uses --audit-level=high: high/critical block builds, moderate/low non-blocking
 
 ### Pre-Phase Checks
 

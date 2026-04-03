@@ -29,7 +29,7 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 23-01-PLAN.md — Middleware CVE strip, Upstash Redis logging hardening, npm audit CI gate
+- [x] 23-01-PLAN.md — Middleware CVE strip, Upstash Redis logging hardening, npm audit CI gate
 - [ ] 23-02-PLAN.md — Supabase spend cap and billing alert (dashboard checkpoint)
 
 ### Phase 24: Application Security Hardening
@@ -74,7 +74,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 23. Critical Fixes & Cost Safeguards | 0/2 | Planned | - |
+| 23. Critical Fixes & Cost Safeguards | 1/2 | In Progress|  |
 | 24. Application Security Hardening | 0/? | Not started | - |
 | 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |

@@ -13,13 +13,13 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 - [ ] **SEC-02**: CSP migrated from static to nonce-based (remove `unsafe-eval` and `unsafe-inline`)
 - [ ] **SEC-03**: Guest write-path validated server-side (guest ID verified before mutations)
 - [ ] **SEC-04**: CORS restricted to production domain(s) only
-- [ ] **SEC-05**: `x-middleware-subrequest` header stripped at edge (CVE-2025-29927 defense-in-depth)
+- [x] **SEC-05**: `x-middleware-subrequest` header stripped at edge (CVE-2025-29927 defense-in-depth)
 - [ ] **SEC-06**: Guest sessions issued server-side via httpOnly cookie (replace localStorage IDs)
 - [ ] **SEC-07**: Input sanitization audit — all API routes validated with Zod schemas, HTML sanitized with DOMPurify
 
 ### Rate Limiting & Abuse Prevention
 
-- [ ] **RATE-01**: Redis-backed rate limiting enforced in production (Upstash, no in-memory fallback)
+- [x] **RATE-01**: Redis-backed rate limiting enforced in production (Upstash, no in-memory fallback)
 - [ ] **RATE-02**: Per-endpoint rate limits tuned (draft picks, auction bids, API reads, auth endpoints)
 - [ ] **RATE-03**: Rate limit bypass prevention — key by IP + authenticated user, not spoofable guest cookie
 - [ ] **RATE-04**: IP-based fallback rate limiting for unauthenticated requests
@@ -79,10 +79,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEC-02 | Phase 24 | Pending |
 | SEC-03 | Phase 24 | Pending |
 | SEC-04 | Phase 24 | Pending |
-| SEC-05 | Phase 23 | Pending |
+| SEC-05 | Phase 23 | Complete |
 | SEC-06 | Phase 25 | Pending |
 | SEC-07 | Phase 24 | Pending |
-| RATE-01 | Phase 23 | Pending |
+| RATE-01 | Phase 23 | Complete |
 | RATE-02 | Phase 24 | Pending |
 | RATE-03 | Phase 24 | Pending |
 | RATE-04 | Phase 24 | Pending |
