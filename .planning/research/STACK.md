@@ -1,207 +1,477 @@
-# Technology Stack — Beta Launch Additions
+# Technology Stack — Security Hardening & Scalability (Milestone 5)
 
 **Project:** Pokemon Draft (draftpokemon.com)
-**Milestone:** 4 — Beta Launch
+**Milestone:** 5 — Security Hardening & Scalability Audit
 **Researched:** 2026-04-03
-**Scope:** NEW dependencies only. Existing stack (Next.js 15, Supabase, Zustand, Tailwind, Radix UI, Framer Motion, TanStack Query v5, Clerk, Vitest) is validated — do not re-evaluate.
+**Scope:** NEW additions only. Existing stack (Next.js 15, Supabase, Clerk, Zustand, Tailwind,
+Radix UI, Framer Motion, TanStack Query v5, Zod, Vitest) is validated — not re-evaluated here.
 
 ---
 
-## New Capabilities Required
+## Critical Prerequisite: Next.js Patch (Do This First)
 
-| Capability | Needed For |
-|------------|------------|
-| Error monitoring | Catch runtime crashes in production before users report them |
-| Product analytics | Understand drop-off in draft creation funnel, feature adoption |
-| In-app feedback widget | Beta tester bug reports with screenshot + error context |
-| PokePaste parser/serializer | Showdown ecosystem interop (import team → pick list, export results) |
-| Mobile bottom sheet | Pokemon picker, team view on 375px screens without desktop dialog |
-| SEO metadata | Sitemap, robots.txt for draftpokemon.com indexing |
+**CVE-2025-29927** — CVSS 9.1 — Authorization bypass in Next.js middleware.
 
----
+Attackers send a crafted `x-middleware-subrequest` HTTP header to skip all middleware-based
+auth checks. On this platform, that means bypassing `clerkMiddleware()` entirely — any
+protected route becomes publicly accessible.
 
-## Recommended Stack Additions
+| Channel | Patched in |
+|---------|-----------|
+| Next.js 15.x | 15.2.4+ (note: 15.2.3 was incomplete — must be 15.2.4 or newer) |
+| Next.js 14.x | 14.2.26+ |
 
-### Error Monitoring
+As of April 2026, the current 15.x line is at 15.3–15.5. Run `npm outdated next` and upgrade
+before any other security work. This is the single highest-risk item in the milestone.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `@sentry/nextjs` | ^9.x (latest: 10.47.0) | Runtime error capture, performance tracing, source maps | Best-in-class Next.js App Router integration with `npx @sentry/wizard -i nextjs` wizard. Auto-instruments React components, server actions, API routes, and edge middleware in one SDK. Already referenced in CLAUDE.md `SENTRY_DSN` env var — infrastructure is already expected. Turbopack dev mode not supported yet (dev only; production fine). |
-
-**Version note:** Sentry v8 was the minimum for User Feedback screenshots. Current is v10.x. Install latest and pin to `^9` floor to stay in supported range.
+**Defense-in-depth (even after patching):** Configure the server/CDN to reject any request
+containing the `x-middleware-subrequest` header. On Vercel Pro, this is a one-line WAF custom
+rule. On the free tier, it can be added as a middleware pre-check.
 
 ---
 
-### Product Analytics
+## Stack Additions
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `posthog-js` | ^1.364.x (latest) | Event tracking, session replay, funnel analysis, feature flags | PostHog covers analytics + surveys + feature flags in a single SDK — avoiding Plausible (pageviews only, no events) and Vercel Analytics (no funnels or custom events). Free tier is generous (1M events/month). Privacy-first, cookieless mode available — no consent banner needed. Integrates with Next.js 15.3+ via `instrumentation-client.ts`. Critical funnel to track: landing → create draft → invite → first pick. |
+### 1. Rate Limiting
 
-**Why not Plausible:** Pageview-only analytics won't tell you whether users are completing draft setup, hitting the invite step, or abandoning during picks. PostHog's funnel analysis does.
+**Recommended: `@upstash/ratelimit` + `@upstash/redis`**
 
-**Why not Vercel Analytics:** No event tracking, no funnels, no session replay. Adequate for a marketing site, not for a product with a multi-step onboarding flow.
+| Property | Value |
+|----------|-------|
+| Packages | `@upstash/ratelimit@2.0.8`, `@upstash/redis` |
+| Runtime | Edge-compatible (Next.js middleware, no cold starts, HTTP-based) |
+| Storage backend | Upstash Redis (hosted, serverless-safe) |
+| Free tier | 500K Redis commands/month — sufficient for beta traffic |
+| Confidence | HIGH — official Vercel template, purpose-built for edge |
 
----
+**Why not in-memory or custom solutions:**
+The existing rate limiter noted as "fixed" in Milestone 2 uses in-memory state, which resets
+on every serverless function cold start. On Vercel, each request may hit a fresh function
+instance — in-memory rate limits offer zero protection against distributed abuse. Upstash
+Redis persists counts across invocations.
 
-### In-App Feedback Widget
+**Why not `express-rate-limit`:**
+Requires a persistent Node.js process and TCP connections — incompatible with the edge runtime
+used by Next.js middleware.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Sentry User Feedback (built into `@sentry/nextjs`) | Same as above | In-app bug report button with screenshot capture and automatic error context | Already included with Sentry SDK — no additional dependency. SDK v8+ supports user-attached screenshots (auto-hidden on mobile). Each feedback submission links to the session replay, breadcrumbs, and any associated error — exactly what beta triage needs. Dismisses the need for a separate Featurebase or Upstash Feedback dependency. |
+**Integration point:** `src/middleware.ts`
 
-**Why not a separate feedback SaaS (Featurebase, Canny, Upstash):** Adds another third-party dependency and monthly cost. Sentry's widget provides richer debugging context (error ID, replay link, breadcrumbs) than any standalone tool. For beta, bug reports with reproduction context beat feature voting boards.
+Apply tiered limits before auth runs:
 
----
+| Route pattern | Algorithm | Limit | Rationale |
+|--------------|-----------|-------|-----------|
+| `/api/draft/*/pick` | `tokenBucket(100, '1m', 10)` | 100 picks/min, burst 10 | Allows session bursts, blocks flooding |
+| `/api/draft/create` | `fixedWindow(5, '60s')` | 5 per minute per IP | Prevents draft spam |
+| `/join-draft` | `fixedWindow(10, '60s')` | 10 per minute per IP | Prevents room code enumeration |
+| All `/api/` routes | `slidingWindow(60, '10s')` | 60 req/10s per IP | General API protection |
 
-### PokePaste Parser / Serializer
+Include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `Retry-After` headers in 429
+responses so clients can back off gracefully.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `@pkmn/sets` | ^5.2.0 (latest) | Parse Showdown/PokePaste export format into typed set objects; serialize draft results back | Official `@pkmn` ecosystem package by the same team behind Smogon's tooling. Provides `Sets.importSet()` and `Sets.exportSet()` — exactly the import/export boundary needed. PokePaste uses Showdown's text format; this package is the canonical JS parser for it. Tiny bundle impact, no runtime dependencies. |
+```bash
+npm install @upstash/ratelimit @upstash/redis
+```
 
-**Implementation note:** PokePaste text → `Sets.importSet()` → map species name to our `pokemon.id` via `@pkmn/dex` lookup. For export: draft picks → `Sets.exportSet()` → paste to clipboard or POST to `pokepast.es/create`. No server round-trip required for parse/format; only the optional paste-hosting POST needs a server action.
-
-**Why not hand-rolling a parser:** The Showdown format has edge cases (nicknames, multi-line moves, unicode species names, forme handling). `@pkmn/sets` handles all of these with test coverage. Building and maintaining a regex parser is a trap.
-
----
-
-### Mobile Bottom Sheet (Drawer)
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| `vaul` | ^1.1.2 | Pokemon picker sheet, team roster drawer, filter panel on mobile | shadcn/ui's `Drawer` component is already built on Vaul — check if it's already transitively installed. If the project uses `@radix-ui/react-dialog` (it does via Radix UI), Vaul is a near-zero-cost addition. Provides snap points, swipe-to-dismiss, background scaling. 184KB, 2k+ npm dependents. Physics-based gestures feel native on iOS/Android. |
-
-**Check first:** Run `npm ls vaul` — shadcn's Drawer component may already list it. If present, no install needed; just add `Drawer` to the mobile draft room layout.
-
----
-
-### SEO / Sitemap
-
-| Technology | Approach | Why |
-|------------|----------|-----|
-| Native Next.js 15 `app/sitemap.ts` + `app/robots.ts` | Built-in metadata file conventions | Next.js 15 has native `generateSitemaps()` and `robots.txt` file conventions in the App Router. No `next-sitemap` package needed — that library exists to patch the Pages Router. Use `app/sitemap.ts` returning static routes + `app/robots.ts`. Zero extra dependency. |
-
-**For dynamic routes:** Draft results pages (`/draft/[id]/results`) should be `noindex` — they're private. Landing page, `/create-draft`, `/join-draft`, and the blog/about pages are the only indexable URLs. Keep the sitemap simple.
+```env
+UPSTASH_REDIS_REST_URL=your-upstash-redis-url
+UPSTASH_REDIS_REST_TOKEN=your-upstash-redis-token
+```
 
 ---
 
-## Alternatives Considered
+### 2. XSS Sanitization
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Error monitoring | `@sentry/nextjs` | Datadog, Rollbar, Bugsnag | Sentry has the best Next.js App Router wizard + User Feedback built in. Already stubbed in CLAUDE.md env var. |
-| Analytics | `posthog-js` | Plausible | Plausible is pageviews only — no custom events, no funnels, no session replay. Insufficient for tracking onboarding drop-off. |
-| Analytics | `posthog-js` | Mixpanel | Mixpanel has no built-in session replay or feature flags. PostHog is more complete and cheaper at this scale. |
-| Analytics | `posthog-js` | Vercel Analytics | No custom events, no funnels. OK for a brochure site; not enough for a draft app. |
-| In-app feedback | Sentry User Feedback | Featurebase, Canny | Additional paid SaaS. Sentry feedback links to error context; standalone tools don't. Overkill for beta. |
-| In-app feedback | Sentry User Feedback | Upstash Feedback | Requires Upstash Redis account; routes to Slack only. No error linking. |
-| PokePaste parser | `@pkmn/sets` | Hand-rolled regex | Showdown format has too many edge cases for a regex approach to be maintainable. |
-| PokePaste parser | `@pkmn/sets` | `@smogon/sets` | `@smogon/sets` is a different package (Smogon's official usage data, not the parser). `@pkmn/sets` is the right import/export package. |
-| Mobile drawer | `vaul` | Radix Sheet | Radix Sheet slides from the side — not idiomatic mobile bottom sheet. Vaul's snap points and swipe-dismiss are what mobile users expect. |
-| Sitemap | Native Next.js | `next-sitemap` | `next-sitemap` is a Pages Router shim. App Router has native file conventions. Adding a package to do what the framework provides natively is wrong. |
+**Recommended: `isomorphic-dompurify@3.7.1`**
+
+| Property | Value |
+|----------|-------|
+| Package | `isomorphic-dompurify` (wraps `dompurify`) |
+| Runtime | Works in Server Components, SSR, and client components |
+| Confidence | HIGH — standard solution for Next.js SSR+CSR contexts |
+
+**Why needed:**
+The platform accepts user-generated text in: draft names, team names, league announcements,
+and display names. React's JSX auto-escaping handles most cases, but any `dangerouslySetInnerHTML`
+usage or stored rich text (league announcements) bypasses this protection.
+
+**Why `isomorphic-dompurify` not plain `dompurify`:**
+Plain DOMPurify requires a browser DOM. It fails silently or throws in Server Components and
+SSR (Next.js GitHub issue #46893). The isomorphic wrapper handles jsdom initialization
+automatically for server contexts.
+
+**Integration point:** Create `src/lib/sanitize.ts`:
+
+```typescript
+import DOMPurify from 'isomorphic-dompurify'
+
+export const sanitizeHtml = (dirty: string): string =>
+  DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+
+export const sanitizeRichHtml = (dirty: string): string =>
+  DOMPurify.sanitize(dirty, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a'],
+    ALLOWED_ATTR: ['href']
+  })
+```
+
+Apply at: any stored text rendered back to users (team names, draft names, league
+announcements). Do NOT apply at the Zod validation layer — sanitize at the render boundary,
+not the input boundary, to avoid double-encoding.
+
+```bash
+npm install isomorphic-dompurify
+npm install -D @types/dompurify
+```
+
+---
+
+### 3. Input Validation — Zod (expand existing coverage, no new install)
+
+| Property | Value |
+|----------|-------|
+| Package | `zod` (already installed, `src/lib/schemas.ts` exists) |
+| Action needed | Coverage audit — not a new dependency |
+| Confidence | HIGH |
+
+The existing `src/lib/schemas.ts` file exists but coverage is incomplete. Every API route
+handler must validate request bodies through a Zod schema before touching the database.
+
+**Audit checklist:**
+- All `POST /api/**` route handlers — validate body with `.safeParse()` and return 400 on failure
+- All Server Actions — validate inputs server-side even if client validates too
+- Use `.strict()` on all schemas to reject unknown fields (prevents mass-assignment attacks)
+- Room code generation: validate 6-char uppercase pattern server-side (currently validated
+  in `src/lib/room-utils.ts` — confirm it rejects malformed inputs)
+
+**No install required.** This is a code coverage task.
+
+---
+
+### 4. Security Headers — `next.config.ts` (no new package)
+
+| Property | Value |
+|----------|-------|
+| Implementation | `next.config.ts` `headers()` async function |
+| Packages needed | None — native Next.js feature |
+| Confidence | HIGH — official Next.js documentation |
+
+**Required headers:**
+
+```typescript
+// next.config.ts headers() return value
+{
+  key: 'Strict-Transport-Security',
+  value: 'max-age=31536000; includeSubDomains; preload'
+},
+{
+  key: 'X-Frame-Options',
+  value: 'DENY'
+},
+{
+  key: 'X-Content-Type-Options',
+  value: 'nosniff'
+},
+{
+  key: 'Referrer-Policy',
+  value: 'strict-origin-when-cross-origin'
+},
+{
+  key: 'Permissions-Policy',
+  value: 'camera=(), microphone=(), geolocation=()'
+},
+{
+  key: 'X-DNS-Prefetch-Control',
+  value: 'on'
+}
+```
+
+**CSP (Content Security Policy):**
+Implement via middleware with per-request nonce. Clerk requires specific CSP allowances —
+use the allowlist from Clerk's official CSP guide as the base:
+- `connect-src` must allow `https://*.clerk.accounts.dev`
+- `script-src` must allow Clerk's hosted JS
+- Add Supabase's WebSocket domain to `connect-src`
+
+Known Next.js 15 bug: CSP headers only apply in production when `await headers()` is called
+in page components AND a nonce is present. Test CSP configuration with
+`Report-To` in report-only mode first before enforcing.
+
+---
+
+### 5. Dependency Vulnerability Scanning — `npm audit` in CI (no new package)
+
+| Property | Value |
+|----------|-------|
+| Tool | `npm audit --audit-level=high` (built-in npm) |
+| CI integration | Add to build step / GitHub Actions |
+| Confidence | HIGH |
+
+**Immediate action:** Run `npm audit --production` now to discover current vulnerabilities.
+CVE-2025-29927 may not be the only critical issue in the dependency tree.
+
+**CI setup:** Add to GitHub Actions workflow before `npm run build`:
+```yaml
+- run: npm audit --audit-level=high --production
+```
+
+This fails the build on high/critical severity findings, preventing vulnerable code from
+reaching production.
+
+**Optional — Snyk (free tier):**
+Snyk provides automatic fix PRs and continuous monitoring beyond point-in-time `npm audit`.
+Not mandatory for launch but recommended for ongoing maintenance. The Snyk free tier covers
+open source projects. Install with `npm install -g snyk` and `snyk auth`.
+
+---
+
+### 6. Supabase Connection Pooling — Supavisor (configuration change, no new package)
+
+| Property | Value |
+|----------|-------|
+| Feature | Supabase Supavisor (built-in on all paid Supabase plans) |
+| Action | Switch DATABASE_URL to pooler connection string |
+| Confidence | HIGH — official Supabase documentation |
+
+**Why this matters:**
+Next.js on Vercel deploys as serverless functions. Each request can spin up a new function
+instance that opens a new PostgreSQL connection. At hundreds of concurrent users, this exhausts
+Postgres's `max_connections` limit (100 on Supabase free tier, ~200 on Pro).
+
+**IMPORTANT caveat:** The existing stack uses `@supabase/supabase-js`, which communicates via
+PostgREST (HTTP API) — not direct TCP connections to Postgres. This means the connection
+exhaustion risk applies only if any code makes direct database connections. Audit for:
+- Any raw `pg` or `postgres` package usage
+- Prisma (not in current stack, but verify)
+- Supabase Edge Functions that use the service role key with direct DB access
+
+If no direct connections exist, Supavisor is still worth enabling for future-proofing and
+the Supabase Dashboard gains connection pool visibility.
+
+**Migration:**
+1. In Supabase Dashboard → Settings → Database → Connection Pooling, note the Transaction
+   mode pooler URL (port 6543)
+2. Set `DATABASE_URL` to the pooler URL in production environment
+3. Keep direct URL available for migrations only (Supabase CLI)
+4. Pool size: allocate 60–70% of max_connections to Supavisor
+
+---
+
+### 7. Supabase Realtime Cost Optimization (configuration, no new package)
+
+| Property | Value |
+|----------|-------|
+| Feature | Supabase Realtime channel consolidation + Broadcast mode |
+| Cost structure | $10 per 1K peak concurrent connections, $2.50 per 1M messages |
+| Action | Audit `useConnectionManager`, reduce channel count |
+| Confidence | HIGH — official Supabase pricing documentation |
+
+**The hidden cost problem:**
+Postgres Changes events fan out: one database INSERT with 100 subscribers triggers 100
+authorization reads (Supabase checks RLS for each subscriber). A 10-person draft with picks
+flowing through Postgres Changes = 10x RLS read amplification on every pick.
+
+**Optimization actions:**
+1. Audit `src/lib/connection-manager.ts` — count how many Supabase channels open per draft
+2. Consolidate per-table subscriptions into a single Broadcast channel where possible:
+   - Picks, turn changes, and timer events can all flow through one broadcast channel
+   - The draft host pushes updates; clients receive via broadcast (no RLS fan-out)
+3. Switch the highest-frequency tables (picks, auctions) from `postgres_changes` to
+   `supabase.channel('draft:${id}').on('broadcast', ...)` — eliminates per-event RLS reads
+4. Enable **Spend Cap** in Supabase Dashboard → Billing to hard-stop overages
+5. Subscribe to Supabase billing email alerts (available in billing settings)
+
+**Expected impact:** Switching picks from Postgres Changes to Broadcast can reduce realtime
+message cost by 80–90% for a typical draft session.
+
+---
+
+### 8. Database Query Optimization — Supabase Built-in Extensions (enable, no install)
+
+| Property | Value |
+|----------|-------|
+| Extensions | `index_advisor`, `hypopg` |
+| Where to enable | Supabase Dashboard → Database → Extensions |
+| Confidence | HIGH — official Supabase documentation |
+
+**index_advisor:** Analyzes slow queries and recommends missing indexes. Works by observing
+actual query patterns and suggesting B-tree or partial indexes.
+
+**hypopg:** Creates hypothetical (virtual) indexes with zero storage cost. Lets you test
+whether a proposed index would improve a query before committing to creating it.
+
+**Enable via SQL:**
+```sql
+CREATE EXTENSION IF NOT EXISTS index_advisor;
+CREATE EXTENSION IF NOT EXISTS hypopg;
+```
+
+**Priority queries to analyze with EXPLAIN ANALYZE:**
+```sql
+-- Most executed: fetch draft state
+SELECT * FROM picks WHERE draft_id = $1 ORDER BY turn_number;
+-- Needs: INDEX on (draft_id, turn_number)
+
+SELECT * FROM teams WHERE draft_id = $1 ORDER BY draft_order;
+-- Needs: INDEX on (draft_id)
+
+-- Auction queries during active auction drafts
+SELECT * FROM auctions WHERE draft_id = $1 AND status = 'active';
+-- Needs: INDEX on (draft_id, status)
+```
+
+The Supabase Dashboard now provides visual EXPLAIN diagrams — use these before adding indexes
+to confirm they'll be used by the query planner.
+
+---
+
+### 9. Load Testing — k6 (standalone CLI tool, not npm)
+
+| Property | Value |
+|----------|-------|
+| Tool | k6 v1.0+ (released May 2025) |
+| Install | `brew install k6` or Docker (`docker pull grafana/k6`) — NOT via npm |
+| Confidence | MEDIUM — community standard; Supabase uses k6 for their own realtime benchmarks |
+
+**Why k6 over Artillery:**
+k6 v1.0 (May 2025) added first-class TypeScript support without transpilation — TypeScript
+scripts run natively. This aligns with the project's TypeScript-first approach. k6 is also
+3x more memory-efficient than JMeter and has better DX for complex scenarios.
+
+**Why not add to npm dependencies:**
+k6 is a Go binary with a JS/TS runtime for test scripts. It does not install via `npm install`.
+Keep load test scripts in `tests/load/` as TypeScript files that k6 runs directly.
+
+**Scenarios to test before launch:**
+1. 8 concurrent users in one draft room making picks (measures Supabase Realtime + API latency)
+2. 10 simultaneous drafts (80 concurrent WebSocket connections — check Supabase connection quota)
+3. Room code join endpoint: enumerate-style load (validate rate limiting blocks at the app layer)
+
+**Do NOT run against production Supabase.** Use a staging project or run against the free tier
+with spend cap enabled. Supabase Realtime benchmarks charge per connection/message.
+
+---
+
+### 10. Vercel WAF Bot Filter (configuration, free tier)
+
+| Property | Value |
+|----------|-------|
+| Feature | Vercel Firewall → Bot Filter managed ruleset |
+| Cost | Free on all Vercel plans |
+| Advanced rules | Vercel Pro plan required for custom WAF rules |
+| Confidence | HIGH — official Vercel documentation |
+
+**Why enable this:**
+Draft room codes are 6 characters (uppercase alphanumeric = ~2.17 billion combinations, but
+in practice far fewer are active). Without bot filtering, scrapers can enumerate active rooms.
+The Bot Filter applies JS challenges to non-browser traffic before requests reach the
+application.
+
+**Enable via:** Vercel Dashboard → Project → Security → Firewall → Enable Bot Filter
+
+**Additional WAF rule (Vercel Pro):** Block requests containing `x-middleware-subrequest`
+header as defense-in-depth against CVE-2025-29927, even after patching Next.js:
+```
+Rule: Header "x-middleware-subrequest" exists → Block
+```
+
+---
+
+### 11. PGAudit (Supabase extension — enable for compliance/debug, no install)
+
+| Property | Value |
+|----------|-------|
+| Extension | `pgaudit` (available as Supabase extension) |
+| Purpose | Log database-level operations for security audit trail |
+| Confidence | HIGH — official Supabase documentation |
+
+**When to enable:** PGAudit logs database operations at the session/object level. For a beta
+launch, enabling object-level auditing on the `picks` and `teams` tables creates a tamper-
+evident log useful for debugging disputed draft results.
+
+**Not strictly required for launch** but low-risk to enable. Enable via:
+```sql
+CREATE EXTENSION IF NOT EXISTS pgaudit;
+```
+
+Configure in `postgresql.conf` (Supabase Dashboard → Database → Settings):
+```
+pgaudit.log = 'write'  -- log INSERT, UPDATE, DELETE
+```
 
 ---
 
 ## What NOT to Add
 
-| Tool | Reason to Avoid |
-|------|----------------|
-| LogRocket | Expensive, redundant with PostHog session replay. Using two session replay tools is wasteful. |
-| Hotjar | No App Router native integration; adds heavy script. PostHog covers heatmaps + sessions. |
-| Google Analytics (GA4) | Requires cookie consent banner (GDPR/CCPA); PostHog cookieless mode avoids this. Pokemon community skews young — minimize data obligations. |
-| Segment | Event routing middleware adds latency and cost at this scale. PostHog ingests events directly. |
-| `react-shepherd` / `intro.js` | Onboarding tour libraries with large bundles (~60KB+). Custom guided highlight using Framer Motion (already in bundle) is lighter and more on-brand. |
-| `react-joyride` | Same as above. |
-| `next-pwa` (additional) | PWA already configured via `public/sw.js`. Don't add a second PWA library. |
-| `react-use-gesture` | Vaul handles gesture physics for bottom sheets. Adding gesture libraries on top creates conflicts. |
-| Sentry Performance Monitoring (transactions) | Enable for production but keep `tracesSampleRate` at 0.1 (10%) to stay on free tier — don't set to 1.0. |
+| Technology | Reason to Avoid |
+|------------|----------------|
+| Cloudflare WAF | Adds a second CDN layer that complicates Clerk's JWT distribution (Clerk uses short-lived JWTs that need clock sync). Vercel's native WAF is sufficient. |
+| Helmet.js | Node.js middleware — does not integrate with Next.js App Router. The `next.config.ts` headers approach is correct. |
+| Redis session store (custom) | Clerk manages sessions via short-lived JWTs. Adding Redis session storage duplicates the auth layer and creates sync bugs. |
+| Prisma / ORM migration | The existing stack uses Supabase JS client (PostgREST). Introducing Prisma during a security milestone is a rewrite risk with no security benefit. |
+| Cloudflare Turnstile / reCAPTCHA | Draft rooms require invitations. CAPTCHA on a private, invite-based flow creates friction with minimal threat surface. Add only if bot abuse is observed post-launch. |
+| SIEM / centralized log aggregation | Overkill at thousands-of-users scale. Supabase logs + Vercel log drains are sufficient. Evaluate at 50K+ MAU. |
+| Dedicated Redis cluster | Upstash free tier handles beta traffic. A self-managed Redis cluster adds operational cost with no benefit until 10M+ requests/month. |
+| `express-rate-limit` | In-memory storage resets on serverless cold starts — fundamentally broken for serverless deployments. |
+| Snyk (mandatory) | `npm audit` in CI is sufficient for launch. Snyk adds CI complexity and cost. Treat as optional enhancement post-launch. |
+| Artillery | k6 v1.0 has native TypeScript and is what Supabase uses for their own benchmarks. Don't maintain two load testing tools. |
 
 ---
 
-## Installation
+## Full Installation Summary
 
 ```bash
-# Error monitoring + feedback widget (one SDK does both)
-npm install @sentry/nextjs
+# New production dependencies (3 packages only)
+npm install @upstash/ratelimit @upstash/redis isomorphic-dompurify
 
-# Analytics + session replay + feature flags
-npm install posthog-js
+# New dev dependencies
+npm install -D @types/dompurify
 
-# PokePaste parser/serializer
-npm install @pkmn/sets
-
-# Check if vaul is already present before installing
-npm ls vaul
-# If not listed:
-npm install vaul
+# No npm install for:
+#   Security headers     → next.config.ts change
+#   Zod validation       → already installed, expand coverage
+#   Supavisor pooling    → environment variable change
+#   Realtime cost fixes  → code changes in useConnectionManager
+#   DB indexes           → SQL commands in Supabase dashboard
+#   k6 load testing      → standalone binary (brew/docker)
+#   Vercel WAF           → dashboard configuration
+#   PGAudit              → SQL extension command
 ```
 
-**Environment variables to add to `.env.local` and Vercel:**
+## New Environment Variables
+
 ```env
-# Sentry (error monitoring + feedback)
-SENTRY_DSN=your-sentry-dsn                          # already stubbed in CLAUDE.md
-NEXT_PUBLIC_SENTRY_DSN=your-sentry-dsn              # client-side capture
+# Upstash Redis — rate limiting (required)
+UPSTASH_REDIS_REST_URL=https://your-instance.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your-token
 
-# PostHog (analytics)
-NEXT_PUBLIC_POSTHOG_KEY=phc_your_project_api_key
-NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com    # or EU: https://eu.posthog.com
+# Supabase pooler — optional if no direct DB connections found in audit
+# SUPABASE_POOLER_URL=postgres://postgres.[project]:[pass]@aws-0-[region].pooler.supabase.com:6543/postgres
 ```
-
----
-
-## Integration Points
-
-### Sentry — App Router Setup
-
-The `npx @sentry/wizard -i nextjs` wizard generates:
-- `sentry.client.config.ts` — browser initialization + User Feedback widget
-- `sentry.server.config.ts` — server-side capture
-- `sentry.edge.config.ts` — edge middleware
-- `app/global-error.tsx` — React rendering error boundary
-- `next.config.ts` update — `withSentryConfig()` wrapper
-
-**User Feedback button placement:** Add to the bottom of the draft page layout (`src/app/draft/[id]/layout.tsx`) so it's present during active drafts when beta testers are most likely to hit bugs.
-
-### PostHog — Next.js 15.3+ Setup
-
-Use `instrumentation-client.ts` (Next.js 15.3+ native hook) for initialization rather than a custom `providers.tsx` wrapper when possible. For server-side capture (server actions, API routes), use `posthog-node` via a singleton `PostHogClient`.
-
-**Key events to capture immediately:**
-- `draft_created` — with `format`, `team_count`, `draft_type`
-- `draft_joined` — with `role` (host/participant/spectator)
-- `pick_made` — with `draft_type`, `round`, `cost`
-- `pokepaste_imported` / `pokepaste_exported`
-- `onboarding_completed`
-
-### PokePaste — Import Flow
-
-```
-User pastes text
-  → Sets.importSet() per-pokemon block
-  → Map species name → internal pokemon.id via name normalization
-  → Validate each pokemon against format rules engine
-  → Display as pre-selected wishlist or team template
-```
-
-Export flow: draft picks → `Sets.exportSet()` → joined text block → copy to clipboard.
-
-### Vaul — Mobile Draft Room
-
-Replace Radix `Dialog` with Vaul `Drawer` for the Pokemon picker on screens < 640px using a `useMediaQuery` check. Snap points: `['80%', 1]` — 80% height for browsing, full-screen for search. The existing `VirtualizedPokemonGrid` drops into the `Drawer.Content` without modification.
 
 ---
 
 ## Sources
 
-- [Sentry for Next.js docs](https://docs.sentry.io/platforms/javascript/guides/nextjs/)
-- [Sentry User Feedback widget screenshots](https://sentry.io/changelog/user-feedback-widget-screenshots/)
-- [PostHog Next.js integration docs](https://posthog.com/docs/libraries/next-js)
-- [PostHog vs Sentry comparison](https://posthog.com/blog/posthog-vs-sentry)
-- [PostHog vs Plausible comparison](https://posthog.com/blog/posthog-vs-plausible)
-- [Vercel PostHog + Next.js guide](https://vercel.com/kb/guide/posthog-nextjs-vercel-feature-flags-analytics)
-- [@pkmn/sets on npm](https://www.npmjs.com/package/@pkmn/sets)
-- [Vaul GitHub](https://github.com/emilkowalski/vaul)
-- [Next.js generateSitemaps docs](https://nextjs.org/docs/app/api-reference/functions/generate-sitemaps)
-- [Next.js robots.txt file convention](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/robots)
-- [Vercel custom domain setup](https://vercel.com/docs/domains/set-up-custom-domain)
+- [@upstash/ratelimit npm — v2.0.8](https://www.npmjs.com/package/@upstash/ratelimit)
+- [Upstash Rate Limiting for Next.js Edge](https://upstash.com/blog/edge-rate-limiting)
+- [Upstash Redis Pricing 2025](https://upstash.com/docs/redis/overall/pricing)
+- [CVE-2025-29927 — Datadog Security Labs](https://securitylabs.datadoghq.com/articles/nextjs-middleware-auth-bypass/)
+- [CVE-2025-29927 — Snyk Blog](https://snyk.io/blog/cve-2025-29927-authorization-bypass-in-next-js-middleware/)
+- [Cloudflare WAF rule for CVE-2025-29927](https://developers.cloudflare.com/changelog/post/2025-03-22-next-js-vulnerability-waf/)
+- [Next.js CSP Configuration](https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy)
+- [Clerk CSP Headers Guide](https://clerk.com/docs/guides/secure/best-practices/csp-headers)
+- [isomorphic-dompurify GitHub](https://github.com/kkomelin/isomorphic-dompurify)
+- [DOMPurify SSR issue in Next.js](https://github.com/vercel/next.js/issues/46893)
+- [Supabase Connection Management](https://supabase.com/docs/guides/database/connection-management)
+- [Supabase Supavisor FAQ](https://supabase.com/docs/guides/troubleshooting/supavisor-faq-YyP5tI)
+- [Supabase Realtime Pricing](https://supabase.com/docs/guides/realtime/pricing)
+- [Supabase Spend Cap](https://supabase.com/docs/guides/platform/spend-cap)
+- [Supabase index_advisor](https://supabase.com/docs/guides/database/extensions/index_advisor)
+- [Supabase Query Optimization](https://supabase.com/docs/guides/database/query-optimization)
+- [PGAudit Extension — Supabase](https://supabase.com/docs/guides/database/extensions/pgaudit)
+- [k6 vs Artillery comparison](https://npm-compare.com/artillery,k6)
+- [Vercel Firewall Documentation](https://vercel.com/docs/vercel-firewall)
+- [Vercel Bot Management](https://vercel.com/security/bot-management)
+- [Vercel WAF Managed Rulesets](https://vercel.com/docs/vercel-firewall/vercel-waf/managed-rulesets)
+- [Supabase RLS Security — Hidden Dangers](https://dev.to/fabio_a26a4e58d4163919a53/supabase-security-the-hidden-dangers-of-rls-and-how-to-audit-your-api-29e9)
+- [Next.js Security Headers Best Practices 2025](https://www.turbostarter.dev/blog/complete-nextjs-security-guide-2025-authentication-api-protection-and-best-practices)

@@ -1,407 +1,439 @@
-# Architecture Patterns
+# Architecture Patterns: Security Hardening & Scalability
 
-**Project:** Pokemon Draft — Milestone 4 Beta Launch
+**Domain:** Security hardening and scalability for Next.js 15 + Supabase + Clerk platform
 **Researched:** 2026-04-03
-**Mode:** Integration architecture for new features into existing codebase
+**Confidence:** HIGH (architecture grounded in actual codebase + official docs)
 
 ---
 
-## System Overview
+## Existing Architecture Snapshot
 
-The app is a Next.js 15 App Router application with 30+ routes. The core architecture is:
+Before mapping integration points, here is what is already in place. This is the baseline every change must integrate with — not a greenfield system.
 
-- **Root layout** (`src/app/layout.tsx`) wraps the entire tree: `ClerkProvider > AnalyticsProvider > PerformanceMonitorProvider > ErrorBoundaryProvider > HydrationFixProvider > ThemeProvider > ImagePreferenceProvider > AuthProvider > QueryProvider`
-- **State** lives in Zustand (`src/stores/draftStore.ts`) for draft-specific state, TanStack Query for server state
-- **Realtime** is Supabase WebSocket channels, managed per-route in hooks
-- **Services** in `src/lib/` are plain TypeScript modules, not React-coupled
-
-Each Milestone 4 feature integrates at a different layer of this tree. The key insight: most features are **already partially implemented** — the work is completing and wiring them, not building from scratch.
+| Layer | Current State |
+|-------|---------------|
+| Middleware | `src/middleware.ts` — Clerk auth + Upstash rate limiting (sliding window, per route) |
+| CSP headers | `next.config.ts` — Static CSP in `headers()` with `unsafe-eval` + `unsafe-inline` |
+| Supabase client | `src/lib/supabase.ts` — anon key, no service role usage in client |
+| Supabase server | `src/lib/supabase/server.ts` — `@supabase/ssr` server client (cookie-based, no auth persistence) |
+| RLS | `migrations/fix-rls-policies.sql` — Owner-check helper functions (SECURITY DEFINER), permissive SELECT, restricted UPDATE/DELETE |
+| Guest auth | `src/lib/user-session.ts` — `guest-{uuid}` IDs in `localStorage`, no server-side validation |
+| Real-time | `src/lib/draft-realtime.ts` — `DraftRealtimeManager`, one channel per draft, postgres_changes + presence + broadcast |
+| Rate limiting | Upstash Redis (primary) + in-memory fallback. Applied to `/api/*` only. |
+| Input validation | `src/lib/validation.ts` + `src/lib/schemas.ts` (Zod) — sanitizers exist but usage is inconsistent |
+| Connection pooling | Not yet configured — using direct Supabase connection strings |
+| DB indexes | `migrations/add-performance-indexes.sql` — picks, teams, drafts, auctions, league tables |
+| Next.js version | `^15.5.12` — past CVE-2025-29927 patch (15.2.3), safe |
 
 ---
 
-## Feature Integration Analysis
+## Recommended Architecture
 
-### 1. Feedback Widget
+### Overview: Five Concern Layers
 
-**Current state:** Full-page feedback at `/feedback/page.tsx`. API route at `/api/feedback/route.ts` posts to Discord webhook via `DISCORD_FEEDBACK_WEBHOOK_URL`. Works end-to-end for the standalone page.
-
-**What's missing:** An in-context widget — a floating button visible from inside draft rooms and the dashboard so users don't have to navigate away mid-session.
-
-**Integration point:** `src/app/layout.tsx` — add a `<FeedbackWidget />` component just before `</body>` close, after `<Analytics />`. This ensures it appears on every page without re-mounting between route transitions.
-
-**Component tree placement:**
 ```
-RootLayout
-  └── <FeedbackWidget />   ← new, rendered outside <main>
-        └── Floating trigger button (bottom-right corner)
-        └── Sheet/Dialog (reuses existing feedback form logic)
-```
-
-**Data flow:**
-- Widget uses the same `POST /api/feedback` route already in place
-- No new server code needed
-- State is local (`useState` inside the widget) — no store involvement
-- Pre-populate `context` field with current route from `usePathname()` for better bug reports
-
-**New vs modified:**
-- NEW: `src/components/feedback/FeedbackWidget.tsx` — floating button + sheet wrapper
-- MODIFIED: `src/app/layout.tsx` — add `<FeedbackWidget />` import and JSX
-- MODIFIED: `src/app/api/feedback/route.ts` — optionally accept a `context` (URL) field
-
-**Avoid:** Don't add the widget inside `SidebarLayout` — it wraps only some pages. The root layout is the correct insertion point.
-
----
-
-### 2. Analytics
-
-**Current state:** PostHog integration fully built in `src/lib/analytics.ts`. `AnalyticsProvider` already in root layout. Vercel Analytics (`@vercel/analytics/next`) is imported and rendered in root layout as `<Analytics />`. `NEXT_PUBLIC_POSTHOG_KEY` env var is documented in `.env.example`.
-
-**What's missing:** Tracking calls are defined but not called at the use sites. The typed event functions in `analytics.ts` exist (`draftCreated`, `pickMade`, `draftJoined`, etc.) but the call sites in service files and hooks need those calls added.
-
-**Integration points — where to add calls:**
-
-| Event | Call site | File |
-|-------|-----------|------|
-| `draft_created` | After successful `DraftService.createDraft()` | `src/lib/draft-lifecycle-service.ts` or `create-draft/page.tsx` |
-| `draft_joined` | After successful join flow | `src/lib/draft-service.ts` `joinDraft()` |
-| `draft_started` | When draft status transitions to `active` | `src/hooks/useDraftRealtime.ts` |
-| `draft_completed` | When draft status transitions to `completed` | `src/hooks/useDraftRealtime.ts` |
-| `pick_made` | After `makePick()` succeeds | `src/hooks/useDraftActions.ts` |
-| `pwa_installed` | On `beforeinstallprompt` event | Wherever PWA install is prompted |
-| `user_registered` / `user_logged_in` | In `AuthContext` after Clerk sign-in | `src/contexts/AuthContext.tsx` |
-
-**Architecture rule:** Analytics calls must be **fire-and-forget** at the action layer (services/hooks), never blocking render. The existing `track()` function already handles the case where PostHog is not initialized.
-
-**Route-level vs component-level:** PostHog's `capture_pageview: true` handles route-level tracking automatically. Only add explicit calls for semantic events (draft created, pick made), not for page views.
-
-**New vs modified:**
-- NO new files needed
-- MODIFIED: `src/hooks/useDraftActions.ts` — add `analytics.pickMade()` call post-pick
-- MODIFIED: `src/lib/draft-lifecycle-service.ts` — add `analytics.draftCreated()` call
-- MODIFIED: `src/contexts/AuthContext.tsx` — add `analytics.userLoggedIn()` on Clerk sign-in detection
-- MODIFIED: `src/lib/analytics.ts` — add any missing event types (e.g., `pokepasteImported`, `feedbackSubmitted`)
-
-**CSP issue to verify:** `next.config.ts` has a hardcoded CSP header with `connect-src` listing `https://us.i.posthog.com`. If using an EU PostHog host, update this. Vercel Analytics already communicates through the Vercel edge and doesn't need a CSP addition.
-
----
-
-### 3. Landing Page Polish
-
-**Current state:** `src/app/page.tsx` is a fully built landing page with hero, feature cards, how-it-works steps, and footer CTAs. It uses Framer Motion animations. It redirects authenticated users to `/dashboard` immediately.
-
-**What's missing:** VGC community-specific messaging (the current copy is generic). No social proof elements. No link to PokePaste demo or quick onboarding path. Mobile layout may need responsive audit.
-
-**Integration point:** The page is already isolated at `/` — this is a **modify existing** task, not a new route.
-
-**Key constraints:**
-- Authenticated users are immediately pushed to `/dashboard` — the landing page is only for unauthenticated users. Don't add anything that requires auth context.
-- The page renders inside `SidebarLayout` — on mobile this adds sidebar chrome. For a landing page this may be undesirable. Consider rendering this page **without** `SidebarLayout` by handling the layout at the route level or using a conditional.
-- The `SidebarLayout` component should be inspected to understand if it injects nav chrome that competes with the landing page hero.
-
-**Suggested structural change:** Move the landing page outside `SidebarLayout` and use the raw layout with just a minimal header. This is a one-line change in `page.tsx` but has visual impact.
-
-**New vs modified:**
-- MODIFIED: `src/app/page.tsx` — copy updates, new sections (social proof, VGC-specific content, PokePaste callout), responsive layout adjustments
-- NO new routes needed — `/` already exists
-
----
-
-### 4. Mobile Draft Room Redesign
-
-**Current state:** `src/components/draft/MobileDraftView.tsx` already exists with a bottom-tab navigation pattern, compact Pokemon cards, and touch-optimized controls. It accepts `pokemon`, `teams`, `picks`, `currentUserTeamId`, `isUserTurn`, `timeRemaining`, and `onPokemonSelect` props.
-
-`src/components/draft/MobileWishlistSheet.tsx` also exists for the mobile wishlist.
-
-**What's missing:** `MobileDraftView` is defined but the main draft page (`src/app/draft/[id]/page.tsx`) needs to conditionally render it instead of the desktop layout when the viewport is mobile-width. Currently the draft page renders its own layout unconditionally.
-
-**Integration pattern:**
-```tsx
-// In src/app/draft/[id]/page.tsx
-const isMobile = useMediaQuery('(max-width: 768px)')
-
-return isMobile
-  ? <MobileDraftView {...mobileProps} />
-  : <DesktopDraftLayout {...desktopProps} />
+Browser / PWA
+    │
+    ├── Service Worker (pokemon-sprites CacheFirst, pokeapi NetworkFirst)
+    │
+    ▼
+Vercel Edge Network
+    │
+    ├── CDN cache (public pages, static assets)
+    ├── Edge Middleware (Clerk auth + Upstash rate limiting)  ← already here
+    │
+    ▼
+Next.js App Router (Node.js / serverless functions)
+    │
+    ├── API Routes  → input validation (Zod) → Clerk server auth check → business logic
+    ├── Server Components → createSupabaseServerClient (anon key + RLS)
+    │
+    ▼
+Supabase
+    │
+    ├── Supavisor (transaction mode, port 6543)  ← ADD
+    ├── PostgreSQL + RLS policies               ← AUDIT & HARDEN
+    └── Realtime (WebSocket)                    ← SCALE & COST OPTIMIZE
 ```
 
-**useMediaQuery hook:** Does not currently exist in the codebase. Add it as `src/hooks/useMediaQuery.ts` — a simple SSR-safe wrapper around `window.matchMedia`. Initialize to `false` server-side (show desktop layout) and hydrate on mount.
+### Component Boundaries
 
-**Touch target minimum:** 44x44px per WCAG. The existing desktop buttons need auditing in mobile context. The `MobileDraftView` component should enforce this via Tailwind (`min-h-[44px] min-w-[44px]`).
-
-**Bottom sheet pattern for Pokemon picker:** On mobile, the Pokemon selection UI should use a Sheet (bottom drawer) rather than a sidebar. `MobileWishlistSheet.tsx` already uses this pattern — the Pokemon picker should adopt the same approach.
-
-**Data flow:** The `MobileDraftView` receives the same data as the desktop layout. No new state or store changes needed. The draft page already computes the required props.
-
-**New vs modified:**
-- NEW: `src/hooks/useMediaQuery.ts` — SSR-safe media query hook
-- MODIFIED: `src/app/draft/[id]/page.tsx` — conditional render of `MobileDraftView` vs desktop layout
-- MODIFIED: `src/components/draft/MobileDraftView.tsx` — any missing functionality (Pokemon details, confirmation modal integration)
-- MODIFIED: `src/components/draft/MobileWishlistSheet.tsx` — verify it integrates correctly with draft page state
+| Component | Responsibility | Communicates With |
+|-----------|---------------|-------------------|
+| Edge Middleware | Rate limiting, Clerk JWT validation, request ID injection | Upstash Redis, Clerk JWKS |
+| API Routes | Input validation, auth verification, business logic orchestration | Supabase (via service role for admin ops), Clerk server SDK |
+| Server Components | Read-only data fetch, no mutations | Supabase anon client (RLS enforced) |
+| Supabase RLS | Row-level access control, enforce ownership without application auth | PostgreSQL executor |
+| Realtime Manager | WebSocket lifecycle, presence, event deduplication | Supabase Realtime server |
+| UserSessionService | Guest ID persistence, draft participation tracking | localStorage (client only) |
 
 ---
 
-### 5. PokePaste Import/Export
+## Integration Point Map: Where Each Change Lives
 
-**Current state:**
-- `src/lib/pokepaste-parser.ts` — full parser and serializer: `parsePokePaste()`, `fetchPokePaste()`, `toPokePaste()`, `teamToPokePaste()`. Handles nicknames, gender, items, EVs, IVs, tera type, nature, moves.
-- `src/lib/export-service.ts` — `ExportService` class with JSON, CSV, Showdown-format, Markdown, HTML export. Has `exportAsShowdown()` that exports stats but not proper PokePaste format.
-- `src/components/draft/ExportDraft.tsx` — existing export UI with JSON, CSV, summary, clipboard options. No PokePaste button.
-- `src/lib/draft-export.ts` — draft-level export helpers.
+### 1. Rate Limiting
 
-**What's missing:**
+**Current state:** Already implemented in `src/middleware.ts` with Upstash Redis + in-memory fallback. Covers `/api/*` routes with per-route sliding windows.
 
-**Import flow:** No UI exists to import a PokePaste during draft setup or team view. The parser exists but is not wired to any UI.
-
-**Export flow:** The export components don't use `teamToPokePaste()`. They use `exportAsShowdown()` which outputs stats instead of proper PokePaste.
+**Gaps to address:**
+- No rate limiting on Supabase Realtime WebSocket connections themselves
+- No per-user-authenticated rate limit (current key uses `user_id` cookie or IP; Clerk userId not used)
+- No rate limiting on draft room join / spectate actions
 
 **Integration points:**
+- `src/middleware.ts` — Extend `getClientId()` to prefer Clerk's `auth().userId` when available (reduces IP-based collisions behind CDN)
+- `src/middleware.ts` — Add rate limit config entry for `/spectate/` and `/join-draft`
+- No new file needed — modify existing middleware only
 
-**PokePaste export** (simpler, do first):
-- MODIFIED: `src/components/draft/ExportDraft.tsx` — add a "PokePaste" button using `teamToPokePaste()`. Since draft picks don't have moveset data (only species name), export generates templates using `toBasicPokePasteTemplate()` per species.
-- The export copies to clipboard or downloads a `.txt` file — no server needed.
+**Data flow change:** None. Middleware already runs before all non-static requests.
 
-**PokePaste import** (more complex):
-- WHERE: The import entry point should be the draft results page (`/draft/[id]/results`) and the team detail page in leagues (`/league/[id]/team/[teamId]`). These are post-draft contexts where a player updates their team's moveset data.
-- A "Import from PokePaste" button opens a textarea or URL input. On submit, `parsePokePaste()` runs client-side. The matched species names are reconciled against the team's drafted Pokemon list.
-- Parsed moveset data (EVs, item, ability, moves) is stored — either in Supabase on a `team_sets` table, or in `localStorage` keyed by team ID for a lighter beta implementation. The beta can use localStorage; a proper DB column can come post-beta.
-- No new API route needed for the parser itself — it runs entirely client-side.
+### 2. Content Security Policy (CSP)
 
-**Name matching problem:** PokePaste uses Showdown names (e.g., "Incineroar") while the draft stores PokeAPI names (e.g., "incineroar"). Normalize to lowercase and strip hyphens/spaces for comparison.
+**Current state:** Static CSP string in `next.config.ts` `headers()`. Uses `'unsafe-eval'` and `'unsafe-inline'` for `script-src` — the two most dangerous exceptions, both added for Next.js hydration compatibility.
 
-**New vs modified:**
-- NEW: `src/components/draft/PokePasteImportModal.tsx` — textarea/URL import UI with name matching display
-- NEW: `src/hooks/usePokePasteStorage.ts` — localStorage-backed moveset storage keyed by `{draftId}-{teamId}`
-- MODIFIED: `src/components/draft/ExportDraft.tsx` — add PokePaste export button
-- MODIFIED: `src/app/draft/[id]/results/page.tsx` — import button + `PokePasteImportModal` integration
+**The problem:** The current CSP cannot be tightened without breaking Next.js inline script injection. The fix requires nonce-based CSP generated per-request in middleware.
+
+**Recommended change:**
+
+Move from static CSP in `next.config.ts` to nonce-based CSP in middleware:
+
+```typescript
+// In src/middleware.ts — generate nonce per request
+const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' https://raw.githubusercontent.com https://pokeapi.co ...;
+  connect-src 'self' https://*.supabase.co wss://*.supabase.co ...;
+`
+// Set as response header AND as request header (for Next.js to read)
+response.headers.set('Content-Security-Policy', cspHeader)
+response.headers.set('x-nonce', nonce)  // Server Components can read this
+```
+
+**Integration points:**
+- `src/middleware.ts` — Add nonce generation, inject as both response CSP header and `x-nonce` request header
+- `next.config.ts` — Remove static `Content-Security-Policy` from `headers()` (it would conflict)
+- Server Components that render `<script>` tags directly — read nonce from `headers()['x-nonce']`
+
+**Constraint:** `'unsafe-inline'` for `style-src` is acceptable because CSS injection doesn't execute code. Radix UI and Tailwind require it. Removing `'unsafe-eval'` from `script-src` is the high-value change.
+
+**Impact:** Nonce-based CSP forces dynamic rendering for all pages that include the nonce header. Cache those pages at the application level (TanStack Query), not at CDN level.
+
+### 3. Supabase Connection Pooling (Supavisor)
+
+**Current state:** `src/lib/supabase/server.ts` uses `NEXT_PUBLIC_SUPABASE_URL` which points to the direct Postgres connection. Under load (many serverless invocations), each function instance opens its own connection, exhausting Postgres's max_connections.
+
+**Recommended change:** Use Supavisor transaction mode for all server-side DB queries.
+
+**Integration points:**
+- Environment variables — Add `DATABASE_URL` (pooled, port 6543) and `DIRECT_URL` (direct, port 5432)
+- `src/lib/supabase/server.ts` — No code change needed; Supabase JS client uses HTTP, not raw TCP. Supavisor applies at the database URL level for direct Postgres access (Prisma, pg, etc.). For `@supabase/supabase-js`, the connection pooling is handled automatically by Supabase's PostgREST layer
+- If raw SQL queries are added (e.g., for RLS audit scripts, EXPLAIN ANALYZE), those should use the pooled URL
+
+**Key distinction (HIGH confidence, official docs):** The `@supabase/supabase-js` client uses PostgREST over HTTP — it does NOT open raw Postgres connections. Supavisor is only relevant if you add raw `pg` / Prisma connections. The real Supabase scalability lever for this stack is **Realtime connection management** (see section 5) and **RLS query efficiency** (see section 4).
+
+**What to actually configure:**
+- Enable Supavisor in Supabase Dashboard → Database → Connection Pooling → Transaction mode (port 6543)
+- Set pool size based on plan limits (keep under 40% for normal, 80% for peak)
+- Add `DATABASE_POOLED_URL` env var for any future raw SQL migrations run from CI
+
+### 4. RLS Policy Audit
+
+**Current state:** `fix-rls-policies.sql` added owner-check functions and locked down UPDATE/DELETE. SELECT remains permissive (`USING (true)`). The guest user model (TEXT user_id) means RLS cannot use `auth.uid()` for write policies — it uses custom `is_draft_host()` / `is_team_owner()` SECURITY DEFINER functions.
+
+**Performance risk (MEDIUM confidence):** Each RLS policy evaluation that calls a SECURITY DEFINER function executes a sub-select. Under Realtime load, this multiplies: 100 subscribers to a table change = 100 RLS evaluation sub-selects.
+
+**Integration points for RLS audit:**
+
+```
+Audit queries to run in Supabase SQL Editor:
+1. SELECT * FROM pg_policies WHERE schemaname = 'public';   -- List all policies
+2. npx supabase inspect db unused-indexes                    -- Find index waste
+3. EXPLAIN ANALYZE [slow query]                              -- Profile RLS overhead
+4. Supabase Dashboard → Database → Query Performance         -- pg_stat_statements
+```
+
+**Patterns to implement:**
+
+a) **Wrap auth functions in SELECT subqueries** to allow Postgres optimizer to cache per-statement:
+```sql
+-- Current (re-evaluated per row):
+USING (is_draft_host(draft_id, request.headers->>'x-user-id'))
+
+-- Better (optimizer can cache):
+USING ((SELECT is_draft_host(draft_id, current_setting('request.jwt.claims', true)::json->>'sub')))
+```
+
+b) **Add missing RLS-support indexes** — any column referenced in WHERE clauses inside RLS helper functions needs an index:
+```sql
+-- These should already exist from add-performance-indexes.sql but verify:
+CREATE INDEX IF NOT EXISTS idx_drafts_host_id ON drafts(host_id);  -- confirmed exists
+CREATE INDEX IF NOT EXISTS idx_teams_owner_id ON teams(owner_id);  -- confirmed exists
+CREATE INDEX IF NOT EXISTS idx_participants_user_id ON participants(user_id);  -- verify
+```
+
+c) **Enable Supabase Security Advisor** — Dashboard → Database → Security Advisor flags `0003_auth_rls_initplan` for the initPlan pattern described above.
+
+**No new files needed** — this is SQL migrations + dashboard configuration.
+
+### 5. WebSocket / Realtime Connection Management at Scale
+
+**Current state:** `DraftRealtimeManager` creates one channel per draft with 5 postgres_changes subscriptions (drafts, teams, picks, participants, auctions) + presence. Each connected client holds open WebSocket for the duration of the draft.
+
+**Scale math:**
+- Supabase Free: 200 concurrent peak connections
+- Supabase Pro: 500 concurrent peak connections (500 extra = $10/month per 1000)
+- One draft room = N participants * 1 connection each
+- 20 concurrent draft rooms * 8 players = 160 connections
+- Add spectators: 20 rooms * 20 spectators = 400 connections
+- Total: ~560 connections — already exceeds Pro plan base at moderate scale
+
+**Key RLS cost (confirmed, official Supabase docs):** Every `postgres_changes` event to a subscribed table triggers one RLS check per subscriber. 100 subscribers + one pick INSERT = 100 RLS evaluations. This can hammer the database.
+
+**Recommended architecture change: Hybrid broadcast model**
+
+For public-read events (picks, turn advances, auction bids), switch from `postgres_changes` to **Supabase Realtime Broadcast** triggered from the server:
+
+```typescript
+// In draft-picks-service.ts (server-side, after successful DB write):
+await supabase.channel(`draft:${draftId}`).send({
+  type: 'broadcast',
+  event: 'pick_made',
+  payload: { pick, newTurn }
+})
+
+// In DraftRealtimeManager (client-side):
+// Replace postgres_changes for 'picks' with broadcast listener
+.on('broadcast', { event: 'pick_made' }, handlePickBroadcast)
+```
+
+**Why this helps:**
+- Broadcast: no RLS check per subscriber (server-controlled events)
+- postgres_changes: one RLS check per subscriber per event
+- Keep postgres_changes ONLY for tables where client needs row-level filtering that can't be sent via broadcast (e.g., private wishlist_items)
+
+**Integration points:**
+- `src/lib/draft-realtime.ts` — Replace `picks` and `teams` postgres_changes with broadcast listeners. Keep postgres_changes for `drafts` (turn state, status) and `participants`
+- `src/lib/draft-picks-service.ts` — Add broadcast send after successful pick insert
+- `src/lib/auction-service.ts` — Add broadcast send after bid/auction state changes
+
+**Presence connection optimization:**
+- Current: presence track called on every subscriber including spectators
+- Recommendation: Only track presence for active participants (not spectators), saving connections on large public drafts
+
+### 6. Guest User Security
+
+**Current state:** Guest IDs (`guest-{uuid}`) generated with `crypto.randomUUID()` in browser, stored in `localStorage`. The ID is used as `host_id` / `owner_id` in database rows. RLS owner-check functions compare against these TEXT IDs.
+
+**Risk assessment:**
+- localStorage is readable by any JavaScript on the page (XSS risk)
+- The guest ID acts as an authentication credential — if stolen, an attacker can impersonate a guest user
+- No server-side validation that a claimed guest ID was legitimately issued
+- The CSP `unsafe-inline` makes XSS vectors more feasible
+
+**Threat model for this product:** Guest users participate in real-time drafts. The attack surface is:
+1. Guest ID theft via XSS — impersonate team owner, make unauthorized picks
+2. Fake guest ID injection — attempt to own any team with guessed ID format
+3. Unlimited guest ID generation — spam participants table with fake joins
+
+**Mitigation architecture (no breaking change to guest flow):**
+
+a) **Fix CSP first** — nonce-based CSP eliminates the most practical XSS vector that could steal localStorage. This is the highest-leverage fix.
+
+b) **Add server-side guest ID issuance** (medium-term):
+```
+POST /api/guest/session
+→ Server generates guest ID
+→ Returns as httpOnly cookie (not just localStorage value)
+→ Client still has localStorage copy for display
+→ API routes verify cookie matches claimed guest ID in request body
+```
+
+c) **Rate limit guest ID creation** — currently any client can generate unlimited guest IDs and spam `participants` inserts. Add rate limit on `/api/guest/session` creation endpoint.
+
+**Integration points:**
+- New file: `src/app/api/guest/session/route.ts` — POST handler for server-issued guest IDs
+- `src/lib/user-session.ts` — `getOrCreateSession()` calls the API endpoint instead of generating locally
+- `src/middleware.ts` — Rate limit `/api/guest/` route pattern
+
+**Build order note:** CSP fix must come before guest session migration because the migration adds a new API call pattern that the CSP must allow.
+
+### 7. Caching Layer Strategy
+
+**Current state:** Three caching layers exist:
+- Service Worker: Pokemon sprites (CacheFirst, 7d), PokeAPI responses (NetworkFirst, 1h)
+- TanStack Query: Draft state, Pokemon data (staleTime 5m, gcTime 10m)
+- In-memory: Pokemon search index, format data (module-level singletons)
+
+**Missing layers:**
+
+a) **API response caching for public/static endpoints:**
+
+```typescript
+// Health check — can be cached at edge
+export async function GET() {
+  return NextResponse.json(health, {
+    headers: {
+      'Cache-Control': 's-maxage=30, stale-while-revalidate=60'
+    }
+  })
+}
+
+// Public draft listing (/api/drafts?public=true)
+// Cache at Vercel edge for 30s with SWR
+'Cache-Control': 's-maxage=30, stale-while-revalidate=120'
+```
+
+b) **TanStack Query staleTime increases for immutable data:**
+- Pokemon species data: increase staleTime from 5m to 24h (PokeAPI data never changes)
+- Format rules: increase from 5m to infinity (loaded from static files)
+- Draft results after completion: increase staleTime to infinity (immutable once completed)
+
+c) **Supabase query result caching:** The `draft-cache-db.ts` file exists — ensure it's used for completed draft data (immutable) to avoid re-querying the database.
+
+**Integration points:**
+- `src/app/api/health/route.ts` — Add Cache-Control header
+- `src/hooks/usePokemon.ts` — Increase staleTime to 24h
+- `src/lib/pokemon-cache.ts` — Verify LRU eviction settings handle 1000+ pokemon
+- No new files needed
+
+### 8. Dependency Vulnerability Audit
+
+**Current state:** Package versions from `package.json`:
+- `next: ^15.5.12` — safe (CVE-2025-29927 patched in 15.2.3)
+- `@clerk/nextjs: ^7.0.8` — check for latest
+- `@supabase/supabase-js: ^2.58.0` — check for latest
+- `@sentry/nextjs: ^10.27.0` — check for latest
+- `serialize-javascript` — override in package.json to `>=7.0.3` (security fix already applied)
+
+**Audit command:**
+```bash
+npm audit --audit-level=moderate
+```
+
+**Integration point:** `package.json` — update dependencies. No architecture changes.
 
 ---
 
-### 6. Onboarding and Draft Templates
+## Data Flow Changes
 
-**Current state:**
-- `src/components/tour/TourGuide.tsx` and `TourProvider.tsx` — a full animated tour guide with a Pokemon character, step definitions for dashboard, and event-based triggering via `TOUR_OPEN_EVENT` custom DOM event.
-- `src/components/draft/DraftTour.tsx` — draft-room specific tour component.
-- `src/lib/draft-templates.ts` — `BUILT_IN_TEMPLATES` array with "VGC Standard", plus template structure definition. Templates are defined but not wired to the create-draft flow.
-- `src/lib/draft-template-presets.ts` — additional preset handling.
-- `src/components/draft/FormatExplainer.tsx` — inline popover explanations for format concepts.
+### Before (Current Flow): Pick Submission
 
-**What's missing:**
-- The `create-draft` page does not show templates as selectable starting points — it uses a manual configuration form.
-- The tour fires when triggered by `TOUR_OPEN_EVENT` but there is no first-time user trigger (e.g., on first dashboard visit, auto-open the tour).
+```
+Client picks Pokemon
+  → optimistic update (Zustand)
+  → POST /api/picks OR direct Supabase RPC
+    → Supabase validates RLS (is_team_owner check)
+    → INSERT into picks table
+    → postgres_changes fires to ALL subscribers
+      → 8 players * 5 table subscriptions = 40 RLS evaluations
+  → Client gets realtime update
+```
 
-**Template integration point:**
-- MODIFIED: `src/app/create-draft/page.tsx` — add a "Start from template" step before or alongside the manual config form. Templates pre-populate format, team count, budget, timer settings. User can still override.
-- The `BUILT_IN_TEMPLATES` array from `draft-templates.ts` drives the template selector UI. No DB needed for built-in templates.
+### After (Target Flow): Pick Submission
 
-**Onboarding trigger:**
-- MODIFIED: `src/app/dashboard/page.tsx` — on first visit (check `localStorage.getItem('onboardingComplete')`), fire `TOUR_OPEN_EVENT` after a 500ms delay to let the page render first.
-- The tour system is already fully built; this is just the trigger.
+```
+Client picks Pokemon
+  → optimistic update (Zustand)
+  → POST /api/picks (rate-limited by middleware)
+    → Clerk auth check (server-side, in route handler)
+    → Zod input validation
+    → Supabase INSERT (RLS or service role for validated writes)
+    → Server broadcasts pick event: channel.send({ event: 'pick_made', payload })
+  → All clients receive broadcast (no RLS eval per subscriber)
+  → Keep postgres_changes ONLY for drafts table (turn/status changes)
+```
 
-**"60-second first draft" target:** The critical path is: landing page → create draft (template selection) → share room code → draft starts. Templates eliminate the manual config step. The tour guides through the dashboard. FormatExplainer handles in-context education.
-
-**New vs modified:**
-- NEW: `src/components/draft/TemplateSelector.tsx` — grid of template cards with format/settings preview
-- MODIFIED: `src/app/create-draft/page.tsx` — prepend template selection step
-- MODIFIED: `src/app/dashboard/page.tsx` — first-visit tour trigger
+**Key improvement:** RLS evaluations drop from O(subscribers * tables) to O(1) per pick.
 
 ---
 
-### 7. Vercel Deployment and Domain
+## Build Order (Dependencies Between Changes)
 
-**Current state:**
-- `vercel.json` exists with GitHub integration, auto-cancel, and CORS headers (`Cross-Origin-Opener-Policy`, `Cross-Origin-Embedder-Policy`).
-- `next.config.ts` has full security headers, CSP, HSTS, PWA via `next-pwa`, Sentry via `@sentry/nextjs`.
-- `src/app/layout.tsx` has `metadataBase` set to `https://draftpokemon.com`.
-- `.env.example` has a complete production checklist.
-- `src/app/sitemap.ts` and `src/app/robots.ts` exist for SEO.
+Security and scalability work has internal dependencies. Build in this order to avoid rework:
 
-**What's missing or needs verification:**
+### Phase 1 — Foundation (no dependencies, can parallelize)
+1. **Dependency audit** — `npm audit`, update packages. Zero risk, no code changes.
+2. **Database RLS audit** — Run pg_stat_statements queries, Security Advisor, add missing indexes. Pure SQL/dashboard work.
+3. **Supavisor configuration** — Dashboard toggle + env var. No code changes.
 
-**CSP is incomplete for Clerk:** The current `connect-src` in `next.config.ts` lists `https://accounts.google.com https://discord.com` but does not include Clerk's CDN (`https://clerk.draftpokemon.com` or `https://*.clerk.accounts.dev`). This will cause Clerk auth to fail in production if the CSP is enforced.
+### Phase 2 — Application Security (depends on Phase 1 audit findings)
+4. **Nonce-based CSP** — Modify `src/middleware.ts` + `next.config.ts`. Must come before guest session work because it removes `unsafe-inline` that XSS attacks exploit.
+5. **Middleware hardening** — Extend rate limiting to use Clerk userId, add spectate/join routes. Modifies existing `src/middleware.ts` only.
+6. **API route auth hardening** — Enforce `auth().protect()` or Clerk server checks in all mutating API routes. Audit each route in `src/app/api/`.
 
-Fix: Add Clerk's domains to the CSP `connect-src` and `script-src` directives. Clerk's recommended CSP domains are `https://clerk.io https://*.clerk.accounts.dev https://accounts.clerk.dev`.
+### Phase 3 — Scalability (depends on Phase 2 auth being correct)
+7. **Realtime broadcast migration** — Replace `picks` + `teams` postgres_changes with server-broadcast. Modifies `DraftRealtimeManager` + pick/auction services. Requires correct server-side auth from Phase 2.
+8. **Guest session server-issuance** — New `/api/guest/session` endpoint + `UserSessionService` migration. Depends on CSP being correct (Phase 2).
 
-**vercel.json is minimal:** Add `functions` config for API routes that have long execution times (e.g., `/api/ai` routes). The default Vercel function timeout is 10s on Hobby, 60s on Pro. AI calls may exceed this.
-
-**Environment variables needed in Vercel dashboard:**
-
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `NEXT_PUBLIC_SUPABASE_URL` | DB | Yes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | DB | Yes |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Auth | Yes |
-| `CLERK_SECRET_KEY` | Auth | Yes |
-| `NEXT_PUBLIC_SITE_URL` | OG images, sitemap | Yes |
-| `NEXT_PUBLIC_POSTHOG_KEY` | Analytics | Yes |
-| `NEXT_PUBLIC_POSTHOG_HOST` | Analytics | Yes (or default) |
-| `DISCORD_FEEDBACK_WEBHOOK_URL` | Feedback | Yes |
-| `UPSTASH_REDIS_REST_URL` | Rate limiting | Recommended |
-| `UPSTASH_REDIS_REST_TOKEN` | Rate limiting | Recommended |
-| `NEXT_PUBLIC_SENTRY_DSN` | Error tracking | Optional |
-
-**Domain setup:** Vercel requires adding `draftpokemon.com` in Project Settings > Domains. Point DNS `A` record to Vercel's IP (76.76.21.21) and `CNAME` of `www` to `cname.vercel-dns.com`.
-
-**New vs modified:**
-- MODIFIED: `vercel.json` — add function timeout config for AI routes
-- MODIFIED: `next.config.ts` — fix CSP to include Clerk domains
-- NO new code files — deployment is configuration only
-
----
-
-## Component Responsibility Map
-
-| Component / File | Responsibility | Integration Layer |
-|-----------------|---------------|-------------------|
-| `src/app/layout.tsx` | Root providers, global chrome, analytics init | Add `<FeedbackWidget />` here |
-| `src/app/page.tsx` | Landing page for unauthenticated users | Modify copy and sections |
-| `src/app/draft/[id]/page.tsx` | Draft room orchestration | Add mobile breakpoint conditional |
-| `src/app/create-draft/page.tsx` | Draft creation wizard | Prepend template selector |
-| `src/app/dashboard/page.tsx` | Authenticated user home | Add first-visit tour trigger |
-| `src/app/draft/[id]/results/page.tsx` | Post-draft results | Add PokePaste import button |
-| `src/lib/analytics.ts` | PostHog typed events | Add calls at action sites |
-| `src/lib/pokepaste-parser.ts` | Parse/serialize PokePaste — COMPLETE | Wire to UI |
-| `src/components/draft/MobileDraftView.tsx` | Mobile draft interface — EXISTS | Wire conditionally in draft page |
-| `src/components/draft/ExportDraft.tsx` | Export UI — EXISTS | Add PokePaste export button |
-| `src/components/tour/TourGuide.tsx` | Onboarding tour — COMPLETE | Trigger on first visit |
-| `src/lib/draft-templates.ts` | Template definitions — COMPLETE | Wire to create-draft flow |
-
----
-
-## Data Flow Diagrams
-
-### Feedback Widget Data Flow
-```
-User fills form (FeedbackWidget or /feedback page)
-  → POST /api/feedback
-    → Validate fields (server)
-    → POST to Discord webhook (DISCORD_FEEDBACK_WEBHOOK_URL)
-    → Return { success: true }
-  → Show success state in UI
-```
-
-### PokePaste Import Data Flow
-```
-User pastes text or URL in PokePasteImportModal
-  → If URL: fetch /raw via client-side fetch (pokepaste-parser.ts#fetchPokePaste)
-  → parsePokePaste(text) → PokemonSet[]
-  → Match PokemonSet.name against team's drafted pokemon names (normalize lowercase)
-  → Show match preview (matched / unmatched)
-  → On confirm: store in localStorage keyed by {draftId}-{teamId}
-    → usePokePasteStorage hook reads/writes this
-  → Team results page renders moveset data from storage
-```
-
-### Analytics Data Flow
-```
-User action in component or hook
-  → Service function (draft-lifecycle-service, useDraftActions, etc.)
-    → analytics.eventName(props)  ← fire-and-forget
-      → posthog.capture(event, props) [if initialized]
-  → Vercel Analytics captures page views independently
-```
-
-### Mobile Layout Selection
-```
-Draft page mounts
-  → useMediaQuery('(max-width: 768px)') [SSR: false, client: real value]
-  → isMobile === true → <MobileDraftView {...props} />
-  → isMobile === false → existing desktop layout
-  Both consume the same draft state and callbacks from draft page hooks
-```
-
----
-
-## Integration Dependencies and Build Order
-
-The features have the following dependency relationships:
-
-```
-Vercel deployment config (no deps)
-  └── Must be done first to unblock production testing
-
-Analytics call sites (depends on: analytics.ts already built)
-  └── Add calls incrementally; no UI work
-
-Landing page polish (no deps)
-  └── Standalone page modification
-
-Feedback widget (no deps on other features)
-  └── Can be built in parallel with any other feature
-
-Mobile draft room (depends on: useMediaQuery hook)
-  └── Build useMediaQuery first, then wire MobileDraftView
-
-PokePaste export (no deps)
-  └── Modification to existing ExportDraft component
-
-PokePaste import (depends on: PokePaste export pattern established)
-  └── Build after export to understand name normalization
-
-Onboarding templates (no deps on other Milestone 4 features)
-  └── Wire existing template data and tour trigger
-```
-
-**Recommended build order:**
-1. Vercel deployment config (CSP fix, env vars) — unblocks production testing of everything else
-2. Analytics call sites — quick additions, validates PostHog is working
-3. Feedback widget — isolated component, fast to ship, high beta value
-4. Landing page polish — content work, no code risk
-5. Mobile draft room — most complex, isolated to draft page
-6. PokePaste export then import — export is simpler, import builds on it
-7. Onboarding templates — can be done any time, nice-to-have polish
+### Phase 4 — Cost Optimization (independent, low risk)
+9. **Caching headers** — API route Cache-Control + TanStack Query staleTime increases.
+10. **Presence optimization** — Spectator-only connections skip presence tracking.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Adding Feedback Inside SidebarLayout
-**What:** Placing the feedback trigger inside `SidebarLayout` instead of root layout
-**Why bad:** SidebarLayout doesn't wrap all pages. The feedback widget would disappear on auth pages, draft room, etc.
-**Instead:** Add to `src/app/layout.tsx` outside the `<main>` tag
+### Anti-Pattern 1: Middleware-Only Auth
+**What:** Relying on `clerkMiddleware` as the sole auth gate.
+**Why bad:** CVE-2025-29927 proved middleware can be bypassed. Fortunately, this project runs Next.js 15.5.12 (patched), but defense-in-depth requires auth checks inside API route handlers too.
+**Instead:** Every mutating API route calls `auth()` from `@clerk/nextjs/server` and throws 401 if no session. Server Components call `auth()` before any data mutation.
 
-### Anti-Pattern 2: Blocking Render on Analytics
-**What:** `await analytics.draftCreated(...)` before showing success UI
-**Why bad:** PostHog calls are network requests that can fail or be slow
-**Instead:** Call analytics after state update, never in the critical path. The existing `track()` function already returns void.
+### Anti-Pattern 2: postgres_changes at Scale
+**What:** Using `postgres_changes` for all real-time events with many subscribers.
+**Why bad:** Every event = N RLS checks (one per subscriber). Confirmed by Supabase docs: 100 subscribers + 1 insert = 100 reads.
+**Instead:** Use broadcast for server-controlled events. Reserve postgres_changes for low-subscriber, row-filtered tables (private wishlists, admin events).
 
-### Anti-Pattern 3: SSR-unsafe useMediaQuery
-**What:** `window.matchMedia(...)` called during server render
-**Why bad:** Causes hydration mismatch; Next.js will throw
-**Instead:** Initialize to `false` (desktop default) during SSR, hydrate on `useEffect`
+### Anti-Pattern 3: Static CSP String with unsafe-eval
+**What:** The current `next.config.ts` CSP has `'unsafe-eval'` in script-src to accommodate Next.js internals.
+**Why bad:** `unsafe-eval` allows `eval()` and `new Function()` — the primary XSS code execution vector.
+**Instead:** Nonce-based CSP in middleware. Next.js 15 App Router supports nonce extraction for its own scripts when CSP header includes a `nonce-{value}` token.
 
-### Anti-Pattern 4: PokePaste Fetch from Browser to pokepast.es (CORS)
-**What:** `fetchPokePaste(url)` called directly from client
-**Why bad:** pokepast.es does not send CORS headers — direct client fetch will fail
-**Instead:** Proxy through an API route at `/api/pokepaste?url=...` that fetches server-side, or instruct users to paste raw text instead of URLs
+### Anti-Pattern 4: Guest ID in localStorage as Auth Credential
+**What:** Current guest IDs in localStorage used as the only proof of ownership for database rows.
+**Why bad:** XSS attack reads localStorage — steals guest ID — makes picks on behalf of that team.
+**Instead:** Server-issued guest IDs returned as httpOnly cookies (primary auth surface) + localStorage (display/convenience only). API routes validate cookie not body-supplied ID.
 
-### Anti-Pattern 5: Storing PokePaste Data in Zustand
-**What:** Putting moveset data in the global draftStore
-**Why bad:** Movesets are post-draft personal data, not shared draft state. Pollutes the realtime-synced store.
-**Instead:** localStorage via `usePokePasteStorage` hook. Post-beta: dedicated `team_sets` Supabase table.
+### Anti-Pattern 5: In-Memory Rate Limiter as Primary Limiter
+**What:** Current code uses in-memory rate limiter as fallback when Upstash Redis is not configured.
+**Why bad:** In-memory state resets between serverless function invocations (Vercel spins up multiple instances). The same client can hit different instances and bypass the limit.
+**Instead:** Always configure Upstash Redis for production. The in-memory fallback is acceptable in development only. Add startup check that warns loudly in production if Redis is not configured.
 
-### Anti-Pattern 6: Modifying CSP in vercel.json Headers Instead of next.config.ts
-**What:** Adding CSP overrides in `vercel.json` headers
-**Why bad:** The app already sets CSP in `next.config.ts` — duplicate header definitions cause unexpected merging or last-write-wins behavior
-**Instead:** All CSP changes go in `next.config.ts` only
+### Anti-Pattern 6: Permissive SELECT + TEXT User ID Comparison
+**What:** RLS SELECT policies use `USING (true)` — any anon client can read all rows.
+**Why bad:** Draft data (Pokemon picks, team compositions, budgets) may be strategically sensitive in sealed/blind draft modes. Evaluate before launching sealed draft features.
+**Instead:** For the current use case (transparent drafts), permissive SELECT is intentional and acceptable. If sealed draft is added, restrict picks SELECT during active phase.
 
 ---
 
 ## Scalability Considerations
 
-| Concern | Current | Beta (100-500 DAU) | Post-Beta |
-|---------|---------|---------------------|-----------|
-| Feedback volume | Discord webhook, no DB | Sufficient; webhook handles easily | Add Supabase `feedback` table for triage |
-| Analytics events | PostHog free tier (1M events/month) | Sufficient for beta | Monitor event volume, may need paid tier |
-| PokePaste data | localStorage only | Sufficient; no server cost | Migrate to `team_sets` DB table |
-| Mobile sessions | No mobile optimization | MobileDraftView covers this | Monitor session length on mobile |
-| Vercel build time | ~2 min | Acceptable | Enable Vercel's build cache for faster deploys |
+| Concern | At 100 concurrent users | At 1K concurrent users | At 10K concurrent users |
+|---------|------------------------|----------------------|------------------------|
+| Supabase Realtime connections | ~100 (free tier 200 limit) | ~1000 (Pro base 500, overage billed) | Need broadcast model to reduce per-event multiplier |
+| RLS evaluation load | Manageable with indexes | Starts to slow without broadcast migration | Must switch to broadcast pattern |
+| Rate limiter accuracy | In-memory works | Upstash required (multi-instance Vercel) | Upstash required + regional distribution |
+| Connection pool exhaustion | Not a risk (HTTP-based Supabase JS) | Not a risk | Only risk if raw pg connections added |
+| Vercel serverless cold starts | Occasional | Frequent on spiky traffic | Consider reserved concurrency |
+| PokeAPI dependency | Cached well (7d sprites, 1h data) | Same — no risk | Same — PokeAPI is not a scalability bottleneck |
 
 ---
 
 ## Sources
 
-- Codebase inspection: `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/feedback/page.tsx`, `src/app/api/feedback/route.ts`
-- `src/lib/analytics.ts`, `src/lib/pokepaste-parser.ts`, `src/lib/export-service.ts`, `src/lib/draft-templates.ts`
-- `src/components/draft/MobileDraftView.tsx`, `src/components/draft/ExportDraft.tsx`, `src/components/tour/TourGuide.tsx`
-- `src/components/providers/AnalyticsProvider.tsx`, `next.config.ts`, `vercel.json`, `.env.example`
-- Confidence: HIGH — based entirely on direct codebase inspection, no external sources needed
+- [Supabase Connection Management docs](https://supabase.com/docs/guides/database/connection-management)
+- [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits)
+- [Supabase Realtime Pricing](https://supabase.com/docs/guides/realtime/pricing)
+- [Supabase RLS Performance and Best Practices](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv)
+- [Supabase Performance and Security Advisors](https://supabase.com/docs/guides/database/database-advisors)
+- [Supabase Query Optimization](https://supabase.com/docs/guides/database/query-optimization)
+- [Supabase Postgres Changes docs](https://supabase.com/docs/guides/realtime/postgres-changes)
+- [Supabase Broadcast docs](https://supabase.com/docs/guides/realtime/broadcast)
+- [Next.js CSP with nonces (App Router)](https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy)
+- [CVE-2025-29927 Next.js Middleware Bypass](https://github.com/vercel/next.js/security/advisories/GHSA-f82v-jwr5-mffw)
+- [Clerk security blog on CVE-2025-29927](https://clerk.com/blog/cve-2025-29927)
+- [Upstash Rate Limiting for Next.js Edge](https://upstash.com/blog/edge-rate-limiting)
+- [localStorage vs httpOnly cookies security](https://design-code.tips/blog/2025-02-28-why-local-storage-is-vulnerable-to-xss-attacks-and-a-safer-alternative/)
+- [Vercel Edge Caching / stale-while-revalidate](https://vercel.com/blog/vercel-cache-api-nextjs-cache)

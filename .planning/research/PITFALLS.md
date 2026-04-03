@@ -1,394 +1,496 @@
-# Domain Pitfalls
+# Domain Pitfalls: Security Hardening & Scalability Audit
 
-**Domain:** Beta launch of complex real-time Pokemon draft platform (adding features to existing ~79K line TypeScript app)
+**Domain:** Adding security hardening, rate limiting, cost optimization, and scalability to an existing Next.js 15 + Supabase + Clerk real-time draft platform
 **Researched:** 2026-04-03
-**Confidence:** HIGH for deployment/auth/realtime (verified with official docs); MEDIUM for community/onboarding (pattern analysis)
+**Overall Confidence:** HIGH for Supabase/Clerk integration issues (official docs verified); MEDIUM for scalability thresholds (community-verified)
+
+---
+
+## Severity Rankings
+
+| Severity | Definition |
+|----------|-----------|
+| CRITICAL | Causes production outage, data breach, or complete auth bypass |
+| HIGH | Breaks core functionality for a class of users, or exposes real data |
+| MODERATE | Degrades experience, incorrect security assumptions, or causes billing surprises |
+| LOW | Wasted work, security theater, or minor friction |
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, production outages, or failed launches.
+### Pitfall 1: RLS Policy Breaks Realtime Subscriptions (Supabase-Specific)
+
+**Severity:** CRITICAL
+**Phase:** Security Audit / RLS Audit
+
+**What goes wrong:** You audit existing RLS policies and tighten them. Realtime subscriptions stop delivering events to some or all participants. Picks no longer propagate. The draft room appears frozen.
+
+**Why it happens:** Supabase Realtime enforces RLS at the subscription layer. When a `postgres_changes` subscription is active, Supabase checks whether the connected user's JWT passes the SELECT policy for the affected row before broadcasting the event. Tightening a SELECT policy that was previously permissive (e.g., `USING (true)`) to require a specific user ID match will cause the Realtime server to silently drop events for rows the user "can't see" according to the new policy — even if the client already has that data on screen.
+
+**The specific trap for this codebase:** The `drafts`, `teams`, `picks`, and `participants` tables are all subscribed via `DraftRealtimeManager` (`src/lib/draft-realtime.ts`). If you add a row-scoped SELECT policy to `picks` that requires `team_id IN (SELECT id FROM teams WHERE draft_id = $draft_id AND user_id = auth.uid())`, spectators and non-team participants will stop receiving pick events entirely — because those rows do not match their user.
+
+**Consequences:** Silent data freeze in draft rooms. All participants still see the UI as connected (WebSocket is alive), but events stop arriving. This is the hardest category of bug to diagnose because there is no error thrown.
+
+**Prevention:**
+- Keep SELECT policies on broadcast tables (picks, teams, drafts) permissive for rows within the same draft (`USING (draft_id = $draft_id)` not `USING (user_id = auth.uid())`)
+- Use INSERT/UPDATE/DELETE policies for mutation control; use SELECT policies only to control visibility, not participation
+- After tightening any RLS policy, run the full subscription test: open two browser tabs as different users, make a pick, confirm both tabs update
+- Check the Supabase dashboard "Realtime" logs for "Policy check failed" entries after any RLS migration
+
+**Detection:** Pick events not received by spectators or non-picking participants; Supabase Realtime inspector shows messages sent from server but not delivered to client.
+
+**Sources:** [Supabase Realtime RLS Issue #35195](https://github.com/supabase/supabase/issues/35195), [Supabase RLS + Realtime Fix (Medium)](https://medium.com/@kidane10g/supabase-realtime-stops-working-when-rls-is-enabled-heres-the-fix-154f0b43c69a)
 
 ---
 
-### Pitfall 1: Clerk Production Keys Not Set Before Launch
+### Pitfall 2: Clerk JWT Claims Do Not Satisfy Supabase auth.uid() in RLS
 
-**What goes wrong:** App works perfectly on localhost and Vercel preview, then auth silently fails or crashes on draftpokemon.com at launch.
+**Severity:** CRITICAL
+**Phase:** Security Audit / RLS Audit
 
-**Why it happens:** Clerk uses two separate application instances — a dev instance (pk_test_*, sk_test_*) and a production instance (pk_live_*, sk_live_*). Vercel preview deployments can run on dev keys, but production deployment on a real domain requires live keys. Additionally, Clerk explicitly blocks production instances from running on *.vercel.app subdomains — so the first real-domain deploy is the first time production keys are exercised.
+**What goes wrong:** You write new RLS policies using `auth.uid()` for per-user row access. Policies silently pass or fail incorrectly because Clerk user IDs are strings (`user_abc123`) while Supabase's `auth.uid()` function returns a UUID. The mismatch causes every RLS check to fail, returning empty result sets instead of an error.
 
-**Consequences:** All users hit auth errors at launch. OAuth providers (Discord, Google) fail because callback URLs are registered against the wrong Clerk instance. The app is dead at the moment that matters most.
+**Why it happens:** As of April 2025, Clerk uses its own JWT template for Supabase integration (deprecated as of April 1 2025 in favor of native Supabase integration). The `sub` claim in a Clerk-issued JWT is a Clerk user ID string, not a UUID. Supabase's `auth.uid()` function casts `sub` to `uuid` type. Any Clerk user ID will fail that cast silently. New RLS policies written with `auth.uid()` look correct but always return `NULL`, causing every policy check to evaluate to false.
+
+**The specific trap for this codebase:** `FIX-RLS-POLICIES.md` in the codebase already documents a Clerk/Supabase JWT mismatch. Adding new policies during the security audit without checking whether the existing workaround (custom `requesting_user_id()` SQL function or `auth.jwt() -> 'sub'`) is consistently applied will create a split: some tables use the workaround correctly, newly-audited tables use `auth.uid()` and silently break.
+
+**Consequences:** All INSERT/UPDATE operations on newly-secured tables fail. Users cannot make picks. Draft creation fails silently. No error appears in the browser because the RLS policy returns empty, not an error.
 
 **Prevention:**
-- Create the Clerk production instance before any deployment work begins
-- Set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_*` and `CLERK_SECRET_KEY=sk_live_*` in Vercel's Production environment (not Preview, not Development)
-- Re-register Discord and Google OAuth callback URLs in the production Clerk dashboard, pointing to draftpokemon.com (not vercel.app)
-- Test auth flow end-to-end on the custom domain before any public announcement
+- Audit every existing RLS policy in `FIX-RLS-POLICIES.md` before writing new ones — identify which function is currently used instead of `auth.uid()`
+- Create a single SQL helper function (e.g., `current_user_id()`) that correctly extracts the user identifier from the Clerk JWT, and use only that function in every RLS policy
+- Never mix `auth.uid()` and custom claims functions across tables
+- After the migration to Supabase's native Clerk integration (recommended by Clerk as of April 2025), retest every policy
 
-**Detection:** 401 errors in production logs, Clerk dashboard shows zero active sessions, users report "sign in not working."
+**Detection:** INSERT queries return empty rows instead of error; `SELECT auth.uid()` from a Clerk-authenticated session returns NULL; RLS policies appear correct but block all mutations.
+
+**Sources:** [Clerk Supabase Integration Docs](https://clerk.com/docs/guides/development/integrations/databases/supabase), [Supabase Clerk Third-Party Auth](https://supabase.com/docs/guides/auth/third-party/clerk), [Supabase Discussion #33091](https://github.com/orgs/supabase/discussions/33091)
 
 ---
 
-### Pitfall 2: Supabase Realtime Connection Limits Hit Under Beta Load
+### Pitfall 3: CSP `connect-src` Missing Clerk FAPI Hostname
 
-**What goes wrong:** Draft rooms work perfectly for 2-4 person tests, then silently break when 10+ users join simultaneously during beta wave.
+**Severity:** CRITICAL
+**Phase:** Security Hardening / CSP Implementation
 
-**Why it happens:** Supabase Free plan limits concurrent Realtime connections (typically 200 concurrent on Free tier). Each draft participant opens multiple channels (draft state, picks, auctions, bids, wishlist). A 6-person draft room can consume 30+ connections. Twenty simultaneous draft rooms = 600+ connections — well above the Free tier limit. When the limit is hit, new WebSocket connections receive "too_many_connections" and silently fail rather than throwing a visible error.
+**What goes wrong:** You add a Content-Security-Policy header (or tighten the existing one in `next.config.ts`). Clerk authentication stops working. The sign-in modal loads but token refresh silently fails. Sessions expire and users cannot re-authenticate without a page reload.
 
-**Consequences:** New joiners see stale state. Picks by other teams don't propagate. The app appears broken with no obvious error message.
+**Why it happens:** The existing CSP in `next.config.ts` (line 125) includes `connect-src 'self' https://*.supabase.co wss://*.supabase.co ...` but does NOT include Clerk's Frontend API (FAPI) hostname. Every Clerk request (session refresh, token validation, OAuth handshake) is a `fetch()` call to your Clerk FAPI URL (e.g., `https://clerk.your-domain.com` in production or `https://aware-skunk-42.clerk.accounts.dev` in development). CSP blocks these as violations. The browser shows no network error in normal mode — CSP violations silently fail in production.
+
+**Required CSP additions for Clerk + Supabase + existing services:**
+
+| Directive | Required Values |
+|-----------|----------------|
+| `connect-src` | `https://[your-fapi-hostname]` |
+| `script-src` | `https://[your-fapi-hostname]` `https://challenges.cloudflare.com` |
+| `img-src` | `https://img.clerk.com` |
+| `frame-src` | `https://challenges.cloudflare.com` (existing `https://discord.com` and `https://accounts.google.com` may already be present) |
+| `worker-src` | `'self' blob:` |
+
+**The specific trap:** The existing CSP uses a static string in `next.config.ts` (`headers()` function). The Clerk FAPI hostname is different between development and production instances. A hardcoded production FAPI domain breaks development, and hardcoding the development domain breaks production. The correct pattern is to build the CSP dynamically from an environment variable (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` can be parsed to derive the FAPI URL, or set `NEXT_PUBLIC_CLERK_FAPI_URL` explicitly).
+
+**Additional trap — `unsafe-eval` in `script-src`:** The existing CSP includes `'unsafe-eval'` in `script-src`, which was likely added to satisfy a Supabase or build dependency. Removing it as part of "tightening" will break Clerk's Cloudflare bot-protection challenge script.
+
+**Consequences:** Clerk authentication silently fails in production after CSP update. Users are logged out and cannot log back in. Guest users are unaffected, but authenticated features (dashboard, settings) are dead.
 
 **Prevention:**
-- Audit connection count per draft room before launch — log how many channels `useConnectionManager` opens per participant
-- Consolidate channels: one channel per draft room rather than per-table subscriptions where possible
-- Upgrade Supabase to Pro before any public announcement (Pro plan supports 10,000+ concurrent connections)
-- Add connection status monitoring: surface the Supabase Realtime connection state in the UI so users know when they are disconnected
+- Make CSP generation dynamic: derive Clerk FAPI URL from environment variable, not hardcode
+- Validate CSP with Clerk's official domains list before deploying (see Clerk CSP docs linked in sources)
+- Test the full auth flow (sign in, token refresh after 60 seconds, OAuth) after any CSP change
+- Use `Content-Security-Policy-Report-Only` header in staging to catch violations before shipping
 
-**Detection:** Pick events not received by some participants; Supabase dashboard shows connection quota warnings; browser console shows "too_many_connections" WebSocket close codes.
+**Detection:** Browser console CSP violation reports after login attempts; `clerk.loaded` never fires; `auth.protect()` calls in middleware redirect users on every request.
+
+**Sources:** [Clerk CSP Headers Guide](https://clerk.com/docs/guides/secure/best-practices/csp-headers), [Next.js CSP Guide](https://nextjs.org/docs/pages/guides/content-security-policy)
 
 ---
 
-### Pitfall 3: PWA Service Worker Serves Stale Build After Deployment
+### Pitfall 4: Next.js CVE-2025-29927 Middleware Bypass (If Unpatched)
 
-**What goes wrong:** You deploy a bug fix. Users who had the app installed (PWA) continue to see the broken version for hours or days because the service worker has cached the old build.
+**Severity:** CRITICAL
+**Phase:** Security Audit (immediate check)
 
-**Why it happens:** The existing `sw.js` (confirmed modified in git status) pre-caches app shell assets. After a Vercel deployment, the hashed filenames change, but the service worker update lifecycle requires: (1) new SW detected, (2) SW installs, (3) old SW releases control on next navigation. If users never close all tabs, they're stuck on the cached version indefinitely.
+**What goes wrong:** Any attacker can send `x-middleware-subrequest: pages/_middleware` header to any protected route and bypass all middleware-based auth checks. The entire `isProtectedRoute` matcher in `src/middleware.ts` is skipped.
 
-**Consequences:** Beta testers file bugs against already-fixed versions. You cannot reliably hotfix production. Cache-busting announcements in Discord are required, which erodes trust.
+**Why it happens:** CVE-2025-29927 (CVSS 9.1, disclosed March 2025) allows complete bypass of Next.js middleware via a crafted internal header. Affected versions: 11.1.4 through 15.2.2. Fixed in 15.2.3+.
+
+**The specific trap for this codebase:** The middleware in `src/middleware.ts` is the PRIMARY auth enforcement mechanism for protected routes (`/dashboard`, `/admin`, `/settings`). If the Next.js version is below 15.2.3, this check is completely bypassable by any external request with the forged header.
+
+**Consequences:** Unauthenticated users access `/admin`, `/dashboard`, and `/settings` routes. League commissioner tools, user data exports, and admin panels are exposed.
 
 **Prevention:**
-- Ensure `sw.js` has a versioned cache name that changes on every build (use the build ID or a hash)
-- Implement `skipWaiting()` + `clients.claim()` in the service worker so updates take effect on next page load, not next close-and-reopen
-- Add a UI notification: "App updated — click to reload" using the `waiting` event from the SW registration
-- Test the update cycle locally: build, serve, load, build again, reload — verify new SW activates
+- Run `npm ls next` to check current version immediately
+- Upgrade to `next@15.2.3` or higher before shipping any security work
+- Even after patching, do NOT rely solely on middleware for auth — each server component and API route must independently verify auth using Clerk's `auth()` server-side function (defense in depth)
+- Vercel's WAF can block the `x-middleware-subrequest` header as an additional layer if you cannot upgrade immediately
 
-**Detection:** Users report issues you've already fixed; DevTools → Application → Service Workers shows "waiting to activate" state.
+**Detection:** `curl -H 'x-middleware-subrequest: middleware' https://draftpokemon.com/dashboard` — if this returns 200 instead of redirect to sign-in, the system is vulnerable.
+
+**Sources:** [Next.js CVE-2025-29927 Advisory](https://nextjs.org/blog/cve-2025-29927), [Clerk Analysis of CVE-2025-29927](https://clerk.com/blog/cve-2025-29927), [Datadog Security Labs Analysis](https://securitylabs.datadoghq.com/articles/nextjs-middleware-auth-bypass/)
 
 ---
 
-### Pitfall 4: PostHog/Sentry Causes React Hydration Errors in Production
+### Pitfall 5: Supabase Service Role Key Leaked Via `NEXT_PUBLIC_` Prefix or `'use client'` Import
 
-**What goes wrong:** Adding PostHog analytics alongside Sentry causes hydration mismatches that surface as console errors in production and can break interactive islands in the App Router.
+**Severity:** CRITICAL
+**Phase:** Security Audit
 
-**Why it happens:** PostHog's `init()` injects a `<script>` tag for remote config loading. This script tag is present server-side but its contents differ from what the client hydrates, triggering React 18's strict hydration diffing. The error is reported as "Prop `dangerouslySetInnerHTML` did not match" or attribute mismatches. Sentry 8.x + PostHog together amplify this because both modify the global error handling chain.
+**What goes wrong:** During the security audit, you add admin-level operations (e.g., bulk deleting a draft, system-level fixes) and create a Supabase admin client using the service role key. The file gets a `'use client'` directive added later, or the key is named `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`, causing it to be bundled into client-side JavaScript.
 
-**Consequences:** Hydration errors cause entire subtrees to re-render client-side, degrading performance. In the worst case, interactive components (pick buttons, bid inputs) fail to attach event handlers.
+**Why it happens:** Next.js prefixes all `NEXT_PUBLIC_*` environment variables into the client bundle at build time. Any variable with this prefix is visible in browser DevTools → Sources → _next/static. The service role key bypasses ALL RLS policies — it is a root-level database credential.
+
+**Consequences:** Any visitor to the site can extract the service role key from the JS bundle, perform full CRUD on every table, delete all draft data, extract all user IDs, and inject malicious picks.
 
 **Prevention:**
-- Use `disable_external_dependency_loading: true` in PostHog init until PostHog fixes this (accepted tradeoff: disables PostHog surveys)
-- Initialize PostHog in `instrumentation-client.ts` (Next.js 15.3+) rather than in a Client Component to avoid the script injection during render
-- Initialize Sentry and PostHog in separate files; do not chain them during the same initialization sequence
-- Test hydration in production build (`npm run build && npm start`) before deploying — hydration errors only appear in production mode
+- Name the key `SUPABASE_SERVICE_ROLE_KEY` (no `NEXT_PUBLIC_` prefix) — server-side only
+- Add `import 'server-only'` at the top of any file that creates the service-role Supabase client
+- Never use the service role client in React components, even Server Components that will later be refactored to Client Components
+- Periodically grep the client bundle: `grep -r "service_role" .next/static/` — if it returns results, a key is exposed
 
-**Detection:** Browser console shows "Hydration failed" or "attribute mismatch" errors; React DevTools highlights hydrated-but-mismatched components.
+**Detection:** Check `.next/static/chunks/` for the string `service_role` after a production build.
+
+**Sources:** [Supabase Understanding API Keys](https://supabase.com/docs/guides/api/api-keys), [Supabase Securing Your API](https://supabase.com/docs/guides/api/securing-your-api)
 
 ---
 
-### Pitfall 5: OG/Social Metadata Missing, Killing Discord/Reddit Link Previews
+## High Severity Pitfalls
 
-**What goes wrong:** The VGC community shares draftpokemon.com on Discord and Reddit. Links show no preview, no image, no description — just a bare URL. This is the first impression for hundreds of potential users.
+### Pitfall 6: Rate Limiting Blocks Legitimate Auction Bidders During Live Draft
 
-**Why it happens:** Next.js App Router requires `generateMetadata()` to be exported from Server Components. Dynamic routes (`/draft/[id]`) need per-page metadata with real data. Social crawlers (Discord, Twitter) do not execute JavaScript — they only read server-rendered HTML. If metadata is missing or relative URLs are used for OG images, crawlers see nothing.
+**Severity:** HIGH
+**Phase:** Rate Limiting Implementation
 
-**Consequences:** Launch posts on r/pokemonvgc and the Smogon Discord generate no engagement because link previews are blank. The platform looks unprofessional at the worst possible moment.
+**What goes wrong:** The `bids` rate limiter is configured at `120 requests/minute` (per the existing `src/middleware.ts`). In a competitive auction draft with 6 teams and a 30-second auction window, each team will submit 5-10 bids in rapid succession when the clock runs down. During a peak bidding moment, a single user can fire 8-12 bids in under 10 seconds, followed by a second burst when the next Pokemon goes to auction. With 6 teams, the shared IP rate limit (from `x-forwarded-for`) may be hit if multiple players are on the same network (e.g., a tournament venue's WiFi).
+
+**Why it happens:** Two specific problems with the current implementation:
+1. `getClientId()` in middleware falls back to IP address for unauthenticated users. Guest users from the same network (tournament venue, household) share one rate limit bucket. Burst bids from different people at a venue can cross-block.
+2. The in-memory fallback (3x limit) resets on every cold start. Vercel spins a new Lambda per request under high load — the in-memory limiter has zero cross-instance state. A user can hit 60 bids/minute from one Lambda instance and another 60 from the next cold start.
+
+**Consequences:** Real auction participants get 429 errors during the most critical moment of a draft. The user sees "Too many requests" and cannot complete their bid. They lose the auction despite being present and active.
 
 **Prevention:**
-- Add `generateMetadata()` to every public-facing route: `/`, `/create-draft`, `/join-draft`, `/draft/[id]`
-- Use absolute URLs for OG images (include `process.env.NEXT_PUBLIC_BASE_URL` prefix)
-- Create a 1200x630px static OG image for the landing page specifically (the most shared URL)
-- Validate with [opengraph.xyz](https://www.opengraph.xyz) and Discord's embed checker before launch
+- Use user ID (from Clerk JWT or guest ID cookie) as the rate limit key, not IP — this prevents shared-network collisions
+- For the `bids` limiter specifically, use a token bucket algorithm (not sliding window) with burst capacity: `Ratelimit.tokenBucket(10, '10 s', 30)` — allows 30 bids in bursts, refills at 10/10s
+- Upstash Redis is already integrated (`src/middleware.ts` lines 44-49) — ensure it is configured in the production Vercel environment or the fallback void applies
+- Never block bid API calls with a 429 that does not include a `Retry-After` header with a short value (2-5 seconds) so the client can auto-retry
 
-**Detection:** Paste draftpokemon.com into Discord and observe blank preview; check `<meta property="og:image">` in page source.
+**Detection:** Monitor 429 rate on `/api/bids` during a test auction with 4+ active bidders. Any 429 during a live auction is a UX failure.
+
+---
+
+### Pitfall 7: In-Memory Rate Limiter Silently Reverts Under Vercel Serverless Scaling
+
+**Severity:** HIGH
+**Phase:** Rate Limiting Implementation
+
+**What goes wrong:** Upstash Redis is not configured in the production environment. The `InMemoryRateLimiter` fallback in `src/middleware.ts` (lines 12-33) is used instead. Under Vercel's default serverless scaling, each concurrent request may spawn a new Lambda function instance, each with its own empty in-memory state. The effective rate limit is `limit * 3 * (number of concurrent Lambda instances)` — functionally unlimited.
+
+**Why it happens:** Vercel serverless functions are stateless by design. Each invocation is an independent process. The `inMemoryRateLimiter` Map is scoped to the Node.js process — it is not shared across instances. Under a moderate load spike (20 concurrent requests), Vercel may have 20 separate Lambda instances each with their own fresh rate limit counters. The comment in the code (`// Use 3x the limit since in-memory state resets between serverless invocations`) acknowledges this but does not solve it.
+
+**Consequences:** Malicious users can bypass rate limits entirely without Redis by sending concurrent requests that hit different Lambda instances. DoS protection is illusory. The codebase has a warning log but no monitoring alert when Redis is missing.
+
+**Prevention:**
+- Treat Redis configuration as a hard deployment requirement, not optional: block deployment (in CI or Vercel build settings) if `UPSTASH_REDIS_REST_URL` is not set for production
+- Add a `/api/health` check that explicitly reports whether Redis is connected, separate from the current health endpoint
+- Configure Upstash Redis via the Vercel integration (one-click in Vercel marketplace) so env vars are injected automatically into production
+
+**Detection:** Check Vercel → Environment Variables for production scope — if `UPSTASH_REDIS_REST_URL` is absent, rate limiting is degraded. The console warning `[RateLimit] Upstash Redis not configured` will appear in Vercel function logs.
+
+---
+
+### Pitfall 8: RLS Policy Performance Degradation From Missing Indexes on `auth.uid()` Columns
+
+**Severity:** HIGH
+**Phase:** RLS Audit / Performance at Scale
+
+**What goes wrong:** Adding or tightening RLS policies that filter by user ID works correctly in testing with a small dataset, then causes timeouts at scale because the columns referenced in the policy's `USING` clause are not indexed.
+
+**Why it happens:** A policy like `USING (host_id = requesting_user_id())` on the `drafts` table causes Postgres to evaluate `requesting_user_id()` once per row scanned. Without an index on `host_id`, every SELECT on `drafts` performs a full sequential scan. On the Free tier (limited compute), a table with 10,000 draft rows scanned by 50 concurrent users produces timeouts.
+
+**The specific trap:** The pattern `auth.uid()` (or a custom equivalent) in RLS policies triggers what Postgres calls an `initPlan` — the function is cached per-statement but still causes the planner to disable index-only scans for certain query shapes. Supabase's own documentation flags this as a common performance killer.
+
+**Consequences:** Draft creation timeouts at scale. Picks API slows from 2ms to 50ms+. Supabase's auto-pausing triggers on excessive compute usage.
+
+**Prevention:**
+- Index every column used in RLS `USING` clauses: `host_id`, `user_id`, `draft_id`, `team_id` on all tables
+- Wrap `auth.uid()` calls in a `(select auth.uid())` subquery to enable Postgres initPlan caching: `USING (host_id = (select auth.uid()))` — this tells the planner the value is stable for the statement
+- Use Supabase's Performance Advisor (Dashboard → Database → Performance) to detect missing indexes flagged by RLS policies
+- Test query performance with `EXPLAIN ANALYZE` before and after adding policies, using a dataset of at least 10,000 rows
+
+**Detection:** Supabase Dashboard → Performance Advisor shows `auth_rls_initplan` lint warning. Query times increase by 10x+ after adding new policies in a staging environment with realistic data volume.
+
+**Sources:** [Supabase RLS Performance Troubleshooting](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv), [Supabase Performance Advisor](https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0003_auth_rls_initplan)
+
+---
+
+### Pitfall 9: Guest User IDs as Rate Limit Keys Are Trivially Spoofable
+
+**Severity:** HIGH
+**Phase:** Rate Limiting / Guest User Security
+
+**What goes wrong:** The rate limiter in `src/middleware.ts` reads `request.cookies.get('user_id')` to identify guest users. A malicious user can send requests with arbitrary `user_id` cookie values, effectively rotating their identity with each request and bypassing per-user rate limits entirely.
+
+**Why it happens:** Guest user IDs are generated client-side (`guest-{timestamp}-{random}`) and stored in localStorage. They're not cryptographically bound to any server-side session. The cookie-based fallback in middleware is unverified — any string passes as a user ID.
+
+**The additional attack vector:** A malicious actor can enumerate other guest users' IDs (they follow a predictable pattern if `Date.now()` is used) or fabricate IDs that collide with authenticated user IDs (`user_abc123` format). This can exhaust another user's rate limit bucket.
+
+**Consequences:**
+- Rate limiting is bypassable by any motivated attacker with guest access
+- An attacker can DoS specific users by burning their rate limit quota using their predictable guest ID
+- Bulk draft creation (10 drafts/hour limit) can be bypassed by rotating cookies
+
+**Prevention:**
+- Fall back to IP-based limiting (not cookie-based) when no authenticated Clerk session is present — IP is harder to rotate than a cookie value
+- If guest sessions need separate tracking, issue a signed cookie server-side (using `crypto.createHmac` with a server secret) and verify the signature in middleware
+- Do not use the guest ID cookie value directly as a rate limit key without signature verification
+- Consider requiring Clerk authentication to create drafts (not just join them) — this eliminates guest abuse of creation endpoints while preserving the guest join experience
+
+**Detection:** Automated test: send 11 `POST /api/drafts` requests with different `user_id` cookie values from the same IP. If all succeed (no 429), the guest ID bypass is active.
+
+---
+
+### Pitfall 10: Supabase Realtime Connection Count Multiplies During React StrictMode and Navigation
+
+**Severity:** HIGH
+**Phase:** Supabase Connection Optimization
+
+**What goes wrong:** The Pro tier limit of 500 concurrent connections is consumed faster than expected because:
+1. React StrictMode (enabled in `next.config.ts` line 133: `reactStrictMode: true`) mounts and unmounts components twice in development, creating double subscriptions
+2. Client-side navigation in Next.js 15 App Router does not always trigger the full `useEffect` cleanup for page-level subscriptions before the new page mounts
+3. The `DraftRealtimeManager` in `src/lib/draft-realtime.ts` creates a channel per `draftId`. If a user navigates away and back (common during draft setup), the old channel may not be cleaned up before the new one is created
+
+**Why it happens:** Supabase's `supabase.channel()` creates a new WebSocket channel each time it is called, even if a channel with the same name exists. If the previous channel was not explicitly unsubscribed, it remains open and counts against the connection limit. The documented fix (checking `supabase.getChannels()` before creating a new one) is not currently implemented.
+
+**Real connection count for this app:** With 6 participants in a draft room, each connecting to channels for `drafts`, `teams`, `picks`, `participants`, and `auctions` tables, plus presence — that is approximately 6 channels per participant. 6 people × 6 channels = 36 connections per draft room. 14 concurrent draft rooms = 504 connections, exceeding the Pro tier limit. With StrictMode double-mounting in development, this doubles to 72 channels per room in dev.
+
+**Consequences:** New joiners cannot establish Realtime connections. Draft rooms silently degrade. Supabase project is suspended if over-quota on a sustained basis.
+
+**Prevention:**
+- The existing `DraftRealtimeManager` already uses a single-channel design for all draft events — confirm this is consistently used and not bypassed by older subscription code in the hooks that predate the refactor
+- Check `src/app/draft/[id]/page.tsx`, `src/lib/trade-service.ts`, and `src/app/league/[id]/trades/page.tsx` (all identified as using `supabase.channel()`) for channel cleanup on unmount
+- Add connection monitoring: log `supabase.getChannels().length` on mount in the draft page to detect accumulation
+- Use `supabase.removeAllChannels()` on page unload (`beforeunload` event) as a safety net for navigation-based leaks
+
+**Detection:** Open the draft page, navigate away, navigate back 5 times. Check `supabase.getChannels().length` — if it is greater than expected (should be ~1), channels are leaking.
+
+**Sources:** [Supabase Realtime TooManyChannels Fix](https://supabase.com/docs/guides/troubleshooting/realtime-too-many-channels-error), [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits)
 
 ---
 
 ## Moderate Pitfalls
 
----
+### Pitfall 11: CSP `unsafe-eval` Prevents Tightening Without Breaking Supabase
 
-### Pitfall 6: Feedback Widget Delays Draft Picks Due to Bundle Weight
+**Severity:** MODERATE
+**Phase:** CSP Hardening
 
-**What goes wrong:** Adding a third-party feedback SDK (Sentry User Feedback, Canny, etc.) adds 80-150KB to the main bundle, slowing the draft page's initial interactive time.
+**What goes wrong:** The security audit identifies `'unsafe-eval'` in `script-src` as a CSP weakness (it allows dynamic code execution from injected strings). Removing it to pass a security scan breaks Supabase's realtime client, which uses `eval()` internally for WebSocket protocol negotiation in some environments.
 
-**Why it happens:** Feedback widgets are often imported eagerly because they need to "always be ready." The draft room already has a large JS payload (Supabase ~80KB, Radix UI ~40KB, Framer Motion ~30KB). Adding a feedback SDK on top without code-splitting pushes the draft page over the 200KB gzipped threshold that degrades mobile performance.
-
-**Prevention:**
-- Use dynamic import with `next/dynamic` and `ssr: false` for any feedback widget
-- Load the widget only after the draft room has reached "active" state — not during the initial join/setup phase
-- Consider a simple custom feedback form (textarea + Discord webhook, which the codebase already uses in `/feedback`) rather than a third-party SDK — the existing infrastructure handles this without additional bundle cost
-- The existing Discord webhook feedback pattern is sufficient for beta; avoid SDK addition unless there is a specific gap
-
-**Detection:** Lighthouse performance score drops after adding the widget; `npm run build` shows increased chunk sizes for draft routes.
-
----
-
-### Pitfall 7: Mobile Bottom Sheet Scroll Conflict on iOS Safari
-
-**What goes wrong:** The Pokemon selection bottom sheet on mobile allows scrolling the Pokemon list, but on iOS Safari, swipe-to-dismiss the sheet competes with scroll-within-sheet, making it nearly impossible to use on iPhone.
-
-**Why it happens:** iOS Safari has a long-standing bug where `overflow: scroll` inside a fixed/modal element conflicts with gesture recognizers. React Spring Bottom Sheet and similar libraries have open issues for this. The problem manifests specifically on real devices — desktop Chrome's device emulator does not reproduce it.
-
-**Consequences:** The mobile draft experience is unusable for iPhone users, which is the primary device for the VGC community at tournaments. This is the feature most visible during beta and will generate the most negative feedback.
+**Why it happens:** `@supabase/realtime-js` versions prior to 2.10 use `eval()` for Phoenix socket protocol handling. The current version may or may not require it depending on build target. Removing `'unsafe-eval'` without testing against a real Supabase connection produces a CSP violation that silently prevents the WebSocket from upgrading.
 
 **Prevention:**
-- Test on a real iPhone (not emulator) before shipping
-- Use `overscroll-behavior: contain` on the inner scroll container
-- Add `touch-action: pan-y` to the inner scrollable element and ensure the drag handle has `touch-action: none`
-- Shadcn/UI's Sheet/Drawer component (Vaul) has better iOS handling than custom implementations — prefer it over rolling a custom bottom sheet
-- Add `env(safe-area-inset-bottom)` padding to avoid content hiding behind the iPhone home indicator
+- Test with `Content-Security-Policy-Report-Only` header first — capture violations without blocking
+- Check whether the current `@supabase/supabase-js` version requires `eval()`: `grep -r "eval(" node_modules/@supabase/realtime-js/dist/`
+- If `unsafe-eval` can be removed, replace with nonce-based `script-src` for Next.js (requires dynamic rendering; not compatible with static export)
+- Accept `'unsafe-eval'` if removal breaks Supabase until a Supabase package update removes the dependency
 
-**Detection:** Test `draftpokemon.com/draft/[id]` on a real iPhone Safari session during the mobile redesign phase.
+**Detection:** Remove `unsafe-eval`, load the app, check browser console for CSP violations and WebSocket connection errors.
 
 ---
 
-### Pitfall 8: PokePaste Parser Fails on Edge-Case Team Formats
+### Pitfall 12: Security Theater — HTTPS-Only Header on Vercel Is Already Enforced
 
-**What goes wrong:** PokePaste import works for standard teams but breaks on common real-world variations: nicknamed Pokemon, custom EV spreads with no label, teams with trailing newlines, or the `(M)` / `(F)` gender notation.
+**Severity:** MODERATE (wasted effort risk)
 
-**Why it happens:** PokePaste format has no formal specification — it is implicitly defined by Pokemon Showdown's export behavior. But real pastes from VGC players include handwritten variations. The format is whitespace-sensitive and line-order-sensitive. A parser written against the happy path will silently drop Pokemon or throw cryptic errors on edge cases.
+**What goes wrong:** The security audit adds HSTS headers (`Strict-Transport-Security`) and redirects HTTP to HTTPS as security work. These are already enforced by Vercel at the infrastructure layer for all production deployments. The code in `next.config.ts` already includes HSTS headers (line 116-119). Adding redirect middleware for HTTP→HTTPS consumes development time but provides zero additional security.
 
-**Consequences:** VGC players paste their team, get a garbled import or silent failure, and immediately distrust the platform. This is high-visibility during beta since PokePaste interop is a key differentiator claim.
+**Why it happens:** Security checklists include "enforce HTTPS" generically. On Vercel, this is a platform feature, not an application concern. Writing middleware to redirect HTTP traffic is security theater — that traffic never reaches Next.js on Vercel.
+
+**Other security theater items to skip:**
+- Adding `X-Powered-By: remove` (already `poweredByHeader: false` in next.config.ts line 136)
+- Adding IP allowlists for "internal" API routes that use Clerk auth — Clerk auth is already sufficient
+- Encrypting Pokemon data at rest — Pokemon data is public; encrypting it adds complexity with zero security benefit
+- Adding CSRF tokens to server actions — Next.js 15 server actions already include Origin header validation and use POST-only with SameSite=Lax cookies by default
 
 **Prevention:**
-- Reference the canonical PokePaste syntax at [pokepast.es/syntax.html](https://pokepast.es/syntax.html)
-- Test against at least 10 real pastes from Smogon's RMT section and the VGC Discord team-dump channels before launch
-- Handle: nickname (Species), gender notations (M)/(F), Ability with alternate spellings, missing EV line (treat as 0), missing Nature line, trailing blank lines, Windows-style CRLF line endings
-- Export: validate that exported PokePaste re-imports cleanly into Showdown before shipping
-- Consider using `@pkmn/sets` library which already handles Showdown set parsing correctly rather than writing a custom parser
-
-**Detection:** Test with pastes from [paste.victoryroad.pro](https://paste.victoryroad.pro) — the primary VGC team-sharing site.
+- Before implementing any security measure, ask: "What is the attack vector this prevents?" If the answer is "I'm not sure" or "Vercel/Next.js/Clerk already handles this," skip it
+- Focus security work on the actual vectors: RLS policies, auth bypass, rate limit bypasses, and injection attacks in user-controlled fields (team names, draft names)
 
 ---
 
-### Pitfall 9: Onboarding Tour Breaks During Live Draft State Transitions
+### Pitfall 13: Input Sanitization Gaps in User-Controlled Text Fields
 
-**What goes wrong:** The product tour starts on the landing page, but if a user triggers it mid-draft (or lands in a draft room via a shared link), tooltip anchors point to elements that are conditionally rendered, creating broken highlight positions or JS errors.
+**Severity:** MODERATE
+**Phase:** Security Hardening
 
-**Why it happens:** Tour libraries (Shepherd.js, react-joyride) anchor to DOM elements by selector. The draft room renders conditionally based on draft status (`setup`, `active`, `completed`). If the element the tour tries to highlight doesn't exist at that moment — because the draft is in `active` state and the "Start Draft" button has been replaced — the library either throws or shows a mispositioned tooltip.
+**What goes wrong:** Draft names, team names, league names, and announcement text are stored in Supabase and rendered in other users' browsers. If not sanitized, these fields are XSS vectors.
+
+**Why it happens:** React escapes JSX-rendered strings automatically, preventing most XSS. However, there are three specific gaps:
+1. Fields rendered with `dangerouslySetInnerHTML` (if any exist) bypass React's escaping
+2. Metadata fields (OG tags, page titles) use `{draft.name}` in `generateMetadata()` — if a draft name contains `<script>`, it appears in `<meta>` tags as a string, which is safe, but can confuse social crawlers
+3. PostgreSQL `text` columns accept any Unicode including null bytes and overlong sequences. Without length limits, a user can store 1MB of text in a `name` field, causing frontend rendering lag
+
+**For this specific codebase:** Team names are displayed with team color-coding and in the activity sidebar. Draft names appear in page titles. League announcement fields likely render rich text. Any of these that use `dangerouslySetInnerHTML` are immediate XSS vectors.
 
 **Prevention:**
-- Scope the full tour to the landing page and `create-draft` flow only — do not attempt to tour the live draft room
-- For the draft room, use contextual tooltips on first encounter (e.g., tooltip on first hover over Pokemon card) rather than a guided tour
-- Add existence checks before each tour step: skip the step if the anchor element is not in the DOM
-- Test the tour with a user who joins via a direct draft link (bypasses the landing page entirely)
+- Grep for `dangerouslySetInnerHTML` across the codebase: `grep -r "dangerouslySetInnerHTML" src/` — any occurrence requires manual review
+- Add database-level length constraints: `name VARCHAR(100)`, `description VARCHAR(500)` — stop oversize inputs at the DB layer
+- Add Zod validation on all API routes that accept user text: minimum 1 char, maximum reasonable length, strip leading/trailing whitespace
+- For any rich text fields (announcements), use DOMPurify server-side before storage, not just client-side
 
-**Detection:** Open a tour in a browser, then trigger a draft state change mid-tour and observe tooltip positions.
+**Detection:** Enter `<img src=x onerror=alert(1)>` as a team name. If an alert fires anywhere in the application, XSS is present. If it renders as text, React's escaping is working.
 
 ---
 
-### Pitfall 10: DNS Propagation and Clerk Domain Mismatch at Launch
+### Pitfall 14: Supabase Free Tier Concurrent Connection Math Is Per-Project, Not Per-Room
 
-**What goes wrong:** You configure draftpokemon.com in Vercel, point DNS to Vercel's servers, and immediately try to test auth — but DNS hasn't propagated yet, so Clerk's production domain check fails intermittently based on which DNS server the request hits.
+**Severity:** MODERATE
+**Phase:** Supabase Cost Optimization
 
-**Why it happens:** DNS TTL for Clerk's domain validation and OAuth redirect URL checks can take up to 48 hours to fully propagate globally. During propagation, some users reach the correct deployment while others are still hitting the old DNS record or get SSL certificate errors.
+**What goes wrong:** You plan for "500 concurrent connections on Pro" assuming 500 users can use the app simultaneously. In practice, each user opens multiple Realtime channels, so 500 connections supports far fewer than 500 simultaneous users.
+
+**Actual math for this application:**
+- Each draft participant connects to ~1 channel (if using the consolidated `DraftRealtimeManager`)
+- Each spectator connects to ~1 channel
+- Each league page may open additional channels (trades, waiver broadcasts)
+- At peak: 50 active drafts × 8 participants + 100 spectators = 500 connections exactly at Pro tier limit
+
+**Consequences:** Billing surprise. If you hit 500 concurrent connections, Supabase begins rejecting new connections. The platform becomes unusable for new joiners during popular events (e.g., a scheduled community tournament).
 
 **Prevention:**
-- Configure DNS at least 48 hours before planned launch announcement
-- Lower TTL to 300 seconds 24 hours before pointing to Vercel, then reduce to 60 seconds at cutover
-- Use `dig draftpokemon.com` and multiple DNS checkers to confirm propagation before announcing
-- Test auth flow from a mobile device on cellular (different DNS resolver than your home router)
+- Audit the actual channel count in production using `supabase.getChannels().length` across a real session
+- Plan to upgrade to the Team tier ($599/month, 10,000 connections) before any organized tournament event
+- Implement connection sharing: if two spectators are watching the same draft, consider using a single broadcast channel that re-broadcasts server events to all clients via the app tier (Supabase Broadcast, not Postgres CDC) — this dramatically reduces per-user connection cost
 
-**Detection:** Auth works from your machine but fails from another location; Clerk dashboard shows domain validation errors.
-
----
-
-## Minor Pitfalls
+**Sources:** [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits), [Supabase Pricing](https://supabase.com/docs/guides/realtime/pricing)
 
 ---
 
-### Pitfall 11: Supabase Free Tier Pauses After 1 Week of Inactivity Pre-Launch
+### Pitfall 15: Over-Engineering for Scale That Does Not Exist Yet
 
-**What goes wrong:** You build and test locally for a week, push to production, then don't touch the Supabase project for 7+ days before launch. Supabase Free tier pauses inactive projects after 7 days. First user to try the app gets a blank screen.
+**Severity:** MODERATE (wasted effort)
+**Phase:** Architecture Cost Analysis
 
-**Prevention:** Keep the Supabase project active during the pre-launch period by enabling the "Pause protection" option, or upgrade to Pro before launch. Set up a simple health check cron job (Vercel Cron or GitHub Actions) that pings the Supabase API every 24 hours.
+**What goes wrong:** The security hardening milestone adds database connection pooling, read replicas, CDN configuration, horizontal scaling patterns, and Redis clustering — all before having a single production user. The time spent on infra engineering delays the actual security work (RLS audit, rate limiting, CSP) that would protect real users.
 
----
+**Specific over-engineering temptations for this stack:**
+- PgBouncer connection pooling: Supabase Pro already includes PgBouncer. You do not need to configure it manually.
+- Database read replicas: Not available until Supabase Enterprise. This is not a relevant optimization for a beta platform.
+- Redis cluster for rate limiting: Upstash Redis (already integrated) handles rate limiting at scale without manual clustering. The current single-instance Upstash configuration is sufficient for 10,000 req/minute.
+- Custom Supabase Realtime infrastructure: Supabase Realtime is managed infrastructure. You cannot horizontally scale it independently — only upgrade plans.
+- CDN cache headers for API responses: Vercel's Edge Network already caches GET responses with `Cache-Control` headers. Adding Cloudflare in front of Vercel creates double-caching complexity for no measurable benefit at beta scale.
 
-### Pitfall 12: Environment Variables Missing in Vercel Production Scope
+**The right scale threshold:** Optimize infrastructure when you have evidence of bottlenecks (Supabase dashboard alerts, Vercel analytics showing p99 >500ms), not before.
 
-**What goes wrong:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, Clerk keys, and any analytics keys set in `.env.local` work locally but are not present in Vercel's Production environment.
-
-**Prevention:** Explicitly add each variable to Vercel → Settings → Environment Variables for the Production scope (not just Preview or Development). Variables in `.env.local` are never deployed. After adding variables, redeploy — existing deployments do not pick up variable changes.
-
----
-
-### Pitfall 13: Vercel Build Timeout on Large Codebase
-
-**What goes wrong:** At ~79K lines with 30+ routes and 414 tests, the Vercel build might approach or exceed the 45-minute build timeout, especially if `npm run build:formats` runs and fetches from PokeAPI during build.
-
-**Prevention:** Separate the format build artifact from the CI build — commit the compiled format pack to the repo so Vercel does not need to re-run `build:formats` on every deploy. Add `scripts/build-format.ts` output to `.gitignore` exclusions carefully so the compiled artifact is tracked.
+**Prevention:**
+- Time-box infrastructure work: spend no more than 10% of this milestone on infra that isn't measurably needed
+- Use the Supabase dashboard's built-in metrics as the trigger for scaling decisions, not hypothetical load projections
 
 ---
 
-### Pitfall 14: Analytics Events Fire in Dev/Preview Environments
+## Low Severity Pitfalls
 
-**What goes wrong:** PostHog or Sentry analytics capture events from your own development sessions and Vercel preview deployments, polluting production metrics before launch.
+### Pitfall 16: Dependency Audit Produces False Urgency
 
-**Prevention:** Gate analytics initialization behind `process.env.NODE_ENV === 'production'` AND check for the production host (`window.location.hostname === 'draftpokemon.com'`). Use PostHog's environment-based project separation (separate write keys for dev and prod).
+**Severity:** LOW
+**Phase:** Security Audit
 
----
+**What goes wrong:** `npm audit` reports dozens of vulnerabilities. The team stops feature work to patch all of them, including transitive dependencies in dev tools that never reach production.
 
-### Pitfall 15: React Strict Mode Double-Fires Supabase Subscriptions in Dev
+**Why it happens:** `npm audit` reports ALL vulnerabilities in the dependency tree, including:
+- Dev dependencies that are not bundled (test runners, linters)
+- Vulnerabilities with no known exploit path
+- Vulnerabilities in packages that are only used at build time (Webpack plugins, type generators)
 
-**What goes wrong:** During mobile redesign testing in development, you notice Supabase events fire twice. You "fix" this by removing cleanup functions, then discover in production that subscriptions leak and accumulate.
-
-**Why it happens:** React 18 Strict Mode intentionally mounts, unmounts, and remounts components in development to surface cleanup bugs. Supabase subscription setup + teardown must be idempotent. This is not a bug — it is the correct behavior surfacing missing cleanup.
-
-**Prevention:** Never remove cleanup functions from `useEffect` to stop double-fires in dev. Instead, ensure every `.subscribe()` call has a matching `.unsubscribe()` in the cleanup function. The double-fire disappears in production (Strict Mode is dev-only).
-
----
-
-## Technical Debt Patterns
-
-Patterns in the existing codebase that will create friction during beta feature additions.
-
-### Pattern 1: Feedback Already Partially Implemented
-
-The codebase has a `/feedback` page using Discord webhooks. Adding another feedback widget will create two parallel feedback mechanisms that confuse users. During the feedback widget phase, audit what the existing `/feedback` page does and decide whether to extend it (lower risk) rather than add a third-party SDK (higher risk, bundle cost).
-
-### Pattern 2: Draft Page Size Still High After Refactor
-
-The draft page was split from 2372 to 1250 lines in Milestone 2. Adding mobile-first redesign (bottom sheets, responsive layouts) to this component risks re-inflating it. Establish a line budget before starting mobile work: if a component exceeds 300 lines during mobile changes, split it.
-
-### Pattern 3: useConnectionManager Opens Many Channels
-
-Before adding analytics that track "user is connected / disconnected," audit the exact channel count per participant. This count directly impacts the Supabase Realtime connection budget. Addressing this before going public prevents silent breakage under load.
+**Prevention:**
+- Use `npm audit --omit=dev` for production-relevant vulnerabilities only
+- Prioritize: CRITICAL/HIGH in `dependencies` (not `devDependencies`) with direct exploit paths
+- `next` itself should be on the latest minor version (vulnerability from CVE-2025-29927 was fixed in 15.2.3)
+- Accept LOW/MODERATE vulnerabilities in dev tooling without patching if no exploit path exists
 
 ---
 
-## Integration Gotchas
+### Pitfall 17: Logging User Data in Vercel Function Logs
 
-Issues that arise specifically from combining these features with the existing system.
+**Severity:** LOW
+**Phase:** Security Audit
 
-### Analytics + Real-Time: Double Event Firing
+**What goes wrong:** During debugging, `console.log(user)` calls left in production code emit full Clerk user objects (email, IP, browser) to Vercel's function logs. These logs are retained and accessible to anyone with Vercel dashboard access.
 
-Supabase Realtime broadcasts events to all subscribers, including the sender. If PostHog tracks "pick made" events from both the Supabase subscription callback AND the UI action handler, each pick generates two analytics events. Instrument only at the UI action layer (user intent), not at the subscription layer (network echo).
-
-### Clerk + Supabase RLS: JWT Claim Mismatch
-
-Clerk issues JWTs with a `sub` claim formatted as Clerk user IDs (`user_abc123`). Supabase RLS policies written for Supabase Auth expect `auth.uid()` to return a UUID. If RLS policies were written for Supabase Auth and then auth was migrated to Clerk, there may be JWT template configuration needed in Clerk to emit claims that match Supabase's expectations. Verify RLS policies work with Clerk-issued JWTs before public launch. See `FIX-RLS-POLICIES.md` in the codebase.
-
-### PokePaste Export + Draft State: Cost Data Exposure
-
-PokePaste format does not have a cost field. When exporting, the team's budget costs are implicitly discarded. This is the correct behavior. However, ensure the export function does not accidentally include cost data in a comment or custom field that leaks draft balance information to opponents in a league context.
-
-### Mobile Redesign + PWA: Viewport Height on iOS
-
-The PWA "standalone" mode on iOS has a different viewport height than Safari browser mode — the bottom bar is hidden but `100vh` still includes that space on some iOS versions. Use `dvh` (dynamic viewport height) instead of `vh` for full-screen draft room layouts, or the bottom of the screen will be clipped under the home indicator.
-
-### Onboarding + Clerk: Unauthenticated Tour Flow
-
-If the landing page onboarding tour includes a step like "create your first draft," clicking it may redirect to Clerk's sign-in page mid-tour, breaking the tour state. Either gate the tour to post-authentication, or design tour steps that do not require authentication to complete.
-
----
-
-## Performance Traps
-
-### Trap 1: Analytics in the Critical Rendering Path
-
-PostHog's page view tracking and Sentry's session replay both add initialization cost to page load. Defer both until after the page is interactive: use `requestIdleCallback` or initialize inside a `useEffect` with no dependencies.
-
-### Trap 2: Mobile Redesign Forces CSS Recalculation
-
-Adding responsive breakpoints to components that use inline styles or Framer Motion's `style` prop forces layout recalculation on every resize. Use Tailwind's responsive prefixes (`sm:`, `md:`) over inline style objects for layout-critical elements.
-
-### Trap 3: PokePaste Parse on Main Thread
-
-A large paste (6 Pokemon with full EV/IV spreads, moves, items) can take 50-100ms to parse with regex. While small, this runs on the main thread and causes a visible input lag if done synchronously on paste. Move the parser to a Web Worker or at minimum defer with `setTimeout(parse, 0)`.
-
----
-
-## Security Mistakes
-
-### Mistake 1: Feedback Submissions Without Rate Limiting
-
-Beta feedback forms get spam-submitted (bots, repeated accidental clicks). The existing Discord webhook approach has no rate limiting. Add a Vercel Edge middleware rate limiter on the feedback API route before launch, or at minimum debounce the submit button for 30 seconds post-submission.
-
-### Mistake 2: Draft Room URLs Indexed by Search Engines
-
-Draft room URLs (`/draft/[id]`) should not be indexed. Active draft state is semi-private (join by room code). Add `noindex` meta tags to draft and spectate routes, and ensure `robots.txt` excludes `/draft/*` and `/spectate/*`. Only the landing page, join page, and results pages should be indexed.
-
-### Mistake 3: Analytics Capturing PII During Auth Flow
-
-PostHog's session replay or event capture may record email addresses, usernames, or Clerk user IDs as part of form interactions. Configure PostHog's `mask_all_inputs: true` for auth-adjacent pages, or use PostHog's consent-based initialization.
-
----
-
-## UX Pitfalls
-
-### Pitfall: Onboarding Blocks Returning Users
-
-A tour that auto-starts on every visit penalizes returning users. Store a `hasSeenOnboarding` flag in localStorage and only show the tour once. Provide a "Replay tutorial" option in the profile/settings menu.
-
-### Pitfall: Mobile Draft Missing Keyboard Dismiss
-
-When a user taps a search field in the Pokemon picker on mobile, the virtual keyboard opens and the draft UI is obscured. The keyboard does not dismiss when the user taps outside the input. Add `inputMode="search"` to the search field and handle `blur` on backdrop tap.
-
-### Pitfall: Feedback Widget Visible During Draft Turns
-
-A floating feedback button that overlaps the pick confirmation area on mobile will receive accidental taps. Position the feedback trigger in the header/menu rather than as a floating action button, especially on the draft page.
-
-### Pitfall: "60-Second First Draft" Template Assumption
-
-The draft template onboarding assumes users want a quick solo test. In reality, VGC players draft in groups and will share the room code with friends immediately. The "60-second first draft" needs to handle the multi-player path gracefully, not just the solo path.
-
----
-
-## "Looks Done But Isn't" Checklist
-
-Items that appear complete in development but have launch-blocking gaps.
-
-- [ ] Clerk production keys set in Vercel → Production scope (not Preview)
-- [ ] OAuth callback URLs (Discord, Google) registered against Clerk production instance for draftpokemon.com
-- [ ] Supabase project on paid plan OR connection count audited and confirmed under free tier limit
-- [ ] Service worker update flow tested: build → deploy → load → build again → verify new version activates
-- [ ] OG/Twitter meta tags present on every public route with absolute image URLs
-- [ ] Social link preview validated in Discord embed tester before any community post
-- [ ] PokePaste import tested with 10+ real-world pastes from VGC community sources
-- [ ] PokePaste export tested by re-importing result into Pokemon Showdown
-- [ ] Mobile bottom sheet tested on real iPhone (not emulator) — specifically scroll-within-sheet
-- [ ] Draft page interactive on 375px viewport without horizontal scroll
-- [ ] Analytics events gated to production hostname only
-- [ ] Analytics NOT instrumenting Supabase subscription callbacks (only UI action layer)
-- [ ] Feedback form rate-limited to prevent spam
-- [ ] Draft room URLs excluded from robots.txt and marked noindex
-- [ ] DNS configured 48+ hours before launch announcement
-- [ ] Vercel environment variables present in Production scope and deployment triggered after adding them
-- [ ] Supabase project not at risk of free-tier pause (last activity < 7 days)
-- [ ] PWA viewport uses `dvh` not `vh` for full-screen layouts
+**Prevention:**
+- The existing `createLogger` in `src/lib/logger.ts` should be the only logging mechanism — audit for raw `console.log` calls with user objects
+- Log user IDs only, never email addresses, names, or session tokens
+- Vercel function logs are not encrypted at rest on the free tier; treat them as semi-public
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|----------------|------------|
-| Mobile redesign | iOS Safari scroll conflict in Pokemon picker bottom sheet | Test on real device before PR merge; use Vaul drawer component |
-| Mobile redesign | `100vh` clipped under iPhone home indicator in PWA | Use `dvh` units for full-screen containers |
-| Onboarding flow | Tour anchors break during live draft state transitions | Scope tour to pre-draft flows only; use contextual tooltips in draft room |
-| Onboarding flow | Tour re-shows on every visit | Store `hasSeenOnboarding` in localStorage on first completion |
-| PokePaste import | Silent failure on real-world paste edge cases | Test with 10+ real pastes; handle nicknames, gender, CRLF, missing fields |
-| PokePaste export | Re-import into Showdown fails | Validate export → import round-trip in Showdown before shipping |
-| Analytics setup | PostHog + Sentry hydration error | Use `disable_external_dependency_loading: true` or instrumentation-client.ts init |
-| Analytics setup | Events firing in development and preview | Gate on `NODE_ENV === 'production'` AND hostname check |
-| Feedback widget | Third-party SDK adds bundle weight to draft page | Use dynamic import or extend existing Discord webhook feedback page |
-| Deployment | Clerk dev keys in production | Use pk_live_* / sk_live_* in Vercel Production scope |
-| Deployment | Supabase Realtime limits hit under beta load | Audit channel count; upgrade to Pro before launch |
-| Deployment | PWA serves stale build post-deploy | Implement skipWaiting + UI update notification |
-| Deployment | DNS propagation lag breaks auth at launch | Configure DNS 48h early; test from multiple locations |
-| Landing page | OG images missing for Discord/Reddit sharing | Add static 1200x630 OG image and generateMetadata to all public routes |
+| Phase Topic | Likely Pitfall | Severity | Mitigation |
+|-------------|---------------|----------|-----------|
+| RLS audit | Tightened SELECT policy silences Realtime events | CRITICAL | Test subscription delivery after every policy change |
+| RLS audit | New policies use `auth.uid()` instead of Clerk-compatible claim | CRITICAL | Audit existing workaround in FIX-RLS-POLICIES.md first |
+| RLS audit | Missing index on policy column causes full table scan | HIGH | Index all RLS-referenced columns before deploying new policies |
+| CSP headers | Missing Clerk FAPI domain in `connect-src` | CRITICAL | Build CSP dynamically from env vars; test full auth flow after any CSP change |
+| CSP headers | Removing `unsafe-eval` breaks Supabase Realtime | MODERATE | Use Report-Only mode to audit before blocking |
+| Rate limiting | Bid rate limits block legitimate auction participants | HIGH | Use token bucket for bids; key on user ID not IP |
+| Rate limiting | In-memory fallback has no cross-Lambda state | HIGH | Require Redis in production CI gate; monitor for missing config |
+| Rate limiting | Guest user cookie is spoofable as rate limit key | HIGH | Fall back to IP for unauthenticated users |
+| Connection optimization | React StrictMode doubles subscription count in dev | HIGH | Confirm cleanup in all 7 files using `supabase.channel()` |
+| Connection optimization | Pro tier 500 connections exhausted at tournament scale | MODERATE | Audit actual channel count per session before any organized event |
+| Security audit | Patching middleware CVE-2025-29927 | CRITICAL | Check `npm ls next` — must be ≥15.2.3 |
+| Security audit | Service role key in `NEXT_PUBLIC_` variable | CRITICAL | Grep `.next/static/` for `service_role` after every build |
+| Security audit | `dangerouslySetInnerHTML` XSS in team/draft names | MODERATE | Grep codebase; add Zod length validation on all text inputs |
+| Input validation | User text fields lack length constraints | MODERATE | Add DB-level VARCHAR constraints and Zod schema validation |
+| Dependency audit | `npm audit` creates false urgency on dev deps | LOW | Use `--omit=dev` flag; prioritize CRITICAL/HIGH in production deps only |
+
+---
+
+## Integration Pitfalls (Stack-Specific)
+
+### Clerk + Supabase JWT: Deprecated Template vs Native Integration
+
+As of April 1, 2025, Clerk's JWT template for Supabase is deprecated. The native Supabase integration (configured in Clerk Dashboard → Integrations → Supabase) is now the recommended path. If the current integration uses the old JWT template, this migration should happen during the security milestone — not because the old method stops working immediately, but because it will eventually stop being maintained and the new path is more secure (uses Supabase's own JWT validation rather than a shared secret).
+
+**Migration risk:** The JWT claim structure changes between the two methods. Any RLS policies using `auth.jwt() -> 'sub'` or custom `requesting_user_id()` functions must be retested after migration.
+
+### Rate Limiting + Supabase Realtime: Don't Rate-Limit the WebSocket Upgrade
+
+Supabase Realtime connections are established via WebSocket upgrade (HTTP → WS). The upgrade request hits the Next.js middleware. The rate limiter in `src/middleware.ts` checks `pathname.startsWith('/api/')` only, so Realtime WebSocket upgrades are NOT rate-limited. This is correct behavior — do not add rate limiting to the WebSocket upgrade path. Supabase handles connection limiting at the infrastructure layer.
+
+However, broadcast events sent via the Realtime channel (user presence updates, draft events) are not gated by the application's rate limiter. A malicious user could spam presence updates. This is handled by Supabase's per-connection message rate limits (500 messages/second on Pro) and does not require application-level mitigation.
+
+### CSP + Supabase Realtime: `wss://` Must Match `connect-src`
+
+The existing CSP in `next.config.ts` correctly includes `wss://*.supabase.co` in `connect-src`. Any change to Supabase project URL (e.g., migrating from free to pro with a different project ID) must be reflected in the CSP. Wildcard `wss://*.supabase.co` handles this correctly and should not be narrowed to a specific project URL.
+
+---
+
+## "Looks Secure But Isn't" Checklist
+
+- [ ] RLS SELECT policies tested with Supabase Realtime subscriptions active (not just REST queries)
+- [ ] `auth.uid()` usage audited against Clerk JWT format — confirmed all policies use Clerk-compatible claim extractor
+- [ ] CSP `connect-src` includes Clerk FAPI hostname (both dev and prod instances)
+- [ ] `next` version confirmed ≥15.2.3 (`npm ls next`)
+- [ ] `.next/static/` does not contain `service_role` string after production build
+- [ ] Rate limit keys use authenticated user ID, not spoofable guest cookie
+- [ ] Upstash Redis is configured in Vercel Production environment variables (not just local .env)
+- [ ] No `dangerouslySetInnerHTML` on user-controlled text fields (team names, draft names, announcements)
+- [ ] Supabase channel cleanup confirmed in all 7 files using `supabase.channel()`
+- [ ] `npm audit --omit=dev` run and CRITICAL/HIGH production CVEs addressed
 
 ---
 
 ## Sources
 
-- Clerk production deployment: [Clerk Docs — Deploy to Production](https://clerk.com/docs/guides/development/deployment/production), [Deploying Clerk to Vercel](https://clerk.com/docs/guides/development/deployment/vercel) — HIGH confidence
-- Supabase Realtime limits: [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits), [Concurrent Peak Connections Quota](https://supabase.com/docs/guides/troubleshooting/realtime-concurrent-peak-connections-quota-jdDqcp) — HIGH confidence
-- Supabase Realtime TIMED_OUT: [Realtime TIMED_OUT Troubleshooting](https://supabase.com/docs/guides/troubleshooting/realtime-connections-timed_out-status), [WebSocket Connection Error](https://drdroid.io/stack-diagnosis/supabase-realtime-websocket-connection-error) — HIGH confidence
-- PostHog + Sentry hydration error: [PostHog/posthog-js Issue #1645](https://github.com/PostHog/posthog-js/issues/1645), [Next.js App Router Analytics](https://posthog.com/tutorials/nextjs-app-directory-analytics) — HIGH confidence
-- Next.js 15 OG/metadata pitfalls: [Next.js Metadata API](https://nextjs.org/docs/app/getting-started/metadata-and-og-images), [Next.js 15 SEO Checklist](https://dev.to/vrushikvisavadiya/nextjs-15-seo-checklist-for-developers-in-2025-with-code-examples-57i1) — HIGH confidence
-- iOS Safari bottom sheet scroll: [Web Platform Interop Issue #788](https://github.com/web-platform-tests/interop/issues/788), [react-spring-bottom-sheet iOS issue](https://github.com/stipsan/react-spring-bottom-sheet/issues/68) — MEDIUM confidence
-- Vercel PWA/service worker caching: [next.js Discussion #32402](https://github.com/vercel/next.js/discussions/32402), [next-pwa docs](https://ducanh-next-pwa.vercel.app/docs/next-pwa/configuring) — MEDIUM confidence
-- PokePaste syntax: [pokepast.es/syntax.html](https://pokepast.es/syntax.html), [Showdown issue #8385](https://github.com/smogon/pokemon-showdown/issues/8385) — MEDIUM confidence
-- Vercel deployment mistakes: [Vercel Production Checklist](https://vercel.com/docs/production-checklist), [Vercel Deployment Errors Guide](https://32blog.com/en/nextjs/vercel-deployment-errors-fix) — HIGH confidence
-- Onboarding overlay pitfalls: [NN/G Onboarding Tutorials](https://www.nngroup.com/articles/onboarding-tutorials/), [Reteno Onboarding Analysis](https://reteno.com/blog/won-in-60-seconds-how-top-apps-nail-onboarding-to-drive-subscriptions) — MEDIUM confidence
+- Supabase RLS + Realtime issue: [GitHub Issue #35195](https://github.com/supabase/supabase/issues/35195), [GitHub Issue #35282](https://github.com/supabase/supabase/issues/35282) — HIGH confidence
+- Supabase RLS performance: [RLS Performance Troubleshooting](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv), [Database Performance Advisors](https://supabase.com/docs/guides/database/database-advisors) — HIGH confidence
+- Clerk + Supabase auth.uid() mismatch: [Clerk Supabase Integration](https://clerk.com/docs/guides/development/integrations/databases/supabase), [Supabase Clerk Docs](https://supabase.com/docs/guides/auth/third-party/clerk), [Discussion #33091](https://github.com/orgs/supabase/discussions/33091) — HIGH confidence
+- Clerk CSP requirements: [Clerk CSP Headers Guide](https://clerk.com/docs/guides/secure/best-practices/csp-headers) — HIGH confidence
+- Next.js CVE-2025-29927: [Next.js Advisory](https://nextjs.org/blog/cve-2025-29927), [Clerk Analysis](https://clerk.com/blog/cve-2025-29927) — HIGH confidence
+- Supabase Realtime limits: [Realtime Limits](https://supabase.com/docs/guides/realtime/limits), [TooManyChannels Fix](https://supabase.com/docs/guides/troubleshooting/realtime-too-many-channels-error) — HIGH confidence
+- Next.js Server Action CSRF: [Next.js Data Security Guide](https://nextjs.org/docs/app/guides/data-security) — HIGH confidence
+- React StrictMode + Supabase realtime double-subscribe: [realtime-js Issue #169](https://github.com/supabase/realtime-js/issues/169) — MEDIUM confidence
+- Vercel serverless rate limiting: [Upstash Ratelimit Blog](https://upstash.com/blog/upstash-ratelimit), [Vercel Rate Limiting Discussion](https://github.com/vercel/vercel/discussions/5325) — HIGH confidence
+- Supabase service role key exposure: [Supabase API Keys](https://supabase.com/docs/guides/api/api-keys), [Supabase Securing API](https://supabase.com/docs/guides/api/securing-your-api) — HIGH confidence
