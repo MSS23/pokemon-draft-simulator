@@ -9,6 +9,7 @@ import { UserSessionService } from '@/lib/user-session'
 import type { DraftRow, TeamRow, ParticipantRow } from '@/types/supabase-helpers'
 import type { DraftSettings as DraftSettingsJson } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
+import { analytics } from '@/lib/analytics'
 import type { DraftState } from './draft-service'
 
 const log = createLogger('DraftLifecycleService')
@@ -174,6 +175,13 @@ export async function startDraft(roomCodeOrDraftId: string): Promise<void> {
 
     throw new Error(`Failed to start draft: ${error?.message || 'Unknown error'}`)
   }
+
+  try {
+    analytics.draftStarted({
+      draftId: roomCodeOrDraftId,
+      participantCount: teams.length,
+    })
+  } catch { /* analytics failure is non-fatal */ }
 
   log.info('Draft started successfully:', { draftId: draftUuid, roomCode: roomCodeOrDraftId })
 }

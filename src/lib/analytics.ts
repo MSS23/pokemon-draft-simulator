@@ -13,6 +13,10 @@ export function initAnalytics() {
   if (initialized) return
   if (typeof window === 'undefined') return
 
+  // Only initialize on production domain — no noise from localhost or preview deploys
+  const hostname = window.location.hostname
+  if (hostname !== 'draftpokemon.com') return
+
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
 

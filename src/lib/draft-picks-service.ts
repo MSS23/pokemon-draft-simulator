@@ -12,6 +12,7 @@ import { Team as AppTeam } from '@/types'
 import { fetchPokemon } from '@/lib/pokemon-api'
 import type { DraftRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
+import { analytics } from '@/lib/analytics'
 import type { DraftState } from './draft-service'
 
 const log = createLogger('DraftPicksService')
@@ -219,6 +220,16 @@ export async function makePick(draftId: string, userId: string, pokemonId: strin
 
   // Invalidate cache so the next getDraftState fetches fresh data
   await invalidateCacheLazy(draftId)
+
+  try {
+    const teamCount = draftState.teams.length || 1
+    analytics.pickMade({
+      draftId,
+      pokemonId,
+      round: Math.floor((currentTurn - 1) / teamCount) + 1,
+      cost: pickCost,
+    })
+  } catch { /* analytics failure is non-fatal */ }
 
   return {
     pickId: result.pickId as string,

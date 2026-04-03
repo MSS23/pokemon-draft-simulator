@@ -25,6 +25,7 @@ import type {
 } from '@/types/supabase-helpers'
 import bcrypt from 'bcryptjs'
 import { createLogger } from '@/lib/logger'
+import { analytics } from '@/lib/analytics'
 
 // ─── Re-export standalone functions from sub-modules ───────────────────────
 // These allow direct imports (e.g. `import { makePick } from '@/lib/draft-service'`)
@@ -513,6 +514,15 @@ export class DraftService {
       isHost: true,
       status: 'active'
     })
+
+    try {
+      analytics.draftCreated({
+        draftId: roomCode.toLowerCase(),
+        format: settings.formatId || DEFAULT_FORMAT,
+        draftType: settings.draftType || 'points',
+        teamCount: settings.maxTeams || 2,
+      })
+    } catch { /* analytics failure is non-fatal */ }
 
     return { roomCode, draftId: roomCode.toLowerCase() }
   }
