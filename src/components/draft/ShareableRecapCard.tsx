@@ -92,7 +92,7 @@ export const ShareableRecapCard = memo<ShareableRecapCardProps>(({
             <div className="text-muted-foreground text-[10px]">Pokemon</div>
           </div>
         </div>
-        <div className="text-muted-foreground/60 text-[10px]">pokemondraftleague.com</div>
+        <div className="text-muted-foreground/60 text-[10px]">draftpokemon.com</div>
       </div>
     </div>
   )

@@ -35,7 +35,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pokemondraftleague.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://draftpokemon.com"),
   title: "Pokémon Draft League",
   description: "Real-time Pokémon drafting platform with VGC 2024 Regulation H compliance, supporting competitive snake and auction formats",
   applicationName: "Pokémon Draft League",
