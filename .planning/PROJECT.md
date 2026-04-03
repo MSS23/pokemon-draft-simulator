@@ -27,22 +27,22 @@ The gold standard platform for Pokemon draft leagues — replacing the fragmente
 **Goal:** Transform the draft room into a premium, broadcast-quality experience that makes Discord bots obsolete. Focus on draft room polish, mobile UX, and competitive data integration.
 **Status:** Paused — cherry-picked mobile, onboarding, and PokePaste into Milestone 4. Remaining features (sounds/animations, competitive data, broadcast mode, auction UX) deferred to post-beta based on user feedback.
 
-### Milestone 4: Beta Launch — draftpokemon.com (2026-04-03) — ACTIVE
+### Milestone 4: Beta Launch — draftpokemon.com (2026-04-03) — PAUSED
 **Goal:** Ship a polished, mobile-friendly beta to the VGC community with feedback collection, onboarding for new users, and PokePaste interop.
+**Status:** Paused — security & scalability hardening prioritized before public launch.
 
-**Domain:** draftpokemon.com (Vercel deployment)
-**Target audience:** VGC competitive community (Reddit, Twitter/X, Discord)
+**Deferred to post-security:** Sound/animations, competitive data overlay, broadcast mode, auction UX overhaul
+
+## Current Milestone: v5 Security Hardening & Scalability Audit
+
+**Goal:** Harden the application for production-scale traffic (thousands of concurrent users, millions of requests) and ensure infrastructure costs don't spiral before public launch.
 
 **Target features:**
-- Mobile-first draft room redesign (375px+, bottom sheets, touch targets)
-- Onboarding & draft templates (60-second first draft, tour, format explainers)
-- PokePaste import/export (Showdown ecosystem interop)
-- Landing page polish (VGC-focused messaging, hero section, clear CTAs)
-- In-app feedback widget (bug reports + suggestions from beta testers)
-- Analytics & error monitoring (track user flows, catch errors)
-- Domain & deployment (draftpokemon.com on Vercel, SSL, SEO basics)
-
-**Deferred to post-beta:** Sound/animations, competitive data overlay, broadcast mode, auction UX overhaul
+- Security audit & hardening (XSS, CSRF, injection, RLS policies, input sanitization, dependency vulnerabilities, auth bypass vectors)
+- API rate limiting & abuse prevention (protect endpoints from spam, scraping, and DoS)
+- Supabase cost optimization (realtime connection management, query efficiency, RLS audit)
+- Architecture cost analysis (identify expensive patterns, estimate costs at scale, set up cost guardrails)
+- Performance at scale (connection pooling, caching strategy, CDN optimization, database indexing)
 
 ## Competitive Landscape
 - **DraftZone:** League management, matchup analysis. No real-time draft room.
@@ -75,4 +75,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03*
+*Last updated: 2026-04-03 after Milestone 5 started*
