@@ -15,7 +15,8 @@ import { CreateTournamentModal } from '@/components/league/CreateTournamentModal
 import { notify } from '@/lib/notifications'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import Link from 'next/link'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName, generateShowdownPaste } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
+import { PokePasteExportButton } from '@/components/draft/PokePasteExport'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('DraftResultsPage')
@@ -297,21 +298,10 @@ export default function DraftResultsPage() {
                   {userPicks.length} Pokemon &middot; {totalCost} pts spent &middot; {userTeam.budgetRemaining ?? 0} pts remaining
                 </CardDescription>
                 <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const paste = generateShowdownPaste({
-                        pokemonNames: userPicks.map(p => p.pokemon_name),
-                        teamName: userTeam.name
-                      })
-                      navigator.clipboard.writeText(paste)
-                      notify.success('Copied to Clipboard!', 'Paste this into Pokemon Showdown\'s teambuilder')
-                    }}
-                  >
-                    <ClipboardCopy className="h-3.5 w-3.5 mr-1.5" />
-                    Export to Showdown
-                  </Button>
+                  <PokePasteExportButton
+                    pokemonNames={userPicks.map(p => p.pokemon_name)}
+                    teamName={userTeam.name}
+                  />
                 </div>
               </CardHeader>
               <CardContent>
@@ -348,6 +338,41 @@ export default function DraftResultsPage() {
             </Card>
           )
         })()}
+
+        {/* Per-Team PokePaste Export */}
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ClipboardCopy className="h-5 w-5" />
+              Export Teams
+            </CardTitle>
+            <CardDescription>
+              Export any team&apos;s roster in PokePaste format for Pokemon Showdown
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {teams.map((team) => {
+                const teamPicks = picks
+                  .filter(p => p.team_id === team.id)
+                  .sort((a, b) => a.pick_order - b.pick_order)
+                return (
+                  <div key={team.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                    <div>
+                      <div className="font-semibold text-sm">{team.name}</div>
+                      <div className="text-xs text-muted-foreground">{team.userName} &middot; {teamPicks.length} Pokemon</div>
+                    </div>
+                    <PokePasteExportButton
+                      pokemonNames={teamPicks.map(p => p.pokemon_name)}
+                      teamName={team.name}
+                      size="sm"
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         <DraftResults
           draftName={draftState.draft.name}
