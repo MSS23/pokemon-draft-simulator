@@ -3,6 +3,7 @@ import { Sora, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { HydrationFixProvider } from "@/components/providers/HydrationFixProvider";
@@ -37,31 +38,47 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://draftpokemon.com"),
-  title: "Pokémon Draft League",
-  description: "Real-time Pokémon drafting platform with VGC 2024 Regulation H compliance, supporting competitive snake and auction formats",
-  applicationName: "Pokémon Draft League",
+  title: {
+    default: "Pokémon Champions Draft League — The #1 Draft Platform for Competitive Pokemon",
+    template: "%s | Pokémon Champions Draft League",
+  },
+  description: "The go-to draft platform for Pokémon Champions. Run snake drafts, auctions, and full league seasons with real-time picks, budget tracking, and community-driven formats. Free, no signup required.",
+  applicationName: "Pokémon Champions Draft League",
+  keywords: [
+    "Pokemon Champions", "Pokemon draft league", "Pokemon draft", "competitive Pokemon",
+    "VGC draft", "Smogon draft", "Pokemon snake draft", "Pokemon auction draft",
+    "draft league tool", "Pokemon league manager", "Pokemon team draft",
+    "Pokemon Champions league", "draft Pokemon online", "Pokemon draft app",
+    "Pokemon draft platform", "competitive draft league",
+  ],
+  authors: [{ name: "Poke Draft League" }],
+  creator: "Poke Draft League",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Draft League",
+    title: "Champions Draft",
   },
   formatDetection: {
     telephone: false,
   },
   openGraph: {
     type: "website",
-    siteName: "Pokémon Draft League",
-    title: "Pokémon Draft League",
-    description: "Real-time Pokémon drafting platform with VGC 2024 compliance",
-    images: [{ url: "/og-image", width: 1200, height: 630, alt: "Pokémon Draft League" }],
+    siteName: "Pokémon Champions Draft League",
+    title: "Pokémon Champions Draft League — Draft Like a Champion",
+    description: "The free drafting platform built for Pokémon Champions. Snake drafts, auctions, full league seasons with standings, trades, and playoffs. No spreadsheets, no signup required.",
+    images: [{ url: "/og-image", width: 1200, height: 630, alt: "Pokémon Champions Draft League — Real-time competitive drafting" }],
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Pokémon Draft League",
-    description: "Real-time Pokémon drafting platform",
+    title: "Pokémon Champions Draft League",
+    description: "The #1 draft platform for competitive Pokémon. Snake drafts, auctions, full leagues — free and real-time.",
     images: ["/og-image"],
   },
   manifest: "/manifest.json",
+  alternates: {
+    canonical: "https://draftpokemon.com",
+  },
 };
 
 export const viewport: Viewport = {
@@ -93,8 +110,14 @@ export default function RootLayout({
           signInFallbackRedirectUrl="/dashboard"
           signUpFallbackRedirectUrl="/dashboard"
           appearance={{
+            baseTheme: dark,
             variables: {
               colorPrimary: '#dc2855',
+              colorBackground: 'hsl(var(--card))',
+              colorText: 'hsl(var(--foreground))',
+              colorTextSecondary: 'hsl(var(--muted-foreground))',
+              colorInputBackground: 'hsl(var(--background))',
+              colorInputText: 'hsl(var(--foreground))',
             },
             elements: {
               formButtonPrimary: 'bg-primary hover:bg-primary/90 text-primary-foreground',
@@ -104,6 +127,7 @@ export default function RootLayout({
               socialButtonsBlockButton: 'bg-card border border-border text-foreground hover:bg-muted',
               formFieldInput: 'bg-background border-border text-foreground',
               footerActionLink: 'text-primary hover:text-primary/80',
+              footer: 'text-muted-foreground',
             }
           }}
         >
