@@ -204,6 +204,7 @@ const isPublicApiRoute = createRouteMatcher([
   '/api/feedback',      // Anonymous feedback — no account needed
   '/api/sheets',        // Google Sheets proxy — public data
   '/api/formats',       // Format list reads — public catalog (not /formats/sync)
+  '/api/guest/(.*)',    // SEC-06: guest session endpoint — must be public for unauthenticated guests
 ])
 
 // ============================================================================
