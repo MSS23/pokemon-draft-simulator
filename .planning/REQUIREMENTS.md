@@ -23,13 +23,13 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 - [x] **RATE-02**: Per-endpoint rate limits tuned (draft picks, auction bids, API reads, auth endpoints)
 - [x] **RATE-03**: Rate limit bypass prevention — key by IP + authenticated user, not spoofable guest cookie
 - [x] **RATE-04**: IP-based fallback rate limiting for unauthenticated requests
-- [ ] **RATE-05**: WebSocket connection rate limiting (max connections per user/IP)
+- [x] **RATE-05**: WebSocket connection rate limiting (max connections per user/IP)
 
 ### Supabase Cost & Scalability
 
 - [ ] **SUPA-01**: Supabase spend cap verified and billing alerts configured
 - [ ] **SUPA-02**: RLS indexes added (btree on user_id, draft_id, team_id columns used in policies)
-- [ ] **SUPA-03**: Realtime channel cleanup enforced (unsubscribe on unmount, connection leak prevention)
+- [x] **SUPA-03**: Realtime channel cleanup enforced (unsubscribe on unmount, connection leak prevention)
 - [ ] **SUPA-04**: Broadcast migration for picks/bids (replace postgres_changes to eliminate O(subscribers) fan-out)
 - [ ] **SUPA-05**: RLS SELECT policies wrapped with security-definer functions to prevent N+1 fan-out reads
 
@@ -86,10 +86,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RATE-02 | Phase 24 | Complete |
 | RATE-03 | Phase 24 | Complete |
 | RATE-04 | Phase 24 | Complete |
-| RATE-05 | Phase 25 | Pending |
+| RATE-05 | Phase 25 | Complete |
 | SUPA-01 | Phase 23 | Pending |
 | SUPA-02 | Phase 25 | Pending |
-| SUPA-03 | Phase 25 | Pending |
+| SUPA-03 | Phase 25 | Complete |
 | SUPA-04 | Phase 25 | Pending |
 | SUPA-05 | Phase 25 | Pending |
 | PERF-01 | Phase 26 | Pending |
