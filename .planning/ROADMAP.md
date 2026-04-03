@@ -46,7 +46,7 @@ Plans:
 
 Plans:
 - [x] 24-01-PLAN.md — Clerk auth enforcement on mutating API routes + rate limit key hardening (SEC-01, RATE-02, RATE-03, RATE-04)
-- [ ] 24-02-PLAN.md — CSP nonce migration, unsafe-eval removal (SEC-02)
+- [x] 24-02-PLAN.md — CSP nonce migration, unsafe-eval removal (SEC-02)
 - [ ] 24-03-PLAN.md — CORS restriction, guest write-path validation, input sanitization (SEC-03, SEC-04, SEC-07)
 
 ### Phase 25: Supabase Scalability & RLS Hardening
@@ -80,7 +80,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
-| 24. Application Security Hardening | 1/3 | In Progress|  |
+| 24. Application Security Hardening | 2/3 | In Progress|  |
 | 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |
 

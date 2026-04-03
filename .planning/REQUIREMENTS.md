@@ -10,7 +10,7 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 ### Security Hardening
 
 - [x] **SEC-01**: Clerk `authorizedParties` enforced on all authenticated API routes and middleware
-- [ ] **SEC-02**: CSP migrated from static to nonce-based (remove `unsafe-eval` and `unsafe-inline`)
+- [x] **SEC-02**: CSP migrated from static to nonce-based (remove `unsafe-eval` and `unsafe-inline`)
 - [ ] **SEC-03**: Guest write-path validated server-side (guest ID verified before mutations)
 - [ ] **SEC-04**: CORS restricted to production domain(s) only
 - [x] **SEC-05**: `x-middleware-subrequest` header stripped at edge (CVE-2025-29927 defense-in-depth)
@@ -76,7 +76,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SEC-01 | Phase 24 | Complete |
-| SEC-02 | Phase 24 | Pending |
+| SEC-02 | Phase 24 | Complete |
 | SEC-03 | Phase 24 | Pending |
 | SEC-04 | Phase 24 | Pending |
 | SEC-05 | Phase 23 | Complete |
