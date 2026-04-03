@@ -28,7 +28,7 @@
   4. DNS has propagated and draftpokemon.com resolves consistently worldwide
 **Plans:** 1 plan
 Plans:
-- [ ] 19-01-PLAN.md — CSP headers for Clerk, env template, and Vercel deployment verification
+- [x] 19-01-PLAN.md — CSP headers for Clerk, env template, and Vercel deployment verification
 
 ### Phase 20: Observability & Feedback
 **Goal**: Beta testing is fully instrumented — runtime errors are captured in Sentry, user flows are tracked in PostHog, and testers can submit feedback from any page
