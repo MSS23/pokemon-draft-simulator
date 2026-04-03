@@ -42,7 +42,12 @@ Plans:
   3. A guest user who submits a pick request with a fabricated guest ID that does not match their server-issued session receives a 403 error
   4. An OPTIONS preflight from a non-production origin to any API route receives a non-permissive CORS response (no `Access-Control-Allow-Origin: *`)
   5. A draft name or team name containing an XSS payload is stored and displayed without script execution in any browser
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 24-01-PLAN.md — Clerk auth enforcement on mutating API routes + rate limit key hardening (SEC-01, RATE-02, RATE-03, RATE-04)
+- [ ] 24-02-PLAN.md — CSP nonce migration, unsafe-eval removal (SEC-02)
+- [ ] 24-03-PLAN.md — CORS restriction, guest write-path validation, input sanitization (SEC-03, SEC-04, SEC-07)
 
 ### Phase 25: Supabase Scalability & RLS Hardening
 **Goal**: Real-time draft events flow through broadcast channels instead of postgres_changes fan-out, RLS policies execute without per-subscriber index scans, and connection leaks are eliminated
@@ -75,7 +80,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
-| 24. Application Security Hardening | 0/? | Not started | - |
+| 24. Application Security Hardening | 0/3 | Not started | - |
 | 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |
 
