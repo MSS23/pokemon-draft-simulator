@@ -1,108 +1,127 @@
-# Requirements: Pokemon Draft — Security Hardening & Scalability Audit
+# Requirements: Pokemon Draft — Milestone 6: Draft UX Overhaul
 
 **Defined:** 2026-04-03
-**Core Value:** Harden the application for production-scale traffic and ensure infrastructure costs don't spiral before public launch.
+**Core Value:** The gold standard platform for Pokemon draft leagues — replacing Discord bots + Google Sheets with a single premium experience
 
-## v5 Requirements
+## Milestone Goal
 
-Requirements for Milestone 5. Each maps to roadmap phases.
+Restructure all drafting pages into a modern, intuitive experience with clear spatial hierarchy, dramatic turn-state shifts, and unified views for managers, participants, and spectators.
 
-### Security Hardening
+## Success Criteria
 
-- [ ] **SEC-01**: Clerk `authorizedParties` enforced on all authenticated API routes and middleware
-- [ ] **SEC-02**: CSP migrated from static to nonce-based (remove `unsafe-eval` and `unsafe-inline`)
-- [ ] **SEC-03**: Guest write-path validated server-side (guest ID verified before mutations)
-- [ ] **SEC-04**: CORS restricted to production domain(s) only
-- [x] **SEC-05**: `x-middleware-subrequest` header stripped at edge (CVE-2025-29927 defense-in-depth)
-- [ ] **SEC-06**: Guest sessions issued server-side via httpOnly cookie (replace localStorage IDs)
-- [ ] **SEC-07**: Input sanitization audit — all API routes validated with Zod schemas, HTML sanitized with DOMPurify
+- Draft room uses a three-zone layout (pool/rosters/activity) with resizable panels on desktop
+- "Your turn" state is visually unmistakable — panels dim, pick button pulses, audio cue plays
+- Host controls are accessible in one tap via persistent command bar (not buried in collapsible panel)
+- Spectators and participants share a single /draft/[id] URL that adapts by database-derived role
+- League hub has 3 primary sections (Overview/Matches/Management) instead of 7+ tabs
+- Draft page.tsx is reduced from 1,382 lines to a ~200-line thin coordinator
 
-### Rate Limiting & Abuse Prevention
+---
 
-- [x] **RATE-01**: Redis-backed rate limiting enforced in production (Upstash, no in-memory fallback)
-- [ ] **RATE-02**: Per-endpoint rate limits tuned (draft picks, auction bids, API reads, auth endpoints)
-- [ ] **RATE-03**: Rate limit bypass prevention — key by IP + authenticated user, not spoofable guest cookie
-- [ ] **RATE-04**: IP-based fallback rate limiting for unauthenticated requests
-- [ ] **RATE-05**: WebSocket connection rate limiting (max connections per user/IP)
+## v6 Requirements
 
-### Supabase Cost & Scalability
+### Draft Room Layout
 
-- [ ] **SUPA-01**: Supabase spend cap verified and billing alerts configured
-- [x] **SUPA-02**: RLS indexes added (btree on user_id, draft_id, team_id columns used in policies)
-- [ ] **SUPA-03**: Realtime channel cleanup enforced (unsubscribe on unmount, connection leak prevention)
-- [x] **SUPA-04**: Broadcast migration for picks/bids (replace postgres_changes to eliminate O(subscribers) fan-out)
-- [x] **SUPA-05**: RLS SELECT policies wrapped with security-definer functions to prevent N+1 fan-out reads
+- [ ] **LAYOUT-01**: User sees a three-zone desktop layout: Pokemon pool (left), team rosters (center), activity feed (right) with drag-to-resize dividers
+- [ ] **LAYOUT-02**: User sees a persistent sticky header showing whose turn it is and time remaining at all scroll positions
+- [ ] **LAYOUT-03**: User sees an always-visible activity feed in the main layout (desktop: right column) instead of a slide-in sidebar overlay
+- [x] **LAYOUT-04**: Draft page.tsx is restructured from monolithic 1,382-line file into a thin coordinator (~200 lines) that wires hooks and passes props to named region components
+- [ ] **LAYOUT-05**: User can drag the divider between Pokemon pool and team roster panels to resize them, with layout persisting across page reloads
 
-### Performance & Caching
+### Turn State & Host Controls
 
-- [x] **PERF-01**: PokeAPI responses served with CDN cache headers (long TTL for static data)
-- [x] **PERF-02**: TanStack Query staleTime optimized per query type (static data 30min+, draft state 0)
-- [x] **PERF-03**: Static/semi-static pages converted to ISR where applicable
-- [x] **PERF-04**: k6 load testing suite covering draft creation, picks, realtime subscriptions, and concurrent users
-- [x] **PERF-05**: Connection pool monitoring dashboard (active Realtime connections, DB query latency)
+- [x] **TURN-01**: User experiences a decisive visual shift when it's their turn — inactive panels dim, pick button pulses, and an audio cue plays
+- [ ] **TURN-02**: Host sees a slim persistent command bar (pause/skip/ping/timer) always visible in the header area, without needing to expand a collapsible panel
+- [ ] **TURN-03**: Host can access a command palette (Ctrl+K) for quick actions: pause draft, skip turn, adjust timer, undo last pick
+- [x] **TURN-04**: Turn state transitions use compositor-only CSS animations (opacity + transform) without layout thrashing on mid-range devices
 
-## Future Requirements
+### Spectator & Unified View
 
-Deferred to post-beta. Tracked but not in current roadmap.
+- [ ] **SPEC-01**: Participant, spectator, and host all use a single /draft/[id] URL that adapts UI based on database-derived role (not URL parameter)
+- [ ] **SPEC-02**: Existing /spectate/[id] URLs redirect (308) to /draft/[id] preserving all shared links in Discord/Reddit
+- [ ] **SPEC-03**: Broadcast/OBS mode remains accessible at /spectate/[id]?mode=broadcast with minimal chrome dark-mode display
 
-### Extended Security
+### Mobile Experience
 
-- **SEC-F01**: Full Postgres Changes to Broadcast migration (all tables, not just picks/bids)
-- **SEC-F02**: Strict CSP removing all `unsafe-inline` for `style-src` (blocked by Radix UI + Tailwind)
-- **SEC-F03**: Audit log table for forensic analysis of admin actions
-- **SEC-F04**: Row-level encryption for sensitive fields
+- [ ] **MOBILE-01**: User sees a persistent bottom bar on mobile with search, team summary, and progress indicators
+- [ ] **MOBILE-02**: Timer and current picker name are visible at all scroll positions on mobile via sticky header
+- [ ] **MOBILE-03**: Mobile layout uses tab-based panel switching (Pokemon/Team/Board) with no horizontal scroll on 375px screens
 
-### Infrastructure
+### League Hub
 
-- **INFRA-F01**: Cloudflare WAF for enterprise-grade DDoS protection
-- **INFRA-F02**: Geographic CDN edge caching for international users
+- [ ] **LEAGUE-01**: User navigates the league hub via 3 primary sections: Overview, Matches, and Management
+- [ ] **LEAGUE-02**: Overview section shows standings, current week matchup, recent activity, and announcements
+- [ ] **LEAGUE-03**: Matches section shows schedule, results, matchup detail, and playoff bracket
+- [ ] **LEAGUE-04**: Management section contains trades, waivers, free agents, power rankings, and commissioner tools
+- [ ] **LEAGUE-05**: All existing league sub-routes remain functional with preserved URLs
+
+### Post-Draft Continuity
+
+- [ ] **POST-01**: User sees a clear CTA on the draft results page to navigate directly to the league hub
+- [ ] **POST-02**: Draft results page links to league hub with the league auto-created on draft completion
+
+---
+
+## v7 Requirements (Deferred)
+
+### Mobile Enhancement
+- **MOBILE-04**: Continuous scroll mobile layout replacing tab navigation (HIGH complexity)
+
+### Social & Sharing
+- **SHARE-01**: Shareable draft recap OG image card for Discord/Reddit/Twitter
+- **SHARE-02**: Embeddable draft recap widget for content creators
+
+### Draft Features
+- **DRAFT-01**: Soft timer option (no auto-advance when timer expires, Sleeper pattern)
+- **DRAFT-02**: AI pick suggestions during draft (requires @pkmn/smogon integration)
+
+---
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| CAPTCHA on draft/pick actions | Invite-based rooms — friction exceeds threat surface |
-| Helmet.js middleware | Incompatible with Next.js App Router |
-| Custom Redis session store | Duplicates Clerk's JWT session layer |
-| Prisma migration | Rewrite risk with no security benefit |
-| Cloudflare WAF (Enterprise) | Rate limiting at Vercel edge sufficient at beta scale |
-| IP allowlists | Over-engineering for community platform |
-| Row-level encryption | Draft data contains no PII beyond display names |
+| Continuous scroll mobile (replacing tabs) | HIGH complexity, unproven pattern — no competitor has solved this; defer to v7 based on mobile usage data |
+| OG image generation for draft recaps | Requires server-side image rendering infrastructure; defer to post-beta |
+| AI pick suggestions | Deferred per PROJECT.md until post-beta; requires @pkmn/smogon integration |
+| Tailwind v4 migration | Separate refactor project; not a UX overhaul task |
+| Supabase Broadcast migration | Covered by Milestone 5 (Security Hardening); out of scope for UX overhaul |
+| Sound engine / audio system | Beyond the single audio cue for turn notification; full sound design deferred to post-beta |
+
+---
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | Phase 24 | Pending |
-| SEC-02 | Phase 24 | Pending |
-| SEC-03 | Phase 24 | Pending |
-| SEC-04 | Phase 24 | Pending |
-| SEC-05 | Phase 23 | Complete |
-| SEC-06 | Phase 25 | Pending |
-| SEC-07 | Phase 24 | Pending |
-| RATE-01 | Phase 23 | Complete |
-| RATE-02 | Phase 24 | Pending |
-| RATE-03 | Phase 24 | Pending |
-| RATE-04 | Phase 24 | Pending |
-| RATE-05 | Phase 25 | Pending |
-| SUPA-01 | Phase 23 | Pending |
-| SUPA-02 | Phase 25 | Complete |
-| SUPA-03 | Phase 25 | Pending |
-| SUPA-04 | Phase 25 | Complete |
-| SUPA-05 | Phase 25 | Complete |
-| PERF-01 | Phase 26 | Complete |
-| PERF-02 | Phase 26 | Complete |
-| PERF-03 | Phase 26 | Complete |
-| PERF-04 | Phase 26 | Complete |
-| PERF-05 | Phase 26 | Complete |
+| LAYOUT-01 | Phase 30 | Pending |
+| LAYOUT-02 | Phase 30 | Pending |
+| LAYOUT-03 | Phase 29 | Pending |
+| LAYOUT-04 | Phase 27 | Complete |
+| LAYOUT-05 | Phase 30 | Pending |
+| TURN-01 | Phase 27 | Complete |
+| TURN-02 | Phase 28 | Pending |
+| TURN-03 | Phase 28 | Pending |
+| TURN-04 | Phase 27 | Complete |
+| SPEC-01 | Phase 31 | Pending |
+| SPEC-02 | Phase 31 | Pending |
+| SPEC-03 | Phase 31 | Pending |
+| MOBILE-01 | Phase 32 | Pending |
+| MOBILE-02 | Phase 32 | Pending |
+| MOBILE-03 | Phase 32 | Pending |
+| LEAGUE-01 | Phase 33 | Pending |
+| LEAGUE-02 | Phase 33 | Pending |
+| LEAGUE-03 | Phase 33 | Pending |
+| LEAGUE-04 | Phase 33 | Pending |
+| LEAGUE-05 | Phase 33 | Pending |
+| POST-01 | Phase 34 | Pending |
+| POST-02 | Phase 34 | Pending |
 
 **Coverage:**
-- v5 requirements: 22 total
+- v6 requirements: 22 total
 - Mapped to phases: 22
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-03*
-*Last updated: 2026-04-03 after roadmap creation*
+*Last updated: 2026-04-03 — traceability filled after roadmap creation*

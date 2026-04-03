@@ -1,88 +1,146 @@
-# ROADMAP.md — Milestone 5: Security Hardening & Scalability Audit
+# ROADMAP.md — Milestone 6: Draft UX Overhaul
 
-**Milestone:** Security Hardening & Scalability Audit
-**Phases:** 4 (Phases 23–26, continuing from Milestone 4)
+**Milestone:** Draft UX Overhaul
+**Phases:** 8 (Phases 27–34, continuing from Milestone 5)
 **Coverage:** 22/22 requirements mapped
+
+---
+
+## Milestones
+
+- ✅ **v1 Production Overhaul** - Phases 1–10 (shipped 2026-03-03)
+- ✅ **v2 Codebase Health** - Phases 11–18 (shipped 2026-04-02)
+- ✅ **v3 Beta Launch** - Phases 19–22 (shipped 2026-04-03)
+- ✅ **v5 Security Hardening** - Phases 23–26 (shipped 2026-04-03)
+- 🚧 **v6 Draft UX Overhaul** - Phases 27–34 (in progress)
 
 ---
 
 ## Phases
 
-- [x] **Phase 23: Critical Fixes & Cost Safeguards** — Production environment verified safe, billing guarded, CVE defense-in-depth applied with zero app code changes (completed 2026-04-03)
-- [x] **Phase 24: Application Security Hardening** — Auth enforcement, CSP nonce migration, input sanitization, and CORS close concrete exploit vectors (completed 2026-04-03)
-- [x] **Phase 25: Supabase Scalability & RLS Hardening** — RLS indexes, broadcast migration for picks/bids, and channel cleanup eliminate per-subscriber fan-out cost (completed 2026-04-03)
-- [x] **Phase 26: Performance, Caching & Load Testing** — CDN caching, query staleTime optimization, monitoring dashboard, and k6 load tests validate the hardened stack (completed 2026-04-03)
+<details>
+<summary>✅ v5 Security Hardening (Phases 23–26) — COMPLETE 2026-04-03</summary>
+
+- [x] **Phase 23: Critical Fixes & Cost Safeguards** — Production baseline verified, billing guarded, CVE defense applied (completed 2026-04-03)
+- [x] **Phase 24: Application Security Hardening** — Auth enforcement, CSP nonce, input sanitization, CORS locked (completed 2026-04-03)
+- [x] **Phase 25: Supabase Scalability & RLS Hardening** — RLS indexes, broadcast migration, channel cleanup (completed 2026-04-03)
+- [x] **Phase 26: Performance, Caching & Load Testing** — CDN caching, staleTime optimization, k6 load test (completed 2026-04-03)
+
+</details>
+
+### 🚧 v6 Draft UX Overhaul (In Progress)
+
+**Milestone Goal:** Restructure all drafting pages into a modern, intuitive experience with clear spatial hierarchy, dramatic turn-state shifts, and unified views for managers, participants, and spectators.
+
+- [ ] **Phase 27: Foundation** — CSS custom properties, ViewerRole enum, TurnStateOverlay, and DraftRealtimeContext established before any structural changes
+- [ ] **Phase 28: Host Command Bar** — Persistent slim host command strip in sticky header plus Ctrl+K command palette replaces buried collapsible controls
+- [ ] **Phase 29: Activity Feed Integration** — DraftActivityFeed always-visible in main layout instead of slide-in sidebar overlay
+- [ ] **Phase 30: Layout Region Extraction** — Three-zone desktop layout with resizable panels; page.tsx reduced to a thin coordinator
+- [ ] **Phase 31: Spectator Unification** — Single /draft/[id] URL adapts by DB-derived role; /spectate redirect and OBS broadcast mode preserved
+- [ ] **Phase 32: Mobile Layout** — Persistent bottom bar, sticky timer, and tab-based panel switching on mobile
+- [ ] **Phase 33: League Hub Navigation** — Three-section league hub (Overview/Matches/Management) replacing 7+ tabs with all sub-routes preserved
+- [ ] **Phase 34: Post-Draft Continuity** — Clear CTA from draft results to league hub with direct navigation
 
 ---
 
 ## Phase Details
 
-### Phase 23: Critical Fixes & Cost Safeguards
-**Goal**: The production environment is verifiably safe from billing surprises and the most severe infrastructure risks, with no application code changes required
+### Phase 27: Foundation
+**Goal**: The turn-state theming system, ViewerRole abstraction, and DraftRealtimeContext provider are in place as primitives that every subsequent phase depends on — no structural JSX changes yet
 **Depends on**: Nothing (first phase of this milestone)
-**Requirements**: SEC-05, RATE-01, SUPA-01
+**Requirements**: LAYOUT-04, TURN-01, TURN-04
 **Success Criteria** (what must be TRUE):
-  1. Supabase billing dashboard shows a spend cap enabled and at least one billing alert configured at a threshold below the cap
-  2. Production Upstash Redis rate limiter is confirmed active (not the in-memory fallback) — verified by checking that rate limit state persists across a Vercel cold start cycle
-  3. Any HTTP request containing the `x-middleware-subrequest` header is stripped at the edge before reaching application middleware
-  4. `npm audit` returns zero critical or high CVEs, or all findings are documented with accepted-risk justification
-**Plans**: 2 plans
-
+  1. When it is the user's turn, the page root carries a `data-turn-state="active"` attribute and inactive panels visually dim while the pick button pulses — the shift is unmistakable without reading text
+  2. The turn-state transition uses only `opacity` and `transform` CSS properties — no layout-affecting properties are animated, confirmed by zero layout recalculations in a Chrome DevTools performance trace at 4x CPU throttle
+  3. A `ViewerRole` type (`host | participant | spectator | lobby`) exists in `useDraftSession` and is correctly derived from the DB participants table — not from a URL parameter
+  4. `DraftRealtimeContext` is mounted at the page-level coordinator and all subscription hooks read from it — the WebSocket channel does not tear down and remount when any child component re-renders
+  5. `page.tsx` exposes a thin coordinator surface where domain hooks are called exactly once and props are forwarded to named region components (structure committed, JSX extraction begins)
+**Plans:** 1/2 plans executed
 Plans:
-- [x] 23-01-PLAN.md — Middleware CVE strip, Upstash Redis logging hardening, npm audit CI gate
-- [x] 23-02-PLAN.md — Supabase spend cap and billing alert (dashboard checkpoint)
+- [x] 27-01-PLAN.md — DraftRealtimeContext, ViewerRole, CSS custom properties, and test scaffold
+- [ ] 27-02-PLAN.md — TurnStateOverlay component and page.tsx integration (context provider, data attribute, overlay replacement)
+**UI hint**: yes
 
-### Phase 24: Application Security Hardening
-**Goal**: Authenticated routes enforce Clerk identity at the handler level, CSP removes unsafe directives, all mutation inputs are validated server-side, and CORS is locked to production domains
-**Depends on**: Phase 23 (production baseline verified before touching auth and CSP)
-**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-07, RATE-02, RATE-03, RATE-04
+### Phase 28: Host Command Bar
+**Goal**: The host can access all primary draft controls (pause, skip, ping, timer) in one tap from a persistent bar in the header, and can trigger any action via Ctrl+K command palette — without expanding a collapsible panel
+**Depends on**: Phase 27 (ViewerRole required for permission-gating the bar from non-host users)
+**Requirements**: TURN-02, TURN-03
 **Success Criteria** (what must be TRUE):
-  1. A forged request to any mutating API route with a missing or invalid Clerk JWT returns 401 — even if middleware is bypassed
-  2. The browser console shows no CSP violations during a full auth flow (sign-in, token refresh, draft pick) on draftpokemon.com
-  3. A guest user who submits a pick request with a fabricated guest ID that does not match their server-issued session receives a 403 error
-  4. An OPTIONS preflight from a non-production origin to any API route receives a non-permissive CORS response (no `Access-Control-Allow-Origin: *`)
-  5. A draft name or team name containing an XSS payload is stored and displayed without script execution in any browser
-**Plans**: 3 plans
+  1. A host sees a slim persistent command bar in the sticky header at all scroll positions — non-host participants see no trace of it
+  2. The host can pause the draft, skip a turn, ping the current picker, and adjust the timer each in a single tap from the command bar
+  3. Pressing Ctrl+K opens a command palette with all host actions searchable by name — the palette is dismissible with Escape and shows a keyboard shortcut hint for each action
+  4. The existing collapsible DraftControls panel remains accessible behind an overflow "•••" button for secondary/advanced controls — no controls are removed
+**Plans**: TBD
+**UI hint**: yes
 
-Plans:
-- [x] 24-01-PLAN.md — Clerk auth enforcement on mutating API routes + rate limit key hardening (SEC-01, RATE-02, RATE-03, RATE-04)
-- [x] 24-02-PLAN.md — CSP nonce migration, unsafe-eval removal (SEC-02)
-- [x] 24-03-PLAN.md — CORS restriction, guest write-path validation, input sanitization (SEC-03, SEC-04, SEC-07)
-
-### Phase 25: Supabase Scalability & RLS Hardening
-**Goal**: Real-time draft events flow through broadcast channels instead of postgres_changes fan-out, RLS policies execute without per-subscriber index scans, and connection leaks are eliminated
-**Depends on**: Phase 24 (server-side auth must be correct before pick/bid services send authenticated broadcast events; CSP must be stable before guest httpOnly cookie endpoint is added to allowlist)
-**Requirements**: SEC-06, RATE-05, SUPA-02, SUPA-03, SUPA-04, SUPA-05
+### Phase 29: Activity Feed Integration
+**Goal**: The draft activity feed is always visible in the main layout — no slide-in overlay required — so all participants passively follow the pick history without an extra action
+**Depends on**: Phase 27 (DraftRealtimeContext must be stable before adding always-mounted consumers)
+**Requirements**: LAYOUT-03
 **Success Criteria** (what must be TRUE):
-  1. An 8-player draft with all players actively picking shows no RLS fan-out queries in the Supabase query performance advisor — pick INSERTs trigger one DB write, not N per-subscriber RLS evaluations
-  2. Guest sessions are issued as httpOnly cookies from the server — a guest user's session ID is not readable from `document.cookie` or `localStorage` in the browser console
-  3. Navigating away from and back to the draft page shows the same channel count in `supabase.getChannels()` — no channel accumulation across navigation cycles
-  4. WebSocket connection attempts beyond the per-user limit receive an explicit rate-limit rejection rather than silently queuing
-  5. The Supabase Performance Advisor shows no RLS-related lint warnings for the `user_id`, `draft_id`, and `team_id` indexed columns
-**Plans**: 4 plans
+  1. The activity feed is visible as a permanent panel in the draft room on desktop at all scroll positions — no button press or sidebar toggle is needed to see pick history
+  2. The activity feed renders without triggering a visible layout shift when new picks arrive — new entries append at the top and existing entries do not move (scroll position preserved)
+  3. Opening the draft page with 50+ prior picks does not cause a measurable frame drop — the feed is virtualized and renders only visible rows
+**Plans**: TBD
+**UI hint**: yes
 
-Plans:
-- [x] 25-01-PLAN.md — RLS btree indexes + security-definer wrapper functions (SUPA-02, SUPA-05)
-- [x] 25-02-PLAN.md — Channel cleanup audit, useRealtimeDraft deprecation, WebSocket rate limiting (SUPA-03, RATE-05)
-- [x] 25-03-PLAN.md — Broadcast migration for picks and bids (SUPA-04)
-- [x] 25-04-PLAN.md — Guest session httpOnly cookie endpoint (SEC-06)
-
-### Phase 26: Performance, Caching & Load Testing
-**Goal**: Static Pokemon data is served from CDN cache, TanStack Query stale times reflect actual data volatility, and a k6 load test confirms the hardened stack handles concurrent draft traffic
-**Depends on**: Phase 25 (load test must run against the broadcast model — testing before broadcast migration measures the wrong architecture)
-**Requirements**: PERF-01, PERF-02, PERF-03, PERF-04, PERF-05
+### Phase 30: Layout Region Extraction
+**Goal**: The draft room presents a three-zone desktop layout (Pokemon pool left, team rosters center, activity feed right) with user-draggable resizable dividers, assembled from pre-built region components with page.tsx as a thin coordinator
+**Depends on**: Phase 27 (CSS vars/context), Phase 28 (HostCommandBar exists), Phase 29 (ActivityFeed exists)
+**Requirements**: LAYOUT-01, LAYOUT-02, LAYOUT-05
 **Success Criteria** (what must be TRUE):
-  1. A PokeAPI response for any Pokemon served through the application includes `Cache-Control: s-maxage=86400` headers — verified in browser Network tab showing a CDN cache hit on second request
-  2. Opening the draft room does not trigger a PokeAPI fetch if the data was loaded within the last 30 minutes — TanStack Query returns cached data without a network request
-  3. The `/` landing page loads from ISR cache on repeat visits — Vercel deployment logs show `Cache: HIT` on static page requests
-  4. A k6 load test simulating 8 concurrent players drafting (all making picks, real-time subscriptions active) completes with p95 pick latency under 500ms and zero failed pick requests
-  5. A monitoring view shows current active Realtime connection count and average DB query latency — accessible without querying the Supabase dashboard directly
-**Plans**: 3 plans
+  1. The draft room shows three clearly delineated zones on desktop: Pokemon pool on the left, team rosters in the center, and activity feed on the right — all visible simultaneously without scrolling
+  2. The "whose turn / time remaining" header is visible at all scroll positions on desktop — scrolling the Pokemon pool or roster does not move it off-screen
+  3. A user can drag the divider between the Pokemon pool and roster panels to resize them; the layout proportions are restored on page reload (persisted in a cookie)
+  4. `page.tsx` is under 300 lines and contains no inline JSX rendering — it only wires hooks and passes props to named region components (`DraftLayout`, `DraftLeftPanel`, `DraftCenterPanel`, `DraftRightPanel`)
+**Plans**: TBD
+**UI hint**: yes
 
-Plans:
-- [x] 26-01-PLAN.md — CDN proxy for PokeAPI + TanStack Query staleTime optimization (PERF-01, PERF-02)
-- [x] 26-02-PLAN.md — ISR for static pages + /api/monitoring endpoint (PERF-03, PERF-05)
-- [x] 26-03-PLAN.md — k6 load test suite (PERF-04)
+### Phase 31: Spectator Unification
+**Goal**: Participants, spectators, and hosts all use a single /draft/[id] URL with UI adapting by database-derived role — no separate /spectate route for regular viewing — while existing spectator links redirect seamlessly and OBS broadcast mode is preserved
+**Depends on**: Phase 27 (ViewerRole), Phase 30 (region components composable enough for layout variants)
+**Requirements**: SPEC-01, SPEC-02, SPEC-03
+**Success Criteria** (what must be TRUE):
+  1. A user who is not assigned to a team (spectator) visiting /draft/[id] sees pick controls hidden and a read-only view — determined by database role, not by URL parameter; removing `?spectator=true` from the URL does not reveal pick controls
+  2. An existing /spectate/[id] URL (e.g., a Discord link) issues a 308 permanent redirect to /draft/[id] — the user lands on the correct draft without a broken-link experience
+  3. /spectate/[id]?mode=broadcast opens a minimal dark-mode view with no navigation chrome — suitable for OBS browser source capture
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 32: Mobile Layout
+**Goal**: Mobile users can draft without tab-switching for core actions — a persistent bottom bar provides always-accessible search and team summary, a sticky timer is visible at all scroll positions, and the layout fits 375px screens without horizontal scroll
+**Depends on**: Phase 30 (region components exist as composable trees for the mobile breakpoint variant)
+**Requirements**: MOBILE-01, MOBILE-02, MOBILE-03
+**Success Criteria** (what must be TRUE):
+  1. A user on a 375px screen sees a persistent bottom bar at all scroll positions containing a Pokemon search trigger, a team summary (pick count and budget), and a draft progress indicator — no scrolling required to reach these
+  2. The current picker's name and countdown timer are visible at all scroll positions on mobile via a sticky header — scrolling the Pokemon list does not push the timer off-screen
+  3. The mobile layout switches between Pokemon, Team, and Board panels via tabs with no horizontal scroll on a 375px viewport — all tab content fits within the screen width
+  4. The mobile layout uses `h-[100dvh]` (not `h-screen`) to correctly account for iOS Safari's dynamic address bar height — confirmed by visual inspection on a physical iOS device
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 33: League Hub Navigation
+**Goal**: The league hub presents three primary navigation sections (Overview, Matches, Management) replacing the current 7+ tabs — all existing sub-routes remain functional and reachable in two taps
+**Depends on**: Nothing (fully independent of draft room phases — can run in parallel with Phases 27–30)
+**Requirements**: LEAGUE-01, LEAGUE-02, LEAGUE-03, LEAGUE-04, LEAGUE-05
+**Success Criteria** (what must be TRUE):
+  1. The league hub top-level navigation shows exactly three sections: Overview, Matches, and Management — no other top-level tabs are present
+  2. Overview shows standings, the current week's matchup for the logged-in user, recent match activity, and league announcements — all on one screen without tab-switching
+  3. Matches shows the full schedule, match results, matchup detail links, and the playoff bracket — all reachable within the Matches section
+  4. Management contains trades, waivers, free agents, power rankings, and commissioner tools — all reachable within the Management section in two taps from the league hub
+  5. Every existing league sub-route URL (e.g., `/league/[id]/trades`, `/league/[id]/standings`) continues to load the correct page — no broken links from prior Discord/Reddit shares
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 34: Post-Draft Continuity
+**Goal**: When a draft completes, the results page presents a clear path to the league hub — the transition from "draft done" to "league started" feels seamless rather than a dead end
+**Depends on**: Nothing (fully independent of draft room phases — can run in parallel with Phases 27–30)
+**Requirements**: POST-01, POST-02
+**Success Criteria** (what must be TRUE):
+  1. The draft results page shows a prominent call-to-action button that navigates directly to the associated league hub — visible above the fold without scrolling
+  2. Clicking the CTA from the results page lands the user on the league Overview section with standings and the first week's fixtures populated — the league is auto-created on draft completion and ready to use immediately
+**Plans**: TBD
+**UI hint**: yes
 
 ---
 
@@ -90,10 +148,14 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
-| 24. Application Security Hardening | 3/3 | Complete    | 2026-04-03 |
-| 25. Supabase Scalability & RLS Hardening | 4/4 | Complete    | 2026-04-03 |
-| 26. Performance, Caching & Load Testing | 3/3 | Complete    | 2026-04-03 |
+| 27. Foundation | 1/2 | In Progress|  |
+| 28. Host Command Bar | 0/? | Not started | - |
+| 29. Activity Feed Integration | 0/? | Not started | - |
+| 30. Layout Region Extraction | 0/? | Not started | - |
+| 31. Spectator Unification | 0/? | Not started | - |
+| 32. Mobile Layout | 0/? | Not started | - |
+| 33. League Hub Navigation | 0/? | Not started | - |
+| 34. Post-Draft Continuity | 0/? | Not started | - |
 
 ---
 
@@ -101,40 +163,40 @@ Plans:
 
 | Requirement | Phase |
 |-------------|-------|
-| SEC-01 | Phase 24 |
-| SEC-02 | Phase 24 |
-| SEC-03 | Phase 24 |
-| SEC-04 | Phase 24 |
-| SEC-05 | Phase 23 |
-| SEC-06 | Phase 25 |
-| SEC-07 | Phase 24 |
-| RATE-01 | Phase 23 |
-| RATE-02 | Phase 24 |
-| RATE-03 | Phase 24 |
-| RATE-04 | Phase 24 |
-| RATE-05 | Phase 25 |
-| SUPA-01 | Phase 23 |
-| SUPA-02 | Phase 25 |
-| SUPA-03 | Phase 25 |
-| SUPA-04 | Phase 25 |
-| SUPA-05 | Phase 25 |
-| PERF-01 | Phase 26 |
-| PERF-02 | Phase 26 |
-| PERF-03 | Phase 26 |
-| PERF-04 | Phase 26 |
-| PERF-05 | Phase 26 |
+| LAYOUT-01 | Phase 30 |
+| LAYOUT-02 | Phase 30 |
+| LAYOUT-03 | Phase 29 |
+| LAYOUT-04 | Phase 27 |
+| LAYOUT-05 | Phase 30 |
+| TURN-01 | Phase 27 |
+| TURN-02 | Phase 28 |
+| TURN-03 | Phase 28 |
+| TURN-04 | Phase 27 |
+| SPEC-01 | Phase 31 |
+| SPEC-02 | Phase 31 |
+| SPEC-03 | Phase 31 |
+| MOBILE-01 | Phase 32 |
+| MOBILE-02 | Phase 32 |
+| MOBILE-03 | Phase 32 |
+| LEAGUE-01 | Phase 33 |
+| LEAGUE-02 | Phase 33 |
+| LEAGUE-03 | Phase 33 |
+| LEAGUE-04 | Phase 33 |
+| LEAGUE-05 | Phase 33 |
+| POST-01 | Phase 34 |
+| POST-02 | Phase 34 |
 
 **Coverage:** 22/22 requirements mapped. No orphans.
 
 ---
 
-## Research Flags (Implementation Notes)
+## Implementation Notes
 
-- **Phase 23**: Run `npm ls @upstash/ratelimit @upstash/redis` before touching rate limiter — packages may already be installed. Verify production Upstash env vars are set in Vercel dashboard (not just .env.local). The `x-middleware-subrequest` strip is a one-line addition to `src/middleware.ts` header deletions — zero risk, do it first.
-- **Phase 24 (CSP)**: Run `grep -r "eval(" node_modules/framer-motion/dist/` before committing to `unsafe-eval` removal — Framer Motion may require it. Use `Content-Security-Policy-Report-Only` in staging first to surface violations without blocking. Derive Clerk FAPI URL from environment variable, never hardcode. Test full auth flow including 60-second token refresh after any CSP change.
-- **Phase 24 (Auth)**: Audit every `auth()` call site across all API routes — grep `src/app/api` for files that call Supabase mutations without a preceding `auth()` check. Middleware-only auth is the current gap.
-- **Phase 24 (Input sanitization)**: Run `grep -r "dangerouslySetInnerHTML" src/` at phase start to scope XSS work accurately. Install `isomorphic-dompurify` (not plain DOMPurify — plain throws in SSR via Next.js issue #46893).
-- **Phase 25 (RLS/Clerk)**: Confirm which JWT integration path is active (legacy Clerk template vs. native Supabase integration) by reviewing `FIX-RLS-POLICIES.md` before writing any new RLS policies. Never mix `auth.uid()` and the custom Clerk JWT helper — `auth.uid()` silently returns NULL for Clerk string user IDs. Always use the existing custom function.
-- **Phase 25 (RLS Realtime)**: Keep SELECT policies draft-scoped (`USING (draft_id = $draft_id)`), not user-scoped — user-scoped SELECT policies silently drop events for spectators with no error thrown. Test every RLS migration by opening two browser tabs as different users.
-- **Phase 25 (Broadcast migration)**: Map which tables must stay on `postgres_changes` (private per-user data like `wishlist_items`) before implementation. The blast radius covers `DraftRealtimeManager`, `draft-picks-service`, `auction-service`, and potentially `useWishlistSync`. Instrument `supabase.getChannels().length` in staging before starting to establish baseline.
-- **Phase 26 (k6)**: Keep load test scripts in `tests/load/`. k6 is a standalone binary — not an npm package. Run load tests after Phase 25 broadcast migration is deployed; testing before migration measures the wrong architecture.
+- **Phase 27 (Foundation):** `DraftRealtimeContext` must be established before any JSX extraction. Prototype the `data-turn-state` CSS custom property approach in isolation first — confirm the visual shift is unmistakable before Phase 30 assembles the full layout.
+- **Phase 28 (Host Command Bar):** Uses `cmdk` via existing shadcn `command` component — no new package install. The existing `DraftControls` collapsible is retained as overflow panel; no controls are deleted.
+- **Phase 29 (Activity Feed):** Gate the always-mounted `DraftActivityFeed` behind `draftState !== null` to avoid mount storm (Pitfall 3 in SUMMARY.md). Instrument `supabase.getChannels().length` before shipping to confirm no duplicate channels.
+- **Phase 30 (Layout Extraction — HIGHEST RISK):** All new panel component selectors must be named exports in `selectors.ts` — no inline selectors (Pitfall 2: Zustand infinite loop). `DraftUIState` stays in `page.tsx` local state — do not lift to Zustand. Convert `allDraftedIds.includes()` to `Set`-based lookup in `useMemo` before making the grid always-visible.
+- **Phase 31 (Spectator Unification):** Write unit test "isSpectator should be true when userId is not in participants list, regardless of URL param" before implementation. 308 redirect is permanent — preserve indefinitely for Discord/Reddit links.
+- **Phase 32 (Mobile):** Physical iOS device testing mandatory. Use `h-[100dvh]` not `h-screen`. Add `touch-action: pan-y` on drag handles, `overscroll-behavior: contain` on WishlistManager.
+- **Phase 33 (League Hub):** Complete a task-flow audit before implementing — for each existing tab, confirm the primary action is reachable in 2 taps from the new 3-section structure. Sub-page files are not merged or deleted; only `LeagueNav` changes.
+- **Phase 34 (Post-Draft):** Verify league auto-creation on draft completion fires before implementing the CTA link — the league must exist before the button navigates to it.

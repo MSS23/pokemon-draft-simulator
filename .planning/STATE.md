@@ -2,98 +2,92 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-last_updated: "2026-04-03T10:09:21.053Z"
+status: executing
+last_updated: "2026-04-03T12:41:38.758Z"
 last_activity: 2026-04-03
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_phases: 8
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 0
 ---
 
 # STATE.md
 
 ## Current Milestone
 
-**Milestone 5:** Security Hardening & Scalability Audit
-**Status:** Milestone complete
-**Next action:** `/gsd:plan-phase 23`
+**Milestone 6:** Draft UX Overhaul
+**Status:** Executing Phase 27
+**Next action:** Execute 27-02
 
 ## Current Position
 
-Phase: 26
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-04-03
+Phase: 27 (Foundation) — EXECUTING
+Plan: 2 of 2
+Status: Executing Phase 27
+Last activity: 2026-04-03 -- Completed 27-01-PLAN.md
 
-## Progress Bar
+Progress: [█████░░░░░] 50%
 
-```
-[Phase 23] [Phase 24] [Phase 25] [Phase 26]
-[        ] [        ] [        ] [        ]
-  0/? plans  0/? plans  0/? plans  0/? plans
-```
+## Performance Metrics
+
+**Velocity:**
+
+- Total plans completed: 1
+- Average duration: 6 minutes
+- Total execution time: 6 minutes
+
+| Phase | Plan | Duration | Tasks | Files |
+| ----- | ---- | -------- | ----- | ----- |
+| 27-foundation | 01 | 6m | 1 | 4 |
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Project State
 
-- Milestone 1 (Production Overhaul) complete
-- Milestone 2 (Codebase Health) complete
-- Milestone 3 paused — cherry-picked mobile, onboarding, PokePaste into M4
-- Milestone 4 (Beta Launch) paused — security hardening prioritized before public launch
-- Milestone 5 (Security Hardening) active — this milestone
+- Milestones 1–5 complete
+- Milestone 6 (Draft UX Overhaul) active — this milestone
 - 414 tests passing, ~79K lines TypeScript, 30+ routes
 - Domain: draftpokemon.com, deploying on Vercel
+- Stack additions this milestone: `react-resizable-panels@4.x`, `nuqs@2.x`, `motion@12.x` (rename), `@tailwindcss/container-queries`, shadcn `command` component
 
 ### Phase Dependency Chain
 
 ```
-Phase 23 (zero-risk baseline)
-  → Phase 24 (auth + CSP hardening)
-      → Phase 25 (Supabase broadcast + RLS)
-          → Phase 26 (caching + load test)
+Phase 27 (Foundation — CSS vars, ViewerRole, DraftRealtimeContext)
+  → Phase 28 (Host Command Bar — needs ViewerRole)
+  → Phase 29 (Activity Feed — needs stable context)
+      → Phase 30 (Layout Extraction — assembles 27+28+29, HIGHEST RISK)
+          → Phase 31 (Spectator Unification — needs ViewerRole + Layout)
+          → Phase 32 (Mobile Layout — needs region composability)
+
+Phase 33 (League Hub Nav) — INDEPENDENT, run parallel to 27–30
+Phase 34 (Post-Draft Continuity) — INDEPENDENT, run parallel to 27–30
 ```
 
-### Known Implementation Constraints
+### Critical Constraints
 
-- CSP headers must be in `next.config.ts` only (not vercel.json — conflict risk)
-- Framer Motion may require `unsafe-eval` — must audit before CSP tightening
-- Clerk uses string user IDs — `auth.uid()` silently returns NULL for Clerk users; use the existing custom JWT helper from `FIX-RLS-POLICIES.md`
-- RLS SELECT policies must be draft-scoped, not user-scoped — user-scoped policies silently drop Realtime events for spectators
-- Broadcast migration blast radius: `DraftRealtimeManager`, `draft-picks-service`, `auction-service`, potentially `useWishlistSync`
-- `wishlist_items` must stay on `postgres_changes` (private per-user filtered data)
-- k6 is a standalone binary, not an npm package — keep test scripts in `tests/load/`
+- `DraftRealtimeContext` must exist at page level BEFORE any JSX extraction — prevents subscription teardown (known bug class: pickInFlightRef race)
+- All Zustand selectors for new panel components must be named exports in `selectors.ts` — inline selectors cause infinite re-render (known production bug: useWishlistSync 2026-03-04)
+- Always-mounted panels gated behind `draftState !== null` — prevents mount storm and duplicate Supabase channels
+- `isSpectator` derived from DB participants check, not URL param — prevents permission drift
+- Turn animations: `opacity` + `transform` only — no layout-affecting properties (prevents Android jank)
+- Mobile layout: `h-[100dvh]` not `h-screen` — iOS Safari dynamic address bar
+- Phase 32: Physical iOS device testing mandatory before shipping
 
 ### Key Decisions
 
-- Security hardening before public beta launch
-- Phase ordering is dependency-driven: billing/CVE fixes first, then app auth, then Supabase scalability, then load validation
-- Broadcast migration covers picks and bids only (not all tables) — full migration deferred to post-beta per SEC-F01
-- Guest session httpOnly cookie (Phase 25) deferred after CSP stabilization (Phase 24) — the new `/api/guest/session` endpoint must be in the CSP allowlist first
-- IP-based rate limiting for unauthenticated requests (RATE-04) in Phase 24 — guest cookie values are spoofable, IP is the correct fallback key
-- [23-01] Strip x-middleware-subrequest unconditionally at edge before any auth checks (CVE-2025-29927 defense)
-- [23-01] Upgrade Redis missing-config warning to console.error CRITICAL for Vercel log visibility
-- [23-01] CI npm audit gate uses --audit-level=high: high/critical block builds, moderate/low non-blocking
-
-### Pre-Phase Checks
-
-Before starting Phase 23:
-
-- Run `npm ls @upstash/ratelimit @upstash/redis` to verify Upstash is already installed
-- Verify production Upstash env vars set in Vercel dashboard
-
-Before starting Phase 24:
-
-- Run `grep -r "eval(" node_modules/framer-motion/dist/` to check unsafe-eval dependency
-- Run `grep -r "dangerouslySetInnerHTML" src/` to scope XSS work
-
-Before starting Phase 25:
-
-- Review `FIX-RLS-POLICIES.md` to confirm active JWT integration path
-- Instrument `supabase.getChannels().length` in staging to establish baseline
+- Phase ordering follows research dependency graph: Foundation → Command Bar → Activity Feed → Layout → Spectator → Mobile; League Hub and Post-Draft run independently
+- `DraftUIState` stays in `page.tsx` local state — NOT lifted to Zustand (hash-based comparison prevents polling re-renders)
+- Existing `DraftControls` collapsible retained as overflow panel — no controls removed, host command bar is additive
+- Continuous-scroll mobile layout (MOBILE-04) deferred to v7 — tabs are proven pattern; continuous scroll deferred pending mobile usage data
+- `/spectate/[id]` 308 redirect preserved indefinitely — Discord/Reddit links must not break
+- [27-01] ViewerRole derives from DB participants data (is_host, team_id) rather than URL params to prevent permission drift
+- [27-01] CSS turn-state animations use box-shadow and opacity only (compositor-only) to prevent Android jank per TURN-04
 
 ## Last Updated
 
-2026-04-03
+2026-04-03 -- 27-01 complete
