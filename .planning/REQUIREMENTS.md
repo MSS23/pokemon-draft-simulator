@@ -97,7 +97,7 @@ Restructure all drafting pages into a modern, intuitive experience with clear sp
 | LAYOUT-01 | Phase 30 | Pending |
 | LAYOUT-02 | Phase 30 | Pending |
 | LAYOUT-03 | Phase 29 | Pending |
-| LAYOUT-04 | Phase 27 | Complete |
+| LAYOUT-04 | Phase 27+30 | Partial (foundation in 27, extraction in 30) |
 | LAYOUT-05 | Phase 30 | Pending |
 | TURN-01 | Phase 27 | Complete |
 | TURN-02 | Phase 28 | Pending |
