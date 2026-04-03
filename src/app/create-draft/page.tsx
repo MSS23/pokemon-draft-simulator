@@ -478,16 +478,10 @@ export default function CreateDraftPage() {
         </div>
       </div>
 
-      {/* Draft type comparison */}
-      <details className="group">
-        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors flex items-center gap-1">
-          <HelpCircle className="h-3 w-3" />
-          Compare draft types side-by-side
-        </summary>
-        <div className="mt-3">
-          <DraftTypeComparison />
-        </div>
-      </details>
+      {/* Draft type comparison — always visible */}
+      <div className="mt-4">
+        <DraftTypeComparison />
+      </div>
 
       {/* Draft type selection */}
       <div className="space-y-3">
