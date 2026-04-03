@@ -42,28 +42,28 @@ const TRUST_PROPS = [
 ]
 
 const STEPS = [
-  { num: '01', title: 'Choose your format', desc: 'Snake, auction, or tiered — pick from official rulesets or create your own community format.' },
-  { num: '02', title: 'Invite your group', desc: 'Share a 6-character room code. No account required for guests.' },
-  { num: '03', title: 'Draft like a champion', desc: 'Real-time picks with turn timer, wishlist, and auto-pick backup.' },
+  { num: '01', title: 'Pick your format', desc: 'VGC Reg H, Smogon tiers, or fully custom — choose a template or build your own ruleset with custom bans and costs.' },
+  { num: '02', title: 'Share the room code', desc: 'Send a 6-character code to your group. No account needed to join as a guest.' },
+  { num: '03', title: 'Draft in real-time', desc: 'Snake or auction with turn timer, wishlist queue, and auto-pick. Budget tracking keeps it competitive.' },
 ]
 
 const FEATURES = [
   {
     icon: Zap,
     title: 'Real-time drafting',
-    desc: 'Every pick syncs instantly across all participants. WebSocket-powered with zero refresh needed.',
+    desc: 'Every pick syncs instantly. No refreshing, no lag — WebSocket-powered so your 8-player VGC draft runs smooth.',
     accent: 'from-amber-500 to-orange-600',
   },
   {
     icon: Trophy,
     title: 'Community-driven formats',
-    desc: 'VGC, Smogon, National Dex, and custom rulesets — the community decides which formats matter.',
+    desc: 'VGC Regulation H, Smogon OU, National Dex, and custom rulesets. Auto-enforced ban lists and cost tiers so nobody sneaks in a restricted legendary.',
     accent: 'from-violet-500 to-purple-600',
   },
   {
     icon: Shield,
     title: 'Full league system',
-    desc: 'Standings, matchups, trades, playoffs, and KO tracking. Everything champions need to compete.',
+    desc: 'Standings, round-robin fixtures, trades with commissioner approval, and playoff brackets. Everything a competitive draft league needs.',
     accent: 'from-emerald-500 to-teal-600',
   },
 ]
@@ -200,19 +200,19 @@ export default function Home() {
             {
               icon: Plus,
               title: 'Create a Draft',
-              desc: 'Pick a template or customize your own. Snake, auction, or tiered — any format your community plays.',
+              desc: 'Pick VGC Reg H, Smogon, or a custom format. Set budget, team count, and share a 6-character room code.',
               accent: 'from-primary to-[hsl(var(--brand-to))]',
             },
             {
               icon: Swords,
-              title: 'Pick Your Team',
-              desc: 'Take turns drafting Pokemon in real-time. Use the wishlist, auto-pick, and budget tracker to build your squad.',
+              title: 'Draft Your Squad',
+              desc: 'Take turns picking Pokemon in real-time. Snake or auction — with wishlist, auto-pick, and budget tracking built in.',
               accent: 'from-violet-500 to-purple-600',
             },
             {
               icon: Trophy,
-              title: 'Compete Like a Champion',
-              desc: 'Run a full league season with standings, matchups, trades, and playoff brackets. Track KOs and stats.',
+              title: 'Run Your League',
+              desc: 'Full season with standings, matchups, trades, and playoff brackets. Track KOs per game and crown a champion.',
               accent: 'from-amber-500 to-orange-600',
             },
           ].map((item, i) => (
@@ -244,7 +244,7 @@ export default function Home() {
             className="mb-8"
           >
             <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
-              Built for Pokemon Champions
+              Built for competitive Pokemon
             </p>
             <h2 className="text-2xl font-bold tracking-tight">
               Everything you need to run your draft
@@ -360,9 +360,9 @@ export default function Home() {
           <p className="text-[11px] font-bold text-primary uppercase tracking-widest">
             Ready to compete?
           </p>
-          <h2 className="text-3xl font-bold tracking-tight">Join the champions</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Your next draft league starts here</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Create your first draft in under 30 seconds. No account needed. Any format your community plays.
+            Create your first draft in under a minute. Free, no signup required, any format your community plays.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
             <Button
@@ -372,7 +372,7 @@ export default function Home() {
               className="rounded-2xl font-bold"
             >
               <Plus className="h-4 w-4 mr-1.5" />
-              Create Draft
+              Start a Draft
               <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
             <Button
