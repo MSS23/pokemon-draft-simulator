@@ -9,7 +9,7 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 
 ### Security Hardening
 
-- [ ] **SEC-01**: Clerk `authorizedParties` enforced on all authenticated API routes and middleware
+- [x] **SEC-01**: Clerk `authorizedParties` enforced on all authenticated API routes and middleware
 - [ ] **SEC-02**: CSP migrated from static to nonce-based (remove `unsafe-eval` and `unsafe-inline`)
 - [ ] **SEC-03**: Guest write-path validated server-side (guest ID verified before mutations)
 - [ ] **SEC-04**: CORS restricted to production domain(s) only
@@ -20,9 +20,9 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 ### Rate Limiting & Abuse Prevention
 
 - [x] **RATE-01**: Redis-backed rate limiting enforced in production (Upstash, no in-memory fallback)
-- [ ] **RATE-02**: Per-endpoint rate limits tuned (draft picks, auction bids, API reads, auth endpoints)
-- [ ] **RATE-03**: Rate limit bypass prevention — key by IP + authenticated user, not spoofable guest cookie
-- [ ] **RATE-04**: IP-based fallback rate limiting for unauthenticated requests
+- [x] **RATE-02**: Per-endpoint rate limits tuned (draft picks, auction bids, API reads, auth endpoints)
+- [x] **RATE-03**: Rate limit bypass prevention — key by IP + authenticated user, not spoofable guest cookie
+- [x] **RATE-04**: IP-based fallback rate limiting for unauthenticated requests
 - [ ] **RATE-05**: WebSocket connection rate limiting (max connections per user/IP)
 
 ### Supabase Cost & Scalability
@@ -75,7 +75,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | Phase 24 | Pending |
+| SEC-01 | Phase 24 | Complete |
 | SEC-02 | Phase 24 | Pending |
 | SEC-03 | Phase 24 | Pending |
 | SEC-04 | Phase 24 | Pending |
@@ -83,9 +83,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEC-06 | Phase 25 | Pending |
 | SEC-07 | Phase 24 | Pending |
 | RATE-01 | Phase 23 | Complete |
-| RATE-02 | Phase 24 | Pending |
-| RATE-03 | Phase 24 | Pending |
-| RATE-04 | Phase 24 | Pending |
+| RATE-02 | Phase 24 | Complete |
+| RATE-03 | Phase 24 | Complete |
+| RATE-04 | Phase 24 | Complete |
 | RATE-05 | Phase 25 | Pending |
 | SUPA-01 | Phase 23 | Pending |
 | SUPA-02 | Phase 25 | Pending |
