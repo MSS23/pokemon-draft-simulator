@@ -630,6 +630,37 @@
     100% { opacity: 0; }
   }
 
+  /* Turn-state theming via data attribute — Phase 27 Foundation */
+  [data-turn-state='active'] {
+    --draft-accent: hsl(142 76% 36%);
+    --draft-surface: hsl(142 76% 36% / 0.05);
+    --draft-border: hsl(142 76% 36% / 0.3);
+  }
+  [data-turn-state='waiting'] {
+    --draft-accent: hsl(var(--muted-foreground));
+    --draft-surface: transparent;
+    --draft-border: hsl(var(--border));
+  }
+
+  /* Pick button pulse — compositor-only, active turn only */
+  [data-turn-state='active'] .pick-button-primary {
+    animation: pick-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pick-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(74,222,128,0); }
+  }
+
+  /* Inactive panel dimming — compositor-only (opacity only, no layout) */
+  [data-turn-state='active'] .panel-dimmed {
+    opacity: 0.6;
+    transition: opacity 0.3s ease;
+  }
+  [data-turn-state='waiting'] .panel-dimmed {
+    opacity: 1;
+    transition: opacity 0.3s ease;
+  }
+
   /* Subtle scan line effect for arena feel */
   .scan-lines::after {
     content: '';

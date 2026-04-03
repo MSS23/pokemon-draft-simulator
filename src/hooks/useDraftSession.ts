@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
 
+export type ViewerRole = 'host' | 'participant' | 'spectator' | 'lobby'
+
 export interface DraftSessionResult {
   userId: string
   isHost: boolean
@@ -13,16 +15,20 @@ export interface DraftSessionResult {
   isJoiningFromLink: boolean
   setIsJoiningFromLink: (v: boolean) => void
   authUser: ReturnType<typeof useAuth>['user']
+  /** Derived viewer role for permission-gating */
+  viewerRole: ViewerRole
 }
 
 interface UseDraftSessionParams {
   roomCode: string
   isHostParam: boolean
   isSpectatorParam: boolean
-  /** Participant list from draft state, used to derive isAdmin */
+  /** Participant list from draft state, used to derive isAdmin and viewerRole */
   participants?: Array<{
     userId: string | null
     is_admin?: boolean
+    team_id?: string | null
+    is_host?: boolean
   }>
 }
 
@@ -77,6 +83,15 @@ export function useDraftSession({
     return me?.is_admin === true
   }, [participants, userId])
 
+  const viewerRole = useMemo((): ViewerRole => {
+    if (!participants || !userId) return 'lobby'
+    const me = participants.find(p => p.userId === userId)
+    if (!me) return isSpectatorParam ? 'spectator' : 'lobby'
+    if (me.is_host) return 'host'
+    if (me.team_id) return 'participant'
+    return 'spectator'
+  }, [participants, userId, isSpectatorParam])
+
   return {
     userId,
     isHost: isHostParam,
@@ -87,5 +102,6 @@ export function useDraftSession({
     isJoiningFromLink,
     setIsJoiningFromLink,
     authUser: authUser ?? null,
+    viewerRole,
   }
 }
