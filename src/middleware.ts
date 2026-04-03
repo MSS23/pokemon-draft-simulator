@@ -187,6 +187,24 @@ const isPublicRoute = createRouteMatcher([
   '/match/(.*)',
 ])
 
+// API routes that require Clerk authentication (mutating or sensitive)
+// These routes MUST have a valid Clerk JWT — middleware is the second layer after route-level auth() calls
+const isAuthRequiredApiRoute = createRouteMatcher([
+  '/api/ai/(.*)',        // AI analysis — expensive, must be authenticated
+  '/api/push/(.*)',      // Push subscriptions — links device to a user
+  '/api/formats/sync',  // Admin sync — mutation
+  '/api/user/(.*)',      // User data mutations — handled at route level but defend in depth
+])
+
+// API routes that are explicitly public (no auth needed)
+// All others default to: auth required if matched by isAuthRequiredApiRoute
+const isPublicApiRoute = createRouteMatcher([
+  '/api/health',        // Health check — monitoring tools
+  '/api/feedback',      // Anonymous feedback — no account needed
+  '/api/sheets',        // Google Sheets proxy — public data
+  '/api/formats',       // Format list reads — public catalog (not /formats/sync)
+])
+
 // ============================================================================
 // MIDDLEWARE
 // ============================================================================
@@ -249,7 +267,8 @@ async function applyRateLimit(request: NextRequest, requestId: string): Promise<
   return null
 }
 
-export default clerkMiddleware(async (auth, request) => {
+export default clerkMiddleware(
+  async (auth, request) => {
   // SEC-05: Strip CVE-2025-29927 exploitation vector at edge
   // The x-middleware-subrequest header is used by the Next.js middleware
   // bypass vulnerability. Strip it unconditionally before any auth checks.
@@ -266,6 +285,22 @@ export default clerkMiddleware(async (auth, request) => {
   // Apply rate limiting to API routes
   const rateLimitResponse = await applyRateLimit(request, requestId)
   if (rateLimitResponse) return rateLimitResponse
+
+  // SEC-01: Enforce Clerk auth on mutating/sensitive API routes at the edge.
+  // This is defense-in-depth — route handlers also call auth(), but middleware
+  // enforces it unconditionally even if a route handler has a bug.
+  if (isAuthRequiredApiRoute(request) && !isPublicApiRoute(request)) {
+    const { userId } = await auth()
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required', requestId },
+        {
+          status: 401,
+          headers: { 'x-request-id': requestId },
+        }
+      )
+    }
+  }
 
   // Protect routes that require authentication
   // Public routes and unmatched routes pass through without auth
@@ -284,7 +319,15 @@ export default clerkMiddleware(async (auth, request) => {
   response.headers.set('Content-Security-Policy', buildCSP(nonce))
 
   return response
-})
+  },
+  {
+    // SEC-01: Only accept JWTs issued for the production app domain.
+    // Prevents tokens from a different Clerk app from being accepted.
+    authorizedParties: process.env.NEXT_PUBLIC_CLERK_AUTHORIZED_PARTIES
+      ? process.env.NEXT_PUBLIC_CLERK_AUTHORIZED_PARTIES.split(',')
+      : ['https://draftpokemon.com', 'http://localhost:3000'],
+  }
+)
 
 export const config = {
   matcher: [
