@@ -18,8 +18,9 @@ export const usePokemon = (id: string) => {
     queryKey: pokemonQueries.detail(id),
     queryFn: () => fetchPokemon(id),
     enabled: !!id,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    // PERF-02: Static Pokemon data — 30 min stale time (species don't change between sessions)
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 60 * 60 * 1000, // 60 minutes
   })
 }
 
@@ -28,8 +29,9 @@ export const usePokemonList = (enabled: boolean = true) => {
     queryKey: pokemonQueries.list({}),
     queryFn: () => fetchPokemonList(),
     enabled,
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    // PERF-02: Static Pokemon data — 30 min stale time (species don't change between sessions)
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 60 * 60 * 1000, // 60 minutes
     retry: 1,
     retryDelay: 2000, // 2 second delay before retry
   })
@@ -54,8 +56,9 @@ export const usePokemonListByFormat = (formatId?: string, customFormatId?: strin
       return fetchPokemonList(150)
     },
     enabled: enabled && (!!formatId || !!customFormatId),
-    staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes
+    // PERF-02: Static Pokemon data — 30 min stale time (species don't change between sessions)
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    gcTime: 60 * 60 * 1000, // 60 minutes
     retry: 1,
     retryDelay: 2000, // 2 second delay before retry
   })
@@ -66,8 +69,9 @@ export const usePokemonByType = (typeName: string) => {
     queryKey: pokemonQueries.list({ type: typeName }),
     queryFn: () => fetchPokemonByType(typeName),
     enabled: !!typeName,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    // PERF-02: Static Pokemon data — 30 min stale time (species don't change between sessions)
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   })
 }
 
@@ -142,7 +146,8 @@ export const usePokemonByIds = (ids: string[]) => {
       }
     },
     enabled: ids.length > 0,
-    staleTime: 5 * 60 * 1000,
+    // PERF-02: Static Pokemon data — 30 min stale time (species don't change between sessions)
+    staleTime: 30 * 60 * 1000,
   })
 }
 
