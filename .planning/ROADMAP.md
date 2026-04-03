@@ -8,7 +8,7 @@
 
 ## Phases
 
-- [ ] **Phase 23: Critical Fixes & Cost Safeguards** — Production environment verified safe, billing guarded, CVE defense-in-depth applied with zero app code changes
+- [x] **Phase 23: Critical Fixes & Cost Safeguards** — Production environment verified safe, billing guarded, CVE defense-in-depth applied with zero app code changes (completed 2026-04-03)
 - [ ] **Phase 24: Application Security Hardening** — Auth enforcement, CSP nonce migration, input sanitization, and CORS close concrete exploit vectors
 - [ ] **Phase 25: Supabase Scalability & RLS Hardening** — RLS indexes, broadcast migration for picks/bids, and channel cleanup eliminate per-subscriber fan-out cost
 - [ ] **Phase 26: Performance, Caching & Load Testing** — CDN caching, query staleTime optimization, monitoring dashboard, and k6 load tests validate the hardened stack
@@ -30,7 +30,7 @@
 
 Plans:
 - [x] 23-01-PLAN.md — Middleware CVE strip, Upstash Redis logging hardening, npm audit CI gate
-- [ ] 23-02-PLAN.md — Supabase spend cap and billing alert (dashboard checkpoint)
+- [x] 23-02-PLAN.md — Supabase spend cap and billing alert (dashboard checkpoint)
 
 ### Phase 24: Application Security Hardening
 **Goal**: Authenticated routes enforce Clerk identity at the handler level, CSP removes unsafe directives, all mutation inputs are validated server-side, and CORS is locked to production domains
@@ -74,7 +74,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 23. Critical Fixes & Cost Safeguards | 1/2 | In Progress|  |
+| 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
 | 24. Application Security Hardening | 0/? | Not started | - |
 | 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |
