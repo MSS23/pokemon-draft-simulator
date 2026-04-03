@@ -161,6 +161,18 @@ export class DraftRealtimeManager {
         .on('broadcast', { event: 'draft_deleted' }, (payload) =>
           this.handleBroadcast('draft_deleted', payload)
         )
+        // SUPA-04: Listen for pick_made broadcast events
+        // These are sent by draft-picks-service after a successful DB insert.
+        // Belt-and-suspenders: if broadcast fails, postgres_changes for picks still fires.
+        .on('broadcast', { event: 'pick_made' }, (payload) => {
+          log.info('[SUPA-04] Received pick_made broadcast')
+          this.handleBroadcast('pick_made', payload.payload)
+        })
+        // SUPA-04: Listen for bid_placed broadcast events
+        .on('broadcast', { event: 'bid_placed' }, (payload) => {
+          log.info('[SUPA-04] Received bid_placed broadcast')
+          this.handleBroadcast('bid_placed', payload.payload)
+        })
 
       // RATE-05: Guard against channel accumulation on re-navigation.
       // Supabase free tier supports 200 concurrent connections; enforce a per-page limit.
@@ -371,6 +383,43 @@ export class DraftRealtimeManager {
         eventType: 'DELETE',
         data: { id: this.draftId, deleted: true, ...(payload as Record<string, unknown>) },
         timestamp: Date.now()
+      })
+    }
+
+    // SUPA-04: Pick broadcast — emit as a picks INSERT event.
+    // The event shape matches what postgres_changes would emit, so useDraftRealtime
+    // handles it identically without any changes to the hook.
+    if (event === 'pick_made') {
+      const pick = payload as Record<string, unknown>
+      this.callbacks.onDraftEvent({
+        table: 'picks',
+        eventType: 'INSERT',
+        data: {
+          draft_id: pick.draftId,
+          team_id: pick.teamId,
+          pokemon_id: pick.pokemonId,
+          pokemon_name: pick.pokemonName,
+          cost: pick.cost,
+          pick_order: pick.pickOrder,
+          round: pick.round
+        },
+        timestamp: (pick.timestamp as number) || Date.now()
+      })
+    }
+
+    // SUPA-04: Bid broadcast — emit as auctions UPDATE event (triggers state refresh)
+    if (event === 'bid_placed') {
+      const bid = payload as Record<string, unknown>
+      this.callbacks.onDraftEvent({
+        table: 'auctions',
+        eventType: 'UPDATE',
+        data: {
+          draft_id: bid.draftId,
+          id: bid.auctionId,
+          current_bid: bid.bidAmount,
+          current_bidder_team_id: bid.teamId
+        },
+        timestamp: (bid.timestamp as number) || Date.now()
       })
     }
   }

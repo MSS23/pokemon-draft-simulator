@@ -19,6 +19,54 @@ const log = createLogger('DraftPicksService')
 
 type Draft = DraftRow
 
+/**
+ * Send a broadcast event for a pick to all subscribers on the draft channel.
+ * This replaces postgres_changes fan-out for picks, reducing O(N) RLS evaluations to O(1).
+ * SUPA-04: Broadcast migration for picks.
+ */
+async function sendPickBroadcast(
+  draftId: string,
+  teamId: string,
+  pokemonId: string,
+  pokemonName: string,
+  cost: number,
+  pickOrder: number,
+  round: number
+): Promise<void> {
+  if (!supabase) return
+
+  const payload = {
+    draftId,
+    teamId,
+    pokemonId,
+    pokemonName,
+    cost,
+    pickOrder,
+    round,
+    timestamp: Date.now()
+  }
+
+  // Use the same channel name as DraftRealtimeManager for this draft
+  const channel = supabase.channel(`draft:${draftId}`)
+
+  try {
+    await channel.send({
+      type: 'broadcast',
+      event: 'pick_made',
+      payload
+    })
+    log.info('[SUPA-04] Broadcast pick_made sent for draft:', draftId)
+  } catch (err) {
+    // Broadcast failure is non-fatal — postgres_changes still delivers the event
+    // as a fallback (picks table subscription stays active for this reason)
+    log.warn('[SUPA-04] Broadcast send failed (postgres_changes fallback active):', err)
+  } finally {
+    // IMPORTANT: This is a fire-and-forget channel — remove it immediately
+    // to avoid channel accumulation. Do not store a reference.
+    supabase.removeChannel(channel)
+  }
+}
+
 // Re-export getDraftState and cache helpers from the main service at call time
 // to avoid circular imports. We use a lazy import pattern.
 async function getDraftStateLazy(draftId: string): Promise<DraftState | null> {
@@ -217,6 +265,21 @@ export async function makePick(draftId: string, userId: string, pokemonId: strin
     nextTurn: result.nextTurn,
     isComplete: result.isComplete
   })
+
+  // SUPA-04: Broadcast the pick to all subscribers on the draft channel.
+  // This is in addition to the postgres_changes event — belt-and-suspenders during migration.
+  const teamCount = draftState.teams.length || 1
+  const pickOrder = currentTurn
+  const round = Math.floor((currentTurn - 1) / teamCount) + 1
+  await sendPickBroadcast(
+    draftUuid,
+    teamId,
+    pokemonId,
+    pokemonName,
+    pickCost,
+    pickOrder,
+    round
+  ).catch(err => log.warn('Pick broadcast failed:', err))
 
   // Invalidate cache so the next getDraftState fetches fresh data
   await invalidateCacheLazy(draftId)
