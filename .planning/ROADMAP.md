@@ -39,9 +39,9 @@ Plans:
   2. PostHog records page views, draft creation events, and pick events in the live dashboard
   3. A floating feedback button is visible on every page and submitting it delivers a message to the Discord webhook channel
   4. Analytics events are gated to production (no noise from localhost or preview deployments)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 Plans:
-- [ ] 20-01-PLAN.md — Sentry completion + PostHog hostname gating + analytics call-site wiring
+- [x] 20-01-PLAN.md — Sentry completion + PostHog hostname gating + analytics call-site wiring
 - [x] 20-02-PLAN.md — Floating feedback button on all pages
 
 ### Phase 21: Core Beta Features
@@ -77,7 +77,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 19. Deployment Foundation | 0/1 | In progress | - |
-| 20. Observability & Feedback | 1/2 | In Progress|  |
+| 20. Observability & Feedback | 2/2 | Complete | 2026-04-03 |
 | 21. Core Beta Features | 0/? | Not started | - |
 | 22. Launch Polish | 0/? | Not started | - |
 

@@ -9,7 +9,7 @@ progress:
   total_phases: 4
   completed_phases: 1
   total_plans: 3
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # STATE.md
@@ -22,10 +22,10 @@ progress:
 
 ## Current Position
 
-Phase: 20 (Observability & Feedback) — EXECUTING
-Plan: 2 of 2
-Status: Ready to execute
-Last activity: 2026-04-03
+Phase: 20 (Observability & Feedback) — COMPLETE
+Plan: 2 of 2 (all complete)
+Status: Phase 20 complete
+Last activity: 2026-04-03 -- Completed 20-01-PLAN.md (Sentry + PostHog production gating)
 
 ## Accumulated Context
 
@@ -52,6 +52,7 @@ Last activity: 2026-04-03
 - Security & scalability hardening before public beta launch — prevents costly rearchitecture later
 - Supabase is primary cost driver (realtime connections, database, bandwidth)
 - Clerk handles auth but integration points need security review
+- Hostname gating over NODE_ENV checks for production-only telemetry (Sentry + PostHog) — prevents Vercel preview deploys from polluting dashboards
 
 ## Last Updated
 

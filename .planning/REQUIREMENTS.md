@@ -20,8 +20,8 @@ Ship a polished, mobile-friendly beta to the VGC community at draftpokemon.com w
 ### Requirements:
 - [ ] **DEPLOY-01**: Site deployed to draftpokemon.com via Vercel with SSL
 - [ ] **DEPLOY-02**: CSP headers include Clerk CDN domains so auth works in production
-- [ ] **DEPLOY-03**: Sentry error monitoring configured with `@sentry/nextjs` (client + server error capture)
-- [ ] **DEPLOY-04**: PostHog analytics wired to track draft creation funnel, page views, and key user actions
+- [x] **DEPLOY-03**: Sentry error monitoring configured with `@sentry/nextjs` (client + server error capture)
+- [x] **DEPLOY-04**: PostHog analytics wired to track draft creation funnel, page views, and key user actions
 - [ ] **DEPLOY-05**: OG meta tags on all public routes (landing, create-draft, join-draft, results) with Pokemon Draft branding for social sharing
 
 ### Acceptance:
@@ -121,8 +121,8 @@ Ship a polished, mobile-friendly beta to the VGC community at draftpokemon.com w
 |--------|-------|--------|
 | DEPLOY-01 | Phase 19 | Pending |
 | DEPLOY-02 | Phase 19 | Pending |
-| DEPLOY-03 | Phase 20 | Pending |
-| DEPLOY-04 | Phase 20 | Pending |
+| DEPLOY-03 | Phase 20 | Complete |
+| DEPLOY-04 | Phase 20 | Complete |
 | LAND-04 | Phase 20 | Complete |
 | MOBILE-01 | Phase 21 | Pending |
 | MOBILE-02 | Phase 21 | Pending |
