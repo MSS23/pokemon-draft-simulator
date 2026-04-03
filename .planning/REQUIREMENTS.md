@@ -38,7 +38,7 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 - [x] **PERF-01**: PokeAPI responses served with CDN cache headers (long TTL for static data)
 - [x] **PERF-02**: TanStack Query staleTime optimized per query type (static data 30min+, draft state 0)
 - [x] **PERF-03**: Static/semi-static pages converted to ISR where applicable
-- [ ] **PERF-04**: k6 load testing suite covering draft creation, picks, realtime subscriptions, and concurrent users
+- [x] **PERF-04**: k6 load testing suite covering draft creation, picks, realtime subscriptions, and concurrent users
 - [x] **PERF-05**: Connection pool monitoring dashboard (active Realtime connections, DB query latency)
 
 ## Future Requirements
@@ -95,7 +95,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PERF-01 | Phase 26 | Complete |
 | PERF-02 | Phase 26 | Complete |
 | PERF-03 | Phase 26 | Complete |
-| PERF-04 | Phase 26 | Pending |
+| PERF-04 | Phase 26 | Complete |
 | PERF-05 | Phase 26 | Complete |
 
 **Coverage:**
