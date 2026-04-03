@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Sora, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
+import { headers } from "next/headers";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
@@ -87,17 +88,23 @@ export const viewport: Viewport = {
   themeColor: "#dc2855",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // SEC-02: Read per-request nonce set by middleware for CSP compliance
+  const headersList = await headers()
+  const nonce = headersList.get('x-nonce') ?? ''
+  // nonce is available for <Script nonce={nonce}> or <script nonce={nonce}> tags
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <Script
           src="/hydration-fix.js"
           strategy="beforeInteractive"
+          nonce={nonce}
         />
       </head>
       <body
