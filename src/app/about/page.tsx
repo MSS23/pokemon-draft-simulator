@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,15 +10,24 @@ import Link from 'next/link'
 
 const FEATURES = [
   { icon: Zap, title: 'Real-time Drafting', desc: 'WebSocket-powered live picks. Every participant sees changes instantly.' },
-  { icon: Shield, title: 'Official Formats', desc: 'VGC Reg H, Reg I, Smogon tiers — automatic ban lists and cost calculation.' },
+  { icon: Shield, title: 'Community-Driven Formats', desc: 'VGC, Smogon, National Dex, and custom rulesets — the community decides which formats to play.' },
   { icon: Users, title: 'No Signup Required', desc: 'Guest access for quick drafts. Create an account when you\'re ready.' },
-  { icon: Trophy, title: 'Full League System', desc: 'Standings, weekly fixtures, trades, playoffs, and KO tracking.' },
+  { icon: Trophy, title: 'Full League System', desc: 'Standings, weekly fixtures, trades, playoffs, and KO tracking — everything champions need.' },
 ]
 
 const TECH_STACK = [
   'Next.js 15', 'React 18', 'TypeScript', 'Supabase',
   'Tailwind CSS', 'Zustand', 'TanStack Query', 'Framer Motion'
 ]
+
+export const metadata: Metadata = {
+  title: 'About Pokémon Champions Draft League — The Free Draft Platform for Competitive Pokemon',
+  description: 'Pokémon Champions Draft League is the go-to draft platform for competitive Pokemon communities. Real-time snake drafts, auctions, full league seasons with standings, trades, and playoffs. Free and open source.',
+  openGraph: {
+    title: 'About Pokémon Champions Draft League',
+    description: 'The free draft platform built for Pokemon Champions. Real-time drafting, community-driven formats, full league system.',
+  },
+}
 
 export default function AboutPage() {
   return (
@@ -32,17 +42,18 @@ export default function AboutPage() {
               <div className="absolute top-1/2 left-0 right-0 h-[1.5px] bg-foreground/60 -translate-y-1/2" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[10px] w-[10px] rounded-full border-[1.5px] border-foreground/60 bg-background" />
             </div>
-            <h1 className="text-3xl font-bold">About Poke Draft</h1>
+            <h1 className="text-3xl font-bold">About Pokémon Champions Draft League</h1>
           </div>
           <p className="text-muted-foreground leading-relaxed">
-            Poke Draft started because managing a draft league in Google Sheets was a nightmare.
+            Pokémon Champions Draft League started because managing a draft league in Google Sheets was a nightmare.
             Turn tracking, budget math, trade records — all scattered across tabs and Discord messages.
-            So I built the tool I wished existed: a real-time drafting platform designed specifically
-            for competitive Pokemon communities.
+            So we built the platform we wished existed: a real-time drafting tool designed specifically
+            for competitive Pokemon champions and their communities.
           </p>
           <p className="text-muted-foreground leading-relaxed">
             Whether you&apos;re running a casual draft with friends or a full league season with
-            playoffs and KO tracking, everything lives in one place. No spreadsheets, no manual
+            playoffs and KO tracking, everything lives in one place. Any format your community plays —
+            VGC, Smogon, National Dex, or something completely custom. No spreadsheets, no manual
             score keeping, no &ldquo;whose turn is it?&rdquo; arguments.
           </p>
         </div>

@@ -1,7 +1,7 @@
 {
-  "name": "Pokémon Draft League",
-  "short_name": "Draft League",
-  "description": "Real-time Pokémon drafting platform with VGC 2024 compliance",
+  "name": "Pokémon Champions Draft League",
+  "short_name": "Champions Draft",
+  "description": "The #1 draft platform for Pokémon Champions. Snake drafts, auctions, and full league seasons — free and real-time.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

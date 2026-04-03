@@ -31,20 +31,20 @@ const TRUST_PROPS = [
   },
   {
     icon: Shield,
-    title: 'VGC & Smogon ready',
-    desc: 'Official format rulesets with automatic ban lists and cost calculation.',
+    title: 'Every format, your rules',
+    desc: 'VGC, Smogon, and community-driven formats with automatic ban lists and cost calculation.',
   },
   {
     icon: Heart,
     title: 'Completely free',
-    desc: 'No paywalls, no premium tiers. Every feature is available to everyone.',
+    desc: 'No paywalls, no premium tiers. Every feature champions use is available to everyone.',
   },
 ]
 
 const STEPS = [
-  { num: '01', title: 'Choose your format', desc: 'Snake, auction, or tiered with official VGC rulesets and custom rules.' },
+  { num: '01', title: 'Choose your format', desc: 'Snake, auction, or tiered — pick from official rulesets or create your own community format.' },
   { num: '02', title: 'Invite your group', desc: 'Share a 6-character room code. No account required for guests.' },
-  { num: '03', title: 'Draft together live', desc: 'Real-time picks with turn timer, wishlist, and auto-pick backup.' },
+  { num: '03', title: 'Draft like a champion', desc: 'Real-time picks with turn timer, wishlist, and auto-pick backup.' },
 ]
 
 const FEATURES = [
@@ -56,14 +56,14 @@ const FEATURES = [
   },
   {
     icon: Trophy,
-    title: 'Official formats',
-    desc: 'VGC Reg H, Smogon tiers, and custom rulesets with automatic cost calculation.',
+    title: 'Community-driven formats',
+    desc: 'VGC, Smogon, National Dex, and custom rulesets — the community decides which formats matter.',
     accent: 'from-violet-500 to-purple-600',
   },
   {
     icon: Shield,
     title: 'Full league system',
-    desc: 'Standings, matchups, trades, playoffs, and KO tracking in one place.',
+    desc: 'Standings, matchups, trades, playoffs, and KO tracking. Everything champions need to compete.',
     accent: 'from-emerald-500 to-teal-600',
   },
 ]
@@ -128,7 +128,7 @@ export default function Home() {
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-foreground/[0.06] border border-foreground/[0.08] backdrop-blur-sm">
                 <Sparkles className="h-3 w-3 text-primary" />
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  Free & Open Source
+                  The #1 Pokemon Draft Platform
                 </span>
               </div>
             </motion.div>
@@ -138,9 +138,9 @@ export default function Home() {
               variants={fadeIn}
               className="text-4xl sm:text-6xl lg:text-7xl font-bold text-foreground leading-[1.05] tracking-tight"
             >
-              Draft your team.
+              Where Pokemon
               <br />
-              <span className="bg-gradient-to-r from-zinc-500 to-zinc-600 bg-clip-text text-transparent">Win your league.</span>
+              <span className="bg-gradient-to-r from-primary to-[hsl(var(--brand-to))] bg-clip-text text-transparent">Champions</span> draft.
             </motion.h1>
 
             {/* Subtitle */}
@@ -148,8 +148,8 @@ export default function Home() {
               variants={fadeIn}
               className="text-muted-foreground text-base sm:text-lg max-w-md leading-relaxed"
             >
-              The free drafting tool built for competitive Pokemon communities.
-              Snake drafts, auctions, full league seasons — no spreadsheets required.
+              The free draft platform built for competitive Pokemon communities.
+              Snake drafts, auctions, full league seasons — any format, decided by you.
             </motion.p>
 
             {/* CTAs */}
@@ -200,7 +200,7 @@ export default function Home() {
             {
               icon: Plus,
               title: 'Create a Draft',
-              desc: 'Pick a template or customize your own. Choose snake, auction, or tiered format with official rulesets.',
+              desc: 'Pick a template or customize your own. Snake, auction, or tiered — any format your community plays.',
               accent: 'from-primary to-[hsl(var(--brand-to))]',
             },
             {
@@ -211,8 +211,8 @@ export default function Home() {
             },
             {
               icon: Trophy,
-              title: 'Battle & Win',
-              desc: 'Compete in a league season with standings, matchups, trades, and playoff brackets. Track KOs and stats.',
+              title: 'Compete Like a Champion',
+              desc: 'Run a full league season with standings, matchups, trades, and playoff brackets. Track KOs and stats.',
               accent: 'from-amber-500 to-orange-600',
             },
           ].map((item, i) => (
@@ -244,7 +244,7 @@ export default function Home() {
             className="mb-8"
           >
             <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
-              Built for competitive play
+              Built for Pokemon Champions
             </p>
             <h2 className="text-2xl font-bold tracking-tight">
               Everything you need to run your draft
@@ -285,10 +285,10 @@ export default function Home() {
             className="mb-8"
           >
             <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-2">
-              Trusted by trainers
+              Trusted by champions
             </p>
             <h2 className="text-2xl font-bold tracking-tight">
-              Built by players, for players
+              Built by the community, for the community
             </h2>
           </motion.div>
 
@@ -360,9 +360,9 @@ export default function Home() {
           <p className="text-[11px] font-bold text-primary uppercase tracking-widest">
             Ready to compete?
           </p>
-          <h2 className="text-3xl font-bold tracking-tight">Start your draft today</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Join the champions</h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Create your first draft in under 30 seconds. No account needed.
+            Create your first draft in under 30 seconds. No account needed. Any format your community plays.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
             <Button
