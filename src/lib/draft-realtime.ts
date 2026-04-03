@@ -67,6 +67,7 @@ export class DraftRealtimeManager {
     onlineUsers: new Set(),
     userPresence: new Map()
   }
+  private beforeUnloadHandler: (() => void) | null = null
 
   constructor(
     private draftId: string,
@@ -161,6 +162,32 @@ export class DraftRealtimeManager {
           this.handleBroadcast('draft_deleted', payload)
         )
 
+      // RATE-05: Guard against channel accumulation on re-navigation.
+      // Supabase free tier supports 200 concurrent connections; enforce a per-page limit.
+      if (typeof window !== 'undefined') {
+        const activeChannels = supabase.getChannels()
+        const draftChannels = activeChannels.filter(ch =>
+          ch.topic.startsWith('draft:') || ch.topic.startsWith('wishlist_')
+        )
+        if (draftChannels.length >= 5) {
+          // Clean up stale channels (not the one we just created) before subscribing
+          log.warn(`[RATE-05] Channel count ${draftChannels.length} exceeds threshold. Cleaning up stale channels before subscribing.`)
+          const staleChannels = draftChannels.filter(ch =>
+            ch.topic !== `draft:${this.draftId}` &&
+            ch.topic !== `wishlist_${this.draftId}`
+          )
+          for (const stale of staleChannels) {
+            try {
+              await stale.unsubscribe()
+              supabase.removeChannel(stale)
+              log.info(`[RATE-05] Removed stale channel: ${stale.topic}`)
+            } catch (err) {
+              log.warn(`[RATE-05] Failed to remove stale channel ${stale.topic}:`, err)
+            }
+          }
+        }
+      }
+
       // Subscribe to channel
       this.channel.subscribe(async (status) => {
         if (this.abortController.signal.aborted) return
@@ -190,6 +217,30 @@ export class DraftRealtimeManager {
           this.callbacks.onConnectionChange({ status: 'disconnected' })
         }
       })
+
+      // Safety net: hard navigation (tab close, browser back) bypasses React cleanup.
+      // beforeunload ensures the channel is removed from Supabase's subscriber list.
+      if (typeof window !== 'undefined') {
+        const handleBeforeUnload = () => {
+          if (this.channel) {
+            // Synchronous untrack — best effort, no await
+            this.channel.unsubscribe()
+            supabase.removeChannel(this.channel)
+            this.channel = null
+          }
+        }
+        // Remove any previous listener before adding a new one (e.g. after reconnect)
+        if (this.beforeUnloadHandler) {
+          window.removeEventListener('beforeunload', this.beforeUnloadHandler)
+        }
+        window.addEventListener('beforeunload', handleBeforeUnload)
+        this.beforeUnloadHandler = handleBeforeUnload
+      }
+
+      // [SUPA-03] Log active channel count for observability
+      if (typeof window !== 'undefined') {
+        log.info(`[SUPA-03] Active channels after subscribe: ${supabase.getChannels().length}`)
+      }
     } catch (error) {
       log.error('Subscription error:', error)
       this.callbacks.onError?.(error instanceof Error ? error : new Error(String(error)))
@@ -404,6 +455,12 @@ export class DraftRealtimeManager {
    */
   async cleanup(): Promise<void> {
     log.info('Cleaning up...')
+
+    // Remove beforeunload safety net listener to prevent memory leaks
+    if (this.beforeUnloadHandler && typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', this.beforeUnloadHandler)
+      this.beforeUnloadHandler = null
+    }
 
     // Signal abort to stop all pending operations
     this.abortController.abort()

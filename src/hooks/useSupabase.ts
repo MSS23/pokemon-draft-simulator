@@ -6,6 +6,14 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('RealtimeDraft')
 
+/**
+ * @deprecated This hook creates a duplicate `draft:${draftId}` channel that conflicts
+ * with DraftRealtimeManager used by useDraftRealtime. Use useDraftRealtime from
+ * src/hooks/useDraftRealtime.ts instead. This hook will be removed in a future cleanup.
+ *
+ * SUPA-03: Channel leak fix — if you must use this hook, ensure the parent component
+ * that also uses useDraftRealtime does NOT render both simultaneously.
+ */
 export const useRealtimeDraft = (draftId: string) => {
   const [isConnected, setIsConnected] = useState(false)
   const { setDraft, setTeams, setParticipants, setCurrentAuction } = useDraftStore()
