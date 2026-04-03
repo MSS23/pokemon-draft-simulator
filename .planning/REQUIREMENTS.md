@@ -30,7 +30,7 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 - [ ] **SUPA-01**: Supabase spend cap verified and billing alerts configured
 - [x] **SUPA-02**: RLS indexes added (btree on user_id, draft_id, team_id columns used in policies)
 - [ ] **SUPA-03**: Realtime channel cleanup enforced (unsubscribe on unmount, connection leak prevention)
-- [ ] **SUPA-04**: Broadcast migration for picks/bids (replace postgres_changes to eliminate O(subscribers) fan-out)
+- [x] **SUPA-04**: Broadcast migration for picks/bids (replace postgres_changes to eliminate O(subscribers) fan-out)
 - [x] **SUPA-05**: RLS SELECT policies wrapped with security-definer functions to prevent N+1 fan-out reads
 
 ### Performance & Caching
@@ -90,7 +90,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SUPA-01 | Phase 23 | Pending |
 | SUPA-02 | Phase 25 | Complete |
 | SUPA-03 | Phase 25 | Pending |
-| SUPA-04 | Phase 25 | Pending |
+| SUPA-04 | Phase 25 | Complete |
 | SUPA-05 | Phase 25 | Complete |
 | PERF-01 | Phase 26 | Pending |
 | PERF-02 | Phase 26 | Pending |

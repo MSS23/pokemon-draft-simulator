@@ -10,7 +10,7 @@
 
 - [x] **Phase 23: Critical Fixes & Cost Safeguards** — Production environment verified safe, billing guarded, CVE defense-in-depth applied with zero app code changes (completed 2026-04-03)
 - [x] **Phase 24: Application Security Hardening** — Auth enforcement, CSP nonce migration, input sanitization, and CORS close concrete exploit vectors (completed 2026-04-03)
-- [ ] **Phase 25: Supabase Scalability & RLS Hardening** — RLS indexes, broadcast migration for picks/bids, and channel cleanup eliminate per-subscriber fan-out cost
+- [x] **Phase 25: Supabase Scalability & RLS Hardening** — RLS indexes, broadcast migration for picks/bids, and channel cleanup eliminate per-subscriber fan-out cost (completed 2026-04-03)
 - [ ] **Phase 26: Performance, Caching & Load Testing** — CDN caching, query staleTime optimization, monitoring dashboard, and k6 load tests validate the hardened stack
 
 ---
@@ -64,7 +64,7 @@ Plans:
 Plans:
 - [x] 25-01-PLAN.md — RLS btree indexes + security-definer wrapper functions (SUPA-02, SUPA-05)
 - [x] 25-02-PLAN.md — Channel cleanup audit, useRealtimeDraft deprecation, WebSocket rate limiting (SUPA-03, RATE-05)
-- [ ] 25-03-PLAN.md — Broadcast migration for picks and bids (SUPA-04)
+- [x] 25-03-PLAN.md — Broadcast migration for picks and bids (SUPA-04)
 - [x] 25-04-PLAN.md — Guest session httpOnly cookie endpoint (SEC-06)
 
 ### Phase 26: Performance, Caching & Load Testing
@@ -87,7 +87,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
 | 24. Application Security Hardening | 3/3 | Complete    | 2026-04-03 |
-| 25. Supabase Scalability & RLS Hardening | 3/4 | In Progress|  |
+| 25. Supabase Scalability & RLS Hardening | 4/4 | Complete   | 2026-04-03 |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |
 
 ---
