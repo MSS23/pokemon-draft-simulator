@@ -1,439 +1,418 @@
-# Architecture Patterns: Security Hardening & Scalability
+# Architecture Research
 
-**Domain:** Security hardening and scalability for Next.js 15 + Supabase + Clerk platform
+**Domain:** Real-time draft room UX overhaul — composable layout, role-adaptive views, league consolidation
 **Researched:** 2026-04-03
-**Confidence:** HIGH (architecture grounded in actual codebase + official docs)
+**Confidence:** HIGH — based on direct codebase analysis of all affected files
 
 ---
 
-## Existing Architecture Snapshot
+## Current Architecture (Baseline)
 
-Before mapping integration points, here is what is already in place. This is the baseline every change must integrate with — not a greenfield system.
+### System Overview
 
-| Layer | Current State |
-|-------|---------------|
-| Middleware | `src/middleware.ts` — Clerk auth + Upstash rate limiting (sliding window, per route) |
-| CSP headers | `next.config.ts` — Static CSP in `headers()` with `unsafe-eval` + `unsafe-inline` |
-| Supabase client | `src/lib/supabase.ts` — anon key, no service role usage in client |
-| Supabase server | `src/lib/supabase/server.ts` — `@supabase/ssr` server client (cookie-based, no auth persistence) |
-| RLS | `migrations/fix-rls-policies.sql` — Owner-check helper functions (SECURITY DEFINER), permissive SELECT, restricted UPDATE/DELETE |
-| Guest auth | `src/lib/user-session.ts` — `guest-{uuid}` IDs in `localStorage`, no server-side validation |
-| Real-time | `src/lib/draft-realtime.ts` — `DraftRealtimeManager`, one channel per draft, postgres_changes + presence + broadcast |
-| Rate limiting | Upstash Redis (primary) + in-memory fallback. Applied to `/api/*` only. |
-| Input validation | `src/lib/validation.ts` + `src/lib/schemas.ts` (Zod) — sanitizers exist but usage is inconsistent |
-| Connection pooling | Not yet configured — using direct Supabase connection strings |
-| DB indexes | `migrations/add-performance-indexes.sql` — picks, teams, drafts, auctions, league tables |
-| Next.js version | `^15.5.12` — past CVE-2025-29927 patch (15.2.3), safe |
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        ROUTE LAYER (Next.js App Router)              │
+├─────────────────────────────────────────────────────────────────────┤
+│  /draft/[id]/page.tsx     │  /spectate/[id]/page.tsx  │  /league/[id]│
+│  1,382 lines               │  ~400 lines               │  7+ sub-pages│
+│  DraftUIState (local)      │  Separate realtime hook   │  Own state   │
+│  5 domain hooks            │  SpectatorId (session)    │  LeagueNav   │
+├─────────────────────────────────────────────────────────────────────┤
+│                     DOMAIN HOOKS LAYER                                │
+│  useDraftSession  useDraftActions  useDraftAuction                   │
+│  useDraftTimers   useDraftActivity  useDraftRealtime                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                        STATE LAYER                                    │
+│  Zustand draftStore         │  Local useState in page.tsx            │
+│  (wishlist, pokemon tiers)  │  (DraftUIState — source of truth)      │
+├─────────────────────────────────────────────────────────────────────┤
+│                        SERVICE LAYER                                  │
+│  DraftService  AuctionService  LeagueService  DraftRealtimeManager  │
+├─────────────────────────────────────────────────────────────────────┤
+│                    SUPABASE (Postgres + Realtime)                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Files and Their Roles
+
+| File | Lines | Responsibility | Change in Overhaul |
+|------|-------|---------------|-------------------|
+| `src/app/draft/[id]/page.tsx` | 1,382 | Orchestrator: holds DraftUIState, wires 5 hooks, renders everything | Extract layout regions into sub-components; page becomes thin coordinator |
+| `src/app/spectate/[id]/page.tsx` | ~400 | Separate spectator with its own realtime hook | Merge role handling into draft page; keep as redirect or alias |
+| `src/app/league/[id]/page.tsx` | ~550 | Hub with fixtures + standings inline | Stays, but layout restructures around 3 views |
+| `src/hooks/useDraftRealtime.ts` | ~200 | Supabase subscription lifecycle | No change — the subscription anchor |
+| `src/hooks/useDraftActions.ts` | ~300 | All pick/start/pause/undo callbacks | No change — stable interface |
+| `src/hooks/useDraftActivity.ts` | ~100 | Sidebar open state + activity data | Rename: `isActivitySidebarOpen` repurposed to mobile-only trigger; feed always visible on desktop |
+| `src/components/draft/DraftActivitySidebar.tsx` | ~200 | Slide-in panel | Replace with inline feed panel on desktop |
+| `src/components/draft/DraftControls.tsx` | ~400 | Collapsible host controls | Extract primary actions into `HostCommandBar` |
+| `src/components/draft/ActivityFeed.tsx` | ~80 | Generic feed (unused in main page) | Promote to primary feed component |
 
 ---
 
-## Recommended Architecture
+## Architecture for the Overhaul
 
-### Overview: Five Concern Layers
+### Q1: Restructuring Draft Page Without Breaking Subscriptions
+
+**The constraint:** `useDraftRealtime` is initialized with `draftState?.draft?.id` derived from DraftUIState in page.tsx local state. The `pickInFlightRef` that suppresses realtime refresh during picks also lives in page.tsx via `useDraftActions`. Both must remain in the same component tree as the subscription.
+
+**Pattern: Thin Coordinator + Region Components**
+
+The page.tsx becomes a thin coordinator that:
+1. Owns DraftUIState (stays as local useState — do not lift to Zustand)
+2. Wires all 5 hooks (unchanged)
+3. Passes derived data down to region components via props
+
+Region components replace the inline JSX blocks. They do NOT subscribe to Supabase directly — they receive pre-derived props only.
 
 ```
-Browser / PWA
-    │
-    ├── Service Worker (pokemon-sprites CacheFirst, pokeapi NetworkFirst)
-    │
-    ▼
-Vercel Edge Network
-    │
-    ├── CDN cache (public pages, static assets)
-    ├── Edge Middleware (Clerk auth + Upstash rate limiting)  ← already here
-    │
-    ▼
-Next.js App Router (Node.js / serverless functions)
-    │
-    ├── API Routes  → input validation (Zod) → Clerk server auth check → business logic
-    ├── Server Components → createSupabaseServerClient (anon key + RLS)
-    │
-    ▼
-Supabase
-    │
-    ├── Supavisor (transaction mode, port 6543)  ← ADD
-    ├── PostgreSQL + RLS policies               ← AUDIT & HARDEN
-    └── Realtime (WebSocket)                    ← SCALE & COST OPTIMIZE
+DraftRoomPage (page.tsx) — coordinator only
+├── DraftPageHeader         — room code, status badge, connection indicator, share
+├── DraftCommandBar         — replaces DraftControls (host-only, always visible)
+├── TurnStateOverlay        — "your turn" dramatic takeover vs dimmed waiting state
+├── DraftLayout             — responsive grid container
+│   ├── DraftLeftPanel      — activity feed (always visible) + turn history
+│   ├── DraftCenterPanel    — pokemon grid + pick controls
+│   └── DraftRightPanel     — user team roster + budget + wishlist
+├── AllTeamsBoard           — team rosters grid (board tab on mobile)
+├── DraftModals             — confirmation, details, auction UIs (portal-rendered)
+└── DraftActivitySidebarLegacy — keep for mobile fallback during transition
 ```
 
-### Component Boundaries
+**Rule:** No region component calls hooks that touch Supabase. All realtime data flows from page.tsx downward. This preserves the subscription lifecycle without any migration risk.
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| Edge Middleware | Rate limiting, Clerk JWT validation, request ID injection | Upstash Redis, Clerk JWKS |
-| API Routes | Input validation, auth verification, business logic orchestration | Supabase (via service role for admin ops), Clerk server SDK |
-| Server Components | Read-only data fetch, no mutations | Supabase anon client (RLS enforced) |
-| Supabase RLS | Row-level access control, enforce ownership without application auth | PostgreSQL executor |
-| Realtime Manager | WebSocket lifecycle, presence, event deduplication | Supabase Realtime server |
-| UserSessionService | Guest ID persistence, draft participation tracking | localStorage (client only) |
+**The DraftUIState stays local.** Moving it to Zustand is out of scope and would require rewriting the `transformDraftState` memoization and hash comparison that prevents unnecessary re-renders from Supabase polling.
 
 ---
 
-## Integration Point Map: Where Each Change Lives
+### Q2: Unifying /draft/[id] and /spectate/[id]
 
-### 1. Rate Limiting
+**Current separation:** The spectator page uses `useDraftStateWithRealtime` (a different hook from `useDraftRealtime`), maintains its own `recentActivity` state, and generates its own `spectatorId`. The main draft page already handles spectators via `isSpectator` flag from `useDraftSession`.
 
-**Current state:** Already implemented in `src/middleware.ts` with Upstash Redis + in-memory fallback. Covers `/api/*` routes with per-route sliding windows.
+**Finding:** The main draft page already renders `<SpectatorMode>` when `isSpectator || !draftState.userTeamId` (line 1057 of page.tsx). The separate spectate route is largely redundant for the UX itself.
 
-**Gaps to address:**
-- No rate limiting on Supabase Realtime WebSocket connections themselves
-- No per-user-authenticated rate limit (current key uses `user_id` cookie or IP; Clerk userId not used)
-- No rate limiting on draft room join / spectate actions
+**Migration Strategy:**
 
-**Integration points:**
-- `src/middleware.ts` — Extend `getClientId()` to prefer Clerk's `auth().userId` when available (reduces IP-based collisions behind CDN)
-- `src/middleware.ts` — Add rate limit config entry for `/spectate/` and `/join-draft`
-- No new file needed — modify existing middleware only
+Step 1 (non-breaking): Add a redirect from `/spectate/[id]` to `/draft/[id]?spectator=true`. The existing `isSpectatorParam` handling in `useDraftSession` picks this up. Keep `/spectate/[id]` alive as a redirect only.
 
-**Data flow change:** None. Middleware already runs before all non-static requests.
+Step 2: The spectator page currently shows a "broadcast view" link to `/spectate/[id]/broadcast`. Preserve this sub-route since it is OBS-targeted with 1920x1080 fixed dimensions.
 
-### 2. Content Security Policy (CSP)
-
-**Current state:** Static CSP string in `next.config.ts` `headers()`. Uses `'unsafe-eval'` and `'unsafe-inline'` for `script-src` — the two most dangerous exceptions, both added for Next.js hydration compatibility.
-
-**The problem:** The current CSP cannot be tightened without breaking Next.js inline script injection. The fix requires nonce-based CSP generated per-request in middleware.
-
-**Recommended change:**
-
-Move from static CSP in `next.config.ts` to nonce-based CSP in middleware:
+Step 3: In the unified draft page, `useDraftSession` already returns `isSpectator`. Add a `viewerRole` derived value:
 
 ```typescript
-// In src/middleware.ts — generate nonce per request
-const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
-const cspHeader = `
-  default-src 'self';
-  script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
-  style-src 'self' 'unsafe-inline';
-  img-src 'self' https://raw.githubusercontent.com https://pokeapi.co ...;
-  connect-src 'self' https://*.supabase.co wss://*.supabase.co ...;
-`
-// Set as response header AND as request header (for Next.js to read)
-response.headers.set('Content-Security-Policy', cspHeader)
-response.headers.set('x-nonce', nonce)  // Server Components can read this
+// src/hooks/useDraftSession.ts — additive change
+type ViewerRole = 'host' | 'participant' | 'spectator' | 'lobby'
+// Derived from: isHost, userTeamId !== null, isSpectatorParam
 ```
 
-**Integration points:**
-- `src/middleware.ts` — Add nonce generation, inject as both response CSP header and `x-nonce` request header
-- `next.config.ts` — Remove static `Content-Security-Policy` from `headers()` (it would conflict)
-- Server Components that render `<script>` tags directly — read nonce from `headers()['x-nonce']`
+Use this single value to gate which layout sub-tree renders:
+- `'spectator'` → DraftSpectatorLayout (read-only, activity feed prominent, no pick controls)
+- `'participant'` → DraftParticipantLayout (full controls, your-turn state)
+- `'host'` → DraftParticipantLayout + HostCommandBar
+- `'lobby'` → waiting room with join prompt
 
-**Constraint:** `'unsafe-inline'` for `style-src` is acceptable because CSS injection doesn't execute code. Radix UI and Tailwind require it. Removing `'unsafe-eval'` from `script-src` is the high-value change.
+**Broadcast mode preservation:** `/spectate/[id]/broadcast` imports `SpectatorMode` directly and has specific OBS CSS. This route stays independent — no merge needed.
 
-**Impact:** Nonce-based CSP forces dynamic rendering for all pages that include the nonce header. Cache those pages at the application level (TanStack Query), not at CDN level.
+---
 
-### 3. Supabase Connection Pooling (Supavisor)
+### Q3: Restructuring the League Hub
 
-**Current state:** `src/lib/supabase/server.ts` uses `NEXT_PUBLIC_SUPABASE_URL` which points to the direct Postgres connection. Under load (many serverless invocations), each function instance opens its own connection, exhausting Postgres's max_connections.
+**Current state:** The league hub page.tsx renders standings and week fixtures inline. The 7+ "tabs" are actually separate Next.js sub-routes: `/schedule`, `/rankings`, `/stats`, `/free-agents`, `/trades`, `/admin`, `/matchup/[id]`, `/team/[teamId]` — each with their own `loading.tsx`.
 
-**Recommended change:** Use Supavisor transaction mode for all server-side DB queries.
+**Finding:** This is a navigation redesign, not a component refactor. The `LeagueNav` component (`src/components/league/LeagueNav.tsx`) already acts as the nav between these pages.
 
-**Integration points:**
-- Environment variables — Add `DATABASE_URL` (pooled, port 6543) and `DIRECT_URL` (direct, port 5432)
-- `src/lib/supabase/server.ts` — No code change needed; Supabase JS client uses HTTP, not raw TCP. Supavisor applies at the database URL level for direct Postgres access (Prisma, pg, etc.). For `@supabase/supabase-js`, the connection pooling is handled automatically by Supabase's PostgREST layer
-- If raw SQL queries are added (e.g., for RLS audit scripts, EXPLAIN ANALYZE), those should use the pooled URL
+**The three target views map as:**
 
-**Key distinction (HIGH confidence, official docs):** The `@supabase/supabase-js` client uses PostgREST over HTTP — it does NOT open raw Postgres connections. Supavisor is only relevant if you add raw `pg` / Prisma connections. The real Supabase scalability lever for this stack is **Realtime connection management** (see section 5) and **RLS query efficiency** (see section 4).
+| New View | Current Location | Content |
+|----------|-----------------|---------|
+| Overview | `/league/[id]` | Standings + current week fixtures + announcements + playoff bracket |
+| Matches | New grouping | `/schedule` + `/matchup/[id]` + match recording. Week navigation stays inline |
+| Management | New grouping | `/trades` + `/free-agents` + `/admin` (commissioner-gated) |
 
-**What to actually configure:**
-- Enable Supavisor in Supabase Dashboard → Database → Connection Pooling → Transaction mode (port 6543)
-- Set pool size based on plan limits (keep under 40% for normal, 80% for peak)
-- Add `DATABASE_POOLED_URL` env var for any future raw SQL migrations run from CI
+**Implementation:** Update `LeagueNav` to show 3 primary navigation items. The existing sub-pages remain functional with their own URL structure — they become nested under each view group in the nav. No sub-page files are merged or deleted.
 
-### 4. RLS Policy Audit
+**LeagueNav integration point:** `src/components/league/LeagueNav.tsx` — change from listing 7+ individual links to 3 top-level views with sub-navigation within each group.
 
-**Current state:** `fix-rls-policies.sql` added owner-check functions and locked down UPDATE/DELETE. SELECT remains permissive (`USING (true)`). The guest user model (TEXT user_id) means RLS cannot use `auth.uid()` for write policies — it uses custom `is_draft_host()` / `is_team_owner()` SECURITY DEFINER functions.
+---
 
-**Performance risk (MEDIUM confidence):** Each RLS policy evaluation that calls a SECURITY DEFINER function executes a sub-select. Under Realtime load, this multiplies: 100 subscribers to a table change = 100 RLS evaluation sub-selects.
+### Q4: Component Composition for Turn-State Visual Changes
 
-**Integration points for RLS audit:**
+**The "your turn" state needs a dramatic full-screen shift.** The current implementation is a subtle border glow (`ring-2 ring-primary/20`). The overhaul targets ESPN/Sleeper-quality visual drama.
 
-```
-Audit queries to run in Supabase SQL Editor:
-1. SELECT * FROM pg_policies WHERE schemaname = 'public';   -- List all policies
-2. npx supabase inspect db unused-indexes                    -- Find index waste
-3. EXPLAIN ANALYZE [slow query]                              -- Profile RLS overhead
-4. Supabase Dashboard → Database → Query Performance         -- pg_stat_statements
-```
+**Pattern: CSS Custom Property Cascade**
 
-**Patterns to implement:**
-
-a) **Wrap auth functions in SELECT subqueries** to allow Postgres optimizer to cache per-statement:
-```sql
--- Current (re-evaluated per row):
-USING (is_draft_host(draft_id, request.headers->>'x-user-id'))
-
--- Better (optimizer can cache):
-USING ((SELECT is_draft_host(draft_id, current_setting('request.jwt.claims', true)::json->>'sub')))
-```
-
-b) **Add missing RLS-support indexes** — any column referenced in WHERE clauses inside RLS helper functions needs an index:
-```sql
--- These should already exist from add-performance-indexes.sql but verify:
-CREATE INDEX IF NOT EXISTS idx_drafts_host_id ON drafts(host_id);  -- confirmed exists
-CREATE INDEX IF NOT EXISTS idx_teams_owner_id ON teams(owner_id);  -- confirmed exists
-CREATE INDEX IF NOT EXISTS idx_participants_user_id ON participants(user_id);  -- verify
-```
-
-c) **Enable Supabase Security Advisor** — Dashboard → Database → Security Advisor flags `0003_auth_rls_initplan` for the initPlan pattern described above.
-
-**No new files needed** — this is SQL migrations + dashboard configuration.
-
-### 5. WebSocket / Realtime Connection Management at Scale
-
-**Current state:** `DraftRealtimeManager` creates one channel per draft with 5 postgres_changes subscriptions (drafts, teams, picks, participants, auctions) + presence. Each connected client holds open WebSocket for the duration of the draft.
-
-**Scale math:**
-- Supabase Free: 200 concurrent peak connections
-- Supabase Pro: 500 concurrent peak connections (500 extra = $10/month per 1000)
-- One draft room = N participants * 1 connection each
-- 20 concurrent draft rooms * 8 players = 160 connections
-- Add spectators: 20 rooms * 20 spectators = 400 connections
-- Total: ~560 connections — already exceeds Pro plan base at moderate scale
-
-**Key RLS cost (confirmed, official Supabase docs):** Every `postgres_changes` event to a subscribed table triggers one RLS check per subscriber. 100 subscribers + one pick INSERT = 100 RLS evaluations. This can hammer the database.
-
-**Recommended architecture change: Hybrid broadcast model**
-
-For public-read events (picks, turn advances, auction bids), switch from `postgres_changes` to **Supabase Realtime Broadcast** triggered from the server:
+The page root element gets a `data-turn-state` attribute that propagates visual theming through CSS variables. This avoids prop drilling the turn state into every sub-component and avoids a React context (which would cause all consumers to re-render on every turn change).
 
 ```typescript
-// In draft-picks-service.ts (server-side, after successful DB write):
-await supabase.channel(`draft:${draftId}`).send({
-  type: 'broadcast',
-  event: 'pick_made',
-  payload: { pick, newTurn }
-})
-
-// In DraftRealtimeManager (client-side):
-// Replace postgres_changes for 'picks' with broadcast listener
-.on('broadcast', { event: 'pick_made' }, handlePickBroadcast)
+// In DraftRoomPage render:
+<div
+  className="min-h-screen draft-room-mobile"
+  data-turn-state={isUserTurn ? 'active' : 'waiting'}
+>
 ```
 
-**Why this helps:**
-- Broadcast: no RLS check per subscriber (server-controlled events)
-- postgres_changes: one RLS check per subscriber per event
-- Keep postgres_changes ONLY for tables where client needs row-level filtering that can't be sent via broadcast (e.g., private wishlist_items)
-
-**Integration points:**
-- `src/lib/draft-realtime.ts` — Replace `picks` and `teams` postgres_changes with broadcast listeners. Keep postgres_changes for `drafts` (turn state, status) and `participants`
-- `src/lib/draft-picks-service.ts` — Add broadcast send after successful pick insert
-- `src/lib/auction-service.ts` — Add broadcast send after bid/auction state changes
-
-**Presence connection optimization:**
-- Current: presence track called on every subscriber including spectators
-- Recommendation: Only track presence for active participants (not spectators), saving connections on large public drafts
-
-### 6. Guest User Security
-
-**Current state:** Guest IDs (`guest-{uuid}`) generated with `crypto.randomUUID()` in browser, stored in `localStorage`. The ID is used as `host_id` / `owner_id` in database rows. RLS owner-check functions compare against these TEXT IDs.
-
-**Risk assessment:**
-- localStorage is readable by any JavaScript on the page (XSS risk)
-- The guest ID acts as an authentication credential — if stolen, an attacker can impersonate a guest user
-- No server-side validation that a claimed guest ID was legitimately issued
-- The CSP `unsafe-inline` makes XSS vectors more feasible
-
-**Threat model for this product:** Guest users participate in real-time drafts. The attack surface is:
-1. Guest ID theft via XSS — impersonate team owner, make unauthorized picks
-2. Fake guest ID injection — attempt to own any team with guessed ID format
-3. Unlimited guest ID generation — spam participants table with fake joins
-
-**Mitigation architecture (no breaking change to guest flow):**
-
-a) **Fix CSP first** — nonce-based CSP eliminates the most practical XSS vector that could steal localStorage. This is the highest-leverage fix.
-
-b) **Add server-side guest ID issuance** (medium-term):
-```
-POST /api/guest/session
-→ Server generates guest ID
-→ Returns as httpOnly cookie (not just localStorage value)
-→ Client still has localStorage copy for display
-→ API routes verify cookie matches claimed guest ID in request body
-```
-
-c) **Rate limit guest ID creation** — currently any client can generate unlimited guest IDs and spam `participants` inserts. Add rate limit on `/api/guest/session` creation endpoint.
-
-**Integration points:**
-- New file: `src/app/api/guest/session/route.ts` — POST handler for server-issued guest IDs
-- `src/lib/user-session.ts` — `getOrCreateSession()` calls the API endpoint instead of generating locally
-- `src/middleware.ts` — Rate limit `/api/guest/` route pattern
-
-**Build order note:** CSP fix must come before guest session migration because the migration adds a new API call pattern that the CSP must allow.
-
-### 7. Caching Layer Strategy
-
-**Current state:** Three caching layers exist:
-- Service Worker: Pokemon sprites (CacheFirst, 7d), PokeAPI responses (NetworkFirst, 1h)
-- TanStack Query: Draft state, Pokemon data (staleTime 5m, gcTime 10m)
-- In-memory: Pokemon search index, format data (module-level singletons)
-
-**Missing layers:**
-
-a) **API response caching for public/static endpoints:**
-
-```typescript
-// Health check — can be cached at edge
-export async function GET() {
-  return NextResponse.json(health, {
-    headers: {
-      'Cache-Control': 's-maxage=30, stale-while-revalidate=60'
-    }
-  })
+```css
+/* In globals.css */
+[data-turn-state='active'] {
+  --draft-accent: var(--color-primary);
+  --draft-surface: hsl(142 76% 36% / 0.05);
+  --draft-border: hsl(142 76% 36% / 0.3);
 }
-
-// Public draft listing (/api/drafts?public=true)
-// Cache at Vercel edge for 30s with SWR
-'Cache-Control': 's-maxage=30, stale-while-revalidate=120'
+[data-turn-state='waiting'] {
+  --draft-accent: var(--color-muted-foreground);
+  --draft-surface: transparent;
+  --draft-border: var(--color-border);
+}
 ```
 
-b) **TanStack Query staleTime increases for immutable data:**
-- Pokemon species data: increase staleTime from 5m to 24h (PokeAPI data never changes)
-- Format rules: increase from 5m to infinity (loaded from static files)
-- Draft results after completion: increase staleTime to infinity (immutable once completed)
+**TurnStateOverlay component** — a fixed-position overlay that mounts only when the turn transitions to active:
+- Mount trigger: `isUserTurn` transitions from `false` to `true`
+- Animation: radial green glow expanding from center (CSS animation, no framer-motion needed)
+- Duration: 600ms then auto-unmount
+- Replaces: the current inline `showTurnFlash` div (line 1366 in page.tsx)
 
-c) **Supabase query result caching:** The `draft-cache-db.ts` file exists — ensure it's used for completed draft data (immutable) to avoid re-querying the database.
+The `showTurnFlash` state and the `turnFlashFade` CSS animation are already wired in the codebase. The `TurnStateOverlay` component wraps and formalizes this existing mechanism.
 
-**Integration points:**
-- `src/app/api/health/route.ts` — Add Cache-Control header
-- `src/hooks/usePokemon.ts` — Increase staleTime to 24h
-- `src/lib/pokemon-cache.ts` — Verify LRU eviction settings handle 1000+ pokemon
-- No new files needed
-
-### 8. Dependency Vulnerability Audit
-
-**Current state:** Package versions from `package.json`:
-- `next: ^15.5.12` — safe (CVE-2025-29927 patched in 15.2.3)
-- `@clerk/nextjs: ^7.0.8` — check for latest
-- `@supabase/supabase-js: ^2.58.0` — check for latest
-- `@sentry/nextjs: ^10.27.0` — check for latest
-- `serialize-javascript` — override in package.json to `>=7.0.3` (security fix already applied)
-
-**Audit command:**
-```bash
-npm audit --audit-level=moderate
-```
-
-**Integration point:** `package.json` — update dependencies. No architecture changes.
+**DraftCenterPanel** changes className based on `isUserTurn` prop:
+- Active turn: full-width grid, pick controls prominent, glowing border via `--draft-border`
+- Waiting turn: grid slightly dimmed (`opacity-80`), pick controls replaced by "Waiting for {team}..." banner
 
 ---
 
-## Data Flow Changes
+### Q5: Persistent Host Controls
 
-### Before (Current Flow): Pick Submission
+**Current problem:** `DraftControls` is dynamically imported and rendered below the team rosters in the page scroll — it is collapsible and gets scrolled off-screen. Host commands are buried during active drafting.
 
-```
-Client picks Pokemon
-  → optimistic update (Zustand)
-  → POST /api/picks OR direct Supabase RPC
-    → Supabase validates RLS (is_team_owner check)
-    → INSERT into picks table
-    → postgres_changes fires to ALL subscribers
-      → 8 players * 5 table subscriptions = 40 RLS evaluations
-  → Client gets realtime update
-```
-
-### After (Target Flow): Pick Submission
+**Pattern: HostCommandBar as Header Slot**
 
 ```
-Client picks Pokemon
-  → optimistic update (Zustand)
-  → POST /api/picks (rate-limited by middleware)
-    → Clerk auth check (server-side, in route handler)
-    → Zod input validation
-    → Supabase INSERT (RLS or service role for validated writes)
-    → Server broadcasts pick event: channel.send({ event: 'pick_made', payload })
-  → All clients receive broadcast (no RLS eval per subscriber)
-  → Keep postgres_changes ONLY for drafts table (turn/status changes)
+DraftPageHeader (sticky, z-30)
+├── Left: RoomCode + StatusBadge + ConnectionBadge
+├── Center: [host/admin only] HostCommandBar
+│     ├── Start/Pause/Resume (primary action button)
+│     ├── Skip Turn (icon button)
+│     ├── Ping Player (bell icon button)
+│     └── Overflow (•••) → Reset, Delete, Shuffle, Undo, Adjust Timer
+└── Right: SoundToggle + Share + ActivityToggle
 ```
 
-**Key improvement:** RLS evaluations drop from O(subscribers * tables) to O(1) per pick.
+**Integration with existing DraftControls:** `DraftControls` accepts 15+ callback props. `HostCommandBar` uses the same callbacks from `useDraftActions` — the prop interface does not change. Only the rendering location and visual treatment change.
+
+**Refactor approach:** Extract the 4 primary action buttons into `HostCommandBar`. Keep `DraftControls` for the overflow panel (triggered by the "•••" button). This is a composition change, not a rewrite.
+
+**File to create:** `src/components/draft/HostCommandBar.tsx`
+**File to modify:** `src/app/draft/[id]/page.tsx` — replace the dynamic DraftControls block (line 1095-1129) with HostCommandBar in the header area
 
 ---
 
-## Build Order (Dependencies Between Changes)
+### Q6: Activity Feed Integration (Sidebar to Always-Visible)
 
-Security and scalability work has internal dependencies. Build in this order to avoid rework:
+**Current data flow:**
+```
+useDraftActivity() → sidebarActivities → DraftActivitySidebar (slide-in, gated by isActivitySidebarOpen)
+```
 
-### Phase 1 — Foundation (no dependencies, can parallelize)
-1. **Dependency audit** — `npm audit`, update packages. Zero risk, no code changes.
-2. **Database RLS audit** — Run pg_stat_statements queries, Security Advisor, add missing indexes. Pure SQL/dashboard work.
-3. **Supavisor configuration** — Dashboard toggle + env var. No code changes.
+**Target data flow:**
+```
+useDraftActivity() → feedActivities → DraftActivityFeed (always mounted in DraftLeftPanel)
+                                    → (mobile) bottom-sheet via isActivitySidebarOpen
+```
 
-### Phase 2 — Application Security (depends on Phase 1 audit findings)
-4. **Nonce-based CSP** — Modify `src/middleware.ts` + `next.config.ts`. Must come before guest session work because it removes `unsafe-inline` that XSS attacks exploit.
-5. **Middleware hardening** — Extend rate limiting to use Clerk userId, add spectate/join routes. Modifies existing `src/middleware.ts` only.
-6. **API route auth hardening** — Enforce `auth().protect()` or Clerk server checks in all mutating API routes. Audit each route in `src/app/api/`.
+**The `useDraftActivity` hook needs one change:** `isActivitySidebarOpen` is repurposed — it controls a mobile bottom-sheet only, not the desktop panel. Rename `sidebarActivities` to `feedActivities` for clarity.
 
-### Phase 3 — Scalability (depends on Phase 2 auth being correct)
-7. **Realtime broadcast migration** — Replace `picks` + `teams` postgres_changes with server-broadcast. Modifies `DraftRealtimeManager` + pick/auction services. Requires correct server-side auth from Phase 2.
-8. **Guest session server-issuance** — New `/api/guest/session` endpoint + `UserSessionService` migration. Depends on CSP being correct (Phase 2).
+**Data shape is already correct.** The `SidebarActivity` type contains `teamId`, `teamName`, `pokemonId`, `pickNumber`, `round`, `timestamp` — everything the inline feed needs. No data restructuring required.
 
-### Phase 4 — Cost Optimization (independent, low risk)
-9. **Caching headers** — API route Cache-Control + TanStack Query staleTime increases.
-10. **Presence optimization** — Spectator-only connections skip presence tracking.
+**DraftActivityFeed component** renders in `DraftLeftPanel` on desktop (md+). On mobile, it becomes a bottom sheet accessed via the History button in the header (same trigger, different container).
+
+**DraftActivitySidebar.tsx:** Retain during transition as the mobile bottom-sheet container. On desktop, `DraftActivityFeed.tsx` takes over. After the overhaul ships, the sidebar file can be deprecated.
+
+**Performance note:** Moving from a conditionally-mounted sidebar to always-mounted feed adds minor memory cost but eliminates open/close animation overhead. The `useMemo` in `useDraftActivity` already has stable dependencies — no changes needed.
+
+---
+
+### Q7: Build Order
+
+```
+CSS custom properties (no deps)
+    ↓
+ViewerRole enum in useDraftSession (no UI deps)
+    ↓
+HostCommandBar component (depends on: ViewerRole for conditional render)
+    ↓
+DraftActivityFeed component (depends on: useDraftActivity hook change)
+    ↓
+TurnStateOverlay component (depends on: CSS custom properties)
+    ↓
+DraftLayout Region Components (depends on: HostCommandBar + ActivityFeed + TurnStateOverlay)
+    ↓
+Spectator Unification (depends on: ViewerRole + DraftLayout composability)
+    ↓
+Mobile Scrollable Flow (depends on: DraftLayout region composability)
+    |
+League Hub Nav Restructure (independent — runs in parallel with any phase)
+    |
+Results-to-League Continuity (independent — no draft room deps)
+```
+
+**Recommended phase breakdown:**
+
+| Phase | Work | Risk | Can Parallelize With |
+|-------|------|------|---------------------|
+| 1. Foundation | CSS variables, ViewerRole, TurnStateOverlay | Low | League Hub (Phase 7) |
+| 2. Host Bar | HostCommandBar, DraftControls overflow | Medium | — |
+| 3. Activity Feed | Hook simplification, DraftActivityFeed | Low | Phase 2 |
+| 4. Layout Regions | DraftLayout + Left/Center/Right panels, refactor page.tsx render | High | — |
+| 5. Spectator Unification | ViewerRole-gated layouts, /spectate redirect | Medium | — |
+| 6. Mobile Flow | Continuous scroll replacing tab switching | Medium | — |
+| 7. League Hub Nav | LeagueNav 3-view restructure | Low | Any phase |
+| 8. Results Continuity | Post-draft league creation flow | Low | Any phase |
+
+**Phase 4 is the highest risk** — it restructures the render block of page.tsx. The mitigation: page.tsx continues to own all state and hooks unchanged. Only the JSX return block changes. Each region component is a pure prop-receiver. If one breaks, the coordinator retains full state and can temporarily inline-render the broken region.
+
+---
+
+## Component Inventory
+
+### New Components to Create
+
+| Component | Location | Purpose | Replaces |
+|-----------|----------|---------|---------|
+| `HostCommandBar` | `src/components/draft/HostCommandBar.tsx` | Persistent host actions in sticky header | Buried collapsible DraftControls |
+| `DraftActivityFeed` | `src/components/draft/DraftActivityFeed.tsx` | Always-visible inline feed panel | DraftActivitySidebar slide-in |
+| `TurnStateOverlay` | `src/components/draft/TurnStateOverlay.tsx` | Full-screen turn flash animation component | Inline `showTurnFlash` div in page.tsx |
+| `DraftLayout` | `src/components/draft/DraftLayout.tsx` | Three-panel responsive grid wrapper | Inline grid in page.tsx |
+| `DraftLeftPanel` | `src/components/draft/DraftLeftPanel.tsx` | Activity feed + history panel | Inline sidebar button trigger |
+| `DraftCenterPanel` | `src/components/draft/DraftCenterPanel.tsx` | Pokemon grid + pick controls bar | Inline grid section in page.tsx |
+| `DraftRightPanel` | `src/components/draft/DraftRightPanel.tsx` | User team roster + budget + wishlist | Separate scattered sections in page.tsx |
+
+### Components to Modify
+
+| Component | Change | Risk |
+|-----------|--------|------|
+| `src/hooks/useDraftActivity.ts` | Repurpose `isActivitySidebarOpen` to mobile-only; rename `sidebarActivities` | Low |
+| `src/hooks/useDraftSession.ts` | Add `viewerRole: ViewerRole` derived return value | Low (additive) |
+| `src/components/draft/DraftControls.tsx` | Extract primary buttons to HostCommandBar; keep overflow actions | Medium |
+| `src/components/league/LeagueNav.tsx` | Restructure to 3 primary views + sub-navigation | Low |
+| `src/app/spectate/[id]/page.tsx` | Convert to redirect to `/draft/[id]?spectator=true` | Low |
+| `src/app/draft/[id]/page.tsx` | Replace inline JSX with region components; all hooks/state unchanged | High |
+
+### Components to Preserve (Do Not Modify)
+
+- `src/hooks/useDraftRealtime.ts` — subscription lifecycle
+- `src/hooks/useDraftActions.ts` — all callback logic
+- `src/hooks/useDraftAuction.ts` — auction state
+- `src/hooks/useDraftTimers.ts` — timer logic
+- `src/lib/draft-realtime.ts` — Supabase channel management
+- `src/stores/draftStore.ts` — Zustand store and selectors
+- All 8 league sub-page files (redirect is the only spectate change)
+- `/spectate/[id]/broadcast` route (OBS-targeted, keep independent)
+
+---
+
+## Data Flow
+
+### Turn State Data Flow (After Overhaul)
+
+```
+page.tsx: isUserTurn = (draftState.userTeamId === draftState.currentTeam)
+    ↓
+<div data-turn-state={isUserTurn ? 'active' : 'waiting'}>
+    ↓ (CSS cascade)
+DraftCenterPanel: border, background via --draft-surface, --draft-border
+TurnStateOverlay: mounts on isUserTurn true transition, auto-unmounts after 600ms
+HostCommandBar: ping/skip buttons highlight state
+```
+
+### Realtime Update Flow (Unchanged)
+
+```
+Supabase postgres_changes event
+    ↓ useDraftRealtime.onRefreshNeeded callback
+    ↓ pickInFlightRef.current check (suppress if pick in flight)
+    ↓ DraftService.getDraftState(roomCode)
+    ↓ transformDraftState(dbState, userId) with hash comparison
+    ↓ setDraftState(newState)
+    ↓ Re-render of all region components (props change)
+```
+
+### Spectator View Data Flow (After Unification)
+
+```
+URL: /draft/[id]?spectator=true (or redirect from /spectate/[id])
+    ↓ useDraftSession → viewerRole: 'spectator'
+    ↓ Same useDraftRealtime subscription as participants
+    ↓ DraftSpectatorLayout (no pick controls, activity feed prominent)
+    ↓ DraftLeftPanel + AllTeamsBoard (read-only)
+```
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Middleware-Only Auth
-**What:** Relying on `clerkMiddleware` as the sole auth gate.
-**Why bad:** CVE-2025-29927 proved middleware can be bypassed. Fortunately, this project runs Next.js 15.5.12 (patched), but defense-in-depth requires auth checks inside API route handlers too.
-**Instead:** Every mutating API route calls `auth()` from `@clerk/nextjs/server` and throws 401 if no session. Server Components call `auth()` before any data mutation.
+### Anti-Pattern 1: Moving DraftUIState to Zustand
 
-### Anti-Pattern 2: postgres_changes at Scale
-**What:** Using `postgres_changes` for all real-time events with many subscribers.
-**Why bad:** Every event = N RLS checks (one per subscriber). Confirmed by Supabase docs: 100 subscribers + 1 insert = 100 reads.
-**Instead:** Use broadcast for server-controlled events. Reserve postgres_changes for low-subscriber, row-filtered tables (private wishlists, admin events).
+**What people do:** Lift all state to Zustand when refactoring for composability.
+**Why it's wrong:** The `transformDraftState` hash comparison (`prevTransformedStateRef`) prevents unnecessary re-renders from Supabase polling. Zustand's shallow equality does not replicate this hash-based comparison. The `pickInFlightRef` pattern requires co-location with both the state setter and the realtime callback.
+**Do this instead:** Keep DraftUIState in page.tsx local state. Pass derived values down to region components as props. Region components remain pure renderers.
 
-### Anti-Pattern 3: Static CSP String with unsafe-eval
-**What:** The current `next.config.ts` CSP has `'unsafe-eval'` in script-src to accommodate Next.js internals.
-**Why bad:** `unsafe-eval` allows `eval()` and `new Function()` — the primary XSS code execution vector.
-**Instead:** Nonce-based CSP in middleware. Next.js 15 App Router supports nonce extraction for its own scripts when CSP header includes a `nonce-{value}` token.
+### Anti-Pattern 2: Giving Region Components Their Own Subscriptions
 
-### Anti-Pattern 4: Guest ID in localStorage as Auth Credential
-**What:** Current guest IDs in localStorage used as the only proof of ownership for database rows.
-**Why bad:** XSS attack reads localStorage — steals guest ID — makes picks on behalf of that team.
-**Instead:** Server-issued guest IDs returned as httpOnly cookies (primary auth surface) + localStorage (display/convenience only). API routes validate cookie not body-supplied ID.
+**What people do:** Move Supabase subscriptions into individual panel components for isolation.
+**Why it's wrong:** Multiple subscriptions to the same Supabase channel from one browser tab causes duplicate event delivery. The connection manager in `useDraftRealtime` handles deduplication — distributing subscriptions breaks this.
+**Do this instead:** Single subscription in page.tsx via `useDraftRealtime`. Region components are dumb renderers.
 
-### Anti-Pattern 5: In-Memory Rate Limiter as Primary Limiter
-**What:** Current code uses in-memory rate limiter as fallback when Upstash Redis is not configured.
-**Why bad:** In-memory state resets between serverless function invocations (Vercel spins up multiple instances). The same client can hit different instances and bypass the limit.
-**Instead:** Always configure Upstash Redis for production. The in-memory fallback is acceptable in development only. Add startup check that warns loudly in production if Redis is not configured.
+### Anti-Pattern 3: Merging League Sub-Pages into a Single Tabbed File
 
-### Anti-Pattern 6: Permissive SELECT + TEXT User ID Comparison
-**What:** RLS SELECT policies use `USING (true)` — any anon client can read all rows.
-**Why bad:** Draft data (Pokemon picks, team compositions, budgets) may be strategically sensitive in sealed/blind draft modes. Evaluate before launching sealed draft features.
-**Instead:** For the current use case (transparent drafts), permissive SELECT is intentional and acceptable. If sealed draft is added, restrict picks SELECT during active phase.
+**What people do:** Interpret "3 views" as requiring a single page.tsx with client-side tab state.
+**Why it's wrong:** The current league sub-pages have `loading.tsx` and proper Next.js code splitting. Merging into client tabs bundles all league data fetching into one large component.
+**Do this instead:** Keep the 7 sub-routes as-is. Restructure `LeagueNav` to group them under 3 primary labels. Navigation remains Next.js route-based.
+
+### Anti-Pattern 4: Removing `isActivitySidebarOpen` Entirely
+
+**What people do:** Delete the sidebar open state assuming the inline feed handles all viewports.
+**Why it's wrong:** On mobile (< md breakpoint) a three-panel layout is impossible. The activity feed needs a mobile trigger.
+**Do this instead:** Repurpose `isActivitySidebarOpen` as the mobile bottom-sheet trigger. On desktop (md+), the feed is always visible in `DraftLeftPanel`. On mobile, the History button in the header opens a bottom sheet.
+
+### Anti-Pattern 5: React Context for Turn State
+
+**What people do:** Create `DraftTurnContext` to propagate `isUserTurn` without prop drilling.
+**Why it's wrong:** Turn state changes every 30-120 seconds. A context with a frequently-updating value causes all consumers to re-render simultaneously — the opposite of what the existing memoized selectors achieve.
+**Do this instead:** CSS custom property cascade via `data-turn-state` attribute. Pass `isUserTurn` as an explicit prop only to the 3 components that need conditional logic: `DraftCenterPanel`, `HostCommandBar`, `TurnStateOverlay`.
 
 ---
 
-## Scalability Considerations
+## Integration Points Summary
 
-| Concern | At 100 concurrent users | At 1K concurrent users | At 10K concurrent users |
-|---------|------------------------|----------------------|------------------------|
-| Supabase Realtime connections | ~100 (free tier 200 limit) | ~1000 (Pro base 500, overage billed) | Need broadcast model to reduce per-event multiplier |
-| RLS evaluation load | Manageable with indexes | Starts to slow without broadcast migration | Must switch to broadcast pattern |
-| Rate limiter accuracy | In-memory works | Upstash required (multi-instance Vercel) | Upstash required + regional distribution |
-| Connection pool exhaustion | Not a risk (HTTP-based Supabase JS) | Not a risk | Only risk if raw pg connections added |
-| Vercel serverless cold starts | Occasional | Frequent on spiky traffic | Consider reserved concurrency |
-| PokeAPI dependency | Cached well (7d sprites, 1h data) | Same — no risk | Same — PokeAPI is not a scalability bottleneck |
+### Realtime Subscription Boundary
+
+| Layer | File | Role |
+|-------|------|------|
+| Subscription owner | `src/hooks/useDraftRealtime.ts` | Creates/destroys Supabase channel |
+| State coordinator | `src/app/draft/[id]/page.tsx` | Receives refresh callbacks, updates DraftUIState |
+| Region components | `DraftCenterPanel`, `DraftLeftPanel`, etc. | Pure renderers, no Supabase access |
+
+**Rule:** Nothing below page.tsx in the component tree should import from `src/lib/supabase.ts` for draft room panels.
+
+### DraftUIState Interface Note
+
+The `DraftUIState` interface is defined in both `page.tsx` and `useDraftActions.ts` (duplication is existing tech debt). Do not unify these during the UX overhaul — it introduces unnecessary merge risk. Keep the duplication and address it in a separate cleanup phase.
+
+### League Sub-Routes Preservation
+
+All 8 league sub-routes remain with their existing URL structure. `LeagueNav` is the only integration point for the hub restructure. Sub-page files are not modified.
 
 ---
 
 ## Sources
 
-- [Supabase Connection Management docs](https://supabase.com/docs/guides/database/connection-management)
-- [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits)
-- [Supabase Realtime Pricing](https://supabase.com/docs/guides/realtime/pricing)
-- [Supabase RLS Performance and Best Practices](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv)
-- [Supabase Performance and Security Advisors](https://supabase.com/docs/guides/database/database-advisors)
-- [Supabase Query Optimization](https://supabase.com/docs/guides/database/query-optimization)
-- [Supabase Postgres Changes docs](https://supabase.com/docs/guides/realtime/postgres-changes)
-- [Supabase Broadcast docs](https://supabase.com/docs/guides/realtime/broadcast)
-- [Next.js CSP with nonces (App Router)](https://nextjs.org/docs/app/building-your-application/configuring/content-security-policy)
-- [CVE-2025-29927 Next.js Middleware Bypass](https://github.com/vercel/next.js/security/advisories/GHSA-f82v-jwr5-mffw)
-- [Clerk security blog on CVE-2025-29927](https://clerk.com/blog/cve-2025-29927)
-- [Upstash Rate Limiting for Next.js Edge](https://upstash.com/blog/edge-rate-limiting)
-- [localStorage vs httpOnly cookies security](https://design-code.tips/blog/2025-02-28-why-local-storage-is-vulnerable-to-xss-attacks-and-a-safer-alternative/)
-- [Vercel Edge Caching / stale-while-revalidate](https://vercel.com/blog/vercel-cache-api-nextjs-cache)
+- Direct analysis: `src/app/draft/[id]/page.tsx` (full 1,382 lines)
+- Direct analysis: `src/app/spectate/[id]/page.tsx`
+- Direct analysis: `src/app/league/[id]/page.tsx` and all 8 sub-page files
+- Direct analysis: `src/hooks/useDraftRealtime.ts`, `useDraftActivity.ts`, `useDraftActions.ts`, `useDraftSession.ts`
+- Direct analysis: `src/components/draft/DraftControls.tsx`, `DraftActivitySidebar.tsx`, `ActivityFeed.tsx`
+- Direct analysis: `src/stores/draftStore.ts`
+- Codebase comment: `Cache bust: 2025-10-14-v3-fix-infinite-loop` — pickInFlightRef pattern was a deliberate fix, not incidental code
+
+---
+*Architecture research for: Pokemon Draft UX Overhaul (Milestone 6)*
+*Researched: 2026-04-03*
