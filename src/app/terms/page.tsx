@@ -1,5 +1,8 @@
 import Link from 'next/link'
 
+// PERF-03: ISR — static content revalidates every 24 hours
+export const revalidate = 86400
+
 export const metadata = { title: 'Terms of Service - Pokémon Draft League' }
 
 export default function TermsPage() {
