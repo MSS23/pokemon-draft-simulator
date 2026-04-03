@@ -113,21 +113,22 @@ export default function RootLayout({
             baseTheme: dark,
             variables: {
               colorPrimary: '#dc2855',
-              colorBackground: 'hsl(var(--card))',
-              colorText: 'hsl(var(--foreground))',
-              colorTextSecondary: 'hsl(var(--muted-foreground))',
-              colorInputBackground: 'hsl(var(--background))',
-              colorInputText: 'hsl(var(--foreground))',
+              colorBackground: '#141619',
+              colorText: '#e8edf3',
+              colorTextSecondary: '#808994',
+              colorInputBackground: '#0d0f11',
+              colorInputText: '#e8edf3',
             },
             elements: {
               formButtonPrimary: 'bg-primary hover:bg-primary/90 text-primary-foreground',
-              card: 'bg-card border border-border shadow-lg',
-              headerTitle: 'text-foreground',
-              headerSubtitle: 'text-muted-foreground',
-              socialButtonsBlockButton: 'bg-card border border-border text-foreground hover:bg-muted',
-              formFieldInput: 'bg-background border-border text-foreground',
-              footerActionLink: 'text-primary hover:text-primary/80',
-              footer: 'text-muted-foreground',
+              card: 'bg-[#141619] border border-[#1f2328] shadow-lg',
+              headerTitle: 'text-[#e8edf3]',
+              headerSubtitle: 'text-[#808994]',
+              socialButtonsBlockButton: 'bg-[#141619] border border-[#1f2328] text-[#e8edf3] hover:bg-[#1a1d21]',
+              formFieldInput: 'bg-[#0d0f11] border-[#1f2328] text-[#e8edf3]',
+              footerActionLink: 'text-[#dc2855] hover:text-[#dc2855]/80',
+              footerActionText: 'text-[#808994]',
+              footer: 'text-[#808994]',
             }
           }}
         >
@@ -151,7 +152,7 @@ export default function RootLayout({
                           <a href="/terms" className="hover:text-foreground transition-colors duration-150">Terms</a>
                           <a href="/privacy" className="hover:text-foreground transition-colors duration-150">Privacy</a>
                           <span className="text-muted-foreground/30">v0.1.1</span>
-                          <span className="text-muted-foreground/30">&copy; {new Date().getFullYear()} Poke Draft League</span>
+                          <span className="text-muted-foreground/30">&copy; {new Date().getFullYear()} Pokémon Champions Draft League</span>
                         </div>
                       </footer>
                     </QueryProvider>
