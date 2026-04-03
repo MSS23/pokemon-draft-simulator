@@ -66,14 +66,14 @@ export const metadata: Metadata = {
     siteName: "Pokémon Champions Draft League",
     title: "Pokémon Champions Draft League — Draft Like a Champion",
     description: "The free drafting platform built for Pokémon Champions. Snake drafts, auctions, full league seasons with standings, trades, and playoffs. No spreadsheets, no signup required.",
-    images: [{ url: "/og-image", width: 1200, height: 630, alt: "Pokémon Champions Draft League — Real-time competitive drafting" }],
+    images: [{ url: "https://draftpokemon.com/og-image", width: 1200, height: 630, alt: "Pokémon Champions Draft League — Real-time competitive drafting" }],
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
     title: "Pokémon Champions Draft League",
     description: "The #1 draft platform for competitive Pokémon. Snake drafts, auctions, full leagues — free and real-time.",
-    images: ["/og-image"],
+    images: ["https://draftpokemon.com/og-image"],
   },
   manifest: "/manifest.json",
   alternates: {
