@@ -26,7 +26,9 @@
   2. A user can sign in with Discord or Google on draftpokemon.com without CSP console errors
   3. Clerk OAuth callbacks are registered against draftpokemon.com (not vercel.app or localhost)
   4. DNS has propagated and draftpokemon.com resolves consistently worldwide
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 19-01-PLAN.md — CSP headers for Clerk, env template, and Vercel deployment verification
 
 ### Phase 20: Observability & Feedback
 **Goal**: Beta testing is fully instrumented — runtime errors are captured in Sentry, user flows are tracked in PostHog, and testers can submit feedback from any page
@@ -71,7 +73,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Deployment Foundation | 0/? | Not started | - |
+| 19. Deployment Foundation | 0/1 | In progress | - |
 | 20. Observability & Feedback | 0/? | Not started | - |
 | 21. Core Beta Features | 0/? | Not started | - |
 | 22. Launch Polish | 0/? | Not started | - |
