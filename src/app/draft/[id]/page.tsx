@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Copy, Share2, History, Crown, Clock, CheckCircle2, Eye } from 'lucide-react'
+import { Copy, Share2, History, Crown, Clock, CheckCircle2, Eye, Heart } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
 import { notify } from '@/lib/notifications'
@@ -37,6 +37,7 @@ import { useDraftActions } from '@/hooks/useDraftActions'
 import { useDraftAuction } from '@/hooks/useDraftAuction'
 import { useDraftTimers } from '@/hooks/useDraftTimers'
 import { useDraftActivity } from '@/hooks/useDraftActivity'
+import { useIsMobile } from '@/hooks/useMediaQuery'
 
 // Critical components - load immediately
 import PokemonGrid from '@/components/pokemon/PokemonGrid'
@@ -95,6 +96,8 @@ const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNot
 })
 
 const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager'), { ssr: false })
+
+const MobileWishlistSheet = dynamic(() => import('@/components/draft/MobileWishlistSheet'), { ssr: false })
 
 const DraftOrderReveal = dynamic(() => import('@/components/draft/DraftOrderReveal'), { ssr: false })
 
@@ -159,6 +162,8 @@ export default function DraftRoomPage() {
 
   // Mobile tab state
   const [activeTab, setActiveTab] = useState<MobileTab>('pokemon')
+  const isMobile = useIsMobile()
+  const [isMobileWishlistOpen, setIsMobileWishlistOpen] = useState(false)
 
   // Real draft state from Supabase
   const [draftState, setDraftState] = useState<DraftUIState | null>(null)
@@ -810,7 +815,7 @@ export default function DraftRoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-500 draft-room-mobile">
+    <div className="min-h-screen bg-background transition-colors duration-500 draft-room-mobile overflow-x-hidden max-w-[100vw]">
       <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 max-w-screen-2xl">
         {/* Header */}
         <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 sm:gap-3 px-1">
@@ -1358,6 +1363,29 @@ export default function DraftRoomPage() {
           />
         )}
       </div>
+
+      {/* Mobile Wishlist FAB + Bottom Sheet */}
+      {isMobile && draftState?.status === 'drafting' && !isSpectator && draftState?.userTeamId && (
+        <>
+          <button
+            onClick={() => setIsMobileWishlistOpen(!isMobileWishlistOpen)}
+            className="fixed bottom-20 right-4 z-40 h-12 w-12 rounded-full bg-purple-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
+            aria-label="Toggle wishlist"
+          >
+            <Heart className="h-5 w-5" />
+          </button>
+          <MobileWishlistSheet
+            wishlist={[]}
+            isConnected={realtimeConnectionStatus.status === 'connected'}
+            totalCost={0}
+            currentBudget={userTeam?.budgetRemaining || 100}
+            isOpen={isMobileWishlistOpen}
+            onToggle={() => setIsMobileWishlistOpen(!isMobileWishlistOpen)}
+            onRemove={() => {}}
+            onReorder={() => {}}
+          />
+        </>
+      )}
 
       {/* Auth modal for join-from-link flow */}
       <AuthModal isOpen={showJoinAuthModal} onClose={() => setShowJoinAuthModal(false)} />
