@@ -1,144 +1,108 @@
-# REQUIREMENTS.md — Milestone 4: Beta Launch — draftpokemon.com
+# Requirements: Pokemon Draft — Security Hardening & Scalability Audit
 
-## Milestone Goal
-Ship a polished, mobile-friendly beta to the VGC community at draftpokemon.com with error monitoring, analytics, onboarding, PokePaste interop, and a feedback loop via Discord — ready for competitive Pokemon players to test and provide feedback.
+**Defined:** 2026-04-03
+**Core Value:** Harden the application for production-scale traffic and ensure infrastructure costs don't spiral before public launch.
 
-## Success Criteria
-- draftpokemon.com is live with working auth, real-time drafting, and error monitoring
-- VGC players can complete a full draft on mobile phones without issues
-- New users create their first draft in <60 seconds using templates
-- Teams can be exported to PokePaste format for use in Pokemon Showdown
-- Landing page communicates value to competitive players within 5 seconds
-- Beta feedback flows to Discord for rapid iteration
+## v5 Requirements
 
----
+Requirements for Milestone 5. Each maps to roadmap phases.
 
-## DEPLOY: Production Deployment & Infrastructure
-**Priority:** P0 (Blocker)
-**Why:** Nothing else can be validated without a working production deployment. CSP/auth breaks are silent killers.
+### Security Hardening
 
-### Requirements:
-- [ ] **DEPLOY-01**: Site deployed to draftpokemon.com via Vercel with SSL
-- [ ] **DEPLOY-02**: CSP headers include Clerk CDN domains so auth works in production
-- [x] **DEPLOY-03**: Sentry error monitoring configured with `@sentry/nextjs` (client + server error capture)
-- [x] **DEPLOY-04**: PostHog analytics wired to track draft creation funnel, page views, and key user actions
-- [ ] **DEPLOY-05**: OG meta tags on all public routes (landing, create-draft, join-draft, results) with Pokemon Draft branding for social sharing
+- [ ] **SEC-01**: Clerk `authorizedParties` enforced on all authenticated API routes and middleware
+- [ ] **SEC-02**: CSP migrated from static to nonce-based (remove `unsafe-eval` and `unsafe-inline`)
+- [ ] **SEC-03**: Guest write-path validated server-side (guest ID verified before mutations)
+- [ ] **SEC-04**: CORS restricted to production domain(s) only
+- [ ] **SEC-05**: `x-middleware-subrequest` header stripped at edge (CVE-2025-29927 defense-in-depth)
+- [ ] **SEC-06**: Guest sessions issued server-side via httpOnly cookie (replace localStorage IDs)
+- [ ] **SEC-07**: Input sanitization audit — all API routes validated with Zod schemas, HTML sanitized with DOMPurify
 
-### Acceptance:
-- Auth (Discord/Google/Twitch) works on draftpokemon.com without CSP errors
-- Sentry captures and reports JS runtime errors from production
-- PostHog records page views, draft creation events, and user actions
-- Sharing a draftpokemon.com link on Discord/Reddit/Twitter shows a branded card
+### Rate Limiting & Abuse Prevention
 
----
+- [ ] **RATE-01**: Redis-backed rate limiting enforced in production (Upstash, no in-memory fallback)
+- [ ] **RATE-02**: Per-endpoint rate limits tuned (draft picks, auction bids, API reads, auth endpoints)
+- [ ] **RATE-03**: Rate limit bypass prevention — key by IP + authenticated user, not spoofable guest cookie
+- [ ] **RATE-04**: IP-based fallback rate limiting for unauthenticated requests
+- [ ] **RATE-05**: WebSocket connection rate limiting (max connections per user/IP)
 
-## MOBILE: Mobile Draft Room Activation
-**Priority:** P0 (Critical)
-**Why:** Most VGC players coordinate on phones. MobileDraftView exists but is unwired — this is the highest-impact integration work.
+### Supabase Cost & Scalability
 
-### Requirements:
-- [ ] **MOBILE-01**: MobileDraftView activated for screens <768px via useMediaQuery hook
-- [ ] **MOBILE-02**: Sticky header with timer + current picker always visible on mobile
-- [ ] **MOBILE-03**: Bottom sheet pattern for Pokemon search/filter (thumb-reachable)
-- [ ] **MOBILE-04**: All touch targets 44px+ minimum (WCAG compliant)
-- [ ] **MOBILE-05**: Full draft completable on 375px screens (iPhone SE) without horizontal scroll
+- [ ] **SUPA-01**: Supabase spend cap verified and billing alerts configured
+- [ ] **SUPA-02**: RLS indexes added (btree on user_id, draft_id, team_id columns used in policies)
+- [ ] **SUPA-03**: Realtime channel cleanup enforced (unsubscribe on unmount, connection leak prevention)
+- [ ] **SUPA-04**: Broadcast migration for picks/bids (replace postgres_changes to eliminate O(subscribers) fan-out)
+- [ ] **SUPA-05**: RLS SELECT policies wrapped with security-definer functions to prevent N+1 fan-out reads
 
-### Acceptance:
-- Complete a full snake draft on an iPhone 13 without zoom/scroll issues
-- Timer and current picker visible at all times during scroll
-- All interactive elements are thumb-reachable
-- No horizontal scroll on any mobile view
+### Performance & Caching
 
----
+- [ ] **PERF-01**: PokeAPI responses served with CDN cache headers (long TTL for static data)
+- [ ] **PERF-02**: TanStack Query staleTime optimized per query type (static data 30min+, draft state 0)
+- [ ] **PERF-03**: Static/semi-static pages converted to ISR where applicable
+- [ ] **PERF-04**: k6 load testing suite covering draft creation, picks, realtime subscriptions, and concurrent users
+- [ ] **PERF-05**: Connection pool monitoring dashboard (active Realtime connections, DB query latency)
 
-## ONBOARD: Onboarding & Draft Templates
-**Priority:** P1 (High)
-**Why:** New users bounce if they don't understand how to start. Templates and tours lower the barrier for VGC players discovering the platform.
+## Future Requirements
 
-### Requirements:
-- [ ] **ONBOARD-01**: Draft templates: "Quick Draft" (4 players, 6 Pokemon, 30s), "League Season" (8 players, 11 Pokemon, 90s), "Showmatch" (2 players, 6 Pokemon, 60s), "Custom" (current create flow)
-- [ ] **ONBOARD-02**: Interactive 5-step tour on first draft room visit (timer, grid, search/filter, team roster, wishlist)
-- [ ] **ONBOARD-03**: Format explainer tooltips on format names in create wizard (e.g., "Regulation H — bans all legendaries, mythicals, paradox Pokemon")
-- [ ] **ONBOARD-04**: Draft type comparison cards on create page (Snake vs Auction — pros, cons, "Recommended for beginners" badge)
+Deferred to post-beta. Tracked but not in current roadmap.
 
-### Acceptance:
-- New user creates a draft in <60 seconds using a template
-- Tour completes in 5 steps without confusion
-- Format tooltips explain terms without requiring competitive Pokemon knowledge
+### Extended Security
 
----
+- **SEC-F01**: Full Postgres Changes to Broadcast migration (all tables, not just picks/bids)
+- **SEC-F02**: Strict CSP removing all `unsafe-inline` for `style-src` (blocked by Radix UI + Tailwind)
+- **SEC-F03**: Audit log table for forensic analysis of admin actions
+- **SEC-F04**: Row-level encryption for sensitive fields
 
-## PASTE: PokePaste Import/Export
-**Priority:** P1 (High)
-**Why:** PokePaste is the universal format for competitive Pokemon. Without it, teams can't move between this platform and Pokemon Showdown — the #1 differentiator vs all competitors.
+### Infrastructure
 
-### Requirements:
-- [ ] **PASTE-01**: Export any team roster as PokePaste format (copy to clipboard + .txt download)
-- [ ] **PASTE-02**: Export button on draft results page (per team) and league team detail page
-- [ ] **PASTE-03**: Import PokePaste text to pre-populate team for matchup analysis
-- [ ] **PASTE-04**: Exported PokePaste imports correctly into Pokemon Showdown (round-trip validated)
+- **INFRA-F01**: Cloudflare WAF for enterprise-grade DDoS protection
+- **INFRA-F02**: Geographic CDN edge caching for international users
 
-### Acceptance:
-- Exported PokePaste imports correctly into Pokemon Showdown teambuilder
-- Import handles common PokePaste syntax variants (with/without nickname, tera type)
-- Export buttons accessible from draft results and league team pages
+## Out of Scope
 
----
-
-## LAND: Landing Page & Feedback
-**Priority:** P1 (High)
-**Why:** First impression for VGC community members arriving from Reddit/Twitter/Discord. The feedback loop via Discord enables rapid iteration during beta.
-
-### Requirements:
-- [ ] **LAND-01**: VGC-focused hero section with clear CTAs ("Start a Draft" / "Join a Draft")
-- [ ] **LAND-02**: "How it works" 3-step section (Create → Draft → Play) with CSS animation
-- [ ] **LAND-03**: Messaging positions app for VGC draft leagues with room to expand to singles formats
-- [x] **LAND-04**: Floating feedback button on all pages that sends to Discord webhook
-- [ ] **LAND-05**: Landing page communicates value proposition within 5 seconds
-
-### Acceptance:
-- Landing page immediately communicates "competitive Pokemon draft platform"
-- CTAs are above the fold and lead to draft creation / join flow
-- Feedback button accessible from every page, submissions arrive in Discord channel
-- Copy mentions VGC/draft leagues without excluding singles players
-
----
-
-## Non-Requirements (Deferred to Post-Beta)
-- Sound/animation engine — ship based on user feedback
-- Competitive data overlay (@pkmn/smogon usage stats) — post-beta feature
-- Broadcast/spectator OBS mode — post-beta, for content creators
-- Auction UX overhaul — post-beta, current UX functional
-- Supabase Pro upgrade — monitor connection usage, upgrade when needed
-- Social recap image generation (Satori) — growth feature for later
-- Damage calculator (@smogon/calc) — post-beta
-
----
+| Feature | Reason |
+|---------|--------|
+| CAPTCHA on draft/pick actions | Invite-based rooms — friction exceeds threat surface |
+| Helmet.js middleware | Incompatible with Next.js App Router |
+| Custom Redis session store | Duplicates Clerk's JWT session layer |
+| Prisma migration | Rewrite risk with no security benefit |
+| Cloudflare WAF (Enterprise) | Rate limiting at Vercel edge sufficient at beta scale |
+| IP allowlists | Over-engineering for community platform |
+| Row-level encryption | Draft data contains no PII beyond display names |
 
 ## Traceability
 
-| REQ-ID | Phase | Status |
-|--------|-------|--------|
-| DEPLOY-01 | Phase 19 | Pending |
-| DEPLOY-02 | Phase 19 | Pending |
-| DEPLOY-03 | Phase 20 | Complete |
-| DEPLOY-04 | Phase 20 | Complete |
-| LAND-04 | Phase 20 | Complete |
-| MOBILE-01 | Phase 21 | Pending |
-| MOBILE-02 | Phase 21 | Pending |
-| MOBILE-03 | Phase 21 | Pending |
-| MOBILE-04 | Phase 21 | Pending |
-| MOBILE-05 | Phase 21 | Pending |
-| ONBOARD-01 | Phase 21 | Pending |
-| ONBOARD-02 | Phase 21 | Pending |
-| ONBOARD-03 | Phase 21 | Pending |
-| ONBOARD-04 | Phase 21 | Pending |
-| PASTE-01 | Phase 21 | Pending |
-| PASTE-02 | Phase 21 | Pending |
-| PASTE-03 | Phase 21 | Pending |
-| PASTE-04 | Phase 21 | Pending |
-| DEPLOY-05 | Phase 22 | Pending |
-| LAND-01 | Phase 22 | Pending |
-| LAND-02 | Phase 22 | Pending |
-| LAND-03 | Phase 22 | Pending |
-| LAND-05 | Phase 22 | Pending |
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SEC-01 | TBD | Pending |
+| SEC-02 | TBD | Pending |
+| SEC-03 | TBD | Pending |
+| SEC-04 | TBD | Pending |
+| SEC-05 | TBD | Pending |
+| SEC-06 | TBD | Pending |
+| SEC-07 | TBD | Pending |
+| RATE-01 | TBD | Pending |
+| RATE-02 | TBD | Pending |
+| RATE-03 | TBD | Pending |
+| RATE-04 | TBD | Pending |
+| RATE-05 | TBD | Pending |
+| SUPA-01 | TBD | Pending |
+| SUPA-02 | TBD | Pending |
+| SUPA-03 | TBD | Pending |
+| SUPA-04 | TBD | Pending |
+| SUPA-05 | TBD | Pending |
+| PERF-01 | TBD | Pending |
+| PERF-02 | TBD | Pending |
+| PERF-03 | TBD | Pending |
+| PERF-04 | TBD | Pending |
+| PERF-05 | TBD | Pending |
+
+**Coverage:**
+- v5 requirements: 22 total
+- Mapped to phases: 0
+- Unmapped: 22 (pending roadmap creation)
+
+---
+*Requirements defined: 2026-04-03*
+*Last updated: 2026-04-03 after initial definition*
