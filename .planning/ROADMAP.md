@@ -77,7 +77,12 @@ Plans:
   3. The `/` landing page loads from ISR cache on repeat visits — Vercel deployment logs show `Cache: HIT` on static page requests
   4. A k6 load test simulating 8 concurrent players drafting (all making picks, real-time subscriptions active) completes with p95 pick latency under 500ms and zero failed pick requests
   5. A monitoring view shows current active Realtime connection count and average DB query latency — accessible without querying the Supabase dashboard directly
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 26-01-PLAN.md — CDN proxy for PokeAPI + TanStack Query staleTime optimization (PERF-01, PERF-02)
+- [ ] 26-02-PLAN.md — ISR for static pages + /api/monitoring endpoint (PERF-03, PERF-05)
+- [ ] 26-03-PLAN.md — k6 load test suite (PERF-04)
 
 ---
 
@@ -88,7 +93,7 @@ Plans:
 | 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
 | 24. Application Security Hardening | 3/3 | Complete    | 2026-04-03 |
 | 25. Supabase Scalability & RLS Hardening | 4/4 | Complete    | 2026-04-03 |
-| 26. Performance, Caching & Load Testing | 0/? | Not started | - |
+| 26. Performance, Caching & Load Testing | 0/3 | Not started | - |
 
 ---
 
