@@ -1,74 +1,68 @@
-# ROADMAP.md — Milestone 4: Beta Launch — draftpokemon.com
+# ROADMAP.md — Milestone 5: Security Hardening & Scalability Audit
 
-**Milestone:** Beta Launch — draftpokemon.com
-**Phases:** 4 (Phases 19–22, continuing from Milestone 3)
-**Coverage:** 23/23 requirements mapped
+**Milestone:** Security Hardening & Scalability Audit
+**Phases:** 4 (Phases 23–26, continuing from Milestone 4)
+**Coverage:** 22/22 requirements mapped
 
 ---
 
 ## Phases
 
-- [ ] **Phase 19: Deployment Foundation** — draftpokemon.com live with working auth and correct security headers
-- [ ] **Phase 20: Observability & Feedback** — Error monitoring, analytics, and in-app feedback active from day one
-- [ ] **Phase 21: Core Beta Features** — Mobile draft room, templates, and PokePaste interop shipped
-- [ ] **Phase 22: Launch Polish** — Landing page, OG metadata, and onboarding tour ready for community announcement
+- [ ] **Phase 23: Critical Fixes & Cost Safeguards** — Production environment verified safe, billing guarded, CVE defense-in-depth applied with zero app code changes
+- [ ] **Phase 24: Application Security Hardening** — Auth enforcement, CSP nonce migration, input sanitization, and CORS close concrete exploit vectors
+- [ ] **Phase 25: Supabase Scalability & RLS Hardening** — RLS indexes, broadcast migration for picks/bids, and channel cleanup eliminate per-subscriber fan-out cost
+- [ ] **Phase 26: Performance, Caching & Load Testing** — CDN caching, query staleTime optimization, monitoring dashboard, and k6 load tests validate the hardened stack
 
 ---
 
 ## Phase Details
 
-### Phase 19: Deployment Foundation
-**Goal**: draftpokemon.com is live with Clerk auth working, SSL active, and CSP headers correct so no auth breakage occurs in production
+### Phase 23: Critical Fixes & Cost Safeguards
+**Goal**: The production environment is verifiably safe from billing surprises and the most severe infrastructure risks, with no application code changes required
 **Depends on**: Nothing (first phase of this milestone)
-**Requirements**: DEPLOY-01, DEPLOY-02
+**Requirements**: SEC-05, RATE-01, SUPA-01
 **Success Criteria** (what must be TRUE):
-  1. Visiting draftpokemon.com loads the app over HTTPS without certificate errors
-  2. A user can sign in with Discord or Google on draftpokemon.com without CSP console errors
-  3. Clerk OAuth callbacks are registered against draftpokemon.com (not vercel.app or localhost)
-  4. DNS has propagated and draftpokemon.com resolves consistently worldwide
-**Plans:** 1 plan
-Plans:
-- [x] 19-01-PLAN.md — CSP headers for Clerk, env template, and Vercel deployment verification
-
-### Phase 20: Observability & Feedback
-**Goal**: Beta testing is fully instrumented — runtime errors are captured in Sentry, user flows are tracked in PostHog, and testers can submit feedback from any page
-**Depends on**: Phase 19 (production URL required for Sentry DSN and PostHog host gating)
-**Requirements**: DEPLOY-03, DEPLOY-04, LAND-04
-**Success Criteria** (what must be TRUE):
-  1. A deliberate JS error in production appears in the Sentry dashboard within 60 seconds
-  2. PostHog records page views, draft creation events, and pick events in the live dashboard
-  3. A floating feedback button is visible on every page and submitting it delivers a message to the Discord webhook channel
-  4. Analytics events are gated to production (no noise from localhost or preview deployments)
-**Plans:** 2/2 plans executed
-Plans:
-- [x] 20-01-PLAN.md — Sentry completion + PostHog hostname gating + analytics call-site wiring
-- [x] 20-02-PLAN.md — Floating feedback button on all pages
-
-### Phase 21: Core Beta Features
-**Goal**: VGC players can complete a full draft on mobile, create a draft in under 60 seconds using a template, and export their team to Pokemon Showdown via PokePaste
-**Depends on**: Phase 20 (analytics must be wired to measure template and PokePaste funnel impact)
-**Requirements**: MOBILE-01, MOBILE-02, MOBILE-03, MOBILE-04, MOBILE-05, ONBOARD-01, ONBOARD-02, ONBOARD-03, ONBOARD-04, PASTE-01, PASTE-02, PASTE-03, PASTE-04
-**Success Criteria** (what must be TRUE):
-  1. On a 375px screen (iPhone SE), a user completes a full snake draft from pick 1 to draft end without horizontal scroll or zoom
-  2. The timer and current picker name are visible at all times while scrolling the Pokemon grid on mobile
-  3. A new user selects the "Quick Draft" template, fills in team names, and starts a draft in under 60 seconds
-  4. A user exports their draft results team to clipboard in PokePaste format and the paste imports correctly into Pokemon Showdown teambuilder
-  5. The interactive tour on first draft room visit completes all 5 steps without confusing the user
+  1. Supabase billing dashboard shows a spend cap enabled and at least one billing alert configured at a threshold below the cap
+  2. Production Upstash Redis rate limiter is confirmed active (not the in-memory fallback) — verified by checking that rate limit state persists across a Vercel cold start cycle
+  3. Any HTTP request containing the `x-middleware-subrequest` header is stripped at the edge before reaching application middleware
+  4. `npm audit` returns zero critical or high CVEs, or all findings are documented with accepted-risk justification
 **Plans**: TBD
-**UI hint**: yes
 
-### Phase 22: Launch Polish
-**Goal**: The landing page communicates the platform's value to VGC players within 5 seconds and every public page shows a branded embed on Discord and Reddit
-**Depends on**: Phase 21 (OG canonical URLs require stable production base URL; landing page copy should reflect what Phase 21 actually shipped)
-**Requirements**: DEPLOY-05, LAND-01, LAND-02, LAND-03, LAND-05
+### Phase 24: Application Security Hardening
+**Goal**: Authenticated routes enforce Clerk identity at the handler level, CSP removes unsafe directives, all mutation inputs are validated server-side, and CORS is locked to production domains
+**Depends on**: Phase 23 (production baseline verified before touching auth and CSP)
+**Requirements**: SEC-01, SEC-02, SEC-03, SEC-04, SEC-07, RATE-02, RATE-03, RATE-04
 **Success Criteria** (what must be TRUE):
-  1. Sharing a draftpokemon.com link on Discord shows a branded card with title, description, and image — not a blank embed
-  2. A competitive Pokemon player landing on the homepage from Reddit immediately understands this is a VGC draft platform without reading body text
-  3. The "How it works" section explains Create → Draft → Play in three steps visible above the fold on desktop
-  4. The hero CTA "Start a Draft" and "Join a Draft" are above the fold on both mobile and desktop
-  5. Copy on the landing page uses VGC/draft league terminology without excluding singles format players
+  1. A forged request to any mutating API route with a missing or invalid Clerk JWT returns 401 — even if middleware is bypassed
+  2. The browser console shows no CSP violations during a full auth flow (sign-in, token refresh, draft pick) on draftpokemon.com
+  3. A guest user who submits a pick request with a fabricated guest ID that does not match their server-issued session receives a 403 error
+  4. An OPTIONS preflight from a non-production origin to any API route receives a non-permissive CORS response (no `Access-Control-Allow-Origin: *`)
+  5. A draft name or team name containing an XSS payload is stored and displayed without script execution in any browser
 **Plans**: TBD
-**UI hint**: yes
+
+### Phase 25: Supabase Scalability & RLS Hardening
+**Goal**: Real-time draft events flow through broadcast channels instead of postgres_changes fan-out, RLS policies execute without per-subscriber index scans, and connection leaks are eliminated
+**Depends on**: Phase 24 (server-side auth must be correct before pick/bid services send authenticated broadcast events; CSP must be stable before guest httpOnly cookie endpoint is added to allowlist)
+**Requirements**: SEC-06, RATE-05, SUPA-02, SUPA-03, SUPA-04, SUPA-05
+**Success Criteria** (what must be TRUE):
+  1. An 8-player draft with all players actively picking shows no RLS fan-out queries in the Supabase query performance advisor — pick INSERTs trigger one DB write, not N per-subscriber RLS evaluations
+  2. Guest sessions are issued as httpOnly cookies from the server — a guest user's session ID is not readable from `document.cookie` or `localStorage` in the browser console
+  3. Navigating away from and back to the draft page shows the same channel count in `supabase.getChannels()` — no channel accumulation across navigation cycles
+  4. WebSocket connection attempts beyond the per-user limit receive an explicit rate-limit rejection rather than silently queuing
+  5. The Supabase Performance Advisor shows no RLS-related lint warnings for the `user_id`, `draft_id`, and `team_id` indexed columns
+**Plans**: TBD
+
+### Phase 26: Performance, Caching & Load Testing
+**Goal**: Static Pokemon data is served from CDN cache, TanStack Query stale times reflect actual data volatility, and a k6 load test confirms the hardened stack handles concurrent draft traffic
+**Depends on**: Phase 25 (load test must run against the broadcast model — testing before broadcast migration measures the wrong architecture)
+**Requirements**: PERF-01, PERF-02, PERF-03, PERF-04, PERF-05
+**Success Criteria** (what must be TRUE):
+  1. A PokeAPI response for any Pokemon served through the application includes `Cache-Control: s-maxage=86400` headers — verified in browser Network tab showing a CDN cache hit on second request
+  2. Opening the draft room does not trigger a PokeAPI fetch if the data was loaded within the last 30 minutes — TanStack Query returns cached data without a network request
+  3. The `/` landing page loads from ISR cache on repeat visits — Vercel deployment logs show `Cache: HIT` on static page requests
+  4. A k6 load test simulating 8 concurrent players drafting (all making picks, real-time subscriptions active) completes with p95 pick latency under 500ms and zero failed pick requests
+  5. A monitoring view shows current active Realtime connection count and average DB query latency — accessible without querying the Supabase dashboard directly
+**Plans**: TBD
 
 ---
 
@@ -76,10 +70,10 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 19. Deployment Foundation | 0/1 | In progress | - |
-| 20. Observability & Feedback | 2/2 | Complete | 2026-04-03 |
-| 21. Core Beta Features | 0/? | Not started | - |
-| 22. Launch Polish | 0/? | Not started | - |
+| 23. Critical Fixes & Cost Safeguards | 0/? | Not started | - |
+| 24. Application Security Hardening | 0/? | Not started | - |
+| 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
+| 26. Performance, Caching & Load Testing | 0/? | Not started | - |
 
 ---
 
@@ -87,39 +81,40 @@ Plans:
 
 | Requirement | Phase |
 |-------------|-------|
-| DEPLOY-01 | Phase 19 |
-| DEPLOY-02 | Phase 19 |
-| DEPLOY-03 | Phase 20 |
-| DEPLOY-04 | Phase 20 |
-| LAND-04 | Phase 20 |
-| MOBILE-01 | Phase 21 |
-| MOBILE-02 | Phase 21 |
-| MOBILE-03 | Phase 21 |
-| MOBILE-04 | Phase 21 |
-| MOBILE-05 | Phase 21 |
-| ONBOARD-01 | Phase 21 |
-| ONBOARD-02 | Phase 21 |
-| ONBOARD-03 | Phase 21 |
-| ONBOARD-04 | Phase 21 |
-| PASTE-01 | Phase 21 |
-| PASTE-02 | Phase 21 |
-| PASTE-03 | Phase 21 |
-| PASTE-04 | Phase 21 |
-| DEPLOY-05 | Phase 22 |
-| LAND-01 | Phase 22 |
-| LAND-02 | Phase 22 |
-| LAND-03 | Phase 22 |
-| LAND-05 | Phase 22 |
+| SEC-01 | Phase 24 |
+| SEC-02 | Phase 24 |
+| SEC-03 | Phase 24 |
+| SEC-04 | Phase 24 |
+| SEC-05 | Phase 23 |
+| SEC-06 | Phase 25 |
+| SEC-07 | Phase 24 |
+| RATE-01 | Phase 23 |
+| RATE-02 | Phase 24 |
+| RATE-03 | Phase 24 |
+| RATE-04 | Phase 24 |
+| RATE-05 | Phase 25 |
+| SUPA-01 | Phase 23 |
+| SUPA-02 | Phase 25 |
+| SUPA-03 | Phase 25 |
+| SUPA-04 | Phase 25 |
+| SUPA-05 | Phase 25 |
+| PERF-01 | Phase 26 |
+| PERF-02 | Phase 26 |
+| PERF-03 | Phase 26 |
+| PERF-04 | Phase 26 |
+| PERF-05 | Phase 26 |
 
-**Coverage:** 23/23 requirements mapped. No orphans.
+**Coverage:** 22/22 requirements mapped. No orphans.
 
 ---
 
 ## Research Flags (Implementation Notes)
 
-- **Phase 19**: CSP changes must only live in `next.config.ts`, not `vercel.json`. Switch Vercel Production environment variables to Clerk `pk_live_*`/`sk_live_*` keys. Re-register Discord + Google OAuth callbacks against draftpokemon.com. Configure DNS early — allow 48h propagation window.
-- **Phase 20**: Initialize PostHog via `instrumentation-client.ts` (Next.js 15.3+) to avoid hydration errors. Initialize Sentry and PostHog in separate files. Gate both on `NODE_ENV === 'production'` AND hostname. Test hydration in production build mode (`npm run build && npm start`) — hydration errors are invisible in dev.
-- **Phase 21 (Mobile)**: Must test on a physical iPhone Safari — iOS Safari scroll-within-sheet conflict is a real-device-only failure mode. Use Vaul drawer component (verify `npm ls vaul` first — shadcn Drawer may already include it). All interactive targets must be 44px minimum.
-- **Phase 21 (PokePaste)**: Inspect existing `src/lib/pokepaste-parser.ts` before adding `@pkmn/sets`. Test export against 10+ real VGC pastes from paste.victoryroad.pro. Validate export → Showdown round-trip before marking PASTE-04 complete.
-- **Phase 21 (Realtime)**: Audit Supabase channel count per draft participant before any public announcement. Free tier cap is ~200 concurrent connections. Upgrade to Supabase Pro if audit shows risk.
-- **Phase 22**: OG images must use absolute URLs (not relative). Validate with Discord embed tester and opengraph.xyz before community posts.
+- **Phase 23**: Run `npm ls @upstash/ratelimit @upstash/redis` before touching rate limiter — packages may already be installed. Verify production Upstash env vars are set in Vercel dashboard (not just .env.local). The `x-middleware-subrequest` strip is a one-line addition to `src/middleware.ts` header deletions — zero risk, do it first.
+- **Phase 24 (CSP)**: Run `grep -r "eval(" node_modules/framer-motion/dist/` before committing to `unsafe-eval` removal — Framer Motion may require it. Use `Content-Security-Policy-Report-Only` in staging first to surface violations without blocking. Derive Clerk FAPI URL from environment variable, never hardcode. Test full auth flow including 60-second token refresh after any CSP change.
+- **Phase 24 (Auth)**: Audit every `auth()` call site across all API routes — grep `src/app/api` for files that call Supabase mutations without a preceding `auth()` check. Middleware-only auth is the current gap.
+- **Phase 24 (Input sanitization)**: Run `grep -r "dangerouslySetInnerHTML" src/` at phase start to scope XSS work accurately. Install `isomorphic-dompurify` (not plain DOMPurify — plain throws in SSR via Next.js issue #46893).
+- **Phase 25 (RLS/Clerk)**: Confirm which JWT integration path is active (legacy Clerk template vs. native Supabase integration) by reviewing `FIX-RLS-POLICIES.md` before writing any new RLS policies. Never mix `auth.uid()` and the custom Clerk JWT helper — `auth.uid()` silently returns NULL for Clerk string user IDs. Always use the existing custom function.
+- **Phase 25 (RLS Realtime)**: Keep SELECT policies draft-scoped (`USING (draft_id = $draft_id)`), not user-scoped — user-scoped SELECT policies silently drop events for spectators with no error thrown. Test every RLS migration by opening two browser tabs as different users.
+- **Phase 25 (Broadcast migration)**: Map which tables must stay on `postgres_changes` (private per-user data like `wishlist_items`) before implementation. The blast radius covers `DraftRealtimeManager`, `draft-picks-service`, `auction-service`, and potentially `useWishlistSync`. Instrument `supabase.getChannels().length` in staging before starting to establish baseline.
+- **Phase 26 (k6)**: Keep load test scripts in `tests/load/`. k6 is a standalone binary — not an npm package. Run load tests after Phase 25 broadcast migration is deployed; testing before migration measures the wrong architecture.

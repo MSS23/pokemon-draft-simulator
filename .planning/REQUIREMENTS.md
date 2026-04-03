@@ -75,34 +75,34 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
-| SEC-05 | TBD | Pending |
-| SEC-06 | TBD | Pending |
-| SEC-07 | TBD | Pending |
-| RATE-01 | TBD | Pending |
-| RATE-02 | TBD | Pending |
-| RATE-03 | TBD | Pending |
-| RATE-04 | TBD | Pending |
-| RATE-05 | TBD | Pending |
-| SUPA-01 | TBD | Pending |
-| SUPA-02 | TBD | Pending |
-| SUPA-03 | TBD | Pending |
-| SUPA-04 | TBD | Pending |
-| SUPA-05 | TBD | Pending |
-| PERF-01 | TBD | Pending |
-| PERF-02 | TBD | Pending |
-| PERF-03 | TBD | Pending |
-| PERF-04 | TBD | Pending |
-| PERF-05 | TBD | Pending |
+| SEC-01 | Phase 24 | Pending |
+| SEC-02 | Phase 24 | Pending |
+| SEC-03 | Phase 24 | Pending |
+| SEC-04 | Phase 24 | Pending |
+| SEC-05 | Phase 23 | Pending |
+| SEC-06 | Phase 25 | Pending |
+| SEC-07 | Phase 24 | Pending |
+| RATE-01 | Phase 23 | Pending |
+| RATE-02 | Phase 24 | Pending |
+| RATE-03 | Phase 24 | Pending |
+| RATE-04 | Phase 24 | Pending |
+| RATE-05 | Phase 25 | Pending |
+| SUPA-01 | Phase 23 | Pending |
+| SUPA-02 | Phase 25 | Pending |
+| SUPA-03 | Phase 25 | Pending |
+| SUPA-04 | Phase 25 | Pending |
+| SUPA-05 | Phase 25 | Pending |
+| PERF-01 | Phase 26 | Pending |
+| PERF-02 | Phase 26 | Pending |
+| PERF-03 | Phase 26 | Pending |
+| PERF-04 | Phase 26 | Pending |
+| PERF-05 | Phase 26 | Pending |
 
 **Coverage:**
 - v5 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 (pending roadmap creation)
+- Mapped to phases: 22
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-03*
-*Last updated: 2026-04-03 after initial definition*
+*Last updated: 2026-04-03 after roadmap creation*
