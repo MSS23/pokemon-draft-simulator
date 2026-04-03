@@ -93,7 +93,7 @@ Ship a polished, mobile-friendly beta to the VGC community at draftpokemon.com w
 - [ ] **LAND-01**: VGC-focused hero section with clear CTAs ("Start a Draft" / "Join a Draft")
 - [ ] **LAND-02**: "How it works" 3-step section (Create → Draft → Play) with CSS animation
 - [ ] **LAND-03**: Messaging positions app for VGC draft leagues with room to expand to singles formats
-- [ ] **LAND-04**: Floating feedback button on all pages that sends to Discord webhook
+- [x] **LAND-04**: Floating feedback button on all pages that sends to Discord webhook
 - [ ] **LAND-05**: Landing page communicates value proposition within 5 seconds
 
 ### Acceptance:
@@ -123,7 +123,7 @@ Ship a polished, mobile-friendly beta to the VGC community at draftpokemon.com w
 | DEPLOY-02 | Phase 19 | Pending |
 | DEPLOY-03 | Phase 20 | Pending |
 | DEPLOY-04 | Phase 20 | Pending |
-| LAND-04 | Phase 20 | Pending |
+| LAND-04 | Phase 20 | Complete |
 | MOBILE-01 | Phase 21 | Pending |
 | MOBILE-02 | Phase 21 | Pending |
 | MOBILE-03 | Phase 21 | Pending |
