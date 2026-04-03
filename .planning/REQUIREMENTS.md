@@ -119,26 +119,26 @@ Ship a polished, mobile-friendly beta to the VGC community at draftpokemon.com w
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| DEPLOY-01 | TBD | Pending |
-| DEPLOY-02 | TBD | Pending |
-| DEPLOY-03 | TBD | Pending |
-| DEPLOY-04 | TBD | Pending |
-| DEPLOY-05 | TBD | Pending |
-| MOBILE-01 | TBD | Pending |
-| MOBILE-02 | TBD | Pending |
-| MOBILE-03 | TBD | Pending |
-| MOBILE-04 | TBD | Pending |
-| MOBILE-05 | TBD | Pending |
-| ONBOARD-01 | TBD | Pending |
-| ONBOARD-02 | TBD | Pending |
-| ONBOARD-03 | TBD | Pending |
-| ONBOARD-04 | TBD | Pending |
-| PASTE-01 | TBD | Pending |
-| PASTE-02 | TBD | Pending |
-| PASTE-03 | TBD | Pending |
-| PASTE-04 | TBD | Pending |
-| LAND-01 | TBD | Pending |
-| LAND-02 | TBD | Pending |
-| LAND-03 | TBD | Pending |
-| LAND-04 | TBD | Pending |
-| LAND-05 | TBD | Pending |
+| DEPLOY-01 | Phase 19 | Pending |
+| DEPLOY-02 | Phase 19 | Pending |
+| DEPLOY-03 | Phase 20 | Pending |
+| DEPLOY-04 | Phase 20 | Pending |
+| LAND-04 | Phase 20 | Pending |
+| MOBILE-01 | Phase 21 | Pending |
+| MOBILE-02 | Phase 21 | Pending |
+| MOBILE-03 | Phase 21 | Pending |
+| MOBILE-04 | Phase 21 | Pending |
+| MOBILE-05 | Phase 21 | Pending |
+| ONBOARD-01 | Phase 21 | Pending |
+| ONBOARD-02 | Phase 21 | Pending |
+| ONBOARD-03 | Phase 21 | Pending |
+| ONBOARD-04 | Phase 21 | Pending |
+| PASTE-01 | Phase 21 | Pending |
+| PASTE-02 | Phase 21 | Pending |
+| PASTE-03 | Phase 21 | Pending |
+| PASTE-04 | Phase 21 | Pending |
+| DEPLOY-05 | Phase 22 | Pending |
+| LAND-01 | Phase 22 | Pending |
+| LAND-02 | Phase 22 | Pending |
+| LAND-03 | Phase 22 | Pending |
+| LAND-05 | Phase 22 | Pending |
