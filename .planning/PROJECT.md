@@ -23,14 +23,26 @@ The gold standard platform for Pokemon draft leagues — replacing the fragmente
 ### Milestone 2: Codebase Health (2026-04-02) — COMPLETE
 8 fixes: split draft-service.ts into 4 sub-modules, split draft page into 5 hooks, moved bcrypt server-side, replaced 31 SELECT * queries, added pagination, fixed as-any casts, standardized error handling, fixed serverless rate limiter.
 
-### Milestone 3: Gold Standard Draft Experience (2026-04-02) — ACTIVE
+### Milestone 3: Gold Standard Draft Experience (2026-04-02) — PAUSED
 **Goal:** Transform the draft room into a premium, broadcast-quality experience that makes Discord bots obsolete. Focus on draft room polish, mobile UX, and competitive data integration.
+**Status:** Paused — cherry-picked mobile, onboarding, and PokePaste into Milestone 4. Remaining features (sounds/animations, competitive data, broadcast mode, auction UX) deferred to post-beta based on user feedback.
 
-**Key insight from research:** The real competitor is Discord bots, not other web apps. No platform offers a premium real-time draft + integrated competitive data + content creator tools.
+### Milestone 4: Beta Launch — draftpokemon.com (2026-04-03) — ACTIVE
+**Goal:** Ship a polished, mobile-friendly beta to the VGC community with feedback collection, onboarding for new users, and PokePaste interop.
 
-**Target audience:** Friend groups, content creators, tournament organizers — all equally.
+**Domain:** draftpokemon.com (Vercel deployment)
+**Target audience:** VGC competitive community (Reddit, Twitter/X, Discord)
 
-**Timeline:** 2-week sprint (5-8 focused phases)
+**Target features:**
+- Mobile-first draft room redesign (375px+, bottom sheets, touch targets)
+- Onboarding & draft templates (60-second first draft, tour, format explainers)
+- PokePaste import/export (Showdown ecosystem interop)
+- Landing page polish (VGC-focused messaging, hero section, clear CTAs)
+- In-app feedback widget (bug reports + suggestions from beta testers)
+- Analytics & error monitoring (track user flows, catch errors)
+- Domain & deployment (draftpokemon.com on Vercel, SSL, SEO basics)
+
+**Deferred to post-beta:** Sound/animations, competitive data overlay, broadcast mode, auction UX overhaul
 
 ## Competitive Landscape
 - **DraftZone:** League management, matchup analysis. No real-time draft room.
@@ -44,3 +56,23 @@ The gold standard platform for Pokemon draft leagues — replacing the fragmente
 3. PokePaste import/export for ecosystem interop
 4. OBS-ready spectator/broadcast view
 5. Mobile-first responsive draft experience
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
+---
+*Last updated: 2026-04-03*
