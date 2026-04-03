@@ -15,16 +15,18 @@ interface LeagueNavProps {
   teamCount?: number
   isCommissioner?: boolean
   enableWaivers?: boolean
+  enableTrades?: boolean
   hasMatchResults?: boolean
   onSettingsClick?: () => void
 }
 
-// Base tabs always visible
-const BASE_TABS = [
+// Base tabs (trades conditionally added based on settings)
+const ALWAYS_TABS = [
   { id: 'overview', label: 'Overview', path: '', icon: TrendingUp },
   { id: 'schedule', label: 'Schedule', path: '/schedule', icon: CalendarDays },
-  { id: 'trades', label: 'Trades', path: '/trades', icon: ArrowLeftRight },
 ]
+
+const TRADE_TAB = { id: 'trades', label: 'Trades', path: '/trades', icon: ArrowLeftRight }
 
 // Tabs that only appear once matches have been played
 const MATCH_TABS = [
@@ -39,6 +41,7 @@ export function LeagueNav({
   teamCount,
   isCommissioner = false,
   enableWaivers = true,
+  enableTrades = true,
   hasMatchResults = false,
   onSettingsClick,
 }: LeagueNavProps) {
@@ -50,11 +53,12 @@ export function LeagueNav({
 
   const basePath = `/league/${leagueId}`
 
-  // Build tab list based on league state
+  // Build tab list based on league state — hide trades & free agents when trades are banned
   const allTabs = [
-    ...BASE_TABS,
+    ...ALWAYS_TABS,
+    ...(enableTrades ? [TRADE_TAB] : []),
     ...(hasMatchResults ? MATCH_TABS : []),
-    ...(enableWaivers ? [{ id: 'free-agents', label: 'Free Agents', path: '/free-agents', icon: UserPlus }] : []),
+    ...(enableTrades && enableWaivers ? [{ id: 'free-agents', label: 'Free Agents', path: '/free-agents', icon: UserPlus }] : []),
     ...(isCommissioner ? [{ id: 'admin', label: 'Admin', path: '/admin', icon: ShieldCheck }] : []),
   ]
 

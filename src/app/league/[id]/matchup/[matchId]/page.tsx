@@ -111,6 +111,7 @@ export default function MatchupPreviewPage() {
   const [pokemonTypes, setPokemonTypes] = useState<Map<string, string[]>>(new Map())
   const [showRecorder, setShowRecorder] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isCommissioner, setIsCommissioner] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -125,6 +126,13 @@ export default function MatchupPreviewPage() {
           } catch { /* guest */ }
         }
         setCurrentUserId(userId || null)
+
+        // Check commissioner status
+        if (userId) {
+          LeagueService.isLeagueCommissioner(leagueId, userId)
+            .then(setIsCommissioner)
+            .catch(() => setIsCommissioner(false))
+        }
 
         // Load league
         const leagueData = await LeagueService.getLeague(leagueId)
@@ -247,7 +255,7 @@ export default function MatchupPreviewPage() {
 
   const homeColors = teamColorMap.get(match.homeTeamId)
   const awayColors = teamColorMap.get(match.awayTeamId)
-  const canRecord = (match.status === 'scheduled' || match.status === 'in_progress') && !!currentUserTeamId
+  const canRecord = (match.status === 'scheduled' || match.status === 'in_progress') && (!!currentUserTeamId || isCommissioner)
 
   return (
     <div className="min-h-screen bg-background">
@@ -616,6 +624,7 @@ export default function MatchupPreviewPage() {
           homeTeamPicks={homePicks}
           awayTeamPicks={awayPicks}
           currentUserTeamId={currentUserTeamId}
+          isCommissioner={isCommissioner}
           onSuccess={() => {
             setShowRecorder(false)
             router.refresh()

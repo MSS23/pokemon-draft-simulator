@@ -51,6 +51,7 @@ export default function LeaguePage() {
   const [awayTeamPicks, setAwayTeamPicks] = useState<Pick[]>([])
   const [viewingWeek, setViewingWeek] = useState<number | null>(null)
   const [isCommissioner, setIsCommissioner] = useState(false)
+  const [userTeamId, setUserTeamId] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -81,9 +82,9 @@ export default function LeaguePage() {
     return () => { supabase.removeChannel(channel) }
   }, [leagueId])
 
-  // Determine commissioner status
+  // Determine commissioner status and user's team
   useEffect(() => {
-    const checkCommissioner = async () => {
+    const checkUserRole = async () => {
       let userId = user?.id
       if (!userId) {
         try {
@@ -98,9 +99,14 @@ export default function LeaguePage() {
       } catch {
         setIsCommissioner(false)
       }
+      // Find user's team in this league
+      if (league) {
+        const myTeam = league.teams.find(t => t.ownerId === userId)
+        setUserTeamId(myTeam?.id || null)
+      }
     }
-    void checkCommissioner()
-  }, [user?.id, leagueId])
+    void checkUserRole()
+  }, [user?.id, leagueId, league])
 
   // Auto-load rosters for all fixtures when week changes
   useEffect(() => {
@@ -290,6 +296,7 @@ export default function LeaguePage() {
         teamCount={league.teams.length}
         isCommissioner={isCommissioner}
         enableWaivers={leagueSettings.enableWaivers !== false}
+        enableTrades={leagueSettings.enableTrades !== false}
         hasMatchResults={standings.some(s => s.wins > 0 || s.losses > 0 || s.draws > 0)}
         onSettingsClick={() => setSettingsOpen(true)}
       />
@@ -337,7 +344,8 @@ export default function LeaguePage() {
                 const homeColors = teamColorMap.get(match.homeTeamId)
                 const awayColors = teamColorMap.get(match.awayTeamId)
                 const rosters = fixtureRosters[match.id]
-                const canRecord = (match.status === 'scheduled' || match.status === 'in_progress')
+                const isUserInMatch = userTeamId === match.homeTeamId || userTeamId === match.awayTeamId
+                const canRecord = (match.status === 'scheduled' || match.status === 'in_progress') && (isUserInMatch || isCommissioner)
 
                 return (
                   <Card
@@ -734,6 +742,8 @@ export default function LeaguePage() {
             match={selectedMatch}
             homeTeamPicks={homeTeamPicks}
             awayTeamPicks={awayTeamPicks}
+            currentUserTeamId={userTeamId}
+            isCommissioner={isCommissioner}
             onSuccess={() => { setSelectedMatch(null); loadLeagueData() }}
           />
         )}

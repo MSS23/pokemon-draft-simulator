@@ -37,6 +37,7 @@ interface MatchRecorderModalProps {
   awayTeamPicks: Pick[]
   onSuccess: () => void
   currentUserTeamId?: string | null
+  isCommissioner?: boolean
 }
 
 interface GameResult {
@@ -70,6 +71,7 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   awayTeamPicks,
   onSuccess,
   currentUserTeamId,
+  isCommissioner = false,
 }: MatchRecorderModalProps) {
   const [currentStep, setCurrentStep] = useState<'games' | 'kos' | 'confirm'>('games')
   const [games, setGames] = useState<GameResult[]>([])
@@ -323,8 +325,8 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
         if (result.status === 'disputed') {
           return
         }
-      } else {
-        // No user team context (admin/spectator) - direct update
+      } else if (isCommissioner) {
+        // Commissioner-only direct update path
         const homeScore = games.filter(g => g.winnerTeamId === match.homeTeamId && !g.isDnf).length
         const awayScore = games.filter(g => g.winnerTeamId === match.awayTeamId && !g.isDnf).length
         await LeagueService.updateMatchResult(match.id, {
@@ -337,6 +339,10 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
         await recordKOs(matchWinner)
         onSuccess()
         onClose()
+      } else {
+        // Spectators cannot record results
+        setError('You do not have permission to record match results.')
+        return
       }
     } catch (err) {
       log.error('Failed to record match:', err)

@@ -696,6 +696,8 @@ export default function TournamentPage() {
             match={selectedMatch}
             homeTeamPicks={homeTeamPicks}
             awayTeamPicks={awayTeamPicks}
+            currentUserTeamId={userTeamId}
+            isCommissioner={isCommissioner}
             onSuccess={handleMatchRecorded}
           />
         )}
