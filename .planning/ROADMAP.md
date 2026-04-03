@@ -59,7 +59,13 @@ Plans:
   3. Navigating away from and back to the draft page shows the same channel count in `supabase.getChannels()` — no channel accumulation across navigation cycles
   4. WebSocket connection attempts beyond the per-user limit receive an explicit rate-limit rejection rather than silently queuing
   5. The Supabase Performance Advisor shows no RLS-related lint warnings for the `user_id`, `draft_id`, and `team_id` indexed columns
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 25-01-PLAN.md — RLS btree indexes + security-definer wrapper functions (SUPA-02, SUPA-05)
+- [ ] 25-02-PLAN.md — Channel cleanup audit, useRealtimeDraft deprecation, WebSocket rate limiting (SUPA-03, RATE-05)
+- [ ] 25-03-PLAN.md — Broadcast migration for picks and bids (SUPA-04)
+- [ ] 25-04-PLAN.md — Guest session httpOnly cookie endpoint (SEC-06)
 
 ### Phase 26: Performance, Caching & Load Testing
 **Goal**: Static Pokemon data is served from CDN cache, TanStack Query stale times reflect actual data volatility, and a k6 load test confirms the hardened stack handles concurrent draft traffic
@@ -81,7 +87,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
 | 24. Application Security Hardening | 3/3 | Complete    | 2026-04-03 |
-| 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
+| 25. Supabase Scalability & RLS Hardening | 0/4 | Not started | - |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |
 
 ---
