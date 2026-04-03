@@ -80,7 +80,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 26-01-PLAN.md — CDN proxy for PokeAPI + TanStack Query staleTime optimization (PERF-01, PERF-02)
+- [x] 26-01-PLAN.md — CDN proxy for PokeAPI + TanStack Query staleTime optimization (PERF-01, PERF-02)
 - [x] 26-02-PLAN.md — ISR for static pages + /api/monitoring endpoint (PERF-03, PERF-05)
 - [ ] 26-03-PLAN.md — k6 load test suite (PERF-04)
 
@@ -93,7 +93,7 @@ Plans:
 | 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
 | 24. Application Security Hardening | 3/3 | Complete    | 2026-04-03 |
 | 25. Supabase Scalability & RLS Hardening | 4/4 | Complete    | 2026-04-03 |
-| 26. Performance, Caching & Load Testing | 1/3 | In Progress|  |
+| 26. Performance, Caching & Load Testing | 2/3 | In Progress|  |
 
 ---
 
