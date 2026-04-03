@@ -9,6 +9,9 @@ const log = createLogger('PokemonApi')
 
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2'
 
+// CDN-cached proxy for Pokemon data (s-maxage=86400 via Vercel Edge)
+const POKEMON_PROXY_URL = typeof window !== 'undefined' ? '/api/pokemon' : POKEAPI_BASE_URL + '/pokemon'
+
 /**
  * Get the generation number from a National Dex number
  * More accurate than simple division by 100
@@ -326,7 +329,7 @@ const processMoveData = async (pokemonMoves: PokeAPIResponse['moves']): Promise<
 }
 
 export const fetchPokemon = async (identifier: string | number, formatId?: string, includeMoves: boolean = false): Promise<Pokemon> => {
-  const response = await fetch(`${POKEAPI_BASE_URL}/pokemon/${identifier}`)
+  const response = await fetch(`${POKEMON_PROXY_URL}/${identifier}`)
   if (!response.ok) {
     throw new Error(`Failed to fetch Pokemon: ${response.statusText}`)
   }
