@@ -98,39 +98,33 @@ class InMemoryRateLimiter {
 const inMemoryLimiter = new InMemoryRateLimiter()
 
 // Upstash Redis rate limiters (per route pattern)
-const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+const hasRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
 
-if (!hasRedis) {
-  console.error(
-    '[RateLimit] CRITICAL: Upstash Redis not configured. ' +
-    'Rate limiting is NON-FUNCTIONAL in this instance — in-memory state does not ' +
-    'persist across Vercel serverless invocations. ' +
-    'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in Vercel environment variables.'
-  )
-}
+let redis: Redis | null = null
+let upstashLimiters: Record<string, Ratelimit> | null = null
 
-const redis = hasRedis
-  ? new Redis({
+try {
+  if (hasRedis) {
+    redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL!,
       token: process.env.UPSTASH_REDIS_REST_TOKEN!,
     })
-  : null
-
-const upstashLimiters = redis
-  ? {
+    upstashLimiters = {
       drafts: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:drafts' }),
       picks: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:picks' }),
       bids: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '1 m'), prefix: 'rl:bids' }),
       export: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 h'), prefix: 'rl:export' }),
       ai: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:ai' }),
       user: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:user' }),
-      // RATE-05: Limit application-level join actions that trigger Supabase Realtime channel creation.
-      // Note: Supabase WS upgrades go directly to wss://*.supabase.co and bypass Next.js middleware.
-      // This rate limit covers /api/drafts/join as an indirect channel-creation guard.
       wsConnect: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m'), prefix: 'rl:ws-connect' }),
       default: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '1 m'), prefix: 'rl:api' }),
     }
-  : null
+  }
+} catch (err) {
+  console.error('[RateLimit] Failed to initialize Upstash Redis:', err)
+  redis = null
+  upstashLimiters = null
+}
 
 const RATE_LIMITS: Record<string, { limit: number; window: number; key?: keyof NonNullable<typeof upstashLimiters> }> = {
   '/api/drafts': { limit: 10, window: 3600000, key: 'drafts' },
@@ -236,13 +230,11 @@ async function applyRateLimit(request: NextRequest, requestId: string): Promise<
   let isAllowed = true
 
   // Use Upstash Redis if available, otherwise fall back to in-memory
-  if (upstashLimiters && rateLimit.key) {
+  if (upstashLimiters && rateLimit.key && rateLimit.key in upstashLimiters) {
     try {
       const result = await upstashLimiters[rateLimit.key].limit(clientId)
       isAllowed = result.success
     } catch (err) {
-      // Redis unavailable — fall back to in-memory limiter.
-      // This should never happen in production. Log at error level so it surfaces in Vercel logs.
       console.error('[RateLimit] Redis call failed, falling back to in-memory limiter:', err)
       isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
     }
@@ -276,66 +268,77 @@ async function applyRateLimit(request: NextRequest, requestId: string): Promise<
 
 export default clerkMiddleware(
   async (auth, request) => {
-  // SEC-04: Handle CORS preflight at edge — reject disallowed origins early
-  if (request.method === 'OPTIONS' && request.nextUrl.pathname.startsWith('/api/')) {
-    const preflightResponse = handleCorsPreflightIfNeeded(request)
-    if (preflightResponse) return preflightResponse
-  }
-
-  // SEC-05: Strip CVE-2025-29927 exploitation vector at edge
-  // The x-middleware-subrequest header is used by the Next.js middleware
-  // bypass vulnerability. Strip it unconditionally before any auth checks.
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.delete('x-middleware-subrequest')
-
-  // Generate request ID for tracing
-  const requestId = requestHeaders.get('x-request-id') || crypto.randomUUID()
-
-  // SEC-02: Generate per-request nonce for CSP script-src
-  const nonce = generateNonce()
-  requestHeaders.set('x-nonce', nonce)
-
-  // Apply rate limiting to API routes
-  const rateLimitResponse = await applyRateLimit(request, requestId)
-  if (rateLimitResponse) return rateLimitResponse
-
-  // SEC-01: Enforce Clerk auth on mutating/sensitive API routes at the edge.
-  // This is defense-in-depth — route handlers also call auth(), but middleware
-  // enforces it unconditionally even if a route handler has a bug.
-  if (isAuthRequiredApiRoute(request) && !isPublicApiRoute(request)) {
-    const { userId } = await auth()
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required', requestId },
-        {
-          status: 401,
-          headers: { 'x-request-id': requestId },
-        }
-      )
+  try {
+    // SEC-04: Handle CORS preflight at edge — reject disallowed origins early
+    if (request.method === 'OPTIONS' && request.nextUrl.pathname.startsWith('/api/')) {
+      const preflightResponse = handleCorsPreflightIfNeeded(request)
+      if (preflightResponse) return preflightResponse
     }
+
+    // SEC-05: Strip CVE-2025-29927 exploitation vector at edge
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.delete('x-middleware-subrequest')
+
+    // Generate request ID for tracing
+    const requestId = requestHeaders.get('x-request-id') || crypto.randomUUID()
+
+    // SEC-02: Generate per-request nonce for CSP script-src
+    const nonce = generateNonce()
+    requestHeaders.set('x-nonce', nonce)
+
+    // Apply rate limiting to API routes
+    const rateLimitResponse = await applyRateLimit(request, requestId)
+    if (rateLimitResponse) return rateLimitResponse
+
+    // SEC-01: Enforce Clerk auth on mutating/sensitive API routes at the edge.
+    if (isAuthRequiredApiRoute(request) && !isPublicApiRoute(request)) {
+      try {
+        const { userId } = await auth()
+        if (!userId) {
+          return NextResponse.json(
+            { error: 'Authentication required', requestId },
+            {
+              status: 401,
+              headers: { 'x-request-id': requestId },
+            }
+          )
+        }
+      } catch {
+        // Auth check failed — let the request through to route-level auth
+      }
+    }
+
+    // Protect routes that require authentication
+    if (isProtectedRoute(request) && !isPublicRoute(request)) {
+      try {
+        await auth.protect()
+      } catch {
+        // Clerk will handle redirect to sign-in
+        const signInUrl = new URL('/sign-in', request.url)
+        signInUrl.searchParams.set('redirect_url', request.url)
+        return NextResponse.redirect(signInUrl)
+      }
+    }
+
+    // Inject request ID header for downstream use
+    const response = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
+    response.headers.set('x-request-id', requestId)
+    // SEC-02: Set nonce-based CSP on every response
+    response.headers.set('Content-Security-Policy', buildCSP(nonce))
+
+    return response
+  } catch (error) {
+    // Middleware must never crash — pass through on error
+    console.error('[Middleware] Unhandled error:', error)
+    return NextResponse.next()
   }
-
-  // Protect routes that require authentication
-  // Public routes and unmatched routes pass through without auth
-  if (isProtectedRoute(request) && !isPublicRoute(request)) {
-    await auth.protect()
-  }
-
-  // Inject request ID header for downstream use
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  })
-  response.headers.set('x-request-id', requestId)
-  // SEC-02: Set nonce-based CSP on every response
-  response.headers.set('Content-Security-Policy', buildCSP(nonce))
-
-  return response
   },
   {
     // SEC-01: Only accept JWTs issued for the production app domain.
-    // Prevents tokens from a different Clerk app from being accepted.
     authorizedParties: process.env.NEXT_PUBLIC_CLERK_AUTHORIZED_PARTIES
       ? process.env.NEXT_PUBLIC_CLERK_AUTHORIZED_PARTIES.split(',')
       : ['https://draftpokemon.com', 'http://localhost:3000'],
