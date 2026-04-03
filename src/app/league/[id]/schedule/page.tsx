@@ -134,7 +134,7 @@ export default function SchedulePage() {
     return 'upcoming'
   }
 
-  const totalWeeks = schedule.length
+  const _totalWeeks = schedule.length
 
   return (
     <div className="min-h-screen bg-background pokemon-bg transition-colors duration-500">

@@ -38,7 +38,12 @@ const inMemoryLimiter = new InMemoryRateLimiter()
 const hasRedis = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
 
 if (!hasRedis) {
-  console.warn('[RateLimit] Upstash Redis not configured — rate limiting is degraded. Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for production.')
+  console.error(
+    '[RateLimit] CRITICAL: Upstash Redis not configured. ' +
+    'Rate limiting is NON-FUNCTIONAL in this instance — in-memory state does not ' +
+    'persist across Vercel serverless invocations. ' +
+    'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in Vercel environment variables.'
+  )
 }
 
 const redis = hasRedis
@@ -139,9 +144,10 @@ async function applyRateLimit(request: NextRequest, requestId: string): Promise<
     try {
       const result = await upstashLimiters[rateLimit.key].limit(clientId)
       isAllowed = result.success
-    } catch {
-      // Redis unavailable — fall back to in-memory
-      // Use 3x the limit since in-memory state resets between serverless invocations
+    } catch (err) {
+      // Redis unavailable — fall back to in-memory limiter.
+      // This should never happen in production. Log at error level so it surfaces in Vercel logs.
+      console.error('[RateLimit] Redis call failed, falling back to in-memory limiter:', err)
       isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
     }
   } else {
@@ -173,8 +179,14 @@ async function applyRateLimit(request: NextRequest, requestId: string): Promise<
 }
 
 export default clerkMiddleware(async (auth, request) => {
+  // SEC-05: Strip CVE-2025-29927 exploitation vector at edge
+  // The x-middleware-subrequest header is used by the Next.js middleware
+  // bypass vulnerability. Strip it unconditionally before any auth checks.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.delete('x-middleware-subrequest')
+
   // Generate request ID for tracing
-  const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
+  const requestId = requestHeaders.get('x-request-id') || crypto.randomUUID()
 
   // Apply rate limiting to API routes
   const rateLimitResponse = await applyRateLimit(request, requestId)
@@ -189,7 +201,7 @@ export default clerkMiddleware(async (auth, request) => {
   // Inject request ID header for downstream use
   const response = NextResponse.next({
     request: {
-      headers: new Headers(request.headers),
+      headers: requestHeaders,
     },
   })
   response.headers.set('x-request-id', requestId)
