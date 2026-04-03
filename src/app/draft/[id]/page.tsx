@@ -30,6 +30,8 @@ import { DraftRoomLoading, TeamStatusSkeleton } from '@/components/ui/loading-st
 import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary'
 import { useTurnNotifications } from '@/hooks/useTurnNotifications'
 import { useDraftRealtime } from '@/hooks/useDraftRealtime'
+import { DraftRealtimeContext } from './DraftRealtimeContext'
+import { TurnStateOverlay } from '@/components/draft/TurnStateOverlay'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
 import { getMaxAffordableCost } from '@/utils/budget-feasibility'
 import { useDraftSession } from '@/hooks/useDraftSession'
@@ -436,10 +438,7 @@ export default function DraftRoomPage() {
   })
 
   // --- Realtime (stays in page.tsx due to tight coupling with pickInFlightRef) ---
-  const {
-    connectionStatus: realtimeConnectionStatus,
-    reconnect: realtimeReconnect,
-  } = useDraftRealtime(draftState?.draft?.id || null, userId, {
+  const realtimeResult = useDraftRealtime(draftState?.draft?.id || null, userId, {
     enabled: !!draftState?.draft?.id,
     refreshDebounce: 300,
     onRefreshNeeded: async () => {
@@ -486,6 +485,7 @@ export default function DraftRoomPage() {
       setTimeout(() => router.push('/my-drafts?deleted=true'), 1000)
     }
   })
+  const { connectionStatus: realtimeConnectionStatus, reconnect: realtimeReconnect } = realtimeResult
 
   const connectionStatus = useMemo(() => {
     if (realtimeConnectionStatus.status === 'connected') return 'online'
@@ -509,8 +509,6 @@ export default function DraftRoomPage() {
     timeLimit: draftState?.draftSettings?.timeLimit
   })
 
-  // --- Your-turn flash overlay ---
-  const [showTurnFlash, setShowTurnFlash] = useState(false)
   // --- Draft completion celebration ---
   const [showCelebration, setShowCelebration] = useState(false)
 
@@ -640,8 +638,6 @@ export default function DraftRoomPage() {
 
           if (draftState.userTeamId === draftState.currentTeam) {
             draftSounds.play('your-turn')
-            setShowTurnFlash(true)
-            setTimeout(() => setShowTurnFlash(false), 500)
             notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
 
             if (actions.preDraftPokemonId) {
@@ -815,7 +811,11 @@ export default function DraftRoomPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background transition-colors duration-500 draft-room-mobile overflow-x-hidden max-w-[100vw]">
+    <DraftRealtimeContext.Provider value={realtimeResult}>
+    <div
+      className="min-h-screen bg-background transition-colors duration-500 draft-room-mobile overflow-x-hidden max-w-[100vw]"
+      data-turn-state={isUserTurn ? 'active' : 'waiting'}
+    >
       <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 max-w-screen-2xl">
         {/* Header */}
         <div className="mb-3 sm:mb-4 flex items-center justify-between gap-2 sm:gap-3 px-1">
@@ -1390,21 +1390,14 @@ export default function DraftRoomPage() {
       {/* Auth modal for join-from-link flow */}
       <AuthModal isOpen={showJoinAuthModal} onClose={() => setShowJoinAuthModal(false)} />
 
-      {/* Your-turn flash overlay */}
-      {showTurnFlash && (
-        <div
-          className="fixed inset-0 z-50 pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle at center, rgba(74,222,128,0.25), transparent 70%)',
-            animation: 'turnFlashFade 0.5s ease-out forwards',
-          }}
-        />
-      )}
+      {/* Turn transition overlay — fires only on false->true transition of isUserTurn */}
+      <TurnStateOverlay isUserTurn={isUserTurn || false} />
 
       {/* Draft completion celebration */}
       <ConfettiCelebration show={showCelebration} />
       {/* Draft Room Tour */}
       <DraftTour />
     </div>
+    </DraftRealtimeContext.Provider>
   )
 }
