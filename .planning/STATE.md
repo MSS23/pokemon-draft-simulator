@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-last_updated: "2026-04-03T12:41:38.758Z"
+status: verifying
+last_updated: "2026-04-03T12:47:30.289Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 0
+  completed_plans: 2
+  percent: 50
 ---
 
 # STATE.md
@@ -18,17 +18,17 @@ progress:
 ## Current Milestone
 
 **Milestone 6:** Draft UX Overhaul
-**Status:** Executing Phase 27
-**Next action:** Execute 27-02
+**Status:** Phase 27 complete — ready for Phase 28
+**Next action:** Execute Phase 28 (Host Command Bar)
 
 ## Current Position
 
-Phase: 27 (Foundation) — EXECUTING
+Phase: 27 (Foundation) — COMPLETE
 Plan: 2 of 2
-Status: Executing Phase 27
-Last activity: 2026-04-03 -- Completed 27-01-PLAN.md
+Status: Phase 27 complete — ready for Phase 28
+Last activity: 2026-04-03
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: [█████░░░░░] 50%
 | Phase | Plan | Duration | Tasks | Files |
 | ----- | ---- | -------- | ----- | ----- |
 | 27-foundation | 01 | 6m | 1 | 4 |
+| 27-foundation | 02 | 8m | 2 | 2 |
 
 *Updated after each plan completion*
 
@@ -87,7 +88,9 @@ Phase 34 (Post-Draft Continuity) — INDEPENDENT, run parallel to 27–30
 - `/spectate/[id]` 308 redirect preserved indefinitely — Discord/Reddit links must not break
 - [27-01] ViewerRole derives from DB participants data (is_host, team_id) rather than URL params to prevent permission drift
 - [27-01] CSS turn-state animations use box-shadow and opacity only (compositor-only) to prevent Android jank per TURN-04
+- [27-02] TurnStateOverlay receives isUserTurn as prop (not Zustand selector) to prevent infinite re-render bug class (ref: useWishlistSync 2026-03-04)
+- [27-02] DraftRealtimeContext.Provider wraps only main drafting return (not early loading/error returns) — provider only needed when subscription is active
 
 ## Last Updated
 
-2026-04-03 -- 27-01 complete
+2026-04-03 -- 27-02 complete

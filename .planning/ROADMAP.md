@@ -32,7 +32,7 @@
 
 **Milestone Goal:** Restructure all drafting pages into a modern, intuitive experience with clear spatial hierarchy, dramatic turn-state shifts, and unified views for managers, participants, and spectators.
 
-- [ ] **Phase 27: Foundation** — CSS custom properties, ViewerRole enum, TurnStateOverlay, and DraftRealtimeContext established before any structural changes
+- [x] **Phase 27: Foundation** — CSS custom properties, ViewerRole enum, TurnStateOverlay, and DraftRealtimeContext established before any structural changes (completed 2026-04-03)
 - [ ] **Phase 28: Host Command Bar** — Persistent slim host command strip in sticky header plus Ctrl+K command palette replaces buried collapsible controls
 - [ ] **Phase 29: Activity Feed Integration** — DraftActivityFeed always-visible in main layout instead of slide-in sidebar overlay
 - [ ] **Phase 30: Layout Region Extraction** — Three-zone desktop layout with resizable panels; page.tsx reduced to a thin coordinator
@@ -55,10 +55,10 @@
   3. A `ViewerRole` type (`host | participant | spectator | lobby`) exists in `useDraftSession` and is correctly derived from the DB participants table — not from a URL parameter
   4. `DraftRealtimeContext` is mounted at the page-level coordinator and all subscription hooks read from it — the WebSocket channel does not tear down and remount when any child component re-renders
   5. `page.tsx` exposes a thin coordinator surface where domain hooks are called exactly once and props are forwarded to named region components (structure committed, JSX extraction begins)
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 27-01-PLAN.md — DraftRealtimeContext, ViewerRole, CSS custom properties, and test scaffold
-- [ ] 27-02-PLAN.md — TurnStateOverlay component and page.tsx integration (context provider, data attribute, overlay replacement)
+- [x] 27-02-PLAN.md — TurnStateOverlay component and page.tsx integration (context provider, data attribute, overlay replacement)
 **UI hint**: yes
 
 ### Phase 28: Host Command Bar
@@ -148,7 +148,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 27. Foundation | 1/2 | In Progress|  |
+| 27. Foundation | 2/2 | Complete   | 2026-04-03 |
 | 28. Host Command Bar | 0/? | Not started | - |
 | 29. Activity Feed Integration | 0/? | Not started | - |
 | 30. Layout Region Extraction | 0/? | Not started | - |
