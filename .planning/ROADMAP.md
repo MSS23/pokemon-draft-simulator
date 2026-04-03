@@ -26,7 +26,11 @@
   2. Production Upstash Redis rate limiter is confirmed active (not the in-memory fallback) — verified by checking that rate limit state persists across a Vercel cold start cycle
   3. Any HTTP request containing the `x-middleware-subrequest` header is stripped at the edge before reaching application middleware
   4. `npm audit` returns zero critical or high CVEs, or all findings are documented with accepted-risk justification
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 23-01-PLAN.md — Middleware CVE strip, Upstash Redis logging hardening, npm audit CI gate
+- [ ] 23-02-PLAN.md — Supabase spend cap and billing alert (dashboard checkpoint)
 
 ### Phase 24: Application Security Hardening
 **Goal**: Authenticated routes enforce Clerk identity at the handler level, CSP removes unsafe directives, all mutation inputs are validated server-side, and CORS is locked to production domains
@@ -70,7 +74,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 23. Critical Fixes & Cost Safeguards | 0/? | Not started | - |
+| 23. Critical Fixes & Cost Safeguards | 0/2 | Planned | - |
 | 24. Application Security Hardening | 0/? | Not started | - |
 | 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |
