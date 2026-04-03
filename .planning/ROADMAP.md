@@ -9,7 +9,7 @@
 ## Phases
 
 - [x] **Phase 23: Critical Fixes & Cost Safeguards** — Production environment verified safe, billing guarded, CVE defense-in-depth applied with zero app code changes (completed 2026-04-03)
-- [ ] **Phase 24: Application Security Hardening** — Auth enforcement, CSP nonce migration, input sanitization, and CORS close concrete exploit vectors
+- [x] **Phase 24: Application Security Hardening** — Auth enforcement, CSP nonce migration, input sanitization, and CORS close concrete exploit vectors (completed 2026-04-03)
 - [ ] **Phase 25: Supabase Scalability & RLS Hardening** — RLS indexes, broadcast migration for picks/bids, and channel cleanup eliminate per-subscriber fan-out cost
 - [ ] **Phase 26: Performance, Caching & Load Testing** — CDN caching, query staleTime optimization, monitoring dashboard, and k6 load tests validate the hardened stack
 
@@ -47,7 +47,7 @@ Plans:
 Plans:
 - [x] 24-01-PLAN.md — Clerk auth enforcement on mutating API routes + rate limit key hardening (SEC-01, RATE-02, RATE-03, RATE-04)
 - [x] 24-02-PLAN.md — CSP nonce migration, unsafe-eval removal (SEC-02)
-- [ ] 24-03-PLAN.md — CORS restriction, guest write-path validation, input sanitization (SEC-03, SEC-04, SEC-07)
+- [x] 24-03-PLAN.md — CORS restriction, guest write-path validation, input sanitization (SEC-03, SEC-04, SEC-07)
 
 ### Phase 25: Supabase Scalability & RLS Hardening
 **Goal**: Real-time draft events flow through broadcast channels instead of postgres_changes fan-out, RLS policies execute without per-subscriber index scans, and connection leaks are eliminated
@@ -80,7 +80,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 23. Critical Fixes & Cost Safeguards | 2/2 | Complete    | 2026-04-03 |
-| 24. Application Security Hardening | 2/3 | In Progress|  |
+| 24. Application Security Hardening | 3/3 | Complete   | 2026-04-03 |
 | 25. Supabase Scalability & RLS Hardening | 0/? | Not started | - |
 | 26. Performance, Caching & Load Testing | 0/? | Not started | - |
 

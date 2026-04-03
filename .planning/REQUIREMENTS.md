@@ -11,11 +11,11 @@ Requirements for Milestone 5. Each maps to roadmap phases.
 
 - [x] **SEC-01**: Clerk `authorizedParties` enforced on all authenticated API routes and middleware
 - [x] **SEC-02**: CSP migrated from static to nonce-based (remove `unsafe-eval` and `unsafe-inline`)
-- [ ] **SEC-03**: Guest write-path validated server-side (guest ID verified before mutations)
-- [ ] **SEC-04**: CORS restricted to production domain(s) only
+- [x] **SEC-03**: Guest write-path validated server-side (guest ID verified before mutations)
+- [x] **SEC-04**: CORS restricted to production domain(s) only
 - [x] **SEC-05**: `x-middleware-subrequest` header stripped at edge (CVE-2025-29927 defense-in-depth)
 - [ ] **SEC-06**: Guest sessions issued server-side via httpOnly cookie (replace localStorage IDs)
-- [ ] **SEC-07**: Input sanitization audit — all API routes validated with Zod schemas, HTML sanitized with DOMPurify
+- [x] **SEC-07**: Input sanitization audit — all API routes validated with Zod schemas, HTML sanitized with DOMPurify
 
 ### Rate Limiting & Abuse Prevention
 
@@ -77,11 +77,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | SEC-01 | Phase 24 | Complete |
 | SEC-02 | Phase 24 | Complete |
-| SEC-03 | Phase 24 | Pending |
-| SEC-04 | Phase 24 | Pending |
+| SEC-03 | Phase 24 | Complete |
+| SEC-04 | Phase 24 | Complete |
 | SEC-05 | Phase 23 | Complete |
 | SEC-06 | Phase 25 | Pending |
-| SEC-07 | Phase 24 | Pending |
+| SEC-07 | Phase 24 | Complete |
 | RATE-01 | Phase 23 | Complete |
 | RATE-02 | Phase 24 | Complete |
 | RATE-03 | Phase 24 | Complete |
