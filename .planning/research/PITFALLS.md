@@ -1,496 +1,394 @@
-# Domain Pitfalls: Security Hardening & Scalability Audit
+# Pitfalls Research
 
-**Domain:** Adding security hardening, rate limiting, cost optimization, and scalability to an existing Next.js 15 + Supabase + Clerk real-time draft platform
+**Domain:** Real-time draft UX overhaul — restructuring drafting pages, unified views, and dramatic turn-state transitions on an existing Next.js 15 + Supabase + Zustand platform
 **Researched:** 2026-04-03
-**Overall Confidence:** HIGH for Supabase/Clerk integration issues (official docs verified); MEDIUM for scalability thresholds (community-verified)
-
----
-
-## Severity Rankings
-
-| Severity | Definition |
-|----------|-----------|
-| CRITICAL | Causes production outage, data breach, or complete auth bypass |
-| HIGH | Breaks core functionality for a class of users, or exposes real data |
-| MODERATE | Degrades experience, incorrect security assumptions, or causes billing surprises |
-| LOW | Wasted work, security theater, or minor friction |
+**Confidence:** HIGH (grounded in this app's actual code, known bugs, prior infinite-loop post-mortem, and real component structure)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: RLS Policy Breaks Realtime Subscriptions (Supabase-Specific)
+### Pitfall 1: Subscription Teardown During Component Restructuring
 
-**Severity:** CRITICAL
-**Phase:** Security Audit / RLS Audit
+**What goes wrong:**
+When components that own subscriptions are refactored — split into panels, merged into layouts, or repositioned in the tree — `useEffect` cleanup functions fire on unmount. Moving the `useDraftRealtime` hook from the monolithic draft page into a new layout wrapper, or changing which component mounts `DraftRealtimeManager`, will cause the WebSocket channel to be torn down and re-created. During re-creation (typically 200–800ms) picks or turn-change events can be lost. If the draft is live during this window, a client ends up with stale turn state — the exact class of bug already documented in the `pickInFlightRef` fix.
 
-**What goes wrong:** You audit existing RLS policies and tighten them. Realtime subscriptions stop delivering events to some or all participants. Picks no longer propagate. The draft room appears frozen.
+**Why it happens:**
+React's effect model ties subscription lifetime to component lifetime. When the component calling `useDraftRealtime` unmounts (even briefly due to layout restructuring), the cleanup path in the hook calls `manager.cleanup()`, which unsubscribes all `postgres_changes` listeners. The new mount re-subscribes, but any events that fired between unmount and the new `subscribe()` acknowledgment are silently lost.
 
-**Why it happens:** Supabase Realtime enforces RLS at the subscription layer. When a `postgres_changes` subscription is active, Supabase checks whether the connected user's JWT passes the SELECT policy for the affected row before broadcasting the event. Tightening a SELECT policy that was previously permissive (e.g., `USING (true)`) to require a specific user ID match will cause the Realtime server to silently drop events for rows the user "can't see" according to the new policy — even if the client already has that data on screen.
+In `src/hooks/useDraftRealtime.ts`, the manager is created in a `useEffect` with `[draftId, userId]` dependencies. Any parent refactor that changes the identity of `draftId` or `userId` props (e.g., because the new layout shell resolves `userId` independently from `useDraftSession`) triggers a full subscription cycle.
 
-**The specific trap for this codebase:** The `drafts`, `teams`, `picks`, and `participants` tables are all subscribed via `DraftRealtimeManager` (`src/lib/draft-realtime.ts`). If you add a row-scoped SELECT policy to `picks` that requires `team_id IN (SELECT id FROM teams WHERE draft_id = $draft_id AND user_id = auth.uid())`, spectators and non-team participants will stop receiving pick events entirely — because those rows do not match their user.
+**How to avoid:**
+- Hoist `useDraftRealtime` to the highest stable component in the new layout — the route-level page component, not a panel or sidebar subcomponent.
+- Wrap `DraftRealtimeManager` in a React context (`DraftRealtimeContext`) so child panels consume events without owning the subscription. The context provider lives at the page level and never unmounts during layout transitions.
+- Before any structural refactor, add a console assertion: log when `DraftRealtimeManager` is created. If the log fires more than once per page session without a deliberate reconnect, a structural issue is causing re-mounts.
+- After restructuring, verify `manager.channel.state === 'joined'` (not `'joining'`) 2 seconds after page load.
 
-**Consequences:** Silent data freeze in draft rooms. All participants still see the UI as connected (WebSocket is alive), but events stop arriving. This is the hardest category of bug to diagnose because there is no error thrown.
+**Warning signs:**
+- Console shows repeated `[UseDraftRealtime] Creating DraftRealtimeManager` logs during normal navigation.
+- Presence user counts flicker to 0 and back without disconnects.
+- `connectionStatus.status` cycles `disconnected → connecting → connected` after layout changes.
+- Other clients see picks that the picker's own UI does not reflect (identical to the previously fixed race condition).
 
-**Prevention:**
-- Keep SELECT policies on broadcast tables (picks, teams, drafts) permissive for rows within the same draft (`USING (draft_id = $draft_id)` not `USING (user_id = auth.uid())`)
-- Use INSERT/UPDATE/DELETE policies for mutation control; use SELECT policies only to control visibility, not participation
-- After tightening any RLS policy, run the full subscription test: open two browser tabs as different users, make a pick, confirm both tabs update
-- Check the Supabase dashboard "Realtime" logs for "Policy check failed" entries after any RLS migration
-
-**Detection:** Pick events not received by spectators or non-picking participants; Supabase Realtime inspector shows messages sent from server but not delivered to client.
-
-**Sources:** [Supabase Realtime RLS Issue #35195](https://github.com/supabase/supabase/issues/35195), [Supabase RLS + Realtime Fix (Medium)](https://medium.com/@kidane10g/supabase-realtime-stops-working-when-rls-is-enabled-heres-the-fix-154f0b43c69a)
-
----
-
-### Pitfall 2: Clerk JWT Claims Do Not Satisfy Supabase auth.uid() in RLS
-
-**Severity:** CRITICAL
-**Phase:** Security Audit / RLS Audit
-
-**What goes wrong:** You write new RLS policies using `auth.uid()` for per-user row access. Policies silently pass or fail incorrectly because Clerk user IDs are strings (`user_abc123`) while Supabase's `auth.uid()` function returns a UUID. The mismatch causes every RLS check to fail, returning empty result sets instead of an error.
-
-**Why it happens:** As of April 2025, Clerk uses its own JWT template for Supabase integration (deprecated as of April 1 2025 in favor of native Supabase integration). The `sub` claim in a Clerk-issued JWT is a Clerk user ID string, not a UUID. Supabase's `auth.uid()` function casts `sub` to `uuid` type. Any Clerk user ID will fail that cast silently. New RLS policies written with `auth.uid()` look correct but always return `NULL`, causing every policy check to evaluate to false.
-
-**The specific trap for this codebase:** `FIX-RLS-POLICIES.md` in the codebase already documents a Clerk/Supabase JWT mismatch. Adding new policies during the security audit without checking whether the existing workaround (custom `requesting_user_id()` SQL function or `auth.jwt() -> 'sub'`) is consistently applied will create a split: some tables use the workaround correctly, newly-audited tables use `auth.uid()` and silently break.
-
-**Consequences:** All INSERT/UPDATE operations on newly-secured tables fail. Users cannot make picks. Draft creation fails silently. No error appears in the browser because the RLS policy returns empty, not an error.
-
-**Prevention:**
-- Audit every existing RLS policy in `FIX-RLS-POLICIES.md` before writing new ones — identify which function is currently used instead of `auth.uid()`
-- Create a single SQL helper function (e.g., `current_user_id()`) that correctly extracts the user identifier from the Clerk JWT, and use only that function in every RLS policy
-- Never mix `auth.uid()` and custom claims functions across tables
-- After the migration to Supabase's native Clerk integration (recommended by Clerk as of April 2025), retest every policy
-
-**Detection:** INSERT queries return empty rows instead of error; `SELECT auth.uid()` from a Clerk-authenticated session returns NULL; RLS policies appear correct but block all mutations.
-
-**Sources:** [Clerk Supabase Integration Docs](https://clerk.com/docs/guides/development/integrations/databases/supabase), [Supabase Clerk Third-Party Auth](https://supabase.com/docs/guides/auth/third-party/clerk), [Supabase Discussion #33091](https://github.com/orgs/supabase/discussions/33091)
+**Phase to address:**
+The very first phase that touches layout structure. Create the `DraftRealtimeContext` provider before splitting any panels. All subsequent phases consume events from context rather than re-subscribing.
 
 ---
 
-### Pitfall 3: CSP `connect-src` Missing Clerk FAPI Hostname
+### Pitfall 2: Zustand Selector Instability in New Panel Components
 
-**Severity:** CRITICAL
-**Phase:** Security Hardening / CSP Implementation
+**What goes wrong:**
+This app already hit this exact bug in `useWishlistSync.ts` — the `() => []` inline selector created a new function reference on every render, causing Zustand to re-evaluate, triggering another render, creating an infinite loop (React #185). When the component tree is restructured, new components are written that read from `useDraftStore`. If those components define selectors inline, the loop recurs. During a UX overhaul, new layout components are written quickly; the `EMPTY_SELECTOR` / `EMPTY_ARRAY` patterns learned from the prior bug are easy to forget.
 
-**What goes wrong:** You add a Content-Security-Policy header (or tighten the existing one in `next.config.ts`). Clerk authentication stops working. The sign-in modal loads but token refresh silently fails. Sessions expire and users cannot re-authenticate without a page reload.
+The risk is highest in the unified participant/spectator view because new conditional logic like `isSpectator ? spectatorSelector : participantSelector` creates a new function reference on every render whenever `isSpectator` is re-evaluated.
 
-**Why it happens:** The existing CSP in `next.config.ts` (line 125) includes `connect-src 'self' https://*.supabase.co wss://*.supabase.co ...` but does NOT include Clerk's Frontend API (FAPI) hostname. Every Clerk request (session refresh, token validation, OAuth handshake) is a `fetch()` call to your Clerk FAPI URL (e.g., `https://clerk.your-domain.com` in production or `https://aware-skunk-42.clerk.accounts.dev` in development). CSP blocks these as violations. The browser shows no network error in normal mode — CSP violations silently fail in production.
+**Why it happens:**
+`useDraftStore(selector)` uses referential equality on the selector function. An inline selector (e.g., `useDraftStore(state => state.teams.find(t => t.id === teamId))`) is a new function every render. Zustand cannot use its cache, re-runs on every store update, and when the selector's return value also changes (because `.find()` returns a new object reference), React schedules another render, which creates another new selector.
 
-**Required CSP additions for Clerk + Supabase + existing services:**
+**How to avoid:**
+- All selectors for new layout panels must be defined as named exports in `src/stores/selectors.ts`. No inline selectors in component files.
+- For parameterized selectors, call the factory inside `useMemo`, not directly in the `useDraftStore` call:
+  ```typescript
+  // Correct (already used in useWishlistSync.ts):
+  const wishlistSelector = useMemo(
+    () => participantId ? selectUserWishlist(participantId) : EMPTY_SELECTOR,
+    [participantId]
+  )
+  const items = useDraftStore(wishlistSelector)
 
-| Directive | Required Values |
-|-----------|----------------|
-| `connect-src` | `https://[your-fapi-hostname]` |
-| `script-src` | `https://[your-fapi-hostname]` `https://challenges.cloudflare.com` |
-| `img-src` | `https://img.clerk.com` |
-| `frame-src` | `https://challenges.cloudflare.com` (existing `https://discord.com` and `https://accounts.google.com` may already be present) |
-| `worker-src` | `'self' blob:` |
+  // Wrong — triggers infinite loop:
+  const items = useDraftStore(state =>
+    participantId ? selectUserWishlist(participantId)(state) : []
+  )
+  ```
+- For the unified view's role-conditional selector, use a stable reference chosen between two named selectors: `const selector = isSpectator ? selectSpectatorView : selectParticipantView`. The variable reference is stable between renders when `isSpectator` doesn't change.
+- Add to `CLAUDE.md`: any `useDraftStore(state => ...)` with an inline arrow function must be wrapped in `useCallback` or moved to `selectors.ts`. Treat this as a lint-enforced rule.
 
-**The specific trap:** The existing CSP uses a static string in `next.config.ts` (`headers()` function). The Clerk FAPI hostname is different between development and production instances. A hardcoded production FAPI domain breaks development, and hardcoding the development domain breaks production. The correct pattern is to build the CSP dynamically from an environment variable (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` can be parsed to derive the FAPI URL, or set `NEXT_PUBLIC_CLERK_FAPI_URL` explicitly).
+**Warning signs:**
+- React DevTools profiler shows a component rendering >5 times per second with no user interaction.
+- Browser tab freezes during the "your turn" transition animation.
+- Any hook referencing `useDraftStore` starts logging continuously.
+- CPU usage climbs steadily on the draft page without picks being made.
 
-**Additional trap — `unsafe-eval` in `script-src`:** The existing CSP includes `'unsafe-eval'` in `script-src`, which was likely added to satisfy a Supabase or build dependency. Removing it as part of "tightening" will break Clerk's Cloudflare bot-protection challenge script.
-
-**Consequences:** Clerk authentication silently fails in production after CSP update. Users are logged out and cannot log back in. Guest users are unaffected, but authenticated features (dashboard, settings) are dead.
-
-**Prevention:**
-- Make CSP generation dynamic: derive Clerk FAPI URL from environment variable, not hardcode
-- Validate CSP with Clerk's official domains list before deploying (see Clerk CSP docs linked in sources)
-- Test the full auth flow (sign in, token refresh after 60 seconds, OAuth) after any CSP change
-- Use `Content-Security-Policy-Report-Only` header in staging to catch violations before shipping
-
-**Detection:** Browser console CSP violation reports after login attempts; `clerk.loaded` never fires; `auth.protect()` calls in middleware redirect users on every request.
-
-**Sources:** [Clerk CSP Headers Guide](https://clerk.com/docs/guides/secure/best-practices/csp-headers), [Next.js CSP Guide](https://nextjs.org/docs/pages/guides/content-security-policy)
-
----
-
-### Pitfall 4: Next.js CVE-2025-29927 Middleware Bypass (If Unpatched)
-
-**Severity:** CRITICAL
-**Phase:** Security Audit (immediate check)
-
-**What goes wrong:** Any attacker can send `x-middleware-subrequest: pages/_middleware` header to any protected route and bypass all middleware-based auth checks. The entire `isProtectedRoute` matcher in `src/middleware.ts` is skipped.
-
-**Why it happens:** CVE-2025-29927 (CVSS 9.1, disclosed March 2025) allows complete bypass of Next.js middleware via a crafted internal header. Affected versions: 11.1.4 through 15.2.2. Fixed in 15.2.3+.
-
-**The specific trap for this codebase:** The middleware in `src/middleware.ts` is the PRIMARY auth enforcement mechanism for protected routes (`/dashboard`, `/admin`, `/settings`). If the Next.js version is below 15.2.3, this check is completely bypassable by any external request with the forged header.
-
-**Consequences:** Unauthenticated users access `/admin`, `/dashboard`, and `/settings` routes. League commissioner tools, user data exports, and admin panels are exposed.
-
-**Prevention:**
-- Run `npm ls next` to check current version immediately
-- Upgrade to `next@15.2.3` or higher before shipping any security work
-- Even after patching, do NOT rely solely on middleware for auth — each server component and API route must independently verify auth using Clerk's `auth()` server-side function (defense in depth)
-- Vercel's WAF can block the `x-middleware-subrequest` header as an additional layer if you cannot upgrade immediately
-
-**Detection:** `curl -H 'x-middleware-subrequest: middleware' https://draftpokemon.com/dashboard` — if this returns 200 instead of redirect to sign-in, the system is vulnerable.
-
-**Sources:** [Next.js CVE-2025-29927 Advisory](https://nextjs.org/blog/cve-2025-29927), [Clerk Analysis of CVE-2025-29927](https://clerk.com/blog/cve-2025-29927), [Datadog Security Labs Analysis](https://securitylabs.datadoghq.com/articles/nextjs-middleware-auth-bypass/)
+**Phase to address:**
+Before any new component is written. Create placeholder selector exports in `selectors.ts` for every new panel, and add the rule to `CLAUDE.md`. Verify with the React DevTools profiler after each new component is added.
 
 ---
 
-### Pitfall 5: Supabase Service Role Key Leaked Via `NEXT_PUBLIC_` Prefix or `'use client'` Import
+### Pitfall 3: Mount Storm When Adding Always-Visible Panels
 
-**Severity:** CRITICAL
-**Phase:** Security Audit
+**What goes wrong:**
+The current draft page lazy-loads `DraftControls`, `WishlistManager`, and `DraftActivitySidebar` with `dynamic()`. They are conditionally rendered (sidebar gated by `isActivitySidebarOpen`). When these become always-visible panels in the new layout, they mount on initial load. Each panel has its own `useEffect` subscriptions, TanStack Query fetches, or Zustand subscriptions. Mounting 4–5 panels simultaneously creates a "mount storm" — all effects fire together, network requests pile up, and the React scheduler is overwhelmed, causing a noticeable freeze on draft page load.
 
-**What goes wrong:** During the security audit, you add admin-level operations (e.g., bulk deleting a draft, system-level fixes) and create a Supabase admin client using the service role key. The file gets a `'use client'` directive added later, or the key is named `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`, causing it to be bundled into client-side JavaScript.
+`WishlistManager` calls `useWishlistSync`, which creates a Supabase channel. `DraftControls` may fetch admin state. If both run setup effects in the same React render cycle, there will be duplicate channel creation attempts in Supabase.
 
-**Why it happens:** Next.js prefixes all `NEXT_PUBLIC_*` environment variables into the client bundle at build time. Any variable with this prefix is visible in browser DevTools → Sources → _next/static. The service role key bypasses ALL RLS policies — it is a root-level database credential.
+**Why it happens:**
+`dynamic()` with `ssr: false` defers the JS bundle load but does not stagger mount timing. When conditional rendering (`isActivitySidebarOpen && <Sidebar />`) is replaced with unconditional rendering, the component moves from never-mounted to always-mounted. All panels race to initialize at once.
 
-**Consequences:** Any visitor to the site can extract the service role key from the JS bundle, perform full CRUD on every table, delete all draft data, extract all user IDs, and inject malicious picks.
+**How to avoid:**
+- Gate heavy panels behind `draftState !== null` — render a skeleton (using the existing `DraftRoomLoading` pattern) until the first draft state load completes. This staggers initialization: critical draft state loads first, panels initialize after.
+- For `WishlistManager` specifically: keep `enabled={draftState !== null && !!participantId}` in `useWishlistSync`. This prevents the wishlist Supabase channel from registering with a null `participantId`.
+- Keep `dynamic()` lazy imports even for always-visible panels. `dynamic()` handles JS splitting; mount timing is a separate concern controlled by conditional rendering.
+- Stagger secondary panel initialization: subscribe to critical draft state first, then enable activity feed and host controls 100–200ms later.
 
-**Prevention:**
-- Name the key `SUPABASE_SERVICE_ROLE_KEY` (no `NEXT_PUBLIC_` prefix) — server-side only
-- Add `import 'server-only'` at the top of any file that creates the service-role Supabase client
-- Never use the service role client in React components, even Server Components that will later be refactored to Client Components
-- Periodically grep the client bundle: `grep -r "service_role" .next/static/` — if it returns results, a key is exposed
+**Warning signs:**
+- Initial page load time increases by >500ms after adding panels.
+- Supabase dashboard shows duplicate channel subscriptions for the same draft ID.
+- TanStack Query DevTools shows the same query key fetched 2+ times in rapid succession on mount.
+- `[UseWishlistSync]` logs show initialization before `draftState` is loaded.
 
-**Detection:** Check `.next/static/chunks/` for the string `service_role` after a production build.
-
-**Sources:** [Supabase Understanding API Keys](https://supabase.com/docs/guides/api/api-keys), [Supabase Securing Your API](https://supabase.com/docs/guides/api/securing-your-api)
-
----
-
-## High Severity Pitfalls
-
-### Pitfall 6: Rate Limiting Blocks Legitimate Auction Bidders During Live Draft
-
-**Severity:** HIGH
-**Phase:** Rate Limiting Implementation
-
-**What goes wrong:** The `bids` rate limiter is configured at `120 requests/minute` (per the existing `src/middleware.ts`). In a competitive auction draft with 6 teams and a 30-second auction window, each team will submit 5-10 bids in rapid succession when the clock runs down. During a peak bidding moment, a single user can fire 8-12 bids in under 10 seconds, followed by a second burst when the next Pokemon goes to auction. With 6 teams, the shared IP rate limit (from `x-forwarded-for`) may be hit if multiple players are on the same network (e.g., a tournament venue's WiFi).
-
-**Why it happens:** Two specific problems with the current implementation:
-1. `getClientId()` in middleware falls back to IP address for unauthenticated users. Guest users from the same network (tournament venue, household) share one rate limit bucket. Burst bids from different people at a venue can cross-block.
-2. The in-memory fallback (3x limit) resets on every cold start. Vercel spins a new Lambda per request under high load — the in-memory limiter has zero cross-instance state. A user can hit 60 bids/minute from one Lambda instance and another 60 from the next cold start.
-
-**Consequences:** Real auction participants get 429 errors during the most critical moment of a draft. The user sees "Too many requests" and cannot complete their bid. They lose the auction despite being present and active.
-
-**Prevention:**
-- Use user ID (from Clerk JWT or guest ID cookie) as the rate limit key, not IP — this prevents shared-network collisions
-- For the `bids` limiter specifically, use a token bucket algorithm (not sliding window) with burst capacity: `Ratelimit.tokenBucket(10, '10 s', 30)` — allows 30 bids in bursts, refills at 10/10s
-- Upstash Redis is already integrated (`src/middleware.ts` lines 44-49) — ensure it is configured in the production Vercel environment or the fallback void applies
-- Never block bid API calls with a 429 that does not include a `Retry-After` header with a short value (2-5 seconds) so the client can auto-retry
-
-**Detection:** Monitor 429 rate on `/api/bids` during a test auction with 4+ active bidders. Any 429 during a live auction is a UX failure.
+**Phase to address:**
+The phase that converts the activity sidebar and host controls from slide-in/collapsible to always-visible. Add explicit `enabled` guards to all panel hooks before removing the conditional rendering gate.
 
 ---
 
-### Pitfall 7: In-Memory Rate Limiter Silently Reverts Under Vercel Serverless Scaling
+### Pitfall 4: iOS Safari Scroll Conflicts in Continuous Mobile Flow
 
-**Severity:** HIGH
-**Phase:** Rate Limiting Implementation
+**What goes wrong:**
+Replacing mobile tab-switching (`activeTab: 'pokemon' | 'team' | 'board'`) with continuous vertical scroll creates overlapping scroll contexts: the browser's viewport scroll, any `overflow-y-scroll` container inside the layout, and Radix UI `ScrollArea` components used in panels. iOS Safari has a documented behavior where `touch-action: none` applied by a parent element silently prevents all scroll events from propagating — the page appears frozen.
 
-**What goes wrong:** Upstash Redis is not configured in the production environment. The `InMemoryRateLimiter` fallback in `src/middleware.ts` (lines 12-33) is used instead. Under Vercel's default serverless scaling, each concurrent request may spawn a new Lambda function instance, each with its own empty in-memory state. The effective rate limit is `limit * 3 * (number of concurrent Lambda instances)` — functionally unlimited.
+`WishlistManager` uses drag-and-drop (`useDragAndDrop` hook). If this panel lives in the continuous scroll flow, its `touch-action: none` region captures swipes intended for page scroll.
 
-**Why it happens:** Vercel serverless functions are stateless by design. Each invocation is an independent process. The `inMemoryRateLimiter` Map is scoped to the Node.js process — it is not shared across instances. Under a moderate load spike (20 concurrent requests), Vercel may have 20 separate Lambda instances each with their own fresh rate limit counters. The comment in the code (`// Use 3x the limit since in-memory state resets between serverless invocations`) acknowledges this but does not solve it.
+**Why it happens:**
+iOS Safari does not fire `touchmove` events when a `touchstart` event's default is prevented anywhere in the event path. Framer Motion's drag handlers call `preventDefault()` on `touchstart` within drag targets. If a drag target is inline in the scroll flow (not inside a bounded panel), any scroll gesture starting over a draggable element is captured as a potential drag, and the page does not scroll.
 
-**Consequences:** Malicious users can bypass rate limits entirely without Redis by sending concurrent requests that hit different Lambda instances. DoS protection is illusory. The codebase has a warning log but no monitoring alert when Redis is missing.
+Additionally, `100vh` on iOS includes the browser chrome. `flex-1 overflow-y-auto` inside an `h-screen flex flex-col` Tailwind layout may fail to scroll if the parent's height isn't computed correctly — a known Tailwind/Safari interaction. The fix is `h-[100dvh]` (dynamic viewport height).
 
-**Prevention:**
-- Treat Redis configuration as a hard deployment requirement, not optional: block deployment (in CI or Vercel build settings) if `UPSTASH_REDIS_REST_URL` is not set for production
-- Add a `/api/health` check that explicitly reports whether Redis is connected, separate from the current health endpoint
-- Configure Upstash Redis via the Vercel integration (one-click in Vercel marketplace) so env vars are injected automatically into production
+**How to avoid:**
+- Keep `WishlistManager` inside a bounded, fixed-height container with its own scroll context and `overscroll-behavior: contain`. It must not be inline in the continuous page scroll flow.
+- Set `touch-action: pan-y` on drag handles (not `none`), which allows vertical scrolling while enabling horizontal drag.
+- Use `h-[100dvh]` (not `h-screen` or `h-[100vh]`) for the mobile layout root container.
+- Avoid nesting Radix `ScrollArea` inside another scrollable container. Radix's `ScrollArea` creates its own viewport and blocks native scroll bubbling.
+- Test on a physical iOS device (not Simulator) before shipping the mobile layout. The Simulator does not reproduce the touch capture bug.
 
-**Detection:** Check Vercel → Environment Variables for production scope — if `UPSTASH_REDIS_REST_URL` is absent, rate limiting is degraded. The console warning `[RateLimit] Upstash Redis not configured` will appear in Vercel function logs.
+**Warning signs:**
+- Page appears frozen after first drag gesture on iOS.
+- Pokemon grid fails to scroll when the wishlist is rendered in the same view.
+- Team roster list does not scroll on iPhone even though it scrolls on Android.
+- `overflow: hidden` appears on `body` (a Radix Dialog side effect that persists if dialog cleanup fails).
 
----
-
-### Pitfall 8: RLS Policy Performance Degradation From Missing Indexes on `auth.uid()` Columns
-
-**Severity:** HIGH
-**Phase:** RLS Audit / Performance at Scale
-
-**What goes wrong:** Adding or tightening RLS policies that filter by user ID works correctly in testing with a small dataset, then causes timeouts at scale because the columns referenced in the policy's `USING` clause are not indexed.
-
-**Why it happens:** A policy like `USING (host_id = requesting_user_id())` on the `drafts` table causes Postgres to evaluate `requesting_user_id()` once per row scanned. Without an index on `host_id`, every SELECT on `drafts` performs a full sequential scan. On the Free tier (limited compute), a table with 10,000 draft rows scanned by 50 concurrent users produces timeouts.
-
-**The specific trap:** The pattern `auth.uid()` (or a custom equivalent) in RLS policies triggers what Postgres calls an `initPlan` — the function is cached per-statement but still causes the planner to disable index-only scans for certain query shapes. Supabase's own documentation flags this as a common performance killer.
-
-**Consequences:** Draft creation timeouts at scale. Picks API slows from 2ms to 50ms+. Supabase's auto-pausing triggers on excessive compute usage.
-
-**Prevention:**
-- Index every column used in RLS `USING` clauses: `host_id`, `user_id`, `draft_id`, `team_id` on all tables
-- Wrap `auth.uid()` calls in a `(select auth.uid())` subquery to enable Postgres initPlan caching: `USING (host_id = (select auth.uid()))` — this tells the planner the value is stable for the statement
-- Use Supabase's Performance Advisor (Dashboard → Database → Performance) to detect missing indexes flagged by RLS policies
-- Test query performance with `EXPLAIN ANALYZE` before and after adding policies, using a dataset of at least 10,000 rows
-
-**Detection:** Supabase Dashboard → Performance Advisor shows `auth_rls_initplan` lint warning. Query times increase by 10x+ after adding new policies in a staging environment with realistic data volume.
-
-**Sources:** [Supabase RLS Performance Troubleshooting](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv), [Supabase Performance Advisor](https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0003_auth_rls_initplan)
+**Phase to address:**
+The mobile continuous scroll phase. Before shipping, test on at least one physical iPhone (dynamic island models have different address bar behavior from older iPhones).
 
 ---
 
-### Pitfall 9: Guest User IDs as Rate Limit Keys Are Trivially Spoofable
+### Pitfall 5: Turn-State Animation Causing Layout Thrashing
 
-**Severity:** HIGH
-**Phase:** Rate Limiting / Guest User Security
+**What goes wrong:**
+The planned "dramatic your-turn takeover" involves large visual changes when `isUserTurn` flips: expanding a command panel, changing background colors, animating a full-screen overlay. If these animations use layout-affecting CSS properties (`height`, `width`, `top`, `padding`, `margin`) rather than compositor-only properties (`transform`, `opacity`), the browser must run layout and paint on every animation frame. On mid-range Android devices, this causes visible jank at the exact moment users are most engaged.
 
-**What goes wrong:** The rate limiter in `src/middleware.ts` reads `request.cookies.get('user_id')` to identify guest users. A malicious user can send requests with arbitrary `user_id` cookie values, effectively rotating their identity with each request and bypassing per-user rate limits entirely.
+Framer Motion (re-added in M1 for landing/dashboard/sidebar) uses `transform` and `opacity` by default, but the `layout` prop on containers triggers layout animations, which force a full reflow. With 8 team roster cards, a Pokemon grid, and a progress bar all present, this reflow touches hundreds of DOM nodes per frame.
 
-**Why it happens:** Guest user IDs are generated client-side (`guest-{timestamp}-{random}`) and stored in localStorage. They're not cryptographically bound to any server-side session. The cookie-based fallback in middleware is unverified — any string passes as a user ID.
+**Why it happens:**
+The `layout` prop tells Framer Motion to animate when the component's position/size changes in the DOM. If the turn-state transition changes the size of a container (e.g., the command bar expanding from 60px to 200px), any `layout` child reflows. This is acceptable on low-frequency pages (results, landing) but causes sustained jank on the live draft page where turn changes happen every 30–60 seconds.
 
-**The additional attack vector:** A malicious actor can enumerate other guest users' IDs (they follow a predictable pattern if `Date.now()` is used) or fabricate IDs that collide with authenticated user IDs (`user_abc123` format). This can exhaust another user's rate limit bucket.
+**How to avoid:**
+- Drive the "your turn" visual shift exclusively with `opacity` and `transform: scale/translateY`. Do not change `height`, `width`, `padding`, or `margin` in the animation.
+- For the full-screen overlay: use `position: fixed` with `opacity: 0 → 1` rather than inserting/removing a DOM node. A fixed overlay does not cause layout reflow on the content beneath it.
+- Apply `will-change: transform, opacity` on the turn-state container only during the transition — not persistently (persistent `will-change` wastes GPU memory).
+- Do not use `AnimatePresence` + `layout` on the draft page. `AnimatePresence` is appropriate on the results page (lower frequency); on the live draft page, prefer CSS `transition-property: opacity, transform`.
+- Profile the animation with Chrome DevTools Performance tab at 4x CPU throttling before integrating. The metric to watch: "Layout" time in the flame chart must be 0ms during the animation.
 
-**Consequences:**
-- Rate limiting is bypassable by any motivated attacker with guest access
-- An attacker can DoS specific users by burning their rate limit quota using their predictable guest ID
-- Bulk draft creation (10 drafts/hour limit) can be bypassed by rotating cookies
+**Warning signs:**
+- Chrome DevTools shows "Layout" events during the `isUserTurn` transition.
+- React DevTools shows the entire draft page re-rendering on every animation frame.
+- The Pokemon grid flickers or jumps during the turn-state transition.
+- Frame rate drops below 30fps during pick notification on a throttled device.
 
-**Prevention:**
-- Fall back to IP-based limiting (not cookie-based) when no authenticated Clerk session is present — IP is harder to rotate than a cookie value
-- If guest sessions need separate tracking, issue a signed cookie server-side (using `crypto.createHmac` with a server secret) and verify the signature in middleware
-- Do not use the guest ID cookie value directly as a rate limit key without signature verification
-- Consider requiring Clerk authentication to create drafts (not just join them) — this eliminates guest abuse of creation endpoints while preserving the guest join experience
-
-**Detection:** Automated test: send 11 `POST /api/drafts` requests with different `user_id` cookie values from the same IP. If all succeed (no 429), the guest ID bypass is active.
+**Phase to address:**
+The turn-state clarity phase. Prototype the animation in isolation (a standalone route like `/test-turn-animation`) before integrating with live draft state. Validate compositor-only properties before connecting to real turn data.
 
 ---
 
-### Pitfall 10: Supabase Realtime Connection Count Multiplies During React StrictMode and Navigation
+### Pitfall 6: Spectator Route Migration Breaking Shared Links
 
-**Severity:** HIGH
-**Phase:** Supabase Connection Optimization
+**What goes wrong:**
+When `/spectate/[id]` is merged into `/draft/[id]?spectator=true`, existing spectator links shared in Discord stop working. VGC communities share spectator links before and during high-stakes drafts. If those links 404 or redirect to a blank page, it damages trust during the beta launch.
 
-**What goes wrong:** The Pro tier limit of 500 concurrent connections is consumed faster than expected because:
-1. React StrictMode (enabled in `next.config.ts` line 133: `reactStrictMode: true`) mounts and unmounts components twice in development, creating double subscriptions
-2. Client-side navigation in Next.js 15 App Router does not always trigger the full `useEffect` cleanup for page-level subscriptions before the new page mounts
-3. The `DraftRealtimeManager` in `src/lib/draft-realtime.ts` creates a channel per `draftId`. If a user navigates away and back (common during draft setup), the old channel may not be cleaned up before the new one is created
+**Why it happens:**
+Route merges are treated as implementation details, but URLs are public API contracts. The current app at `/spectate/[id]` uses `useDraftStateWithRealtime` and has distinct presence tracking (`spectator-${Date.now()}` IDs). If the file is deleted without a redirect, every link shared in Discord, Twitter, or pinned messages breaks permanently. The service worker (`public/sw.js`) may also cache the old route and serve stale 200 responses for redirected URLs.
 
-**Why it happens:** Supabase's `supabase.channel()` creates a new WebSocket channel each time it is called, even if a channel with the same name exists. If the previous channel was not explicitly unsubscribed, it remains open and counts against the connection limit. The documented fix (checking `supabase.getChannels()` before creating a new one) is not currently implemented.
+**How to avoid:**
+- Replace `src/app/spectate/[id]/page.tsx` with a 308 redirect. Do not delete the file:
+  ```typescript
+  // src/app/spectate/[id]/route.ts (route handler, not page)
+  import { redirect } from 'next/navigation'
+  export function GET(req: Request, { params }: { params: { id: string } }) {
+    redirect(`/draft/${params.id}?spectator=true`, 308)
+  }
+  ```
+  A 308 preserves the HTTP method and signals to crawlers the URL has permanently moved.
+- Before removing any internal navigation, audit all `router.push('/spectate/...')` and `href="/spectate/..."` occurrences in the codebase. There are at least 2 (the spectate button in draft setup, the back button in the spectate page). Update all internal links first.
+- After the redirect is deployed, bump the service worker cache version in `public/sw.js` to prevent cached 200s from masking the redirect.
 
-**Real connection count for this app:** With 6 participants in a draft room, each connecting to channels for `drafts`, `teams`, `picks`, `participants`, and `auctions` tables, plus presence — that is approximately 6 channels per participant. 6 people × 6 channels = 36 connections per draft room. 14 concurrent draft rooms = 504 connections, exceeding the Pro tier limit. With StrictMode double-mounting in development, this doubles to 72 channels per room in dev.
+**Warning signs:**
+- `router.push('/spectate/...')` calls remain in the codebase after the merge.
+- `curl -I https://draftpokemon.com/spectate/TESTCODE` returns 404 instead of 308.
+- Service worker logs show cache hits for `/spectate/` URLs after the redirect.
+- Discord link previews for old spectator URLs show a broken card.
 
-**Consequences:** New joiners cannot establish Realtime connections. Draft rooms silently degrade. Supabase project is suspended if over-quota on a sustained basis.
+**Phase to address:**
+The unified participant/spectator view phase. The redirect must be deployed before the old route is removed. Keep `/spectate/[id]` as a redirect indefinitely — do not delete it post-launch.
 
-**Prevention:**
-- The existing `DraftRealtimeManager` already uses a single-channel design for all draft events — confirm this is consistently used and not bypassed by older subscription code in the hooks that predate the refactor
-- Check `src/app/draft/[id]/page.tsx`, `src/lib/trade-service.ts`, and `src/app/league/[id]/trades/page.tsx` (all identified as using `supabase.channel()`) for channel cleanup on unmount
-- Add connection monitoring: log `supabase.getChannels().length` on mount in the draft page to detect accumulation
-- Use `supabase.removeAllChannels()` on page unload (`beforeunload` event) as a safety net for navigation-based leaks
+---
 
-**Detection:** Open the draft page, navigate away, navigate back 5 times. Check `supabase.getChannels().length` — if it is greater than expected (should be ~1), channels are leaking.
+### Pitfall 7: Permission Drift in Unified Participant/Spectator View
 
-**Sources:** [Supabase Realtime TooManyChannels Fix](https://supabase.com/docs/guides/troubleshooting/realtime-too-many-channels-error), [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits)
+**What goes wrong:**
+The current separation of `/draft/[id]` and `/spectate/[id]` provides a natural permission boundary. In the unified view, a single `isSpectator` flag gates all action surfaces: the pick button, wishlist, host controls, bid button, skip-turn button, and admin ping. If any check is missing, a spectator can trigger a mutation. Worse, `isSpectator` in `useDraftSession` is derived from `searchParams.get('spectator') === 'true'` — a URL parameter any user can remove.
+
+**Why it happens:**
+URL parameters are not auth. The current architecture trusts `isSpectator` from the URL because the routes were separated — spectators physically navigated to a different URL. In the unified view, the URL parameter becomes the only client-side gate. A user removing `?spectator=true` from the URL gets participant-level UI without being a registered participant. Supabase RLS will block the actual DB mutation, but the UI shows pick buttons and the user gets confusing error messages.
+
+**How to avoid:**
+- Derive `isSpectator` from the database state, not solely from the URL parameter. When `draftState` loads, check whether `userId` appears in `draftState.participants` with a `team_id`. If not, treat as spectator regardless of the URL:
+  ```typescript
+  const isSpectator = useMemo(() => {
+    if (isSpectatorParam) return true  // URL hint for initial load
+    if (!draftState?.participants || !userId) return false
+    const me = draftState.participants.find(p => p.userId === userId)
+    return !me?.team_id  // no team assignment = spectator
+  }, [isSpectatorParam, draftState?.participants, userId])
+  ```
+- The URL parameter is a valid initial hint (to show the spectator skeleton before `draftState` arrives) but must be superseded by the database check once data loads.
+- Introduce a single `userRole: 'host' | 'participant' | 'spectator' | 'unknown'` derived value that all permission checks use, rather than scattered `isHost &&` / `!isSpectator &&` conditionals throughout JSX.
+- Apply the same pattern to `isHost`: derive from `participants.find(p => p.userId === userId)?.is_host`, not from `isHostParam` URL parameter.
+
+**Warning signs:**
+- Removing `?spectator=true` from the URL in DevTools shows pick controls to a non-participant.
+- A new user navigating directly to `/draft/[id]` without a join flow sees pick controls rather than a join prompt.
+- Setting `?isHost=true` in the URL exposes host controls to a non-host.
+
+**Phase to address:**
+The unified view phase. Treat role derivation as a security concern. Write a test: `isSpectator should be true when userId is not in participants list, regardless of URL param`.
 
 ---
 
 ## Moderate Pitfalls
 
-### Pitfall 11: CSP `unsafe-eval` Prevents Tightening Without Breaking Supabase
+### Pitfall 8: League Hub Tab Consolidation Losing Discoverability
 
-**Severity:** MODERATE
-**Phase:** CSP Hardening
+**What goes wrong:**
+Reducing from 7+ tabs to a 3-view layout risks hiding features that infrequent users rely on. If "Trades" and "Free Agents" are consolidated under "Management," a commissioner processing a trade during a draft session will not find it quickly. The feature exists, but users assume it is broken or gone, creating Discord support load during the beta period.
 
-**What goes wrong:** The security audit identifies `'unsafe-eval'` in `script-src` as a CSP weakness (it allows dynamic code execution from injected strings). Removing it to pass a security scan breaks Supabase's realtime client, which uses `eval()` internally for WebSocket protocol negotiation in some environments.
+**Why it happens:**
+Tab consolidation is designed from the author's mental model (who knows where everything is), not from user task flows. A commissioner processing a weekly trade check navigates: Trades → pending trades → approve. In a 3-view layout where Trades is under Management → Trade Center, that is one extra navigation layer. Under time pressure, one extra tap causes abandonment.
 
-**Why it happens:** `@supabase/realtime-js` versions prior to 2.10 use `eval()` for Phoenix socket protocol handling. The current version may or may not require it depending on build target. Removing `'unsafe-eval'` without testing against a real Supabase connection produces a CSP violation that silently prevents the WebSocket from upgrading.
+**How to avoid:**
+- Map user tasks, not features. Three views should reflect task frequency:
+  - **Overview:** Standings, current-week fixtures, announcements (read-only, high frequency)
+  - **Matches:** This week's matchups, record results, KO tracking (action-oriented, weekly frequency)
+  - **Management:** Trades, free agents, waiver wire, commissioner tools (administrative, low frequency)
+- Keep "Trades" accessible from the Overview view via a badge/quick-link when there are pending trade requests. The existing pending trade count badge must be preserved in the new layout — it is the primary discoverability mechanism for the most time-sensitive action.
+- Do not remove sub-routes (`/league/[id]/trades`, `/league/[id]/free-agents`). The consolidated hub tabs link to these sub-pages; consolidation changes the navigation entry point, not the destination.
+- Add deep-linkable `?tab=management&section=trades` anchor support so trade notifications can link directly to the Trade Center rather than the Management tab root.
 
-**Prevention:**
-- Test with `Content-Security-Policy-Report-Only` header first — capture violations without blocking
-- Check whether the current `@supabase/supabase-js` version requires `eval()`: `grep -r "eval(" node_modules/@supabase/realtime-js/dist/`
-- If `unsafe-eval` can be removed, replace with nonce-based `script-src` for Next.js (requires dynamic rendering; not compatible with static export)
-- Accept `'unsafe-eval'` if removal breaks Supabase until a Supabase package update removes the dependency
+**Warning signs:**
+- Beta testers report "I can't find trades" in feedback.
+- The pending trade count badge disappears in the new layout (badge logic was tied to the old tab rendering).
+- Commissioner-specific controls render for non-commissioners (wasted navigation causing confusion).
 
-**Detection:** Remove `unsafe-eval`, load the app, check browser console for CSP violations and WebSocket connection errors.
-
----
-
-### Pitfall 12: Security Theater — HTTPS-Only Header on Vercel Is Already Enforced
-
-**Severity:** MODERATE (wasted effort risk)
-
-**What goes wrong:** The security audit adds HSTS headers (`Strict-Transport-Security`) and redirects HTTP to HTTPS as security work. These are already enforced by Vercel at the infrastructure layer for all production deployments. The code in `next.config.ts` already includes HSTS headers (line 116-119). Adding redirect middleware for HTTP→HTTPS consumes development time but provides zero additional security.
-
-**Why it happens:** Security checklists include "enforce HTTPS" generically. On Vercel, this is a platform feature, not an application concern. Writing middleware to redirect HTTP traffic is security theater — that traffic never reaches Next.js on Vercel.
-
-**Other security theater items to skip:**
-- Adding `X-Powered-By: remove` (already `poweredByHeader: false` in next.config.ts line 136)
-- Adding IP allowlists for "internal" API routes that use Clerk auth — Clerk auth is already sufficient
-- Encrypting Pokemon data at rest — Pokemon data is public; encrypting it adds complexity with zero security benefit
-- Adding CSRF tokens to server actions — Next.js 15 server actions already include Origin header validation and use POST-only with SameSite=Lax cookies by default
-
-**Prevention:**
-- Before implementing any security measure, ask: "What is the attack vector this prevents?" If the answer is "I'm not sure" or "Vercel/Next.js/Clerk already handles this," skip it
-- Focus security work on the actual vectors: RLS policies, auth bypass, rate limit bypasses, and injection attacks in user-controlled fields (team names, draft names)
+**Phase to address:**
+The league hub consolidation phase. Complete a task-flow audit before implementing: for each existing tab, identify the primary action taken on that tab and ensure it is reachable in ≤2 taps from the new hub.
 
 ---
 
-### Pitfall 13: Input Sanitization Gaps in User-Controlled Text Fields
+### Pitfall 9: Activity Feed Always-Visible Causing Full Page Re-renders Per Pick
 
-**Severity:** MODERATE
-**Phase:** Security Hardening
+**What goes wrong:**
+The current `DraftActivitySidebar` is a slide-in overlay — it only renders when `isActivitySidebarOpen` is true. When it becomes always-visible and part of the main layout, its parent re-renders on every pick event (because `sidebarActivities` is derived from `draftState?.teams` in a `useMemo` on the page). Every pick re-computes the entire activity list and re-renders the feed, which is rendered in the same React subtree as the Pokemon grid. On a fast draft (8 teams, 30s timer), this is a pick every 30 seconds — acceptable. But during auction bidding, events come in every few seconds, causing visible stutter.
 
-**What goes wrong:** Draft names, team names, league names, and announcement text are stored in Supabase and rendered in other users' browsers. If not sanitized, these fields are XSS vectors.
+**Why it happens:**
+The current `sidebarActivities` derivation in `useDraftActivity` (or the draft page's `useMemo`) iterates all teams and all picks on every state update. This is O(teams × picks) per render. When the activity feed is a slide-in, this only runs when the sidebar is open. As an always-visible panel, it runs on every single draft state update.
 
-**Why it happens:** React escapes JSX-rendered strings automatically, preventing most XSS. However, there are three specific gaps:
-1. Fields rendered with `dangerouslySetInnerHTML` (if any exist) bypass React's escaping
-2. Metadata fields (OG tags, page titles) use `{draft.name}` in `generateMetadata()` — if a draft name contains `<script>`, it appears in `<meta>` tags as a string, which is safe, but can confuse social crawlers
-3. PostgreSQL `text` columns accept any Unicode including null bytes and overlong sequences. Without length limits, a user can store 1MB of text in a `name` field, causing frontend rendering lag
+**How to avoid:**
+- Move the activity feed state into its own hook (`useDraftActivity` already exists) that subscribes only to a pick-count change signal, not to the full `draftState.teams` object.
+- Use `useReducer` to append to the activity list incrementally (each new pick appends an item) rather than deriving the full list from all teams on every render.
+- Alternatively, pass `activities` as a stable prop from the page's `useDraftActivity` hook that only changes reference when a new pick is added — not when turn state or budget changes.
+- Memoize the activity feed component with `React.memo` and a custom comparison that checks only `activities.length`, not deep equality.
 
-**For this specific codebase:** Team names are displayed with team color-coding and in the activity sidebar. Draft names appear in page titles. League announcement fields likely render rich text. Any of these that use `dangerouslySetInnerHTML` are immediate XSS vectors.
+**Warning signs:**
+- React DevTools profiler shows `DraftActivityFeed` re-rendering on every state change, not just pick events.
+- CPU usage is elevated during turn-timer countdowns (which update `timeRemaining` every second, causing full page re-renders).
+- The Pokemon grid has noticeable lag during auction bidding.
 
-**Prevention:**
-- Grep for `dangerouslySetInnerHTML` across the codebase: `grep -r "dangerouslySetInnerHTML" src/` — any occurrence requires manual review
-- Add database-level length constraints: `name VARCHAR(100)`, `description VARCHAR(500)` — stop oversize inputs at the DB layer
-- Add Zod validation on all API routes that accept user text: minimum 1 char, maximum reasonable length, strip leading/trailing whitespace
-- For any rich text fields (announcements), use DOMPurify server-side before storage, not just client-side
-
-**Detection:** Enter `<img src=x onerror=alert(1)>` as a team name. If an alert fires anywhere in the application, XSS is present. If it renders as text, React's escaping is working.
-
----
-
-### Pitfall 14: Supabase Free Tier Concurrent Connection Math Is Per-Project, Not Per-Room
-
-**Severity:** MODERATE
-**Phase:** Supabase Cost Optimization
-
-**What goes wrong:** You plan for "500 concurrent connections on Pro" assuming 500 users can use the app simultaneously. In practice, each user opens multiple Realtime channels, so 500 connections supports far fewer than 500 simultaneous users.
-
-**Actual math for this application:**
-- Each draft participant connects to ~1 channel (if using the consolidated `DraftRealtimeManager`)
-- Each spectator connects to ~1 channel
-- Each league page may open additional channels (trades, waiver broadcasts)
-- At peak: 50 active drafts × 8 participants + 100 spectators = 500 connections exactly at Pro tier limit
-
-**Consequences:** Billing surprise. If you hit 500 concurrent connections, Supabase begins rejecting new connections. The platform becomes unusable for new joiners during popular events (e.g., a scheduled community tournament).
-
-**Prevention:**
-- Audit the actual channel count in production using `supabase.getChannels().length` across a real session
-- Plan to upgrade to the Team tier ($599/month, 10,000 connections) before any organized tournament event
-- Implement connection sharing: if two spectators are watching the same draft, consider using a single broadcast channel that re-broadcasts server events to all clients via the app tier (Supabase Broadcast, not Postgres CDC) — this dramatically reduces per-user connection cost
-
-**Sources:** [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits), [Supabase Pricing](https://supabase.com/docs/guides/realtime/pricing)
+**Phase to address:**
+The activity feed integration phase. Profile the activity feed in isolation before integrating it into the main layout.
 
 ---
 
-### Pitfall 15: Over-Engineering for Scale That Does Not Exist Yet
+## Technical Debt Patterns
 
-**Severity:** MODERATE (wasted effort)
-**Phase:** Architecture Cost Analysis
-
-**What goes wrong:** The security hardening milestone adds database connection pooling, read replicas, CDN configuration, horizontal scaling patterns, and Redis clustering — all before having a single production user. The time spent on infra engineering delays the actual security work (RLS audit, rate limiting, CSP) that would protect real users.
-
-**Specific over-engineering temptations for this stack:**
-- PgBouncer connection pooling: Supabase Pro already includes PgBouncer. You do not need to configure it manually.
-- Database read replicas: Not available until Supabase Enterprise. This is not a relevant optimization for a beta platform.
-- Redis cluster for rate limiting: Upstash Redis (already integrated) handles rate limiting at scale without manual clustering. The current single-instance Upstash configuration is sufficient for 10,000 req/minute.
-- Custom Supabase Realtime infrastructure: Supabase Realtime is managed infrastructure. You cannot horizontally scale it independently — only upgrade plans.
-- CDN cache headers for API responses: Vercel's Edge Network already caches GET responses with `Cache-Control` headers. Adding Cloudflare in front of Vercel creates double-caching complexity for no measurable benefit at beta scale.
-
-**The right scale threshold:** Optimize infrastructure when you have evidence of bottlenecks (Supabase dashboard alerts, Vercel analytics showing p99 >500ms), not before.
-
-**Prevention:**
-- Time-box infrastructure work: spend no more than 10% of this milestone on infra that isn't measurably needed
-- Use the Supabase dashboard's built-in metrics as the trigger for scaling decisions, not hypothetical load projections
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Inline Zustand selectors in new panel components | Faster to write | Infinite loop (this app already hit it); breaks with store restructuring | Never — use named selectors in `selectors.ts` |
+| Derive `isSpectator` from URL param only | Works in isolation | Security theater — user removes URL param to get participant UI | Only as initial hint; must be superseded by DB-derived role |
+| Remove `/spectate/[id]` without redirect | Simplifies route tree | Breaks all existing shared Discord links permanently | Never |
+| `layout` prop on Framer Motion containers for turn animation | Natural-looking resize animation | Forces layout recalculation every frame; jank on mobile | Acceptable on results/landing page (not on live draft page) |
+| Mount all panels immediately, add `enabled` guards later | Faster to see working UI | Mount storm + Supabase duplicate channels | Never — add `enabled` guards before making any panel always-visible |
+| Pass full `draftState` to activity feed as prop | Simple API | Activity feed re-renders on every state change including timer ticks | Never — pass only `activities` array from a dedicated hook |
+| `position: absolute` overlay for host controls | Quick to overlay existing layout | Overlaps interactive elements on small screens | Never — use layout flow |
 
 ---
 
-## Low Severity Pitfalls
+## Integration Gotchas
 
-### Pitfall 16: Dependency Audit Produces False Urgency
-
-**Severity:** LOW
-**Phase:** Security Audit
-
-**What goes wrong:** `npm audit` reports dozens of vulnerabilities. The team stops feature work to patch all of them, including transitive dependencies in dev tools that never reach production.
-
-**Why it happens:** `npm audit` reports ALL vulnerabilities in the dependency tree, including:
-- Dev dependencies that are not bundled (test runners, linters)
-- Vulnerabilities with no known exploit path
-- Vulnerabilities in packages that are only used at build time (Webpack plugins, type generators)
-
-**Prevention:**
-- Use `npm audit --omit=dev` for production-relevant vulnerabilities only
-- Prioritize: CRITICAL/HIGH in `dependencies` (not `devDependencies`) with direct exploit paths
-- `next` itself should be on the latest minor version (vulnerability from CVE-2025-29927 was fixed in 15.2.3)
-- Accept LOW/MODERATE vulnerabilities in dev tooling without patching if no exploit path exists
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Supabase Realtime | Creating the channel inside a component that can unmount during layout transitions | Hoist to a stable React context provider at the page/route level |
+| Supabase Realtime | Calling `channel.subscribe()` without checking `channel.state !== 'joined'` first | Rely on `DraftRealtimeManager` which handles state checks — do not bypass it by creating channels in panel components |
+| Framer Motion `AnimatePresence` | Wrapping the entire draft panel tree during turn transitions | Only wrap the specific element that enters/exits (turn overlay); never wrap the Pokemon grid or team roster |
+| TanStack Query | Calling `usePokemonListByFormat` independently in new always-visible panels | Pokemon data comes from one page-level fetch; pass as prop down to panels — panels must not fetch independently |
+| Next.js `dynamic()` + `ssr: false` | Assuming `dynamic()` prevents mount until needed | It prevents SSR but not client-side mount; a conditional `{condition && <DynamicComponent />}` is still required to delay mount |
+| `useDraftSession` | Resolving `userId` independently in panel components | `userId` resolution has a 5-step priority chain (auth → participation → session → sessionStorage → guest); resolve once at the page level and pass down, never re-resolve in panels |
+| `public/sw.js` service worker | Not bumping cache version when routes change | After `/spectate/[id]` becomes a redirect, bump `CACHE_VERSION` in `sw.js` or cached 200s will mask the 308 |
 
 ---
 
-### Pitfall 17: Logging User Data in Vercel Function Logs
+## Performance Traps
 
-**Severity:** LOW
-**Phase:** Security Audit
-
-**What goes wrong:** During debugging, `console.log(user)` calls left in production code emit full Clerk user objects (email, IP, browser) to Vercel's function logs. These logs are retained and accessible to anyone with Vercel dashboard access.
-
-**Prevention:**
-- The existing `createLogger` in `src/lib/logger.ts` should be the only logging mechanism — audit for raw `console.log` calls with user objects
-- Log user IDs only, never email addresses, names, or session tokens
-- Vercel function logs are not encrypted at rest on the free tier; treat them as semi-public
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| `allDraftedIds.includes(pokemonId)` in always-visible grid | Pokemon grid lags 50ms+ per pick as 700+ items are re-filtered with array scan | Convert to `Set`: `const draftedSet = useMemo(() => new Set(allDraftedIds), [allDraftedIds])` then `!draftedSet.has(p.id)` | Already exists; becomes critical when grid is always-visible instead of tab-switched |
+| Activity feed derived from full `draftState.teams` on every render | CPU spikes during timer ticks (every 1s); auction bidding causes stutter | Use `useDraftActivity` hook that appends incrementally; memoize with `React.memo` | With 8 teams × 15 picks = 120 iterations per re-render, every second during timer |
+| Framer Motion `layout` on team roster cards | Visible reflow of team panel on each pick; 48 nodes reflow with 8 teams × 6 picks | Remove `layout` prop from roster card components; use CSS `transition` for visual changes | With 8 teams each with full 6-Pokemon rosters |
+| Turn timer countdown triggering full page re-render | Draft page re-renders every second; wasteful when only the timer display needs to update | Isolate timer state in `useDraftTimers` hook (already exists); ensure timer updates do not call `setDraftState` on the page — use local state in the timer component only | During every active draft turn (60s window) |
+| `draftState?.teams.find(...)` in JSX render body (not memoized) | Re-computes on every render including timer ticks | All derived state from `draftState.teams` must be inside `useMemo` with `[draftState?.teams]` dependency — never computed inline in JSX | Immediately visible during auction bidding |
 
 ---
 
-## Phase-Specific Warnings
+## UX Pitfalls
 
-| Phase Topic | Likely Pitfall | Severity | Mitigation |
-|-------------|---------------|----------|-----------|
-| RLS audit | Tightened SELECT policy silences Realtime events | CRITICAL | Test subscription delivery after every policy change |
-| RLS audit | New policies use `auth.uid()` instead of Clerk-compatible claim | CRITICAL | Audit existing workaround in FIX-RLS-POLICIES.md first |
-| RLS audit | Missing index on policy column causes full table scan | HIGH | Index all RLS-referenced columns before deploying new policies |
-| CSP headers | Missing Clerk FAPI domain in `connect-src` | CRITICAL | Build CSP dynamically from env vars; test full auth flow after any CSP change |
-| CSP headers | Removing `unsafe-eval` breaks Supabase Realtime | MODERATE | Use Report-Only mode to audit before blocking |
-| Rate limiting | Bid rate limits block legitimate auction participants | HIGH | Use token bucket for bids; key on user ID not IP |
-| Rate limiting | In-memory fallback has no cross-Lambda state | HIGH | Require Redis in production CI gate; monitor for missing config |
-| Rate limiting | Guest user cookie is spoofable as rate limit key | HIGH | Fall back to IP for unauthenticated users |
-| Connection optimization | React StrictMode doubles subscription count in dev | HIGH | Confirm cleanup in all 7 files using `supabase.channel()` |
-| Connection optimization | Pro tier 500 connections exhausted at tournament scale | MODERATE | Audit actual channel count per session before any organized event |
-| Security audit | Patching middleware CVE-2025-29927 | CRITICAL | Check `npm ls next` — must be ≥15.2.3 |
-| Security audit | Service role key in `NEXT_PUBLIC_` variable | CRITICAL | Grep `.next/static/` for `service_role` after every build |
-| Security audit | `dangerouslySetInnerHTML` XSS in team/draft names | MODERATE | Grep codebase; add Zod length validation on all text inputs |
-| Input validation | User text fields lack length constraints | MODERATE | Add DB-level VARCHAR constraints and Zod schema validation |
-| Dependency audit | `npm audit` creates false urgency on dev deps | LOW | Use `--omit=dev` flag; prioritize CRITICAL/HIGH in production deps only |
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| "Your turn" full-screen takeover covers the Pokemon grid mid-search | User loses search state and filtered results at the moment they need to act fastest | Use a persistent banner/spotlight, not a modal overlay. Keep the Pokemon grid visible during the user's turn; use background color change + border highlight + pulsing turn indicator |
+| Activity feed always-visible reduces Pokemon grid height | Less space to browse Pokemon during the most frequent action | Make activity feed a resizable or collapsible panel; default to collapsed on desktop below 1280px; remember collapse state in localStorage |
+| Continuous mobile scroll removes "jump to team" shortcut | Mobile users must scroll past 700+ Pokemon to see their team during a pick | Keep a floating action button that jumps to the team roster section, or a sticky mini-roster strip showing pick counts and budget |
+| Turn timer hidden when user scrolls down | User misses time-out, causing frustrating auto-skip | Turn timer must be visible regardless of scroll position — use `position: sticky` or a persistent header, never bury the timer in a scrollable panel |
+| Removing the activity sidebar removes the option to hide it | Power users want a clean grid during their turn | Even if activity is always-visible by default, provide a collapse toggle; auto-collapse during the user's turn |
+| "Your turn" state transition plays simultaneously with pick confirmation animation | Visual chaos — two dramatic animations compete for attention | Sequence animations: pick confirmation plays first (500ms), then turn-transition begins. Use a `setTimeout` or `AnimatePresence` exit callback to chain them |
 
 ---
 
-## Integration Pitfalls (Stack-Specific)
+## "Looks Done But Isn't" Checklist
 
-### Clerk + Supabase JWT: Deprecated Template vs Native Integration
-
-As of April 1, 2025, Clerk's JWT template for Supabase is deprecated. The native Supabase integration (configured in Clerk Dashboard → Integrations → Supabase) is now the recommended path. If the current integration uses the old JWT template, this migration should happen during the security milestone — not because the old method stops working immediately, but because it will eventually stop being maintained and the new path is more secure (uses Supabase's own JWT validation rather than a shared secret).
-
-**Migration risk:** The JWT claim structure changes between the two methods. Any RLS policies using `auth.jwt() -> 'sub'` or custom `requesting_user_id()` functions must be retested after migration.
-
-### Rate Limiting + Supabase Realtime: Don't Rate-Limit the WebSocket Upgrade
-
-Supabase Realtime connections are established via WebSocket upgrade (HTTP → WS). The upgrade request hits the Next.js middleware. The rate limiter in `src/middleware.ts` checks `pathname.startsWith('/api/')` only, so Realtime WebSocket upgrades are NOT rate-limited. This is correct behavior — do not add rate limiting to the WebSocket upgrade path. Supabase handles connection limiting at the infrastructure layer.
-
-However, broadcast events sent via the Realtime channel (user presence updates, draft events) are not gated by the application's rate limiter. A malicious user could spam presence updates. This is handled by Supabase's per-connection message rate limits (500 messages/second on Pro) and does not require application-level mitigation.
-
-### CSP + Supabase Realtime: `wss://` Must Match `connect-src`
-
-The existing CSP in `next.config.ts` correctly includes `wss://*.supabase.co` in `connect-src`. Any change to Supabase project URL (e.g., migrating from free to pro with a different project ID) must be reflected in the CSP. Wildcard `wss://*.supabase.co` handles this correctly and should not be narrowed to a specific project URL.
+- [ ] **Unified view role gating:** `isSpectator` derived from DB participants, not just URL param — verify by navigating to `/draft/[id]` as a non-participant without `?spectator=true` and confirming no pick controls appear
+- [ ] **Subscription continuity:** Channel name logged on mount/unmount; verify it does not change between layout renders — check that `DraftRealtimeManager` is created only once per page session
+- [ ] **Old spectator route redirect:** `/spectate/[id]` returns 308 not 404 — verify with `curl -I https://draftpokemon.com/spectate/TESTCODE`
+- [ ] **Service worker cache invalidated:** After route changes, `CACHE_VERSION` in `public/sw.js` is bumped — verify old spectate URLs are not served from cache
+- [ ] **Mobile drag-and-drop scroll:** Wishlist reordering does not prevent page scroll on iOS Safari — test on physical device with WishlistManager in continuous scroll flow
+- [ ] **Turn animation compositor-only:** Chrome DevTools Performance tab shows 0ms "Layout" time during `isUserTurn` transition — profile before shipping
+- [ ] **Host controls server-validated:** Every host action API route independently checks `is_host` in DB, not the client-supplied `isHostParam` URL parameter
+- [ ] **League hub deep links preserved:** `?tab=management&section=trades` navigates directly to Trade Center — test all existing notification deep-link patterns still work
+- [ ] **Selector stability:** No new inline `useDraftStore(state => ...)` calls in panel components — verify with `grep -r "useDraftStore(state =>" src/components` and confirm all results are in `selectors.ts` or wrapped in `useCallback`/`useMemo`
+- [ ] **Panel mount guards:** All always-visible panels have `enabled={draftState !== null && !!participantId}` or equivalent — Supabase dashboard shows 1 channel per draft room, not N channels
+- [ ] **Activity feed isolation:** Re-rendering the timer state (every 1 second) does not cause `DraftActivityFeed` to re-render — verify with React DevTools profiler
 
 ---
 
-## "Looks Secure But Isn't" Checklist
+## Recovery Strategies
 
-- [ ] RLS SELECT policies tested with Supabase Realtime subscriptions active (not just REST queries)
-- [ ] `auth.uid()` usage audited against Clerk JWT format — confirmed all policies use Clerk-compatible claim extractor
-- [ ] CSP `connect-src` includes Clerk FAPI hostname (both dev and prod instances)
-- [ ] `next` version confirmed ≥15.2.3 (`npm ls next`)
-- [ ] `.next/static/` does not contain `service_role` string after production build
-- [ ] Rate limit keys use authenticated user ID, not spoofable guest cookie
-- [ ] Upstash Redis is configured in Vercel Production environment variables (not just local .env)
-- [ ] No `dangerouslySetInnerHTML` on user-controlled text fields (team names, draft names, announcements)
-- [ ] Supabase channel cleanup confirmed in all 7 files using `supabase.channel()`
-- [ ] `npm audit --omit=dev` run and CRITICAL/HIGH production CVEs addressed
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Subscription teardown breaks live draft mid-session | HIGH | 1. Revert layout refactor to last stable commit. 2. Add `DraftRealtimeContext` provider. 3. Re-deploy. 4. Affected users refresh. Post Discord announcement. |
+| Zustand infinite loop in new panel | HIGH | 1. Identify inline selector via React DevTools → Components → highlight re-rendering component. 2. Replace with named selector from `selectors.ts`. 3. Hot-fix deploy. Template: the `EMPTY_SELECTOR` pattern in `useWishlistSync.ts`. |
+| iOS Safari scroll freeze with drag-and-drop in scroll flow | MEDIUM | 1. Add `touch-action: pan-y` to drag handle CSS. 2. Wrap draggable area in bounded container with `overflow: hidden`. 3. Worst case: move WishlistManager back to slide-in modal on mobile only. |
+| Old spectate links 404 after route merge | MEDIUM | 1. Deploy 308 redirect immediately. 2. Post in Discord acknowledging the break. 3. Update pinned Discord messages with new link format. |
+| Activity feed causing draft page performance regression | MEDIUM | 1. Gate activity feed re-renders behind `React.memo` with `activities.length` comparison. 2. Move to incremental append model. 3. If still slow, move activity feed back to slide-in overlay (it worked before). |
+| League hub consolidation hides trades from beta users | LOW | 1. Add "Trades" quick-link to Overview. 2. Restore full Trades tab as a fourth tab. 3. Underlying route `/league/[id]/trades` is unchanged so no data loss. |
+| Turn animation causing jank on mobile | LOW | 1. Remove `layout` props from animated containers. 2. Replace CSS height/width transitions with opacity/transform. 3. Add `will-change: transform, opacity` only during active transition. |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Subscription teardown during restructuring | First layout phase (before any panel moves) | `DraftRealtimeContext` provider exists; no `useDraftRealtime` calls outside the page-level context |
+| Zustand selector instability | Before any new component is written | `grep "useDraftStore(state =>"` returns no inline selectors in `src/components/` files |
+| Mount storm from always-visible panels | Phase adding always-visible panels | Supabase dashboard shows exactly 1 channel per draft room; no duplicate channel subscriptions |
+| iOS Safari scroll conflicts | Mobile continuous scroll phase | Tested on physical iOS device; wishlist drag does not block page scroll |
+| Turn animation layout thrashing | Turn-state clarity phase | Chrome Performance: 0ms Layout time during animation; profiled at 4x CPU throttle |
+| Spectator route migration | Unified view phase | `curl -I /spectate/[id]` returns 308; `sw.js` cache version bumped |
+| Permission drift in unified view | Unified view phase | Unit test: non-participant without `?spectator=true` gets spectator UI; `isHost` derived from DB participants |
+| League tab discoverability loss | League hub consolidation phase | Task-flow audit complete; pending trade badge preserved; trades reachable in ≤2 taps |
+| Activity feed re-render regression | Activity feed integration phase | React DevTools: `DraftActivityFeed` does not re-render during timer ticks; profiler baseline recorded before and after integration |
 
 ---
 
 ## Sources
 
-- Supabase RLS + Realtime issue: [GitHub Issue #35195](https://github.com/supabase/supabase/issues/35195), [GitHub Issue #35282](https://github.com/supabase/supabase/issues/35282) — HIGH confidence
-- Supabase RLS performance: [RLS Performance Troubleshooting](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv), [Database Performance Advisors](https://supabase.com/docs/guides/database/database-advisors) — HIGH confidence
-- Clerk + Supabase auth.uid() mismatch: [Clerk Supabase Integration](https://clerk.com/docs/guides/development/integrations/databases/supabase), [Supabase Clerk Docs](https://supabase.com/docs/guides/auth/third-party/clerk), [Discussion #33091](https://github.com/orgs/supabase/discussions/33091) — HIGH confidence
-- Clerk CSP requirements: [Clerk CSP Headers Guide](https://clerk.com/docs/guides/secure/best-practices/csp-headers) — HIGH confidence
-- Next.js CVE-2025-29927: [Next.js Advisory](https://nextjs.org/blog/cve-2025-29927), [Clerk Analysis](https://clerk.com/blog/cve-2025-29927) — HIGH confidence
-- Supabase Realtime limits: [Realtime Limits](https://supabase.com/docs/guides/realtime/limits), [TooManyChannels Fix](https://supabase.com/docs/guides/troubleshooting/realtime-too-many-channels-error) — HIGH confidence
-- Next.js Server Action CSRF: [Next.js Data Security Guide](https://nextjs.org/docs/app/guides/data-security) — HIGH confidence
-- React StrictMode + Supabase realtime double-subscribe: [realtime-js Issue #169](https://github.com/supabase/realtime-js/issues/169) — MEDIUM confidence
-- Vercel serverless rate limiting: [Upstash Ratelimit Blog](https://upstash.com/blog/upstash-ratelimit), [Vercel Rate Limiting Discussion](https://github.com/vercel/vercel/discussions/5325) — HIGH confidence
-- Supabase service role key exposure: [Supabase API Keys](https://supabase.com/docs/guides/api/api-keys), [Supabase Securing API](https://supabase.com/docs/guides/api/securing-your-api) — HIGH confidence
+- App codebase — `src/hooks/useWishlistSync.ts`: the `EMPTY_SELECTOR` fix for infinite loop (React #185)
+- App codebase — `src/hooks/useDraftRealtime.ts`: callback refs pattern (`onRefreshNeededRef`) preventing unstable dependency loops
+- App codebase — `src/app/draft/[id]/page.tsx`: `pickInFlightRef` race condition fix, `EMPTY_ARRAY` stable reference pattern
+- App `MEMORY.md` — Infinite loop post-mortem (2026-03-04), pick-not-showing-for-picker root cause and fix
+- App `CLAUDE.md` — Performance optimization guidelines, subscription cleanup patterns, Zustand best practices
+- App `PROJECT.md` — Current milestone target features confirming the specific UX changes planned
+- App history — Draft page split M2 (2372→1382 lines, still monolithic after split), confirming ongoing complexity risk
+- iOS Safari `touch-action` scroll capture — WebKit Bugzilla documented behavior
+- Framer Motion docs — `layout` prop reflow behavior, `will-change` guidance
+- Next.js App Router docs — `redirect()` with 308 status in route handlers
+
+---
+*Pitfalls research for: Draft UX Overhaul (real-time Next.js 15 + Supabase + Zustand)*
+*Researched: 2026-04-03*
