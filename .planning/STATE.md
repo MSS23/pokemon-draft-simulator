@@ -1,31 +1,31 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: executing
-last_updated: "2026-04-03T08:20:20.661Z"
-last_activity: 2026-04-03
+milestone: v6
+milestone_name: Draft UX Overhaul
+status: defining_requirements
+last_updated: "2026-04-03"
+last_activity: 2026-04-03 -- Milestone v6 started
 progress:
-  total_phases: 4
-  completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # STATE.md
 
 ## Current Milestone
 
-**Milestone 5:** Security Hardening & Scalability Audit
-**Status:** Ready to execute
+**Milestone 6:** Draft UX Overhaul
+**Status:** Defining requirements
 **Next action:** Define requirements and create roadmap
 
 ## Current Position
 
-Phase: 20 (Observability & Feedback) — COMPLETE
-Plan: 2 of 2 (all complete)
-Status: Phase 20 complete
-Last activity: 2026-04-03 -- Completed 20-01-PLAN.md (Sentry + PostHog production gating)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-03 — Milestone v6 started
 
 ## Accumulated Context
 
@@ -35,24 +35,25 @@ Last activity: 2026-04-03 -- Completed 20-01-PLAN.md (Sentry + PostHog productio
 - Milestone 2 (Codebase Health) complete
 - Milestone 3 paused — cherry-picked mobile, onboarding, PokePaste into M4
 - Milestone 4 (Beta Launch) paused — security hardening prioritized before public launch
+- Milestone 5 (Security Hardening) paused — Draft UX overhaul prioritized
 - 414 tests passing, ~79K lines TypeScript, 30+ routes
 - Domain: draftpokemon.com, deploying on Vercel
 
 ### Known Implementation Constraints
 
 - CSP headers must be in `next.config.ts` only (not vercel.json — conflict risk)
-- PostHog and Sentry must be initialized in separate files to avoid hydration errors
-- Mobile bottom sheet requires physical iPhone Safari testing (emulator insufficient)
-- Existing pokepaste-parser.ts should be inspected before adding @pkmn/sets
-- Supabase channel count per draft participant must be audited before public launch
-- Clerk production keys (pk_live_*, sk_live_*) must be set in Vercel Production scope — not preview scope
+- Draft page already split into 5 hooks (useDraftRealtime, useDraftSession, useDraftActions, useDraftAuction, useDraftTimers)
+- Framer Motion in use for animations, Radix UI + Tailwind for components
+- Must preserve real-time Supabase subscriptions and optimistic update patterns
+- Spectator broadcast mode at /spectate/[id]/broadcast must be preserved
+- Mobile bottom sheet requires physical iPhone Safari testing
 
 ### Key Decisions
 
-- Security & scalability hardening before public beta launch — prevents costly rearchitecture later
-- Supabase is primary cost driver (realtime connections, database, bandwidth)
-- Clerk handles auth but integration points need security review
-- Hostname gating over NODE_ENV checks for production-only telemetry (Sentry + PostHog) — prevents Vercel preview deploys from polluting dashboards
+- Draft UX overhaul before security hardening — establish premium experience first
+- Unified participant/spectator view instead of separate routes
+- Mobile-first continuous flow instead of tab-switching
+- Hostname gating over NODE_ENV checks for production-only telemetry (Sentry + PostHog)
 
 ## Last Updated
 

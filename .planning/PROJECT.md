@@ -33,16 +33,23 @@ The gold standard platform for Pokemon draft leagues — replacing the fragmente
 
 **Deferred to post-security:** Sound/animations, competitive data overlay, broadcast mode, auction UX overhaul
 
-## Current Milestone: v5 Security Hardening & Scalability Audit
+### Milestone 5: Security Hardening & Scalability Audit (2026-04-03) — PAUSED
+**Goal:** Harden the application for production-scale traffic and ensure infrastructure costs don't spiral before public launch.
+**Status:** Paused — Draft UX overhaul prioritized to establish the premium experience before security hardening.
 
-**Goal:** Harden the application for production-scale traffic (thousands of concurrent users, millions of requests) and ensure infrastructure costs don't spiral before public launch.
+## Current Milestone: v6 Draft UX Overhaul
+
+**Goal:** Restructure all drafting pages into a modern, intuitive experience with clear spatial hierarchy, dramatic turn-state shifts, and unified views for managers, participants, and spectators.
 
 **Target features:**
-- Security audit & hardening (XSS, CSRF, injection, RLS policies, input sanitization, dependency vulnerabilities, auth bypass vectors)
-- API rate limiting & abuse prevention (protect endpoints from spam, scraping, and DoS)
-- Supabase cost optimization (realtime connection management, query efficiency, RLS audit)
-- Architecture cost analysis (identify expensive patterns, estimate costs at scale, set up cost guardrails)
-- Performance at scale (connection pooling, caching strategy, CDN optimization, database indexing)
+- Draft room redesign — purpose-built layout with persistent command bar, split-panel Pokemon grid + team roster, dramatic "your turn" state changes
+- Unified participant/spectator view — single draft page that adapts by role instead of separate /spectate route
+- Mobile-first draft flow — continuous scrollable flow replacing tab-switching, always-accessible Pokemon grid/team/progress
+- Streamlined league hub — consolidate 7+ tabs into focused 3-view layout (Overview, Matches, Management)
+- Turn state clarity — dramatic visual shift between "your turn" (full-screen takeover) vs "waiting" (dimmed spectator-like)
+- Draft activity integration — always-visible activity feed in main layout instead of slide-in sidebar
+- Host command center — persistent, accessible host controls instead of buried collapsible panel
+- Results-to-league continuity — smooth transition from draft completion to league creation
 
 ## Competitive Landscape
 - **DraftZone:** League management, matchup analysis. No real-time draft room.
@@ -75,4 +82,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after Milestone 5 started*
+*Last updated: 2026-04-03 after Milestone 6 started*
