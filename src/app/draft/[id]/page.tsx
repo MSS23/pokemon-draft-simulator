@@ -668,7 +668,9 @@ export default function DraftRoomPage() {
       const { supabase } = await import('@/lib/supabase')
       if (!supabase) return
 
-      channel = supabase.channel(`ping:${roomCode.toLowerCase()}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // only participants of the draft owning this room code may subscribe.
+      channel = supabase.channel(`ping:${roomCode.toLowerCase()}`, { config: { private: true } })
       channel.on('broadcast', { event: 'ping_player' }, () => {
         if (draftStateRef.current?.userTeamId === draftStateRef.current?.currentTeam) {
           notify.yourTurn()

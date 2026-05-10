@@ -339,7 +339,9 @@ export class WishlistService {
     }
 
     return supabase
-      .channel(`wishlist_${draftId}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // only participants of this draft can subscribe.
+      .channel(`wishlist_${draftId}`, { config: { private: true } })
       .on(
         'postgres_changes',
         {

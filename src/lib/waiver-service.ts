@@ -216,7 +216,9 @@ export class WaiverService {
 
     // Broadcast roster invalidation so league pages refresh
     try {
-      const ch = supabase.channel(`league-roster-invalidate:${claim.league_id}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // league team owners + commissioner only.
+      const ch = supabase.channel(`league-roster-invalidate:${claim.league_id}`, { config: { private: true } })
       ch.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           ch.send({ type: 'broadcast', event: 'trade_update', payload: { event: 'waiver_completed', claimId } })

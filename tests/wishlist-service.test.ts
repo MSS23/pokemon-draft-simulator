@@ -624,7 +624,12 @@ describe('WishlistService', () => {
       const callback = vi.fn()
       const result = WishlistService.subscribeToWishlistChanges('draft-uuid-1', callback)
 
-      expect(mockSupabase.channel).toHaveBeenCalledWith('wishlist_draft-uuid-1')
+      // Channel is now opened with private: true so realtime.messages RLS
+      // (migration 029) can gate the subscription to draft participants.
+      expect(mockSupabase.channel).toHaveBeenCalledWith(
+        'wishlist_draft-uuid-1',
+        { config: { private: true } }
+      )
       expect(mockOn).toHaveBeenCalledWith(
         'postgres_changes',
         expect.objectContaining({

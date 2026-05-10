@@ -607,7 +607,9 @@ export class TradeService {
     if (!supabase) return
 
     try {
-      const channel = supabase.channel(`league-trades:${leagueId}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // league team owners + commissioner only.
+      const channel = supabase.channel(`league-trades:${leagueId}`, { config: { private: true } })
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           channel
@@ -623,7 +625,9 @@ export class TradeService {
 
       // Also invalidate roster caches on league pages when trade completes
       if (event === 'completed') {
-        const rosterChannel = supabase.channel(`league-roster-invalidate:${leagueId}`)
+        // private: true — gated by realtime.messages RLS (migration 029):
+        // league team owners + commissioner only.
+        const rosterChannel = supabase.channel(`league-roster-invalidate:${leagueId}`, { config: { private: true } })
         rosterChannel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             rosterChannel

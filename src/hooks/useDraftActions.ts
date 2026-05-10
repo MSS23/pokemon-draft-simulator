@@ -612,11 +612,15 @@ export function useDraftActions({
       const { supabase } = await import('@/lib/supabase')
       if (!supabase) return
 
-      await supabase.channel(`ping:${roomCode.toLowerCase()}`).send({
-        type: 'broadcast',
-        event: 'ping_player',
-        payload: { from: userId, timestamp: now }
-      })
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // only participants of the draft owning this room code may broadcast.
+      await supabase
+        .channel(`ping:${roomCode.toLowerCase()}`, { config: { private: true } })
+        .send({
+          type: 'broadcast',
+          event: 'ping_player',
+          payload: { from: userId, timestamp: now }
+        })
 
       const team = draftState?.teams.find(t => t.id === draftState?.currentTeam)
       notify.info('Ping Sent', `Notified ${team?.userName || 'current player'}`)

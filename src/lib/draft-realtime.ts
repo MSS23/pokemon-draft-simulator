@@ -92,11 +92,15 @@ export class DraftRealtimeManager {
     this.callbacks.onConnectionChange({ status: 'connecting' })
 
     try {
-      // Create a single channel for all draft events
+      // Create a single channel for all draft events.
+      // private: true gates this topic via the realtime.messages RLS policies
+      // added in migration 029_realtime_channel_privacy — only participants
+      // of this draft can subscribe / broadcast.
       this.channel = supabase.channel(`draft:${this.draftId}`, {
         config: {
           presence: { key: this.userId },
-          broadcast: { self: false }
+          broadcast: { self: false },
+          private: true
         }
       })
 

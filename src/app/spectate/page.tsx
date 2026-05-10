@@ -52,6 +52,13 @@ export default function SpectatePage() {
 
     // Set up real-time subscription for public drafts
     if (supabase) {
+      // public-drafts-list is intentionally PUBLIC (no private: true).
+      // The /spectate lobby must work for anonymous visitors browsing
+      // public drafts. The underlying public.drafts SELECT policy already
+      // restricts visibility to drafts where is_public = true, so this
+      // channel never leaks private-draft state. A dedicated
+      // realtime_public_lobby_select_p029 policy grants anon + authenticated
+      // SELECT access on this exact topic.
       const channel = supabase
         .channel("public-drafts-list")
         .on(

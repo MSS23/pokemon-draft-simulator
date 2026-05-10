@@ -46,8 +46,10 @@ async function sendPickBroadcast(
     timestamp: Date.now()
   }
 
-  // Use the same channel name as DraftRealtimeManager for this draft
-  const channel = supabase.channel(`draft:${draftId}`)
+  // Use the same channel name as DraftRealtimeManager for this draft.
+  // private: true — realtime.messages RLS (migration 029) gates this topic
+  // to draft participants only.
+  const channel = supabase.channel(`draft:${draftId}`, { config: { private: true } })
 
   try {
     await channel.send({

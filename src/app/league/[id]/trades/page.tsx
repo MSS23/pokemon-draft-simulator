@@ -155,7 +155,9 @@ export default function TradesPage() {
   useEffect(() => {
     if (!supabase || !leagueId) return
 
-    const channel = supabase.channel(`league-trades:${leagueId}`)
+    // private: true — gated by realtime.messages RLS (migration 029):
+    // league team owners + commissioner only.
+    const channel = supabase.channel(`league-trades:${leagueId}`, { config: { private: true } })
     channel
       .on('broadcast', { event: 'trade_update' }, () => {
         // Re-fetch trades + activity on any update

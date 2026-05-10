@@ -701,7 +701,9 @@ function KOBreakdownCard({
   useEffect(() => {
     if (!supabase) return
     const ch = supabase
-      .channel(`match-kos-detail:${matchId}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // league team owners + commissioner only.
+      .channel(`match-kos-detail:${matchId}`, { config: { private: true } })
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'match_pokemon_kos', filter: `match_id=eq.${matchId}` },

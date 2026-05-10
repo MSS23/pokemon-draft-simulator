@@ -30,7 +30,9 @@ async function sendBidBroadcast(
     timestamp: Date.now()
   }
 
-  const channel = supabase.channel(`draft:${draftId}`)
+  // private: true — realtime.messages RLS (migration 029) gates this topic
+  // to draft participants only.
+  const channel = supabase.channel(`draft:${draftId}`, { config: { private: true } })
 
   try {
     await channel.send({
@@ -294,7 +296,9 @@ class AuctionService {
     }
 
     const channel = supabase
-      .channel(`bid-history:${auctionId}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // only participants of the parent draft can subscribe.
+      .channel(`bid-history:${auctionId}`, { config: { private: true } })
       .on(
         'postgres_changes',
         {
@@ -348,7 +352,9 @@ class AuctionService {
     }
 
     const channel = supabase
-      .channel(`auction-updates:${draftId}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // only draft participants can subscribe to auction-updates.
+      .channel(`auction-updates:${draftId}`, { config: { private: true } })
       .on(
         'postgres_changes',
         {

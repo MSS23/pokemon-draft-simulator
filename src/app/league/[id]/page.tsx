@@ -73,7 +73,9 @@ export default function LeaguePage() {
   useEffect(() => {
     if (!supabase) return
     const channel = supabase
-      .channel(`league-roster-invalidate:${leagueId}`)
+      // private: true — gated by realtime.messages RLS (migration 029):
+      // league team owners + commissioner only.
+      .channel(`league-roster-invalidate:${leagueId}`, { config: { private: true } })
       .on('broadcast', { event: 'trade_update' }, () => {
         // Clear cached rosters — the auto-load effect will re-fetch
         setFixtureRosters({})

@@ -131,7 +131,11 @@ export function useWishlistSync({
       if (!draftUuid) return
       
       const channel = supabase
-        .channel(`wishlist_${draftId}`)
+        // private: true — gated by realtime.messages RLS (migration 029):
+        // only participants of this draft can subscribe to wishlist events.
+        // Per-user wishlist privacy is still enforced at the
+        // public.wishlist_items SELECT policy layer (sec-p1).
+        .channel(`wishlist_${draftId}`, { config: { private: true } })
         .on(
           'postgres_changes',
           {
