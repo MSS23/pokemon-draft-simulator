@@ -147,6 +147,15 @@ export function ClerkAppearanceProvider({
 
   return (
     <ClerkProvider
+      // Force all internal redirects (SignInButton, RedirectToSignIn,
+      // middleware re-routes, etc.) to use the styled embedded pages on
+      // the application domain instead of accounts.draftpokemon.com
+      // (the Clerk-hosted Account Portal). Setting these here overrides
+      // the dashboard's "Component paths" radio regardless of which
+      // option is selected there — the only source of truth is this
+      // codebase.
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
       appearance={appearance}
