@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
   if (body.isPublic !== undefined) draftInsert.is_public = !!body.isPublic
   if (body.description) draftInsert.description = body.description
   if (body.tags) draftInsert.tags = body.tags
-  if (body.password) draftInsert.password = await bcrypt.hash(body.password, 12)
+  if (body.password) draftInsert.has_password = true
   if (customFormatId) draftInsert.custom_format_id = customFormatId
 
   const { data: draft, error: draftErr } = await supabase
@@ -188,6 +188,24 @@ export async function POST(request: NextRequest) {
     )
   }
   const draftId = (draft as { id: string }).id
+
+  // Persist bcrypt hash to the service-role-only draft_passwords table so the
+  // hash is never exposed via the anon key (see migration 028).
+  if (body.password) {
+    const passwordHash = await bcrypt.hash(body.password, 12)
+    const { error: pwErr } = await supabase
+      .from('draft_passwords')
+      .insert({ draft_id: draftId, password: passwordHash })
+
+    if (pwErr) {
+      log.error('draft_passwords insert failed; rolling back draft', pwErr)
+      await supabase.from('drafts').delete().eq('id', draftId)
+      return NextResponse.json(
+        { error: `Failed to store draft password: ${pwErr.message}` },
+        { status: 500 },
+      )
+    }
+  }
 
   // 7. Insert host team
   const { data: team, error: teamErr } = await supabase

@@ -33,7 +33,7 @@ export function createMockDraft(overrides?: Partial<Draft>): Draft {
     spectatorCount: 0,
     description: null,
     tags: null,
-    password: null,
+    hasPassword: false,
     customFormatId: null,
     turnStartedAt: null,
     deletedAt: null,

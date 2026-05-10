@@ -24,7 +24,7 @@ export const mockDraft: Draft = {
   spectatorCount: 0,
   description: null,
   tags: null,
-  password: null,
+  hasPassword: false,
   customFormatId: null,
   turnStartedAt: null,
   deletedAt: null,

@@ -117,7 +117,7 @@ const mockDraftDb = {
   spectator_count: 0,
   description: null,
   tags: null,
-  password: null,
+  has_password: false,
   custom_format_id: null,
   deleted_at: null,
   deleted_by: null,
@@ -681,22 +681,40 @@ describe('DraftService', () => {
   })
 
   describe('verifyDraftPassword', () => {
+    // Helper: stub `supabase.from(...)` so the first call (drafts) returns
+    // the draft row and the second call (draft_passwords) returns the hash.
+    // Mirrors the post-migration flow where the bcrypt hash lives in
+    // public.draft_passwords (RLS-locked, service-role-only).
+    const stubDraftAndPasswordFetch = (
+      draftRow: { id: string; has_password: boolean } | null,
+      passwordRow: { password: string } | null,
+    ) => {
+      const draftsSingle = vi.fn().mockResolvedValue({
+        data: draftRow,
+        error: draftRow ? null : { message: 'not found' },
+      })
+      const draftsEq = vi.fn(() => ({ single: draftsSingle }))
+      const draftsSelect = vi.fn(() => ({ eq: draftsEq }))
+
+      const pwSingle = vi.fn().mockResolvedValue({
+        data: passwordRow,
+        error: passwordRow ? null : { message: 'not found' },
+      })
+      const pwEq = vi.fn(() => ({ single: pwSingle }))
+      const pwSelect = vi.fn(() => ({ eq: pwEq }))
+
+      vi.mocked(supabase).from.mockImplementation((table: string) => {
+        if (table === 'drafts') return { select: draftsSelect } as any
+        if (table === 'draft_passwords') return { select: pwSelect } as any
+        return {} as any
+      })
+    }
+
     it('should return true for correct password', async () => {
-      const mockEq = vi.fn().mockReturnThis()
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { password: 'hashed_correct-password' },
-        error: null,
-      })
-
-      const mockSelect = vi.fn(() => ({
-        eq: mockEq,
-      }))
-
-      mockEq.mockReturnValue({
-        single: mockSingle,
-      })
-
-      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect } as any)
+      stubDraftAndPasswordFetch(
+        { id: 'draft-1', has_password: true },
+        { password: 'hashed_correct-password' },
+      )
 
       const result = await DraftService.verifyDraftPassword({
         roomCode: 'TEST01',
@@ -707,21 +725,10 @@ describe('DraftService', () => {
     })
 
     it('should return false for incorrect password', async () => {
-      const mockEq = vi.fn().mockReturnThis()
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { password: 'hashed_correct-password' },
-        error: null,
-      })
-
-      const mockSelect = vi.fn(() => ({
-        eq: mockEq,
-      }))
-
-      mockEq.mockReturnValue({
-        single: mockSingle,
-      })
-
-      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect } as any)
+      stubDraftAndPasswordFetch(
+        { id: 'draft-1', has_password: true },
+        { password: 'hashed_correct-password' },
+      )
 
       const result = await DraftService.verifyDraftPassword({
         roomCode: 'TEST01',
@@ -732,21 +739,10 @@ describe('DraftService', () => {
     })
 
     it('should return true if draft has no password', async () => {
-      const mockEq = vi.fn().mockReturnThis()
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { password: null },
-        error: null,
-      })
-
-      const mockSelect = vi.fn(() => ({
-        eq: mockEq,
-      }))
-
-      mockEq.mockReturnValue({
-        single: mockSingle,
-      })
-
-      vi.mocked(supabase).from.mockReturnValue({ select: mockSelect } as any)
+      stubDraftAndPasswordFetch(
+        { id: 'draft-1', has_password: false },
+        null,
+      )
 
       const result = await DraftService.verifyDraftPassword({
         roomCode: 'TEST01',

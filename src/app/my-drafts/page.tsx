@@ -123,7 +123,7 @@ export default function MyDraftsPage() {
                   spectatorCount: draftData.spectator_count ?? 0,
                   description: draftData.description ?? null,
                   tags: draftData.tags ?? null,
-                  password: draftData.password ?? null,
+                  hasPassword: draftData.has_password ?? false,
                   customFormatId: draftData.custom_format_id ?? null,
                   turnStartedAt: draftData.turn_started_at ?? null,
                   deletedAt: draftData.deleted_at ?? null,

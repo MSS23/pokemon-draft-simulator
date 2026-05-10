@@ -66,7 +66,7 @@ function JoinDraftForm() {
       }
 
       const hostParticipant = draftState.participants.find((p) => p.is_host);
-      const hasPassword = !!draftState.draft.password;
+      const hasPassword = !!draftState.draft.has_password;
 
       setRequiresPassword(hasPassword);
       setDraftInfo({

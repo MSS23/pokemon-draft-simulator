@@ -5,14 +5,10 @@ import bcrypt from 'bcryptjs'
 /**
  * Server-side password verification for draft rooms.
  *
- * Previously the client fetched the bcrypt hash and compared locally,
- * which leaked the hash to the browser. This API route keeps the hash
- * server-side and only returns a boolean result.
- *
- * Uses the service-role client because the upcoming RLS migration revokes
- * SELECT (password) from anon/authenticated. With the anon-key client this
- * route would silently return password=NULL and bypass every protected
- * draft.
+ * The bcrypt hash lives in public.draft_passwords (RLS-enabled, no policies,
+ * service-role-only — see migration 028). The anon key cannot read it.
+ * This route uses the service-role client to fetch the hash and compare
+ * the user-supplied password server-side, returning only a boolean.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -36,9 +32,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Look up draft by room code and pull its has_password flag.
     const { data: draft, error } = await supabase
       .from('drafts')
-      .select('password')
+      .select('id, has_password')
       .eq('room_code', roomCode.toLowerCase())
       .single()
 
@@ -49,13 +46,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // If draft has no password, allow access
-    if (!draft.password) {
+    // Draft has no password — allow access.
+    if (!draft.has_password) {
       return NextResponse.json({ valid: true })
     }
 
-    // Securely compare passwords using bcrypt on the server
-    const valid = await bcrypt.compare(password, draft.password)
+    // Fetch the bcrypt hash from the service-role-only table.
+    const { data: pwRow, error: pwErr } = await supabase
+      .from('draft_passwords')
+      .select('password')
+      .eq('draft_id', draft.id)
+      .single()
+
+    if (pwErr || !pwRow) {
+      // has_password=true but no row — inconsistent state. Fail closed.
+      return NextResponse.json({ valid: false })
+    }
+
+    const valid = await bcrypt.compare(password, pwRow.password)
     return NextResponse.json({ valid })
   } catch (_err) {
     return NextResponse.json(

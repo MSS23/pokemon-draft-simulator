@@ -32,6 +32,24 @@ if (!supabaseConfigured) {
 export type Database = {
   public: {
     Tables: {
+      draft_passwords: {
+        Row: {
+          draft_id: string
+          password: string
+          created_at: string
+        }
+        Insert: {
+          draft_id: string
+          password: string
+          created_at?: string
+        }
+        Update: {
+          draft_id?: string
+          password?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       drafts: {
         Row: {
           id: string
@@ -53,7 +71,7 @@ export type Database = {
           spectator_count: number
           description: string | null
           tags: string[] | null
-          password: string | null
+          has_password: boolean
           custom_format_id: string | null
           deleted_at: string | null
           deleted_by: string | null
@@ -78,7 +96,7 @@ export type Database = {
           spectator_count?: number
           description?: string | null
           tags?: string[] | null
-          password?: string | null
+          has_password?: boolean
           custom_format_id?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
@@ -103,7 +121,7 @@ export type Database = {
           spectator_count?: number
           description?: string | null
           tags?: string[] | null
-          password?: string | null
+          has_password?: boolean
           custom_format_id?: string | null
           deleted_at?: string | null
           deleted_by?: string | null

@@ -301,14 +301,19 @@ export class DraftService {
       }
     }
 
-    // SSR / test fallback: compare directly (hash is only in server memory)
+    // SSR / test fallback. The bcrypt hash lives in public.draft_passwords
+    // (service-role-only, RLS-locked — see migration 028). The anon-key
+    // client used here cannot read that table, so this fallback only works
+    // when the route handler is unreachable but the caller has direct DB
+    // access (effectively: tests with mocked supabase). In production
+    // browser context the API route above is always used.
     if (!supabase) {
       throw new Error('Supabase is not configured')
     }
 
     const { data: draft, error } = await supabase
       .from('drafts')
-      .select('password')
+      .select('id, has_password')
       .eq('room_code', roomCode.toLowerCase())
       .single()
 
@@ -316,12 +321,21 @@ export class DraftService {
       throw new Error('Draft not found')
     }
 
-    // If draft has no password, allow access
-    if (!draft.password) {
+    if (!draft.has_password) {
       return true
     }
 
-    return await bcrypt.compare(password, draft.password)
+    const { data: pwRow, error: pwErr } = await supabase
+      .from('draft_passwords')
+      .select('password')
+      .eq('draft_id', draft.id)
+      .single()
+
+    if (pwErr || !pwRow) {
+      return false
+    }
+
+    return await bcrypt.compare(password, pwRow.password)
   }
 
   /**
@@ -460,8 +474,9 @@ export class DraftService {
     if (isPublic !== undefined) draftInsert.is_public = isPublic || false
     if (description) draftInsert.description = description
     if (tags) draftInsert.tags = tags
-    // Hash password before storing for security
-    if (password) draftInsert.password = await bcrypt.hash(password, 12)
+    // Flag that this draft has a password; the bcrypt hash itself is written
+    // to the service-role-only draft_passwords table below (migration 028).
+    if (password) draftInsert.has_password = true
     if (customFormatId) draftInsert.custom_format_id = customFormatId
 
     const { data: draft, error: draftError } = await supabase
@@ -473,6 +488,24 @@ export class DraftService {
     if (draftError) {
       log.error('Error creating draft:', draftError)
       throw new Error(`Failed to create draft: ${draftError.message || JSON.stringify(draftError)}`)
+    }
+
+    // Persist bcrypt hash into draft_passwords. This anon-key client cannot
+    // write to that RLS-locked table, so this fallback path effectively only
+    // works under service-role contexts (legacy / direct DB tests). The
+    // production create flow now goes through /api/draft/create.
+    if (password) {
+      const passwordHash = await bcrypt.hash(password, 12)
+      const { error: pwError } = await supabase
+        .from('draft_passwords')
+        .insert({ draft_id: draft.id, password: passwordHash })
+
+      if (pwError) {
+        log.error('Error storing draft password:', pwError)
+        // Roll back the draft so we don't leave an inconsistent has_password=true row.
+        await supabase.from('drafts').delete().eq('id', draft.id)
+        throw new Error(`Failed to store draft password: ${pwError.message}`)
+      }
     }
 
     // Create host team

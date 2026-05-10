@@ -67,7 +67,7 @@ export interface Draft {
   spectatorCount: number
   description: string | null
   tags: string[] | null
-  password: string | null
+  hasPassword: boolean
   customFormatId: string | null
   turnStartedAt: string | null
   deletedAt: string | null
