@@ -40,7 +40,9 @@ export default function LobbyPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'drafts' | 'leagues'>('all')
   const [isLoading, setIsLoading] = useState(true)
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  // Use null on SSR/initial render so server and client agree; populate after mount.
+  // Avoids React hydration error #418 (text mismatch) from `new Date()` differing.
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   const loadData = async () => {
     setIsLoading(true)
@@ -264,7 +266,13 @@ export default function LobbyPage() {
 
         {/* Footer info */}
         <div className="text-center text-xs text-muted-foreground pt-4">
-          Last refreshed {lastRefresh.toLocaleTimeString()}
+          {lastRefresh ? (
+            <span suppressHydrationWarning>
+              Last refreshed {lastRefresh.toLocaleTimeString()}
+            </span>
+          ) : (
+            <span>&nbsp;</span>
+          )}
         </div>
       </div>
     </SidebarLayout>
