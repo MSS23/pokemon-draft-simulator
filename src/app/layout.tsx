@@ -127,12 +127,12 @@ export default async function RootLayout({
                       <Header />
                       <TourProvider />
                       <main className="min-h-[calc(100vh-3rem)]">{children}</main>
-                      <footer className="border-t border-border/50 py-5 text-center text-xs text-muted-foreground px-4">
+                      <footer className="border-t border-border/50 py-5 text-center text-xs text-slate-600 dark:text-slate-400 px-4">
                         <div className="flex items-center justify-center gap-5 flex-wrap">
-                          <a href="/terms" className="hover:text-foreground transition-colors duration-150">Terms</a>
-                          <a href="/privacy" className="hover:text-foreground transition-colors duration-150">Privacy</a>
-                          <span className="text-muted-foreground/70">v0.1.1</span>
-                          <span className="text-muted-foreground/70">&copy; {new Date().getFullYear()} Pokémon Champions Draft League</span>
+                          <a href="/terms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-150">Terms</a>
+                          <a href="/privacy" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-150">Privacy</a>
+                          <span>v0.1.1</span>
+                          <span>&copy; {new Date().getFullYear()} Pokémon Champions Draft League</span>
                         </div>
                       </footer>
                     </QueryProvider>
