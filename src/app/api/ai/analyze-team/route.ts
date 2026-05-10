@@ -13,7 +13,7 @@ import { AIAnalysisService } from '@/lib/ai-analysis-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { supabase } from '@/lib/supabase'
-import { createClient } from '@supabase/supabase-js'
+import { auth } from '@clerk/nextjs/server'
 import { analyzeTeamSchema, validateRequestBody } from '@/lib/schemas'
 import { createLogger } from '@/lib/logger'
 import type { Pick } from '@/types'
@@ -22,20 +22,13 @@ const log = createLogger('AnalyzeTeamAPI')
 
 export async function POST(request: NextRequest) {
   try {
-    // Extract authenticated user if available
-    let authenticatedUserId: string | undefined
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (token) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      if (supabaseUrl && supabaseKey) {
-        const authClient = createClient(supabaseUrl, supabaseKey, {
-          global: { headers: { Authorization: `Bearer ${token}` } }
-        })
-        const { data: { user } } = await authClient.auth.getUser(token)
-        if (user) authenticatedUserId = user.id
-      }
-    }
+    // SEC-AUDIT: previously this read a Bearer token and called
+    // supabase.auth.getUser(token), which cannot validate Clerk JWTs and
+    // always returned undefined. AccessControl then fell back to body-only
+    // checks. Use Clerk auth() directly — the canonical pattern used by
+    // the rest of the codebase (e.g. /api/formats/sync).
+    const { userId } = await auth()
+    const authenticatedUserId: string | undefined = userId ?? undefined
 
     const body = await request.json()
     const validation = validateRequestBody(analyzeTeamSchema, body)

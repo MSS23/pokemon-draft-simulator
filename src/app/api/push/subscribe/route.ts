@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { createLogger } from '@/lib/logger'
 import { z } from 'zod'
 import { auth } from '@clerk/nextjs/server'
@@ -24,11 +24,21 @@ const unsubscribeSchema = z.object({
   endpoint: z.string().url(),
 })
 
+// Service-role client. push_subscriptions has self-only RLS that requires
+// clerk_user_id() = user_id. Guest users (cookie-derived id) cannot pass
+// that check from the anon client, and we already validate identity here
+// server-side, so we bypass RLS deliberately.
+//
+// NOTE: push_subscriptions is created by a pending migration and is not
+// yet present in the generated Database<> type — cast to any so we can
+// query it. Once the type generator is re-run we can drop the cast.
 function getSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseAnonKey) return null
-  return createClient(supabaseUrl, supabaseAnonKey)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return createServiceRoleClient() as any
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -134,18 +144,40 @@ export async function DELETE(request: Request) {
 
   const { endpoint } = parsed.data
 
+  // SEC-AUDIT: ownership check. Without this, anyone who learns another
+  // user's endpoint URL could delete their subscription. We require either
+  // a Clerk session OR the guest cookie that originally created the
+  // subscription, and we filter the DELETE by `user_id` so a stolen
+  // endpoint can only be deleted by its owner.
+  const { userId: clerkUserId } = await auth()
+  let resolvedUserId: string | null = clerkUserId ?? null
+  if (!resolvedUserId) {
+    const cookieStore = await cookies()
+    const guestCookie = cookieStore.get(GUEST_COOKIE_NAME)
+    if (guestCookie?.value) {
+      resolvedUserId = guestCookie.value
+    }
+  }
+  if (!resolvedUserId) {
+    return NextResponse.json(
+      { error: 'No session identity — sign in or call /api/guest/session first.' },
+      { status: 401 }
+    )
+  }
+
   try {
     const { error } = await supabase
       .from('push_subscriptions')
       .delete()
       .eq('endpoint', endpoint)
+      .eq('user_id', resolvedUserId)
 
     if (error) {
       log.error('Failed to remove push subscription', { error: error.message })
       return NextResponse.json({ error: 'Failed to remove subscription' }, { status: 500 })
     }
 
-    log.info('Push subscription removed', { endpoint })
+    log.info('Push subscription removed', { endpoint, user_id: resolvedUserId })
     return NextResponse.json({ success: true })
   } catch (err) {
     log.error('Unexpected error removing push subscription', err)
