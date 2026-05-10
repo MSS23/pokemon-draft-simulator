@@ -25,17 +25,21 @@ function useHtmlTheme(): 'light' | 'dark' {
   return theme
 }
 
+// Brand crimson #dc2855 sits at ~4.2:1 against both light and dark surfaces,
+// which fails WCAG AA for normal text. For text-only contexts (inline links)
+// we substitute a darker shade on light bg and a lighter shade on dark bg
+// — same hue, higher contrast. Solid bg buttons keep #dc2855 because white
+// text on it has plenty of headroom regardless.
 const sharedElements = {
   rootBox: '',
   cardBox: '',
   formButtonPrimary:
-    'bg-[#dc2855] hover:bg-[#c9224d] text-white font-medium shadow-md shadow-[#dc2855]/20',
-  formFieldAction: 'text-[#dc2855] hover:text-[#c9224d] font-medium',
-  formResendCodeLink: 'text-[#dc2855] hover:text-[#c9224d] font-medium',
-  identityPreviewEditButton: 'text-[#dc2855] hover:text-[#c9224d]',
-  footerActionLink: 'text-[#dc2855] hover:text-[#c9224d] font-medium',
+    'bg-[#dc2855] hover:bg-[#c9224d] text-white font-semibold shadow-md shadow-[#dc2855]/20',
   socialButtonsProviderIcon: 'opacity-100',
-  logoBox: 'opacity-60',
+  // "Secured by Clerk" — was opacity-60 (effectively ~3:1 on dark, similar
+  // on light). Bumped so the wordmark is legible without competing visually
+  // with primary content.
+  logoBox: 'opacity-80',
 }
 
 const darkAppearance = {
@@ -80,9 +84,16 @@ const darkAppearance = {
     alert: 'bg-[#0d0f11] border border-[#2a2f36] text-[#e8edf3]',
     alertText: 'text-[#e8edf3]',
     alertIcon: 'text-[#f87171]',
+    // Action links on dark bg: lighter pink (#f59ab1 = ~8.7:1 on #141619)
+    // is the same color we use for the "Last used" badge — visually
+    // harmonious and well above AA threshold.
+    formFieldAction: 'text-[#f59ab1] hover:text-[#fab2c5] font-semibold',
+    formResendCodeLink: 'text-[#f59ab1] hover:text-[#fab2c5] font-semibold',
+    identityPreviewEditButton: 'text-[#f59ab1] hover:text-[#fab2c5] font-semibold',
     footer: 'bg-transparent text-[#b6bdc7]',
     footerAction: 'text-[#b6bdc7]',
     footerActionText: 'text-[#b6bdc7]',
+    footerActionLink: 'text-[#f59ab1] hover:text-[#fab2c5] font-semibold',
     footerPages: 'text-[#b6bdc7]',
     footerPagesLink: 'text-[#b6bdc7] hover:text-[#e8edf3]',
   },
@@ -112,8 +123,9 @@ const lightAppearance = {
     socialButtonsBlockButtonText: 'text-slate-900 font-medium',
     socialButtonsIconButton:
       'bg-white border border-slate-300 text-slate-900 hover:bg-slate-50 hover:border-slate-400',
+    // Badge uses the darker crimson too for AA on light bg.
     lastAuthenticationStrategyBadge:
-      'bg-[#dc2855]/10 text-[#dc2855] border border-[#dc2855]/30',
+      'bg-[#dc2855]/10 text-[#a01a3a] border border-[#dc2855]/30',
     dividerLine: 'bg-slate-200',
     dividerText: 'text-slate-600',
     formFieldLabel: 'text-slate-900 font-medium',
@@ -129,9 +141,15 @@ const lightAppearance = {
     alert: 'bg-slate-50 border border-slate-200 text-slate-900',
     alertText: 'text-slate-900',
     alertIcon: 'text-red-600',
+    // Action links on light bg: darker crimson (#b91d44 = ~6.0:1 on white,
+    // ~5.7:1 on slate-50) keeps the brand identity while clearing AA.
+    formFieldAction: 'text-[#b91d44] hover:text-[#a01a3a] font-semibold',
+    formResendCodeLink: 'text-[#b91d44] hover:text-[#a01a3a] font-semibold',
+    identityPreviewEditButton: 'text-[#b91d44] hover:text-[#a01a3a] font-semibold',
     footer: 'bg-transparent text-slate-600',
     footerAction: 'text-slate-600',
     footerActionText: 'text-slate-600',
+    footerActionLink: 'text-[#b91d44] hover:text-[#a01a3a] font-semibold',
     footerPages: 'text-slate-600',
     footerPagesLink: 'text-slate-600 hover:text-slate-900',
   },
