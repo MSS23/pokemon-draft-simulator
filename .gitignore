@@ -36,6 +36,9 @@ yarn-error.log*
 # MCP config — contains a Supabase Personal Access Token. Never commit.
 .mcp.json
 
+# Playwright saved auth state (Clerk cookies + localStorage). Never commit.
+.auth/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
