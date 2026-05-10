@@ -375,6 +375,16 @@ export default function CreateDraftPage() {
       );
       return;
     }
+    const budget = parseInt(formData.budgetPerTeam);
+    if (!Number.isFinite(budget) || budget < 10 || budget > 5000) {
+      notify.warning("Invalid Budget", "Budget per team must be between 10 and 5000 points");
+      return;
+    }
+    const weeks = parseInt(formData.leagueWeeks);
+    if (formData.createLeague && (!Number.isFinite(weeks) || weeks < 1 || weeks > 52)) {
+      notify.warning("Invalid Season Length", "Season length must be between 1 and 52 weeks");
+      return;
+    }
 
     if (!user?.id) {
       notify.error("Sign in required", "Please sign in again — your session has expired.");
@@ -876,17 +886,43 @@ export default function CreateDraftPage() {
               {formData.draftType === "tiered" ? "(tier points)" : "(draft points)"}
             </span>
           </Label>
-          <Select value={formData.budgetPerTeam} onValueChange={(v) => handleInputChange("budgetPerTeam", v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="50">50 points</SelectItem>
-              <SelectItem value="75">75 points</SelectItem>
-              <SelectItem value="100">100 points (default)</SelectItem>
-              <SelectItem value="120">120 points</SelectItem>
-              <SelectItem value="150">150 points</SelectItem>
-              <SelectItem value="200">200 points</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap gap-1.5">
+            {[50, 75, 100, 120, 150, 200, 300, 500].map((n) => {
+              const active = parseInt(formData.budgetPerTeam) === n;
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => handleInputChange("budgetPerTeam", String(n))}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background hover:bg-muted border-border"
+                  }`}
+                >
+                  {n}
+                  {n === 100 && " ★"}
+                </button>
+              );
+            })}
+          </div>
+          <Input
+            id="budgetPerTeam"
+            type="text"
+            inputMode="numeric"
+            min={10}
+            max={5000}
+            value={formData.budgetPerTeam}
+            onChange={(e) => {
+              const v = e.target.value.replace(/\D/g, "");
+              if (v === "") { handleInputChange("budgetPerTeam", ""); return; }
+              const n = Math.min(5000, Math.max(10, parseInt(v)));
+              handleInputChange("budgetPerTeam", String(n));
+            }}
+            placeholder="10 - 5000"
+            aria-label="Budget per team in points"
+          />
+          <p className="text-xs text-muted-foreground">Any value from 10 to 5000 points</p>
         </div>
 
         <div className="space-y-2">
@@ -902,6 +938,7 @@ export default function CreateDraftPage() {
               <SelectItem value="3600">1 hour</SelectItem>
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">How long each player has to pick</p>
         </div>
       </div>
 
@@ -1210,18 +1247,44 @@ export default function CreateDraftPage() {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="leagueWeeks" className="text-sm font-medium">Season Length</Label>
-                    <Select value={formData.leagueWeeks} onValueChange={(v) => handleInputChange("leagueWeeks", v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3">3 weeks</SelectItem>
-                        <SelectItem value="4">4 weeks (default)</SelectItem>
-                        <SelectItem value="6">6 weeks</SelectItem>
-                        <SelectItem value="8">8 weeks</SelectItem>
-                        <SelectItem value="10">10 weeks</SelectItem>
-                        <SelectItem value="12">12 weeks</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="leagueWeeks" className="text-sm font-medium">Season Length (weeks)</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[3, 4, 6, 8, 10, 12, 16].map((n) => {
+                        const active = parseInt(formData.leagueWeeks) === n;
+                        return (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => handleInputChange("leagueWeeks", String(n))}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                              active
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-background hover:bg-muted border-border"
+                            }`}
+                          >
+                            {n}
+                            {n === 4 && " ★"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <Input
+                      id="leagueWeeks"
+                      type="text"
+                      inputMode="numeric"
+                      min={1}
+                      max={52}
+                      value={formData.leagueWeeks}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "");
+                        if (v === "") { handleInputChange("leagueWeeks", ""); return; }
+                        const n = Math.min(52, Math.max(1, parseInt(v)));
+                        handleInputChange("leagueWeeks", String(n));
+                      }}
+                      placeholder="1 - 52"
+                      aria-label="Season length in weeks"
+                    />
+                    <p className="text-xs text-muted-foreground">Any value from 1 to 52 weeks</p>
                   </div>
                 </div>
 
