@@ -193,6 +193,14 @@ const pwaConfig = withPWA({
         },
       },
     },
+    // SEC-AUDIT (vibe-security): never cache /api/* in the service worker.
+    // The catch-all `^https?.*` rule below would otherwise stash auth-bearing
+    // JSON responses (draft creation, AI analysis) in offlineCache — which is
+    // a leak vector on shared devices.
+    {
+      urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/'),
+      handler: 'NetworkOnly',
+    },
     {
       urlPattern: /^https?.*/,
       handler: 'NetworkFirst',

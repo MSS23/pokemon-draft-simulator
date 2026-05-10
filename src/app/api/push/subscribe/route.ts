@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
 import { z } from 'zod'
@@ -6,11 +7,16 @@ import { auth } from '@clerk/nextjs/server'
 
 const log = createLogger('PushSubscribeAPI')
 
+const GUEST_COOKIE_NAME = 'guest-session-id'
+
 const subscribeSchema = z.object({
   endpoint: z.string().url(),
   p256dh: z.string().min(1),
   auth: z.string().min(1),
-  user_id: z.string().min(1),
+  // user_id is now optional. For Clerk users we always derive it server-side
+  // from the session. For guests we derive it from the httpOnly cookie. The
+  // body field, if present, is ignored — kept for backwards compatibility.
+  user_id: z.string().min(1).optional(),
   platform: z.string().default('web'),
 })
 
@@ -50,17 +56,25 @@ export async function POST(request: Request) {
     )
   }
 
-  const { endpoint, p256dh, auth: authToken, user_id, platform } = parsed.data
+  const { endpoint, p256dh, auth: authToken, platform } = parsed.data
 
-  // SEC-03: For authenticated (Clerk) users, verify the user_id in the body
-  // matches the session identity. This prevents a Clerk user from registering
-  // another user's push subscription.
-  // Guest users (no Clerk session) are allowed to pass their guest ID directly.
+  // SEC-AUDIT (vibe-security): always derive user_id server-side, never
+  // trust the body field. For Clerk users → session identity. For guests
+  // → httpOnly cookie identity (same one /api/guest/session sets). Without
+  // either, refuse the request.
   const { userId: clerkUserId } = await auth()
-  if (clerkUserId && clerkUserId !== user_id) {
+  let resolvedUserId: string | null = clerkUserId ?? null
+  if (!resolvedUserId) {
+    const cookieStore = await cookies()
+    const guestCookie = cookieStore.get(GUEST_COOKIE_NAME)
+    if (guestCookie?.value) {
+      resolvedUserId = guestCookie.value
+    }
+  }
+  if (!resolvedUserId) {
     return NextResponse.json(
-      { error: 'user_id does not match authenticated session' },
-      { status: 403 }
+      { error: 'No session identity — sign in or call /api/guest/session first.' },
+      { status: 401 }
     )
   }
 
@@ -73,7 +87,7 @@ export async function POST(request: Request) {
           endpoint,
           p256dh,
           auth: authToken,
-          user_id,
+          user_id: resolvedUserId,
           platform,
           updated_at: new Date().toISOString(),
         },
@@ -81,11 +95,11 @@ export async function POST(request: Request) {
       )
 
     if (error) {
-      log.error('Failed to store push subscription', { error: error.message, user_id })
+      log.error('Failed to store push subscription', { error: error.message, user_id: resolvedUserId })
       return NextResponse.json({ error: 'Failed to store subscription' }, { status: 500 })
     }
 
-    log.info('Push subscription stored', { user_id, platform })
+    log.info('Push subscription stored', { user_id: resolvedUserId, platform })
     return NextResponse.json({ success: true })
   } catch (err) {
     log.error('Unexpected error storing push subscription', err)

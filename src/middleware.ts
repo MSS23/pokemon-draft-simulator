@@ -111,11 +111,15 @@ try {
     })
     upstashLimiters = {
       drafts: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:drafts' }),
+      tournaments: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:tournaments' }),
+      passwordVerify: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:pw-verify' }),
       picks: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:picks' }),
       bids: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '1 m'), prefix: 'rl:bids' }),
       export: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 h'), prefix: 'rl:export' }),
       ai: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:ai' }),
       user: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:user' }),
+      sheets: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m'), prefix: 'rl:sheets' }),
+      feedback: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(3, '1 h'), prefix: 'rl:feedback' }),
       wsConnect: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m'), prefix: 'rl:ws-connect' }),
       default: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '1 m'), prefix: 'rl:api' }),
     }
@@ -126,14 +130,19 @@ try {
   upstashLimiters = null
 }
 
+// SEC-AUDIT (vibe-security): Map matches REAL routes under src/app/api/**.
+// Order matters — `applyRateLimiting` walks this map and uses the first
+// matching prefix, so put narrower paths above broader ones.
 const RATE_LIMITS: Record<string, { limit: number; window: number; key?: keyof NonNullable<typeof upstashLimiters> }> = {
-  '/api/drafts': { limit: 10, window: 3600000, key: 'drafts' },
-  '/api/drafts/join': { limit: 10, window: 60000, key: 'wsConnect' }, // RATE-05: indirect WS channel creation guard
-  '/api/picks': { limit: 60, window: 60000, key: 'picks' },
-  '/api/bids': { limit: 120, window: 60000, key: 'bids' },
+  // Auth-sensitive: brute-force surface for short user-chosen draft passwords
+  '/api/draft/verify-password': { limit: 5, window: 60000, key: 'passwordVerify' },
+  '/api/draft/create': { limit: 10, window: 3600000, key: 'drafts' },
+  '/api/tournament/create': { limit: 10, window: 3600000, key: 'tournaments' },
   '/api/user/export': { limit: 5, window: 3600000, key: 'export' },
-  '/api/user': { limit: 5, window: 60000, key: 'user' },   // 5/min — tight: delete, export are destructive
+  '/api/user': { limit: 5, window: 60000, key: 'user' },   // 5/min — tight: delete is destructive
   '/api/ai': { limit: 10, window: 3600000, key: 'ai' },    // 10/hr — AI analysis is expensive
+  '/api/sheets': { limit: 10, window: 60000, key: 'sheets' }, // public proxy — prevent free use as a CSV fetcher
+  '/api/feedback': { limit: 3, window: 3600000, key: 'feedback' }, // Discord webhook spam guard
   '/api/': { limit: 100, window: 60000, key: 'default' },
 }
 

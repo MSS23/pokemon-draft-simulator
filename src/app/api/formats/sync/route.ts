@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { syncShowdownData } from '@/services/showdown-sync'
+import { auth } from '@clerk/nextjs/server'
 import { createClient } from '@supabase/supabase-js'
 import { createLogger } from '@/lib/logger'
 
@@ -14,28 +15,40 @@ const log = createLogger('FormatsSyncRoute')
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
 
-async function verifyAdmin(request: NextRequest): Promise<{ authorized: boolean; error?: string }> {
+/**
+ * SEC-AUDIT (vibe-security): admin gate must use Clerk's `auth()` and a
+ * service-role Supabase client. The original `supabase.auth.getUser(token)`
+ * call cannot validate Clerk JWTs and was effectively a permanent 401.
+ */
+async function verifyAdmin(_request: NextRequest): Promise<{ authorized: boolean; error?: string }> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!supabaseUrl || !supabaseKey) return { authorized: false, error: 'Service unavailable' }
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseServiceKey) {
+    log.error('Admin gate misconfigured — service role key missing')
+    return { authorized: false, error: 'Service unavailable' }
+  }
 
-  const token = request.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) return { authorized: false, error: 'Authentication required' }
+  const { userId } = await auth()
+  if (!userId) return { authorized: false, error: 'Authentication required' }
 
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    global: { headers: { Authorization: `Bearer ${token}` } }
+  // Service-role read is necessary because user_profiles.is_admin is the
+  // source of truth and we need to bypass RLS to verify it.
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  if (error || !user) return { authorized: false, error: 'Invalid session' }
-
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from('user_profiles')
     .select('is_admin')
-    .eq('user_id', user.id)
-    .single()
+    .eq('user_id', userId)
+    .maybeSingle()
 
-  if (!profile?.is_admin) return { authorized: false, error: 'Admin access required' }
+  if (error) {
+    log.warn('Admin check query failed', { userId, message: error.message })
+    return { authorized: false, error: 'Authorization check failed' }
+  }
+  const row = profile as { is_admin?: boolean } | null
+  if (!row?.is_admin) return { authorized: false, error: 'Admin access required' }
   return { authorized: true }
 }
 

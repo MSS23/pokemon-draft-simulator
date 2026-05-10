@@ -13,14 +13,20 @@ export async function DELETE() {
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!supabaseUrl || !supabaseAnonKey) {
+  // SEC-AUDIT: account deletion must never fall back to the anon key.
+  // Anon-key writes are gated by RLS and would silently leave orphan rows
+  // (participants, wishlist_items) in violation of the user's deletion
+  // request. Refuse loudly instead of doing a partial wipe.
+  if (!supabaseUrl || !supabaseServiceKey) {
+    log.error('Account deletion requires SUPABASE_SERVICE_ROLE_KEY', {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+    })
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
   }
 
-  // Use service role key if available for admin-level data cleanup, otherwise anon key
-  const supabase = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey)
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   try {
     // Anonymize teams owned by this user (don't delete - preserves draft history)
