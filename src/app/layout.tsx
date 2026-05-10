@@ -3,8 +3,7 @@ import { Sora, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 import { headers } from "next/headers";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
-import { dark } from "@clerk/themes";
+import { ClerkAppearanceProvider } from "@/components/providers/ClerkAppearanceProvider";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { HydrationFixProvider } from "@/components/providers/HydrationFixProvider";
@@ -112,63 +111,7 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <HydrationErrorFilter />
-        <ClerkProvider
-          signInFallbackRedirectUrl="/dashboard"
-          signUpFallbackRedirectUrl="/dashboard"
-          appearance={{
-            baseTheme: dark,
-            variables: {
-              colorPrimary: '#dc2855',
-              colorBackground: '#141619',
-              colorText: '#e8edf3',
-              // Bumped from #808994 (~4.7:1 on card bg) to #b6bdc7 (~7.3:1) so
-              // labels, descriptions, and footer text are comfortably readable.
-              colorTextSecondary: '#b6bdc7',
-              colorInputBackground: '#0d0f11',
-              colorInputText: '#e8edf3',
-              colorDanger: '#f87171',
-              colorSuccess: '#34d399',
-              colorWarning: '#fbbf24',
-              colorNeutral: '#e8edf3',
-              borderRadius: '0.625rem',
-            },
-            elements: {
-              card: 'bg-[#141619] border border-[#1f2328] shadow-xl shadow-black/40',
-              headerTitle: 'text-[#e8edf3] font-semibold',
-              headerSubtitle: 'text-[#b6bdc7]',
-              // Social buttons previously shared bg-[#141619] with the card,
-              // so they had no visible surface. Distinct fill + brighter border.
-              socialButtonsBlockButton: 'bg-[#1a1e23] border border-[#2a2f36] text-[#e8edf3] hover:bg-[#23282e] hover:border-[#3a4049]',
-              socialButtonsBlockButtonText: 'text-[#e8edf3] font-medium',
-              socialButtonsProviderIcon: 'opacity-100',
-              dividerLine: 'bg-[#2a2f36]',
-              dividerText: 'text-[#b6bdc7]',
-              formFieldLabel: 'text-[#e8edf3] font-medium',
-              formFieldInput: 'bg-[#0d0f11] border-[#2a2f36] text-[#e8edf3] focus:border-[#dc2855] focus:ring-[#dc2855]/30',
-              formFieldHintText: 'text-[#b6bdc7]',
-              formFieldErrorText: 'text-[#f87171]',
-              formFieldAction: 'text-[#dc2855] hover:text-[#e8395f]',
-              formButtonPrimary: 'bg-[#dc2855] hover:bg-[#c9224d] text-white font-medium shadow-md shadow-[#dc2855]/20',
-              formButtonReset: 'text-[#b6bdc7] hover:text-[#e8edf3]',
-              formResendCodeLink: 'text-[#dc2855] hover:text-[#e8395f]',
-              identityPreview: 'bg-[#0d0f11] border border-[#2a2f36]',
-              identityPreviewText: 'text-[#e8edf3]',
-              identityPreviewEditButton: 'text-[#dc2855] hover:text-[#e8395f]',
-              otpCodeFieldInput: 'bg-[#0d0f11] border-[#2a2f36] text-[#e8edf3] focus:border-[#dc2855]',
-              alert: 'bg-[#0d0f11] border border-[#2a2f36] text-[#e8edf3]',
-              alertText: 'text-[#e8edf3]',
-              alertIcon: 'text-[#f87171]',
-              footer: 'bg-transparent text-[#b6bdc7]',
-              footerAction: 'text-[#b6bdc7]',
-              footerActionText: 'text-[#b6bdc7]',
-              footerActionLink: 'text-[#dc2855] hover:text-[#e8395f] font-medium',
-              footerPages: 'text-[#b6bdc7]',
-              footerPagesLink: 'text-[#b6bdc7] hover:text-[#e8edf3]',
-              // "Secured by Clerk" branding line — was nearly invisible.
-              logoBox: 'opacity-70',
-            }
-          }}
-        >
+        <ClerkAppearanceProvider>
         <AnalyticsProvider>
         <PerformanceMonitorProvider>
           <ErrorBoundaryProvider>
@@ -200,7 +143,7 @@ export default async function RootLayout({
           </ErrorBoundaryProvider>
         </PerformanceMonitorProvider>
         </AnalyticsProvider>
-        </ClerkProvider>
+        </ClerkAppearanceProvider>
         <FloatingFeedbackButton />
         <Analytics />
       </body>
