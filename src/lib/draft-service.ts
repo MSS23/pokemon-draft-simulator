@@ -203,6 +203,11 @@ export interface DraftSettings {
 
 export interface CreateDraftParams {
   name: string
+  /** Authenticated user id (Clerk user.id). The caller must supply this —
+   *  we can't recover it via supabase.auth.getUser() because the supabase
+   *  client is configured with the Clerk accessToken bridge and that API
+   *  is unavailable in that mode. */
+  hostId: string
   hostName: string
   teamName: string
   settings: DraftSettings
@@ -365,7 +370,7 @@ export class DraftService {
     }
   }
 
-  static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, password, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
+  static async createDraft({ name, hostId, hostName, teamName, settings, isPublic, description, tags, password, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
     if (!supabase) {
       log.error('Supabase configuration error', {
         hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -374,9 +379,10 @@ export class DraftService {
       throw new Error('Supabase is not properly configured. Please check your environment variables and restart the dev server.')
     }
 
-    // Require authentication to create drafts
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Auth is delegated to Clerk \u2014 caller supplies hostId. Refuse if missing
+    // rather than calling supabase.auth.getUser() (unavailable when the
+    // client is configured with the Clerk accessToken bridge).
+    if (!hostId) {
       throw new Error('You must be logged in to create a draft. Please sign in or create an account.')
     }
 
@@ -386,7 +392,6 @@ export class DraftService {
     }
 
     const roomCode = this.generateRoomCode()
-    const hostId = user.id
 
     let customFormatId: string | null = null
 
@@ -542,12 +547,13 @@ export class DraftService {
 
     let displayName: string
 
-    // If no profile exists, fall back to user metadata and create profile
+    // If no profile exists, auto-create one with a generic display name.
+    // (We can't pull display_name from supabase.auth.getUser() because the
+    // client uses Clerk's accessToken bridge which disables that API. The
+    // user can rename themselves later from /settings.)
     if (profileError || !userProfile) {
-      const { data: { user } } = await supabase.auth.getUser()
-      displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
+      displayName = `Player-${userId.slice(0, 6)}`
 
-      // Auto-create missing profile
       const { error: createError } = await supabase
         .from('user_profiles')
         .insert({
@@ -718,12 +724,12 @@ export class DraftService {
 
     let displayName: string
 
-    // If no profile exists, fall back to user metadata and create profile
+    // If no profile exists, auto-create one with a generic display name.
+    // (Same reason as in joinDraft above: supabase.auth.getUser is unavailable
+    // when the client uses the Clerk accessToken bridge.)
     if (profileError || !userProfile) {
-      const { data: { user } } = await supabase.auth.getUser()
-      displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
+      displayName = `Spectator-${userId.slice(0, 6)}`
 
-      // Auto-create missing profile
       const { error: createError } = await supabase
         .from('user_profiles')
         .insert({

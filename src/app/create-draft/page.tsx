@@ -376,11 +376,17 @@ export default function CreateDraftPage() {
       return;
     }
 
+    if (!user?.id) {
+      notify.error("Sign in required", "Please sign in again — your session has expired.");
+      return;
+    }
+
     setIsCreating(true);
     try {
       const { DraftService } = await import("@/lib/draft-service");
       const { roomCode } = await DraftService.createDraft({
         name: `${formData.userName}'s Draft`,
+        hostId: user.id,
         hostName: formData.userName,
         teamName: formData.teamName,
         settings: {

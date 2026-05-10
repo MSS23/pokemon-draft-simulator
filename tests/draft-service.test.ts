@@ -254,6 +254,7 @@ describe('DraftService', () => {
 
       const result = await DraftService.createDraft({
         name: 'Test Draft',
+        hostId: 'user-test-123',
         hostName: 'Host Player',
         teamName: 'Host Team',
         settings: {
@@ -270,15 +271,11 @@ describe('DraftService', () => {
       expect(mockInsert).toHaveBeenCalled()
     })
 
-    it('should throw error if user is not authenticated', async () => {
-      ;(vi.mocked(supabase).auth.getUser as any).mockResolvedValue({
-        data: { user: null },
-        error: { message: 'Not authenticated' },
-      })
-
+    it('should throw error if hostId is missing (not signed in)', async () => {
       await expect(
         DraftService.createDraft({
           name: 'Test Draft',
+          hostId: '',
           hostName: 'Host Player',
           teamName: 'Host Team',
           settings: {
@@ -296,6 +293,7 @@ describe('DraftService', () => {
       await expect(
         DraftService.createDraft({
           name: 'Test Draft',
+          hostId: 'user-test-123',
           hostName: 'Host Player',
           teamName: 'Host Team',
           settings: {
@@ -333,6 +331,7 @@ describe('DraftService', () => {
       await expect(
         DraftService.createDraft({
           name: 'Test Draft',
+          hostId: 'user-test-123',
           hostName: 'Host Player',
           teamName: 'Host Team',
           settings: {
