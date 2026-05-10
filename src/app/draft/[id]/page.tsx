@@ -32,6 +32,9 @@ import { useTurnNotifications } from '@/hooks/useTurnNotifications'
 import { useDraftRealtime } from '@/hooks/useDraftRealtime'
 import { DraftRealtimeContext } from './DraftRealtimeContext'
 import { TurnStateOverlay } from '@/components/draft/TurnStateOverlay'
+import { OnTheClockHero } from '@/components/draft/OnTheClockHero'
+import { PickRevealOverlay } from '@/components/draft/PickRevealOverlay'
+import { DraftBoard } from '@/components/draft/DraftBoard'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
 import { getMaxAffordableCost } from '@/utils/budget-feasibility'
 import { useDraftSession } from '@/hooks/useDraftSession'
@@ -44,7 +47,6 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
 // Critical components - load immediately
 import PokemonGrid from '@/components/pokemon/PokemonGrid'
 import TeamRoster from '@/components/team/TeamRoster'
-import DraftProgress from '@/components/team/DraftProgress'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import DraftActivitySidebar from '@/components/draft/DraftActivitySidebar'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -627,26 +629,21 @@ export default function DraftRoomPage() {
     }
 
     if (!isAuctionDraft && draftState.currentTurn !== prevState.currentTurn) {
+      // Dedup by turn number only — every distinct turn deserves a notification.
+      // Previous 1500ms gate was suppressing legitimate back-to-back "your turn"
+      // alerts when picks happened in fast succession.
       if (draftState.currentTurn !== lastNotifiedTurnRef.current) {
-        const now = Date.now()
-        const MIN_NOTIFICATION_INTERVAL = 1500
-        const timeSinceLastNotification = now - lastTurnNotificationTime.current
+        lastNotifiedTurnRef.current = draftState.currentTurn
+        lastTurnNotificationTime.current = Date.now()
 
-        if (timeSinceLastNotification >= MIN_NOTIFICATION_INTERVAL || lastTurnNotificationTime.current === 0) {
-          lastNotifiedTurnRef.current = draftState.currentTurn
-          lastTurnNotificationTime.current = now
+        if (draftState.userTeamId === draftState.currentTeam) {
+          draftSounds.play('your-turn')
+          notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
 
-          if (draftState.userTeamId === draftState.currentTeam) {
-            draftSounds.play('your-turn')
-            notify.yourTurn(pickTimeRemaining > 0 ? pickTimeRemaining : undefined)
-
-            if (actions.preDraftPokemonId) {
-              const preDraftedPokemon = pokemon.find(p => p.id === actions.preDraftPokemonId)
-              if (preDraftedPokemon && !allDraftedIds.includes(actions.preDraftPokemonId)) {
-                actions.setIsConfirmationOpen(true)
-                // Set confirmation pokemon via initiate flow would be better,
-                // but we need to set it directly here
-              }
+          if (actions.preDraftPokemonId) {
+            const preDraftedPokemon = pokemon.find(p => p.id === actions.preDraftPokemonId)
+            if (preDraftedPokemon && !allDraftedIds.includes(actions.preDraftPokemonId)) {
+              actions.setIsConfirmationOpen(true)
             }
           }
         }
@@ -976,19 +973,21 @@ export default function DraftRoomPage() {
           </div>
         )}
 
-        {/* Draft Progress — sticky on mobile */}
-        {draftState?.status === 'drafting' && (
-          <div className="mb-2 md:mb-4 sticky top-0 z-30 bg-background/95 backdrop-blur-sm -mx-2 px-2 pt-1 pb-2 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 md:bg-transparent md:backdrop-blur-none" id="tour-draft-progress">
-            <DraftProgress
-              currentTurn={draftState?.currentTurn}
-              totalTeams={draftState?.teams?.length || 0}
-              maxRounds={draftState?.draftSettings?.pokemonPerTeam}
-              draftStatus={draftState?.status}
-              timeRemaining={pickTimeRemaining}
-              userTeamId={draftState?.userTeamId ?? undefined}
-              isUserTurn={isUserTurn}
+        {/* On the Clock Hero — broadcast-style header */}
+        {(draftState?.status === 'drafting' || draftState?.status === 'paused') && (
+          <div
+            className="mb-3 md:mb-4 sticky top-0 z-30 -mx-2 px-2 pt-1 pb-2 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0"
+            id="tour-draft-progress"
+          >
+            <OnTheClockHero
               teams={draftState?.teams || []}
-              compact={true}
+              currentTeamId={draftState?.currentTeam || ''}
+              userTeamId={draftState?.userTeamId}
+              currentTurn={draftState?.currentTurn || 1}
+              maxRounds={draftState?.draftSettings?.pokemonPerTeam || 6}
+              timeRemaining={pickTimeRemaining}
+              timeLimit={draftState?.draftSettings?.timeLimit || 0}
+              draftStatus={draftState?.status || 'drafting'}
             />
           </div>
         )}
@@ -1291,6 +1290,23 @@ export default function DraftRoomPage() {
           </div>
         )}
 
+        {/* Big Board — visual draft progression */}
+        {draftState && (draftState.status === 'drafting' || draftState.status === 'paused') && (
+          <div className={cn(
+            'mb-4',
+            draftState.status === 'drafting' && activeTab !== 'board' && 'hidden md:block'
+          )}>
+            <DraftBoard
+              teams={draftState.teams || []}
+              pokemon={pokemon || []}
+              currentTurn={draftState.currentTurn || 1}
+              maxRounds={draftState.draftSettings?.pokemonPerTeam || 6}
+              userTeamId={draftState.userTeamId}
+              draftStatus={draftState.status}
+            />
+          </div>
+        )}
+
         {/* Pokemon Grid */}
         <div id="tour-pokemon-grid" className={cn(
           'bg-card rounded-lg shadow-sm border p-2 sm:p-4',
@@ -1392,6 +1408,15 @@ export default function DraftRoomPage() {
 
       {/* Turn transition overlay — fires only on false->true transition of isUserTurn */}
       <TurnStateOverlay isUserTurn={isUserTurn || false} />
+
+      {/* Broadcast-style pick reveal — fires whenever any team's picks grow */}
+      {draftState && (
+        <PickRevealOverlay
+          teams={draftState.teams || []}
+          pokemon={pokemon || []}
+          enabled={draftState.status === 'drafting' || draftState.status === 'paused'}
+        />
+      )}
 
       {/* Draft completion celebration */}
       <ConfettiCelebration show={showCelebration} />

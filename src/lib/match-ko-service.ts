@@ -45,10 +45,11 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    // Get pick details to find pokemon_id
+    // Get pick details to satisfy NOT NULL columns on match_pokemon_kos
+    // (pokemon_id, pokemon_name, team_id are all required by the schema).
     const pickResponse = await supabase
       .from('picks')
-      .select('pokemon_id')
+      .select('pokemon_id, pokemon_name, team_id')
       .eq('id', pickId)
       .single()
 
@@ -66,6 +67,8 @@ export class MatchKOService {
         game_number: gameNumber,
         pick_id: pickId,
         pokemon_id: pick.pokemon_id,
+        pokemon_name: pick.pokemon_name,
+        team_id: pick.team_id,
         ko_count: koCount,
         is_death: isDeath,
         ko_details: details || null,
@@ -484,6 +487,186 @@ export class MatchKOService {
     }
 
     return deathMap
+  }
+
+  // ============================================================
+  // Scorer-attributed KO events  (Milestone A: real league scoring)
+  // ------------------------------------------------------------
+  // The original recordPokemonKO captures only the victim. These methods
+  // record full attribution so a match score can be computed deterministically
+  // as count-of-KOs-scored-by-each-team. Both teams' rosters appear in the
+  // logger UI and KOs are submitted as scorer→victim events.
+
+  /**
+   * Record a single KO event with full scorer attribution.
+   * Returns the inserted event id so the UI can offer "undo".
+   */
+  static async recordScoredKO(params: {
+    matchId: string
+    gameNumber?: number
+    scorerPickId: string
+    scorerTeamId: string
+    victimPickId: string
+    victimTeamId: string
+    turnNumber?: number
+    recordedBy?: string | null
+  }): Promise<{ id: string }> {
+    if (!supabase) throw new Error('Supabase client not initialized')
+
+    // Resolve pokemon_id for the victim (required by the original schema column)
+    const { data: victim, error: victimErr } = await supabase
+      .from('picks')
+      .select('pokemon_id, pokemon_name')
+      .eq('id', params.victimPickId)
+      .single()
+    if (victimErr || !victim) {
+      throw new Error(`Victim pick not found: ${victimErr?.message ?? 'missing'}`)
+    }
+
+    const insertRow = {
+      match_id: params.matchId,
+      game_number: params.gameNumber ?? 1,
+      pick_id: params.victimPickId,
+      pokemon_id: victim.pokemon_id,
+      pokemon_name: victim.pokemon_name,
+      team_id: params.victimTeamId,
+      scorer_pick_id: params.scorerPickId,
+      scorer_team_id: params.scorerTeamId,
+      turn_number: params.turnNumber ?? null,
+      recorded_by: params.recordedBy ?? null,
+      ko_count: 1,
+      is_death: false,
+    }
+
+    const { data, error } = await supabase
+      .from('match_pokemon_kos')
+      .insert(insertRow)
+      .select('id')
+      .single()
+    if (error || !data) {
+      throw new Error(`Failed to record KO: ${error?.message ?? 'unknown'}`)
+    }
+
+    // Best-effort: bump victim's faint counter and scorer's KO counter.
+    void this.incrementKOCount(params.scorerPickId, 1)
+    return { id: data.id }
+  }
+
+  /**
+   * Remove a KO event (undo). Only the recorder or a commissioner should call
+   * this; RLS on the table is the actual gate.
+   */
+  static async deleteScoredKO(eventId: string): Promise<void> {
+    if (!supabase) throw new Error('Supabase client not initialized')
+    const { error } = await supabase
+      .from('match_pokemon_kos')
+      .delete()
+      .eq('id', eventId)
+    if (error) throw new Error(`Failed to delete KO: ${error.message}`)
+  }
+
+  /**
+   * Full ordered KO log for a match — used by the scoring UI and the
+   * match detail view. Sorted by turn then created_at.
+   */
+  static async listMatchKOEvents(matchId: string): Promise<Array<{
+    id: string
+    matchId: string
+    gameNumber: number
+    turnNumber: number | null
+    scorerPickId: string | null
+    scorerTeamId: string | null
+    victimPickId: string
+    victimTeamId: string | null
+    victimPokemonId: string
+    victimPokemonName: string | null
+    recordedBy: string | null
+    createdAt: string
+  }>> {
+    if (!supabase) throw new Error('Supabase client not initialized')
+    const { data, error } = await supabase
+      .from('match_pokemon_kos')
+      .select(
+        'id, match_id, game_number, pick_id, pokemon_id, pokemon_name, team_id, scorer_pick_id, scorer_team_id, turn_number, recorded_by, created_at'
+      )
+      .eq('match_id', matchId)
+      .order('turn_number', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(`Failed to list KO events: ${error.message}`)
+    return (data ?? []).map(r => ({
+      id: r.id,
+      matchId: r.match_id,
+      gameNumber: r.game_number,
+      turnNumber: r.turn_number ?? null,
+      scorerPickId: r.scorer_pick_id ?? null,
+      scorerTeamId: r.scorer_team_id ?? null,
+      victimPickId: r.pick_id,
+      victimTeamId: r.team_id ?? null,
+      victimPokemonId: r.pokemon_id,
+      victimPokemonName: r.pokemon_name ?? null,
+      recordedBy: r.recorded_by ?? null,
+      createdAt: r.created_at,
+    }))
+  }
+
+  /**
+   * Authoritative match score from KO events.
+   * Counts attributed KOs per team — never trusts client-submitted scores.
+   */
+  static async tallyMatchScore(matchId: string): Promise<{
+    homeTeamId: string | null
+    awayTeamId: string | null
+    homeScore: number
+    awayScore: number
+    totalKOs: number
+  }> {
+    if (!supabase) throw new Error('Supabase client not initialized')
+
+    // Try the helper RPC first (added in add-ko-scorer-attribution.sql)
+    type TallyRow = {
+      home_team_id: string | null
+      away_team_id: string | null
+      home_score: number
+      away_score: number
+      ko_count: number
+    }
+    const rpcResult = await (supabase as unknown as {
+      rpc: (n: string, a: Record<string, unknown>) => Promise<{ data: TallyRow[] | null; error: { code?: string; message: string } | null }>
+    }).rpc('tally_match_score', { p_match_id: matchId })
+
+    if (rpcResult.error && rpcResult.error.code !== '42883') {
+      // Real failure (not "function does not exist")
+      throw new Error(`Failed to tally match score: ${rpcResult.error.message}`)
+    }
+
+    if (rpcResult.data && rpcResult.data.length > 0) {
+      const row = rpcResult.data[0]
+      return {
+        homeTeamId: row.home_team_id,
+        awayTeamId: row.away_team_id,
+        homeScore: row.home_score,
+        awayScore: row.away_score,
+        totalKOs: row.ko_count,
+      }
+    }
+
+    // Fallback: compute in JS by reading the match + KO rows.
+    const { data: match } = await supabase
+      .from('matches')
+      .select('home_team_id, away_team_id')
+      .eq('id', matchId)
+      .single()
+
+    const events = await this.listMatchKOEvents(matchId)
+    const home = events.filter(e => e.scorerTeamId === match?.home_team_id).length
+    const away = events.filter(e => e.scorerTeamId === match?.away_team_id).length
+    return {
+      homeTeamId: match?.home_team_id ?? null,
+      awayTeamId: match?.away_team_id ?? null,
+      homeScore: home,
+      awayScore: away,
+      totalKOs: events.filter(e => e.scorerTeamId !== null).length,
+    }
   }
 
   /**

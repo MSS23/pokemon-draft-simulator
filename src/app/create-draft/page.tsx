@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { notify } from "@/lib/notifications";
+import { validateName } from "@/lib/profanity";
 import {
   POKEMON_FORMATS,
   getFormatById,
@@ -343,6 +344,15 @@ export default function CreateDraftPage() {
 
   // ─── Submit ─────────────────────────────────────────────────────────
   const handleCreateDraft = async () => {
+    const userNameCheck = validateName(formData.userName, { fieldLabel: 'Your name', maxLength: 50 });
+    if (!userNameCheck.ok) { notify.warning('Invalid name', userNameCheck.reason!); return; }
+    const teamNameCheck = validateName(formData.teamName, { fieldLabel: 'Team name', maxLength: 50 });
+    if (!teamNameCheck.ok) { notify.warning('Invalid team name', teamNameCheck.reason!); return; }
+    if (formData.description) {
+      const descCheck = validateName(formData.description, { fieldLabel: 'Description', maxLength: 500, allowEmpty: true });
+      if (!descCheck.ok) { notify.warning('Invalid description', descCheck.reason!); return; }
+    }
+
     if (!formData.userName.trim() || !formData.teamName.trim()) {
       notify.warning("Missing Information", "Please enter both your name and team name");
       return;
@@ -351,9 +361,18 @@ export default function CreateDraftPage() {
       notify.warning("Missing Draft Pool", "Please upload a CSV file or paste a Google Sheets link");
       return;
     }
+    const teamsCount = parseInt(formData.maxTeams);
+    if (!Number.isFinite(teamsCount) || teamsCount < 2 || teamsCount > 32) {
+      notify.warning("Invalid Team Count", "Number of teams must be between 2 and 32");
+      return;
+    }
     const pokemonCount = parseInt(formData.pokemonPerTeam);
-    if (formData.draftType !== "auction" && pokemonCount < 6) {
-      notify.warning("Invalid Pokemon Count", "Points and tiered drafts require at least 6 Pokemon per team");
+    const minPokemon = formData.draftType === "auction" ? 1 : 6;
+    if (!Number.isFinite(pokemonCount) || pokemonCount < minPokemon || pokemonCount > 30) {
+      notify.warning(
+        "Invalid Pokemon Count",
+        `Pokemon per team must be between ${minPokemon} and 30${formData.draftType !== "auction" ? " for points and tiered drafts" : ""}`,
+      );
       return;
     }
 
@@ -584,40 +603,92 @@ export default function CreateDraftPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="maxTeams" className="text-sm font-medium">Number of Teams</Label>
-            <Select value={formData.maxTeams} onValueChange={(v) => handleInputChange("maxTeams", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {[2, 3, 4, 5, 6, 7, 8, 10, 12, 16, 20].map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n} Teams {n === 4 && "(recommended)"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap gap-1.5">
+              {[2, 3, 4, 5, 6, 7, 8, 10, 12, 16, 20].map((n) => {
+                const active = parseInt(formData.maxTeams) === n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => handleInputChange("maxTeams", String(n))}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background hover:bg-muted border-border"
+                    }`}
+                  >
+                    {n}
+                    {n === 4 && " ★"}
+                  </button>
+                );
+              })}
+            </div>
+            <Input
+              id="maxTeams"
+              type="text"
+              inputMode="numeric"
+              min={2}
+              max={32}
+              value={formData.maxTeams}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "");
+                if (v === "") { handleInputChange("maxTeams", ""); return; }
+                const n = Math.min(32, Math.max(2, parseInt(v)));
+                handleInputChange("maxTeams", String(n));
+              }}
+              placeholder="2 - 32"
+              aria-label="Number of teams"
+            />
+            <p className="text-xs text-muted-foreground">Any value from 2 to 32 teams</p>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="pokemonPerTeam" className="text-sm font-medium">Pokemon per Team</Label>
-            <Select value={formData.pokemonPerTeam} onValueChange={(v) => handleInputChange("pokemonPerTeam", v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {formData.draftType === "auction" && (
-                  <>
-                    <SelectItem value="3">3 Pokemon</SelectItem>
-                    <SelectItem value="4">4 Pokemon</SelectItem>
-                    <SelectItem value="5">5 Pokemon</SelectItem>
-                  </>
-                )}
-                <SelectItem value="6">6 Pokemon {formData.draftType !== "auction" && "(recommended)"}</SelectItem>
-                <SelectItem value="9">9 Pokemon</SelectItem>
-                <SelectItem value="11">11 Pokemon</SelectItem>
-                <SelectItem value="12">12 Pokemon</SelectItem>
-                <SelectItem value="15">15 Pokemon</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap gap-1.5">
+              {[6, 9, 11, 12, 15, 18, 24].map((n) => {
+                const active = parseInt(formData.pokemonPerTeam) === n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => handleInputChange("pokemonPerTeam", String(n))}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background hover:bg-muted border-border"
+                    }`}
+                  >
+                    {n}
+                    {n === 6 && formData.draftType !== "auction" && " ★"}
+                  </button>
+                );
+              })}
+            </div>
+            <Input
+              id="pokemonPerTeam"
+              type="text"
+              inputMode="numeric"
+              min={formData.draftType === "auction" ? 1 : 6}
+              max={30}
+              value={formData.pokemonPerTeam}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "");
+                if (v === "") { handleInputChange("pokemonPerTeam", ""); return; }
+                const lo = formData.draftType === "auction" ? 1 : 6;
+                const n = Math.min(30, Math.max(lo, parseInt(v)));
+                handleInputChange("pokemonPerTeam", String(n));
+              }}
+              placeholder={formData.draftType === "auction" ? "1 - 30" : "6 - 30"}
+              aria-label="Pokemon per team"
+            />
             {formData.draftType !== "auction" && parseInt(formData.pokemonPerTeam) < 6 && (
               <p className="text-xs text-orange-600 dark:text-orange-400">
                 Points and tiered drafts require at least 6 Pokemon per team
+              </p>
+            )}
+            {(formData.draftType === "auction" ? parseInt(formData.pokemonPerTeam) > 30 : false) && (
+              <p className="text-xs text-orange-600 dark:text-orange-400">
+                Maximum 30 Pokemon per team
               </p>
             )}
           </div>

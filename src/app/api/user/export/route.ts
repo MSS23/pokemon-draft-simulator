@@ -9,7 +9,10 @@ export async function GET() {
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  // Export requires the service role key — falling back to the anon key would
+  // silently respect RLS and return a partial dump, which fails GDPR-style
+  // export contracts. Refuse the request instead.
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
   }

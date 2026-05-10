@@ -493,6 +493,7 @@ export default function TradesPage() {
         totalWeeks={league?.totalWeeks}
         teamCount={league?.teams?.length}
         isCommissioner={isCommissioner}
+        isMember={!!userTeamId}
       />
       <div className="container mx-auto px-4 py-4 max-w-6xl">
         {!tradeEligibility.allowed && tradeEligibility.reason && (

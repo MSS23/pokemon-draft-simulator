@@ -278,6 +278,7 @@ export default function CommissionerPage() {
         currentWeek={league.currentWeek}
         totalWeeks={league.totalWeeks}
         isCommissioner={true}
+        isMember={true}
       />
       <div className="container mx-auto px-4 py-4 max-w-6xl">
         <Tabs defaultValue="matches" className="space-y-4">

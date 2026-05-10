@@ -15,6 +15,8 @@ import type { League, Team } from '@/types'
 import { buildTeamColorMap } from '@/utils/team-colors'
 import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import { createLogger } from '@/lib/logger'
+import { useAuth } from '@/contexts/AuthContext'
+import { UserSessionService } from '@/lib/user-session'
 
 const log = createLogger('StatsPage')
 
@@ -34,6 +36,26 @@ export default function StatsPage() {
   const [teamFilter, setTeamFilter] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userTeamId, setUserTeamId] = useState<string | null>(null)
+
+  const { user } = useAuth()
+
+  // Identify user's team
+  useEffect(() => {
+    const identify = async () => {
+      let userId = user?.id
+      if (!userId) {
+        try {
+          const session = await UserSessionService.getOrCreateSession()
+          userId = session.userId
+        } catch { return }
+      }
+      if (!userId || !league) return
+      const myTeam = league.teams.find(t => t.ownerId === userId)
+      setUserTeamId(myTeam?.id || null)
+    }
+    void identify()
+  }, [user?.id, league])
 
   const loadData = async () => {
     setError(null)
@@ -126,6 +148,7 @@ export default function StatsPage() {
         currentWeek={league.currentWeek}
         totalWeeks={league.totalWeeks}
         teamCount={league.teams?.length}
+        isMember={!!userTeamId}
       />
       <div className="container mx-auto px-4 py-4 max-w-6xl">
         {/* Error State */}

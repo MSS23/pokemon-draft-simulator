@@ -622,8 +622,28 @@ export async function advanceTurn(draftId: string): Promise<void> {
   }
 
   if (!updateResult || updateResult.length === 0) {
-    // Optimistic lock failed - turn was already advanced by another process
-    log.warn('Optimistic lock failed - turn was already advanced')
+    // Optimistic lock failed - turn was already advanced by another process.
+    // Treat as idempotent success when the draft has already moved past `currentTurn`.
+    const { data: latest } = await (supabase
+      .from('drafts'))
+      .select('current_turn,status')
+      .eq('id', internalId)
+      .maybeSingle()
+
+    if (latest && (latest.status === 'completed' || (latest.current_turn ?? 0) >= nextTurn)) {
+      log.info('Turn already advanced past currentTurn — treating as success', {
+        currentTurn,
+        nextTurn,
+        latestTurn: latest.current_turn,
+        status: latest.status,
+      })
+      return
+    }
+
+    log.warn('Optimistic lock failed - turn was already advanced', {
+      currentTurn,
+      latestTurn: latest?.current_turn,
+    })
     throw new Error('Turn was already advanced by another process')
   }
 }

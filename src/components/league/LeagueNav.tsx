@@ -4,7 +4,7 @@ import { useParams, usePathname, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   ArrowLeft, CalendarDays, BarChart3, ArrowLeftRight,
-  UserPlus, ShieldCheck, Trophy, TrendingUp, Copy, Check, Settings,
+  UserPlus, ShieldCheck, Trophy, TrendingUp, Copy, Check, Settings, Eye,
 } from 'lucide-react'
 import { useState, useCallback } from 'react'
 
@@ -14,6 +14,9 @@ interface LeagueNavProps {
   totalWeeks?: number
   teamCount?: number
   isCommissioner?: boolean
+  /** True when the viewer owns a team in this league. Non-members see a
+   *  trimmed nav (no Trades, no Free Agents) and a "Viewing only" pill. */
+  isMember?: boolean
   enableWaivers?: boolean
   enableTrades?: boolean
   hasMatchResults?: boolean
@@ -40,6 +43,7 @@ export function LeagueNav({
   totalWeeks,
   teamCount,
   isCommissioner = false,
+  isMember = false,
   enableWaivers = true,
   enableTrades = true,
   hasMatchResults = false,
@@ -53,12 +57,15 @@ export function LeagueNav({
 
   const basePath = `/league/${leagueId}`
 
+  // Participation-only tabs — guests don't see Trades or Free Agents
+  const showParticipantTabs = isMember || isCommissioner
+
   // Build tab list based on league state — hide trades & free agents when trades are banned
   const allTabs = [
     ...ALWAYS_TABS,
-    ...(enableTrades ? [TRADE_TAB] : []),
+    ...(enableTrades && showParticipantTabs ? [TRADE_TAB] : []),
     ...(hasMatchResults ? MATCH_TABS : []),
-    ...(enableTrades && enableWaivers ? [{ id: 'free-agents', label: 'Free Agents', path: '/free-agents', icon: UserPlus }] : []),
+    ...(enableTrades && enableWaivers && showParticipantTabs ? [{ id: 'free-agents', label: 'Free Agents', path: '/free-agents', icon: UserPlus }] : []),
     ...(isCommissioner ? [{ id: 'admin', label: 'Admin', path: '/admin', icon: ShieldCheck }] : []),
   ]
 
@@ -90,7 +97,18 @@ export function LeagueNav({
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold tracking-tight truncate">{leagueName}</h1>
+            <div className="flex items-center gap-2 min-w-0">
+              <h1 className="text-lg font-bold tracking-tight truncate">{leagueName}</h1>
+              {!isMember && !isCommissioner && (
+                <span
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground border shrink-0"
+                  title="You're not a member of this league — you're viewing in read-only mode."
+                >
+                  <Eye className="h-3 w-3" />
+                  Viewing only
+                </span>
+              )}
+            </div>
             {(currentWeek || teamCount) && (
               <p className="text-xs text-muted-foreground">
                 {currentWeek && totalWeeks && `Week ${currentWeek}/${totalWeeks}`}
@@ -105,7 +123,13 @@ export function LeagueNav({
                 <Settings className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy invite link'}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleCopy}
+              title={copied ? 'Copied!' : isMember || isCommissioner ? 'Copy invite link' : 'Copy share link'}
+            >
               {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>

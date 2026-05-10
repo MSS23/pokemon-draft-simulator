@@ -21,6 +21,7 @@ import { TeamIcon } from '@/components/league/TeamIcon'
 import { importTournament, type Tournament } from '@/lib/tournament-service'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { LeagueNav } from '@/components/league/LeagueNav'
+import { KillLeadersCard } from '@/components/league/KillLeadersCard'
 import {
   ArrowLeft, Trophy, TrendingUp, Loader2,
   ChevronLeft, ChevronRight, CalendarDays, Megaphone,
@@ -295,6 +296,7 @@ export default function LeaguePage() {
         totalWeeks={league.totalWeeks}
         teamCount={league.teams.length}
         isCommissioner={isCommissioner}
+        isMember={!!userTeamId}
         enableWaivers={leagueSettings.enableWaivers !== false}
         enableTrades={leagueSettings.enableTrades !== false}
         hasMatchResults={standings.some(s => s.wins > 0 || s.losses > 0 || s.draws > 0)}
@@ -558,12 +560,13 @@ export default function LeaguePage() {
             <Card>
               <CardContent className="p-0">
                 {/* Table header */}
-                <div className="grid grid-cols-[2rem_1fr_5rem_4rem] sm:grid-cols-[2rem_1fr_6rem_5rem_5rem] items-center gap-3 px-4 py-2 border-b text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="grid grid-cols-[2rem_1fr_5rem_4rem] sm:grid-cols-[2rem_1fr_6rem_5rem_5rem_4rem] items-center gap-3 px-4 py-2 border-b text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                   <div>#</div>
                   <div>Team</div>
                   <div className="text-center">Record</div>
                   <div className="text-right hidden sm:block">Pts</div>
                   <div className="text-right">+/-</div>
+                  <div className="text-right hidden sm:block" title="Strength of Schedule (avg opponent winning %)">SoS</div>
                 </div>
 
                 {standings.map((standing, index) => {
@@ -574,7 +577,7 @@ export default function LeaguePage() {
                       key={standing.id}
                       role="button"
                       tabIndex={0}
-                      className={`grid grid-cols-[2rem_1fr_5rem_4rem] sm:grid-cols-[2rem_1fr_6rem_5rem_5rem] items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer border-l-[3px] ${colors?.border || 'border-transparent'} ${index < standings.length - 1 ? 'border-b' : ''}`}
+                      className={`grid grid-cols-[2rem_1fr_5rem_4rem] sm:grid-cols-[2rem_1fr_6rem_5rem_5rem_4rem] items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors cursor-pointer border-l-[3px] ${colors?.border || 'border-transparent'} ${index < standings.length - 1 ? 'border-b' : ''}`}
                       onClick={() => router.push(`/league/${leagueId}/team/${standing.teamId}`)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/league/${leagueId}/team/${standing.teamId}`) } }}
                     >
@@ -613,6 +616,16 @@ export default function LeaguePage() {
                       }`}>
                         {standing.pointDifferential > 0 ? '+' : ''}{standing.pointDifferential}
                       </div>
+                      <div
+                        className="text-right text-xs font-mono tabular-nums text-muted-foreground hidden sm:block"
+                        title={typeof standing.strengthOfSchedule === 'number'
+                          ? `Average opponent winning %: ${(standing.strengthOfSchedule * 100).toFixed(1)}%`
+                          : 'Not enough data'}
+                      >
+                        {typeof standing.strengthOfSchedule === 'number'
+                          ? standing.strengthOfSchedule.toFixed(3)
+                          : '—'}
+                      </div>
                     </div>
                   )
                 })}
@@ -620,6 +633,41 @@ export default function LeaguePage() {
             </Card>
           )}
         </div>
+
+        {/* Kill Leaders + Weekly Results CTA */}
+        {standings.length > 0 && league && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold mb-1">Weekly Results</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Full team × week grid with per-Pokémon K/D drilldown — the league&apos;s scoreboard at a glance.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/league/${leagueId}/weekly-results`)}
+                  >
+                    Open grid
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+            <KillLeadersCard
+              leagueId={leagueId}
+              teams={(league.teams ?? []).map(t => ({
+                id: t.id,
+                name: t.name,
+                abbreviation: t.abbreviation,
+                draftOrder: t.draftOrder,
+              }))}
+              limit={8}
+            />
+          </div>
+        )}
 
         {/* Sibling conference */}
         {isConference && siblingLeague && siblingStandings.length > 0 && (

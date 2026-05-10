@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { KnockoutService } from '@/lib/knockout-service'
 import { POKEMON_FORMATS, getFormatById } from '@/lib/formats'
 import { notify } from '@/lib/notifications'
+import { validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
 import {
   Swords, Trophy, ArrowLeft, Loader2, Shield, ChevronLeft, ChevronRight, GitBranch,
@@ -52,6 +53,8 @@ export default function CreateTournamentPage() {
     if (!user) return
     setIsCreating(true)
     try {
+      const nameCheck = validateName(name, { fieldLabel: 'Tournament name', maxLength: 60 });
+      if (!nameCheck.ok) { notify.warning('Invalid tournament name', nameCheck.reason!); setIsCreating(false); return; }
       const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Host'
       const { league, roomCode } = await KnockoutService.createLobby({
         name: name.trim(),

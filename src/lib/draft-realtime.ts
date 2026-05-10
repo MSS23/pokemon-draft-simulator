@@ -62,7 +62,10 @@ export class DraftRealtimeManager {
   private maxReconnectDelay = 30000
   private isSubscribed = false
   private lastEventIds = new Map<string, number>() // For deduplication
-  private eventDedupeWindow = 3000 // 3 second window for deduplication
+  // Event IDs already include record id + updated_at, so the window only needs to
+  // suppress true echoes from Supabase's realtime layer (typically <500ms).
+  // 3s was over-conservative and could mask legitimate fast-fire updates.
+  private eventDedupeWindow = 800
   private presenceState: PresenceState = {
     onlineUsers: new Set(),
     userPresence: new Map()

@@ -367,9 +367,9 @@ export class DraftService {
 
   static async createDraft({ name, hostName, teamName, settings, isPublic, description, tags, password, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {
     if (!supabase) {
-      log.error('Supabase configuration error:', {
-        url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      log.error('Supabase configuration error', {
+        hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       })
       throw new Error('Supabase is not properly configured. Please check your environment variables and restart the dev server.')
     }

@@ -6,6 +6,9 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
+    // Playwright specs live under e2e/ and use @playwright/test (incompatible
+    // runtime); they are run via `npx playwright test`, not vitest.
+    exclude: ['node_modules', 'dist', '.next', 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json', 'lcov'],

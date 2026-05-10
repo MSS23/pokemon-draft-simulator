@@ -20,7 +20,6 @@ import { FloatingFeedbackButton } from "@/components/feedback/FloatingFeedbackBu
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import { validateEnv } from "@/lib/env";
-// import ErrorBoundary from "@/components/ui/error-boundary";
 
 // Validate environment variables at startup
 validateEnv();

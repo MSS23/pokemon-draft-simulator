@@ -14,21 +14,25 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id ON push_subscriptions(user_id);
 
--- RLS: users can manage their own subscriptions
+-- RLS: users can manage their own subscriptions (idempotent — safe to re-run)
 ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own subscriptions" ON push_subscriptions;
 CREATE POLICY "Users can view their own subscriptions"
   ON push_subscriptions FOR SELECT
   USING (true);
 
+DROP POLICY IF EXISTS "Users can insert their own subscriptions" ON push_subscriptions;
 CREATE POLICY "Users can insert their own subscriptions"
   ON push_subscriptions FOR INSERT
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Users can update their own subscriptions" ON push_subscriptions;
 CREATE POLICY "Users can update their own subscriptions"
   ON push_subscriptions FOR UPDATE
   USING (true);
 
+DROP POLICY IF EXISTS "Users can delete their own subscriptions" ON push_subscriptions;
 CREATE POLICY "Users can delete their own subscriptions"
   ON push_subscriptions FOR DELETE
   USING (true);

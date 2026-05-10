@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { FormatValidator, type FormatRules } from '@/lib/format-validator'
-import type { CachedPokemon } from '@/lib/pokemon-cache-db'
+import { FormatValidator, type FormatRules, type CachedPokemon } from '@/lib/format-validator'
 
 // Test format
 const TEST_FORMAT: FormatRules = {

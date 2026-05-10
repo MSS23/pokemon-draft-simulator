@@ -2,16 +2,16 @@
 -- Purpose: Allow drafts to be soft-deleted so participants can be notified and history is preserved
 -- Date: 2025-01-12
 
--- Add soft delete columns to drafts table
+-- Add soft delete columns to drafts table (idempotent — safe to re-run)
 ALTER TABLE drafts
-  ADD COLUMN deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-  ADD COLUMN deleted_by TEXT DEFAULT NULL;
+  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS deleted_by TEXT DEFAULT NULL;
 
 -- Create index for queries that filter out deleted drafts (performance optimization)
-CREATE INDEX idx_drafts_not_deleted ON drafts (id) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_drafts_not_deleted ON drafts (id) WHERE deleted_at IS NULL;
 
 -- Create index for querying deleted drafts (admin/audit purposes)
-CREATE INDEX idx_drafts_deleted_at ON drafts (deleted_at) WHERE deleted_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_drafts_deleted_at ON drafts (deleted_at) WHERE deleted_at IS NOT NULL;
 
 -- Add comment for documentation
 COMMENT ON COLUMN drafts.deleted_at IS 'Timestamp when draft was soft-deleted. NULL means not deleted.';
@@ -40,6 +40,7 @@ CREATE POLICY "Users can view drafts they are in" ON drafts
   );
 
 -- Admin users can still see deleted drafts for management purposes
+DROP POLICY IF EXISTS "Admins can view all drafts including deleted" ON drafts;
 CREATE POLICY "Admins can view all drafts including deleted" ON drafts
   FOR SELECT
   USING (
@@ -67,12 +68,19 @@ UPDATE drafts
 SET deleted_at = NULL, deleted_by = NULL
 WHERE deleted_at IS NULL;
 
--- Add check constraint to ensure deleted_by is set when deleted_at is set
-ALTER TABLE drafts
-  ADD CONSTRAINT check_deleted_by_required
-  CHECK (
-    (deleted_at IS NULL AND deleted_by IS NULL)
-    OR (deleted_at IS NOT NULL AND deleted_by IS NOT NULL)
-  );
+-- Add check constraint to ensure deleted_by is set when deleted_at is set (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'check_deleted_by_required'
+  ) THEN
+    ALTER TABLE drafts
+      ADD CONSTRAINT check_deleted_by_required
+      CHECK (
+        (deleted_at IS NULL AND deleted_by IS NULL)
+        OR (deleted_at IS NOT NULL AND deleted_by IS NOT NULL)
+      );
+  END IF;
+END $$;
 
 COMMENT ON CONSTRAINT check_deleted_by_required ON drafts IS 'Ensures deleted_by is set when draft is soft-deleted';

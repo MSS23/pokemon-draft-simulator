@@ -97,7 +97,8 @@ export class KnockoutService {
 
     if (draftError || !draftRow) {
       log.error('Failed to create draft for tournament:', draftError)
-      throw new Error('Failed to create tournament lobby')
+      const detail = draftError?.message ? `: ${draftError.message}` : ''
+      throw new Error(`Failed to create tournament lobby${detail}`)
     }
 
     // Create host's team
@@ -139,7 +140,11 @@ export class KnockoutService {
 
     if (leagueError || !leagueRow) {
       log.error('Failed to create league:', leagueError)
-      throw new Error('Failed to create tournament')
+      // Roll back the orphaned draft row so retries don't pile up half-created
+      // tournaments under the same room code.
+      await supabase.from('drafts').delete().eq('id', draftRow.id)
+      const detail = leagueError?.message ? `: ${leagueError.message}` : ''
+      throw new Error(`Failed to create tournament${detail}`)
     }
 
     return {
@@ -253,10 +258,10 @@ export class KnockoutService {
     const tournamentType = (settings.tournamentType as TournamentFormat) || 'single-elimination'
     const matchFormat = (settings.matchFormat as string) || 'best_of_3'
 
-    const participants = teamRows.map((t: TeamRow, i: number) => ({
-      id: t.id,
-      name: t.name,
-      teamId: t.id,
+    const participants = teamRows.map((t, i: number) => ({
+      id: (t as { id: string }).id,
+      name: (t as { name: string }).name,
+      teamId: (t as { id: string }).id,
       seed: i + 1,
     }))
 
@@ -290,9 +295,9 @@ export class KnockoutService {
       .eq('id', leagueRow.draft_id)
 
     // Add league_teams entries
-    const leagueTeams = teamRows.map((t: TeamRow, i: number) => ({
+    const leagueTeams = teamRows.map((t, i: number) => ({
       league_id: leagueId,
-      team_id: t.id,
+      team_id: (t as { id: string }).id,
       seed: i + 1,
     }))
 

@@ -5,8 +5,29 @@
  * Performance: < 1ms for cached checks, < 10ms for uncached
  */
 
-import type { CachedPokemon } from './pokemon-cache-db'
 import { createLogger } from '@/lib/logger'
+
+/**
+ * Minimal Pokemon shape consumed by the validator. Originally pulled from a
+ * cache-db module; inlined here so the validator stays self-contained.
+ */
+export interface CachedPokemon {
+  id: string
+  name: string
+  is_legendary?: boolean
+  is_mythical?: boolean
+  stats: Array<{ base_stat: number; stat: { name: string } }>
+  // Optional fields the validator does not consume but downstream callers
+  // (e.g. test fixtures, image renderers) may provide.
+  types?: Array<{ type: { name: string } }>
+  abilities?: Array<{ ability: { name: string }; is_hidden?: boolean }>
+  sprites?: { front_default?: string | null; [k: string]: unknown }
+  species?: { name: string; url?: string }
+  height?: number
+  weight?: number
+  moves?: unknown[]
+  cachedAt?: number
+}
 
 const log = createLogger('FormatValidator')
 

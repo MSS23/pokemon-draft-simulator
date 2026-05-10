@@ -311,6 +311,83 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
     }
   },
 
+  // Pokémon Champions Regulation MA (Megas legal)
+  {
+    id: 'vgc-reg-ma',
+    name: 'Pokémon Champions Regulation MA',
+    shortName: 'Reg MA',
+    description: 'Pokémon Champions Reg MA — Mega Evolutions are back. All Megas legal, plus the standard non-restricted dex. No restricted legendaries, no Mythicals.',
+    generation: 9,
+    gameType: 'doubles',
+    category: 'vgc',
+    ruleset: {
+      speciesClause: true,
+      itemClause: true,
+      bannedPokemon: [
+        // Restricted legendaries — banned in Reg MA (no restricted slots)
+        'koraidon','miraidon','terapagos','terapagos-terastal','terapagos-stellar',
+        'mewtwo','lugia','ho-oh','kyogre','groudon','rayquaza',
+        'dialga','dialga-origin','palkia','palkia-origin',
+        'giratina','giratina-origin',
+        'reshiram','zekrom','kyurem','kyurem-black','kyurem-white',
+        'xerneas','yveltal','zygarde','zygarde-10','zygarde-complete',
+        'cosmog','cosmoem','solgaleo','lunala','necrozma','necrozma-dusk-mane',
+        'necrozma-dawn-wings','necrozma-ultra',
+        'zacian','zacian-crowned','zamazenta','zamazenta-crowned',
+        'eternatus','eternatus-eternamax',
+        'calyrex','calyrex-ice','calyrex-shadow',
+        // Mythicals
+        'mew','celebi','jirachi','deoxys','deoxys-attack','deoxys-defense','deoxys-speed',
+        'phione','manaphy','darkrai','shaymin','shaymin-sky','arceus',
+        'victini','keldeo','keldeo-resolute','meloetta','meloetta-pirouette','genesect',
+        'diancie','hoopa','hoopa-unbound','volcanion',
+        'magearna','marshadow','zeraora','meltan','melmetal','zarude','pecharunt','enamorus',
+      ],
+      bannedTiers: [],
+      allowedGenerations: [],
+      legendaryPolicy: 'restricted',
+      mythicalPolicy: 'banned',
+      paradoxPolicy: 'allowed',
+      bannedAbilities: [],
+      bannedItems: [],
+      bannedMoves: [],
+    },
+    costConfig: {
+      type: 'hybrid',
+      bstTiers: {
+        680: 50, 600: 35, 550: 30, 500: 25, 450: 20, 400: 15, 350: 10, 300: 7, 0: 4,
+      },
+      costOverrides: {
+        // Mega forms — premium because they're the headline of Reg MA
+        'venusaur-mega': 35, 'charizard-mega-x': 42, 'charizard-mega-y': 42,
+        'blastoise-mega': 32, 'beedrill-mega': 28, 'pidgeot-mega': 30,
+        'alakazam-mega': 38, 'slowbro-mega': 30, 'gengar-mega': 40, 'kangaskhan-mega': 36,
+        'pinsir-mega': 32, 'gyarados-mega': 38, 'aerodactyl-mega': 30,
+        'ampharos-mega': 32, 'steelix-mega': 32, 'scizor-mega': 38, 'heracross-mega': 32,
+        'houndoom-mega': 30, 'tyranitar-mega': 42,
+        'sceptile-mega': 32, 'blaziken-mega': 38, 'swampert-mega': 32,
+        'gardevoir-mega': 36, 'sableye-mega': 28, 'mawile-mega': 32, 'aggron-mega': 32,
+        'medicham-mega': 30, 'manectric-mega': 32, 'sharpedo-mega': 32, 'camerupt-mega': 28,
+        'altaria-mega': 30, 'banette-mega': 28, 'absol-mega': 32, 'glalie-mega': 28,
+        'salamence-mega': 42, 'metagross-mega': 40,
+        'latias-mega': 38, 'latios-mega': 38,
+        'lopunny-mega': 32, 'garchomp-mega': 42, 'lucario-mega': 38, 'abomasnow-mega': 28,
+        'gallade-mega': 32, 'audino-mega': 24, 'diancie-mega': 38,
+      },
+      costMultiplier: 1.0,
+      minCost: 4,
+      maxCost: 50,
+    },
+    meta: {
+      isOfficial: true,
+      lastUpdated: '2026-01-01',
+      season: 'Pokémon Champions Reg MA',
+      source: 'The Pokémon Company International — Pokémon Champions',
+      popularity: 5,
+      complexity: 4,
+    },
+  },
+
   // VGC 2023 Regulation C
   {
     id: 'vgc-reg-c',

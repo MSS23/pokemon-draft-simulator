@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { createLogger } from "@/lib/logger";
+import { validateName } from "@/lib/profanity";
 
 const log = createLogger("JoinDraft");
 
@@ -99,6 +100,11 @@ function JoinDraftForm() {
     if (!joinAsSpectator && !formData.teamName.trim()) {
       setError("Please enter a team name or join as spectator");
       return;
+    }
+
+    if (!joinAsSpectator) {
+      const teamCheck = validateName(formData.teamName, { fieldLabel: 'Team name', maxLength: 50 });
+      if (!teamCheck.ok) { setError(teamCheck.reason!); return; }
     }
 
     if (requiresPassword && !formData.password.trim()) {

@@ -18,8 +18,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { mapTeamRowFull } from '@/lib/league-service'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { MatchKOService } from '@/lib/match-ko-service'
+import { TeamIdentityModal } from '@/components/league/TeamIdentityModal'
 import { AIAccessControl } from '@/lib/ai-access-control'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -74,6 +76,7 @@ export default function TeamDetailPage() {
   const [canAnalyzeTeams, setCanAnalyzeTeams] = useState(false)
   const [accessChecked, setAccessChecked] = useState(false)
   const [viewerRole, setViewerRole] = useState<ViewerRole>('spectator')
+  const [identityModalOpen, setIdentityModalOpen] = useState(false)
   const { data: allPokemon } = usePokemonList()
 
   const [importedSets, setImportedSets] = useState<PokemonSet[]>([])
@@ -107,10 +110,11 @@ export default function TeamDetailPage() {
         .single()
 
       if (teamError) throw teamError
-      setTeam(teamData as unknown as Team)
+      const mappedTeam = mapTeamRowFull(teamData as Parameters<typeof mapTeamRowFull>[0])
+      setTeam(mappedTeam)
 
       // Determine viewer role
-      if (userId && (teamData as unknown as Team).ownerId === userId) {
+      if (userId && mappedTeam.ownerId === userId) {
         setViewerRole('owner')
       } else if (userId) {
         // Check if user owns another team in this league
@@ -315,12 +319,46 @@ export default function TeamDetailPage() {
           <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8" onClick={() => router.push(`/league/${leagueId}`)}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold">{team.name}</h1>
-            <p className="text-sm text-muted-foreground">
+          {/* Team logo */}
+          {team.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={team.logoUrl}
+              alt={`${team.name} logo`}
+              className="h-12 w-12 rounded-lg object-contain border border-border bg-muted/40 shrink-0"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
+          ) : null}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold truncate">{team.name}</h1>
+              {team.abbreviation && (
+                <Badge variant="outline" className="font-mono text-xs">
+                  {team.abbreviation}
+                </Badge>
+              )}
+              {team.divisionName && (
+                <Badge variant="secondary" className="text-xs">
+                  {team.divisionName}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground truncate">
               {stats.wins}-{stats.losses}-{stats.draws} &middot; {stats.totalPointsFor} PF, {stats.totalPointsAgainst} PA
+              {team.coachDisplayName && <> &middot; Coach: {team.coachDisplayName}</>}
+              {team.discordHandle && <> &middot; @{team.discordHandle}</>}
             </p>
           </div>
+          {viewerRole === 'owner' && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setIdentityModalOpen(true)}
+            >
+              Edit team
+            </Button>
+          )}
         </div>
 
 
@@ -795,6 +833,22 @@ export default function TeamDetailPage() {
 
         </Tabs>
       </div>
+
+      {/* Team identity edit modal */}
+      <TeamIdentityModal
+        isOpen={identityModalOpen}
+        onClose={() => setIdentityModalOpen(false)}
+        team={{
+          id: team.id,
+          name: team.name,
+          logoUrl: team.logoUrl,
+          abbreviation: team.abbreviation,
+          coachDisplayName: team.coachDisplayName,
+          discordHandle: team.discordHandle,
+          divisionName: team.divisionName,
+        }}
+        onSaved={() => { router.refresh(); window.location.reload() }}
+      />
     </div>
   )
 }

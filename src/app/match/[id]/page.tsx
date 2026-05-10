@@ -52,6 +52,9 @@ export default function MatchDetailPage() {
         }
 
         // Load team picks
+        if (!supabase) {
+          throw new Error('Supabase not configured')
+        }
         const { data: homePicks } = await supabase
           .from('picks')
           .select('*')

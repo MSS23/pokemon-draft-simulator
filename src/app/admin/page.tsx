@@ -1,16 +1,45 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import FormatSyncPanel from '@/components/admin/FormatSyncPanel'
 import DraftManagementPanel from '@/components/admin/DraftManagementPanel'
 import { Shield, Database, Settings, Trash2, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
 
 export default function AdminPage() {
   const { user, loading } = useAuth()
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
 
-  if (loading) {
+  // Verify admin role against user_profiles.is_admin. Default-deny on any
+  // failure (missing client, query error, no profile) — admin access must
+  // never fall open.
+  useEffect(() => {
+    if (loading) return
+    if (!user) { setIsAdmin(false); return }
+    if (!supabase) { setIsAdmin(false); return }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase!
+          .from('user_profiles')
+          .select('is_admin')
+          .eq('user_id', user.id)
+          .maybeSingle()
+        if (cancelled) return
+        const profile = data as { is_admin?: boolean } | null
+        setIsAdmin(!!profile?.is_admin && !error)
+      } catch {
+        if (!cancelled) setIsAdmin(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user, loading])
+
+  if (loading || isAdmin === null) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -18,7 +47,7 @@ export default function AdminPage() {
     )
   }
 
-  if (!user) {
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md">
@@ -28,7 +57,9 @@ export default function AdminPage() {
               Admin Access Required
             </CardTitle>
             <CardDescription>
-              You must be signed in as an admin to access this page.
+              {user
+                ? 'Your account does not have admin privileges.'
+                : 'You must be signed in as an admin to access this page.'}
             </CardDescription>
           </CardHeader>
         </Card>

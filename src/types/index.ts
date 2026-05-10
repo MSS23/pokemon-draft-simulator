@@ -115,6 +115,12 @@ export interface Team {
   draftOrder: number
   undosRemaining: number
   picks: Pick[]
+  // League identity fields (sheet-aligned — see migrations/add-team-identity-fields.sql)
+  logoUrl?: string | null
+  abbreviation?: string | null
+  coachDisplayName?: string | null
+  discordHandle?: string | null
+  divisionName?: string | null
 }
 
 export interface Pick {
@@ -285,6 +291,12 @@ export interface Standing {
   rank: number | null
   currentStreak: string | null
   updatedAt: string
+  /**
+   * Derived strength of schedule (avg opponent winning %).
+   * Computed at read time; not persisted to the standings table.
+   * Range: 0.000 - 1.000
+   */
+  strengthOfSchedule?: number
 }
 
 export interface MatchGame {

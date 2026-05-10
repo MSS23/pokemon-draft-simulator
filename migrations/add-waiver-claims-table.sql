@@ -18,14 +18,17 @@ CREATE TABLE IF NOT EXISTS waiver_claims (
 CREATE INDEX IF NOT EXISTS idx_waiver_claims_league ON waiver_claims(league_id);
 CREATE INDEX IF NOT EXISTS idx_waiver_claims_team ON waiver_claims(team_id);
 
--- RLS policies
+-- RLS policies (idempotent — safe to re-run)
 ALTER TABLE waiver_claims ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Anyone can view waiver claims" ON waiver_claims;
 CREATE POLICY "Anyone can view waiver claims" ON waiver_claims
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Team owners can insert claims" ON waiver_claims;
 CREATE POLICY "Team owners can insert claims" ON waiver_claims
   FOR INSERT WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Team owners can update own claims" ON waiver_claims;
 CREATE POLICY "Team owners can update own claims" ON waiver_claims
   FOR UPDATE USING (true);

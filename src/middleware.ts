@@ -339,9 +339,13 @@ export default clerkMiddleware(
   },
   {
     // SEC-01: Only accept JWTs issued for the production app domain.
+    // Localhost is only ever valid in non-production builds; never trust it
+    // when NODE_ENV === 'production' even if the env var is missing.
     authorizedParties: process.env.NEXT_PUBLIC_CLERK_AUTHORIZED_PARTIES
       ? process.env.NEXT_PUBLIC_CLERK_AUTHORIZED_PARTIES.split(',')
-      : ['https://draftpokemon.com', 'http://localhost:3000'],
+      : process.env.NODE_ENV === 'production'
+        ? ['https://draftpokemon.com']
+        : ['https://draftpokemon.com', 'http://localhost:3000'],
   }
 )
 

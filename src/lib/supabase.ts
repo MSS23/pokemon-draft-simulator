@@ -120,6 +120,11 @@ export type Database = {
           budget_remaining: number
           draft_order: number
           undos_remaining: number
+          logo_url: string | null
+          abbreviation: string | null
+          coach_display_name: string | null
+          discord_handle: string | null
+          division_name: string | null
         }
         Insert: {
           id?: string
@@ -130,6 +135,11 @@ export type Database = {
           budget_remaining?: number
           draft_order: number
           undos_remaining?: number
+          logo_url?: string | null
+          abbreviation?: string | null
+          coach_display_name?: string | null
+          discord_handle?: string | null
+          division_name?: string | null
         }
         Update: {
           id?: string
@@ -140,6 +150,11 @@ export type Database = {
           budget_remaining?: number
           draft_order?: number
           undos_remaining?: number
+          logo_url?: string | null
+          abbreviation?: string | null
+          coach_display_name?: string | null
+          discord_handle?: string | null
+          division_name?: string | null
         }
         Relationships: []
       }
@@ -957,6 +972,12 @@ export type Database = {
           ko_count: number
           is_death: boolean
           ko_details: Record<string, unknown> | null
+          scorer_pick_id: string | null
+          scorer_team_id: string | null
+          turn_number: number | null
+          recorded_by: string | null
+          team_id?: string | null
+          pokemon_name?: string | null
           created_at: string
           updated_at: string
         }
@@ -969,6 +990,12 @@ export type Database = {
           ko_count?: number
           is_death?: boolean
           ko_details?: Record<string, unknown> | null
+          scorer_pick_id?: string | null
+          scorer_team_id?: string | null
+          turn_number?: number | null
+          recorded_by?: string | null
+          team_id?: string | null
+          pokemon_name?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -981,6 +1008,12 @@ export type Database = {
           ko_count?: number
           is_death?: boolean
           ko_details?: Record<string, unknown> | null
+          scorer_pick_id?: string | null
+          scorer_team_id?: string | null
+          turn_number?: number | null
+          recorded_by?: string | null
+          team_id?: string | null
+          pokemon_name?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1399,6 +1432,33 @@ if (typeof window !== 'undefined') {
   }
 }
 
+/**
+ * Bridge Clerk → Supabase: when a user is signed into Clerk, every Supabase
+ * request carries a Clerk-issued JWT. The "supabase" JWT template in Clerk
+ * dashboard must be configured (HS256 signed with the Supabase JWT secret)
+ * for this to authenticate; otherwise PostgREST treats the request as anon.
+ *
+ * The callback is non-throwing — if Clerk isn't loaded (SSR, anon visitor,
+ * or template not configured) we return null and Supabase falls back to the
+ * anon key.
+ */
+async function getClerkSupabaseToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null
+  // window.Clerk is set by ClerkProvider; ?. handles "not loaded yet"
+  type ClerkLike = {
+    session?: {
+      getToken: (opts?: { template?: string }) => Promise<string | null>
+    }
+  }
+  const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk
+  if (!clerk?.session) return null
+  try {
+    return await clerk.session.getToken({ template: 'supabase' })
+  } catch {
+    return null
+  }
+}
+
 export const supabase = (() => {
   if (!supabaseConfigured) {
     // Return a placeholder during build — pages that use supabase
@@ -1407,19 +1467,24 @@ export const supabase = (() => {
   }
   if (!supabaseInstance) {
     supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      // Auth is owned by Clerk; disable Supabase's session persistence to
+      // prevent the two systems from fighting over localStorage/cookies.
       auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        // Use a unique storage key to avoid conflicts
-        storageKey: 'sb-pokemon-draft-auth-token'
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+        storageKey: 'sb-pokemon-draft-auth-token',
       },
       global: {
         headers: {
-          'X-Client-Info': 'pokemon-draft-app'
-        }
-      }
-    })
+          'X-Client-Info': 'pokemon-draft-app',
+        },
+      },
+      // Supabase JS v2: invoked on every request to attach the bearer token.
+      // Returning null means "use the anon key" (existing behaviour for
+      // signed-out visitors and guest mode).
+      accessToken: getClerkSupabaseToken,
+    } as Parameters<typeof createClient<Database>>[2])
 
     // Store instance reference in window to prevent duplication
     if (typeof window !== 'undefined') {

@@ -85,3 +85,12 @@ cleanup-*.bat
 .claude/agents/frontend-architect.md
 .claude/agents/pokemon-data-specialist.md
 .claude/agents/state-management-expert.md
+
+# clerk configuration (can include secrets)
+/.clerk/
+
+# playwright artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

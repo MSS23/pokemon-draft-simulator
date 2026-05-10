@@ -66,6 +66,38 @@ function mapMatchRow(m: MatchRow): Match {
   }
 }
 
+/**
+ * Map a raw teams row to the camelCase Team domain type, including the
+ * Milestone B identity fields (logo_url, abbreviation, coach_display_name,
+ * discord_handle, division_name).
+ *
+ * NOTE: existing code in this file casts `team as unknown as Team` directly,
+ * which leaves snake_case keys at runtime. New code should call this helper.
+ */
+export function mapTeamRowFull(row: TeamRow & {
+  logo_url?: string | null
+  abbreviation?: string | null
+  coach_display_name?: string | null
+  discord_handle?: string | null
+  division_name?: string | null
+}): Team {
+  return {
+    id: row.id,
+    draftId: row.draft_id,
+    name: row.name,
+    ownerId: row.owner_id,
+    budgetRemaining: row.budget_remaining,
+    draftOrder: row.draft_order,
+    undosRemaining: row.undos_remaining,
+    picks: [],
+    logoUrl: row.logo_url ?? null,
+    abbreviation: row.abbreviation ?? null,
+    coachDisplayName: row.coach_display_name ?? null,
+    discordHandle: row.discord_handle ?? null,
+    divisionName: row.division_name ?? null,
+  }
+}
+
 function mapLeagueRow(row: LeagueRow): League {
   return {
     id: row.id,
@@ -577,7 +609,8 @@ export class LeagueService {
   }
 
   /**
-   * Get standings for a league
+   * Get standings for a league, with strength-of-schedule (SoS) computed
+   * at read time from the matches table. SoS = average opponent winning%.
    */
   static async getStandings(leagueId: string): Promise<(Standing & { team: Team })[]> {
     if (!supabase) throw new Error('Supabase not configured')
@@ -596,21 +629,62 @@ export class LeagueService {
     // Cast to access joined team since Supabase Relationships config is empty
     const standings = rawStandings as unknown as StandingWithTeam[]
 
-    return standings.map((s: StandingWithTeam) => ({
-      id: s.id,
-      leagueId: s.league_id,
-      teamId: s.team_id,
-      wins: s.wins,
-      losses: s.losses,
-      draws: s.draws,
-      pointsFor: s.points_for,
-      pointsAgainst: s.points_against,
-      pointDifferential: s.point_differential,
-      rank: s.rank,
-      currentStreak: s.current_streak,
-      updatedAt: s.updated_at,
-      team: s.team as unknown as Team
-    }))
+    // Pull all completed matches once to compute SoS in-memory.
+    // Wrapped in try/catch so SoS is best-effort — the standings response is
+    // still returned (without strengthOfSchedule) if the matches read fails.
+    const opponentMap = new Map<string, string[]>()
+    if (standings.length > 0) {
+      try {
+        const { data: completed } = await supabase
+          .from('matches')
+          .select('home_team_id, away_team_id, status, league_id')
+          .eq('league_id', leagueId)
+
+        for (const m of completed ?? []) {
+          if (m.status !== 'completed') continue
+          const arr1 = opponentMap.get(m.home_team_id) ?? []
+          arr1.push(m.away_team_id)
+          opponentMap.set(m.home_team_id, arr1)
+          const arr2 = opponentMap.get(m.away_team_id) ?? []
+          arr2.push(m.home_team_id)
+          opponentMap.set(m.away_team_id, arr2)
+        }
+      } catch {
+        // SoS unavailable — return standings without it
+      }
+    }
+
+    // Build a winning% lookup once
+    const winPct = new Map<string, number>()
+    for (const s of standings) {
+      const total = s.wins + s.losses + s.draws
+      winPct.set(s.team_id, total > 0 ? (s.wins + s.draws * 0.5) / total : 0)
+    }
+
+    return standings.map((s: StandingWithTeam) => {
+      const opps = opponentMap.get(s.team_id) ?? []
+      let sos: number | undefined = undefined
+      if (opps.length > 0) {
+        const sum = opps.reduce((acc, id) => acc + (winPct.get(id) ?? 0), 0)
+        sos = Math.round((sum / opps.length) * 1000) / 1000
+      }
+      return {
+        id: s.id,
+        leagueId: s.league_id,
+        teamId: s.team_id,
+        wins: s.wins,
+        losses: s.losses,
+        draws: s.draws,
+        pointsFor: s.points_for,
+        pointsAgainst: s.points_against,
+        pointDifferential: s.point_differential,
+        rank: s.rank,
+        currentStreak: s.current_streak,
+        updatedAt: s.updated_at,
+        strengthOfSchedule: sos,
+        team: s.team as unknown as Team,
+      }
+    })
   }
 
   /**
@@ -862,6 +936,60 @@ export class LeagueService {
     return {
       ...mapLeagueRow(league),
       teams: league.league_teams.map((lt: { team: TeamRow }) => lt.team as unknown as Team)
+    }
+  }
+
+  /**
+   * Read fully-mapped team identity (sheet-aligned fields). Returns null if
+   * the team isn't found. Use this when you need the new logo/abbreviation/
+   * coach/discord/division fields populated as camelCase.
+   */
+  static async getTeamIdentity(teamId: string): Promise<Team | null> {
+    if (!supabase) throw new Error('Supabase not configured')
+    const { data, error } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('id', teamId)
+      .maybeSingle()
+    if (error || !data) return null
+    return mapTeamRowFull(data as Parameters<typeof mapTeamRowFull>[0])
+  }
+
+  /**
+   * Update sheet-aligned team identity fields. Authorisation must be enforced
+   * by the caller (team owner OR commissioner). RLS still gates the write.
+   */
+  static async updateTeamIdentity(
+    teamId: string,
+    updates: {
+      logoUrl?: string | null
+      abbreviation?: string | null
+      coachDisplayName?: string | null
+      discordHandle?: string | null
+      divisionName?: string | null
+    }
+  ): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const payload: Record<string, string | null> = {}
+    if (updates.logoUrl !== undefined) payload.logo_url = updates.logoUrl
+    if (updates.abbreviation !== undefined) payload.abbreviation = updates.abbreviation
+    if (updates.coachDisplayName !== undefined) payload.coach_display_name = updates.coachDisplayName
+    if (updates.discordHandle !== undefined) payload.discord_handle = updates.discordHandle
+    if (updates.divisionName !== undefined) payload.division_name = updates.divisionName
+
+    if (Object.keys(payload).length === 0) return
+
+    const { error } = await (supabase
+      .from('teams') as unknown as {
+        update: (p: Record<string, string | null>) => { eq: (col: string, val: string) => Promise<{ error: { message: string } | null }> }
+      })
+      .update(payload)
+      .eq('id', teamId)
+
+    if (error) {
+      log.error('Failed to update team identity', error)
+      throw new Error(`Failed to update team: ${error.message}`)
     }
   }
 

@@ -31,6 +31,8 @@ import {
 import type { AdvancedTeamStats, TeamFormIndicator } from '@/lib/league-stats-service'
 import type { Team } from '@/types'
 import { createLogger } from '@/lib/logger'
+import { useAuth } from '@/contexts/AuthContext'
+import { UserSessionService } from '@/lib/user-session'
 
 const log = createLogger('LeagueRankingsPage')
 
@@ -58,6 +60,9 @@ export default function PowerRankingsPage() {
   const [currentWeek, setCurrentWeek] = useState<number>(1)
   const [leagueName, setLeagueName] = useState('')
   const [totalWeeks, setTotalWeeks] = useState(0)
+  const [userTeamId, setUserTeamId] = useState<string | null>(null)
+
+  const { user } = useAuth()
 
   const loadRankings = useCallback(async () => {
     try {
@@ -92,6 +97,20 @@ export default function PowerRankingsPage() {
       if (teamsResponse.error) throw teamsResponse.error
       const teams = teamsResponse.data as unknown as Team[]
       if (!teams || teams.length === 0) throw new Error('No teams found')
+
+      // Determine membership from raw rows (owner_id is snake_case in DB)
+      let userId = user?.id
+      if (!userId) {
+        try {
+          const session = await UserSessionService.getOrCreateSession()
+          userId = session.userId
+        } catch { /* guest, no membership */ }
+      }
+      if (userId) {
+        const rawTeams = teamsResponse.data as unknown as Array<{ id: string; owner_id: string | null }>
+        const myTeam = rawTeams.find(t => t.owner_id === userId)
+        setUserTeamId(myTeam?.id || null)
+      }
 
       // Load stats and form for each team
       const teamRankings = await Promise.all(
@@ -151,7 +170,7 @@ export default function PowerRankingsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [leagueId])
+  }, [leagueId, user?.id])
 
   useEffect(() => {
     loadRankings()
@@ -217,6 +236,7 @@ export default function PowerRankingsPage() {
         leagueName={leagueName}
         currentWeek={currentWeek}
         totalWeeks={totalWeeks}
+        isMember={!!userTeamId}
       />
       <div className="container mx-auto px-4 py-4 max-w-6xl">
         {/* Page-specific header */}

@@ -10,6 +10,7 @@ import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
 import { KnockoutService } from '@/lib/knockout-service'
 import { notify } from '@/lib/notifications'
+import { validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
 import {
   Swords, ArrowLeft, Loader2, Shield,
@@ -32,9 +33,12 @@ export default function JoinTournamentPage() {
     if (!user) return
     setIsJoining(true)
     try {
+      const finalName = (playerName.trim() || displayName).trim();
+      const nameCheck = validateName(finalName, { fieldLabel: 'Your name', maxLength: 50 });
+      if (!nameCheck.ok) { notify.error('Invalid name', nameCheck.reason!); setIsJoining(false); return; }
       const { league } = await KnockoutService.joinTournament({
         roomCode: roomCode.trim().toUpperCase(),
-        playerName: (playerName.trim() || displayName).trim(),
+        playerName: finalName,
         userId: user.id,
       })
       notify.success('Joined!', 'You\'re in the tournament')

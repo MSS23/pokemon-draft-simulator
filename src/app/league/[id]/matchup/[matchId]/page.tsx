@@ -272,9 +272,26 @@ export default function MatchupPreviewPage() {
             </p>
           </div>
           {canRecord && (
-            <Button onClick={() => setShowRecorder(true)}>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                onClick={() => router.push(`/league/${leagueId}/matchup/${matchId}/score`)}
+              >
+                <Swords className="h-4 w-4 mr-2" />
+                Score Live
+              </Button>
+              <Button variant="outline" onClick={() => setShowRecorder(true)}>
+                Record Final
+              </Button>
+            </div>
+          )}
+          {!canRecord && match.status !== 'completed' && (
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/league/${leagueId}/matchup/${matchId}/score`)}
+            >
               <Swords className="h-4 w-4 mr-2" />
-              Record Result
+              Watch Live
             </Button>
           )}
         </div>
@@ -613,6 +630,18 @@ export default function MatchupPreviewPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* KO breakdown — turn-by-turn log */}
+        <KOBreakdownCard
+          matchId={matchId}
+          homeTeamId={match.homeTeamId}
+          awayTeamId={match.awayTeamId}
+          homeTeamName={match.homeTeam.name}
+          awayTeamName={match.awayTeam.name}
+          allPicks={[...homePicks, ...awayPicks]}
+          onScoreLive={() => router.push(`/league/${leagueId}/matchup/${matchId}/score`)}
+          canScore={canRecord}
+        />
       </div>
 
       {/* Match Recorder Modal */}
@@ -632,5 +661,136 @@ export default function MatchupPreviewPage() {
         />
       )}
     </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// KO breakdown card — read-only turn-by-turn log of attributed KO events.
+// Reads from match_pokemon_kos via MatchKOService.listMatchKOEvents and
+// subscribes to realtime changes so spectators see scoring live.
+// ────────────────────────────────────────────────────────────────────────────
+function KOBreakdownCard({
+  matchId,
+  homeTeamId,
+  awayTeamId,
+  homeTeamName,
+  awayTeamName,
+  allPicks,
+  onScoreLive,
+  canScore,
+}: {
+  matchId: string
+  homeTeamId: string
+  awayTeamId: string
+  homeTeamName: string
+  awayTeamName: string
+  allPicks: Pick[]
+  onScoreLive: () => void
+  canScore: boolean
+}) {
+  const [events, setEvents] = useState<Awaited<ReturnType<typeof MatchKOService.listMatchKOEvents>>>([])
+
+  useEffect(() => {
+    let mounted = true
+    MatchKOService.listMatchKOEvents(matchId)
+      .then(ev => { if (mounted) setEvents(ev) })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [matchId])
+
+  useEffect(() => {
+    if (!supabase) return
+    const ch = supabase
+      .channel(`match-kos-detail:${matchId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'match_pokemon_kos', filter: `match_id=eq.${matchId}` },
+        async () => {
+          try { setEvents(await MatchKOService.listMatchKOEvents(matchId)) }
+          catch { /* ignore */ }
+        }
+      )
+      .subscribe()
+    return () => { void supabase!.removeChannel(ch) }
+  }, [matchId])
+
+  const tally = useMemo(() => {
+    let h = 0, a = 0
+    for (const e of events) {
+      if (e.scorerTeamId === homeTeamId) h++
+      else if (e.scorerTeamId === awayTeamId) a++
+    }
+    return { home: h, away: a }
+  }, [events, homeTeamId, awayTeamId])
+
+  return (
+    <Card className="mt-6">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-base">KO Breakdown</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Live tally: {homeTeamName} {tally.home} — {tally.away} {awayTeamName}
+          </p>
+        </div>
+        {canScore && (
+          <Button size="sm" variant="outline" onClick={onScoreLive}>
+            <Swords className="h-3.5 w-3.5 mr-2" />
+            Open scoring
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {events.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">
+            No KOs logged yet.{' '}
+            {canScore && <span>Open scoring to start tracking the match.</span>}
+          </p>
+        ) : (
+          <ol className="space-y-1.5">
+            {events.map((ev, idx) => {
+              const scorer = allPicks.find(p => p.id === ev.scorerPickId)
+              const victim = allPicks.find(p => p.id === ev.victimPickId)
+              const isHome = ev.scorerTeamId === homeTeamId
+              return (
+                <li
+                  key={ev.id}
+                  className="flex items-center gap-2 text-sm py-1 border-b border-border/40 last:border-0"
+                >
+                  <span className="font-mono text-[10px] text-muted-foreground w-6 shrink-0">
+                    {idx + 1}.
+                  </span>
+                  {scorer && (
+                    <PokemonSprite
+                      pokemonId={scorer.pokemonId}
+                      pokemonName={scorer.pokemonName}
+                      className="w-7 h-7 object-contain shrink-0"
+                    />
+                  )}
+                  <span className={`font-semibold capitalize truncate ${isHome ? 'text-blue-600 dark:text-blue-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                    {scorer?.pokemonName ?? '—'}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0">KO&apos;d</span>
+                  {victim && (
+                    <PokemonSprite
+                      pokemonId={victim.pokemonId}
+                      pokemonName={victim.pokemonName}
+                      className="w-7 h-7 object-contain shrink-0"
+                    />
+                  )}
+                  <span className="font-semibold capitalize truncate flex-1">
+                    {victim?.pokemonName ?? ev.victimPokemonName ?? '—'}
+                  </span>
+                  {ev.turnNumber !== null && (
+                    <Badge variant="outline" className="text-[10px] shrink-0">
+                      T{ev.turnNumber}
+                    </Badge>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   )
 }

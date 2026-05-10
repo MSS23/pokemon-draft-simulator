@@ -80,6 +80,7 @@ function RosterCardInner({
 
   const hasStats = (matchesPlayed ?? 0) > 0
   const kd = hasStats ? ((kills ?? 0) / Math.max(deaths ?? 1, 1)) : null
+  const diff = hasStats ? ((kills ?? 0) - (deaths ?? 0)) : null
 
   return (
     <div
@@ -179,10 +180,20 @@ function RosterCardInner({
           </div>
           {(subtitle || hasStats) && (
             <p className="text-white/50 text-[10px] mt-0.5 truncate font-medium">
-              {hasStats
-                ? `${kills ?? 0} KOs · ${deaths ?? 0} deaths · ${matchesPlayed} games`
-                : subtitle
-              }
+              {hasStats ? (
+                <>
+                  {kills ?? 0} K · {deaths ?? 0} D ·{' '}
+                  <span
+                    className={cn(
+                      (diff ?? 0) > 0 && 'text-emerald-300',
+                      (diff ?? 0) < 0 && 'text-red-300',
+                    )}
+                  >
+                    {(diff ?? 0) > 0 ? '+' : ''}{diff ?? 0}
+                  </span>{' '}
+                  · {matchesPlayed} {matchesPlayed === 1 ? 'game' : 'games'}
+                </>
+              ) : subtitle}
             </p>
           )}
         </div>

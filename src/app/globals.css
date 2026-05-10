@@ -642,6 +642,31 @@
     --draft-border: hsl(var(--border));
   }
 
+  /* NBA-broadcast pick reveal */
+  @keyframes pickReveal {
+    0%   { opacity: 0; backdrop-filter: blur(0px); }
+    20%  { opacity: 1; backdrop-filter: blur(8px); }
+    85%  { opacity: 1; backdrop-filter: blur(8px); }
+    100% { opacity: 0; backdrop-filter: blur(0px); }
+  }
+  .animate-pickReveal {
+    animation: pickReveal 2.6s ease-out forwards;
+  }
+
+  @keyframes pickRevealStaggerIn {
+    0%   { opacity: 0; transform: translateY(14px) scale(0.97); }
+    60%  { opacity: 1; transform: translateY(0) scale(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .animate-pickRevealStaggerIn {
+    animation: pickRevealStaggerIn 0.6s ease-out backwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-pickReveal { animation-duration: 1.6s; }
+    .animate-pickRevealStaggerIn { animation: none; opacity: 1; transform: none; }
+  }
+
   /* Pick button pulse — compositor-only, active turn only */
   [data-turn-state='active'] .pick-button-primary {
     animation: pick-pulse 1.5s ease-in-out infinite;

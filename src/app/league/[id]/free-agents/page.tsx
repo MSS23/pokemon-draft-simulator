@@ -235,6 +235,7 @@ export default function FreeAgentsPage() {
         currentWeek={league?.currentWeek}
         totalWeeks={league?.totalWeeks}
         teamCount={league?.teams?.length}
+        isMember={!!userTeamId}
       />
       <div className="container mx-auto px-4 py-4 max-w-6xl">
         {/* Budget & claims summary */}
