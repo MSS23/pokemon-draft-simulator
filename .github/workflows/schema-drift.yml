@@ -1,0 +1,117 @@
+name: Schema Drift Check
+
+# Detects unauthorized schema changes (e.g. a hand-edit in Supabase Studio
+# against production) by diffing the live PROD database against the
+# migrations on main. Runs daily at 11:00 UTC; can also be triggered
+# manually.
+
+on:
+  schedule:
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link production project
+        run: |
+          supabase link \
+            --project-ref "$PROD_PROJECT_REF" \
+            --password "$PROD_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROD_PROJECT_REF:      ${{ secrets.PROD_PROJECT_REF }}
+          PROD_DB_PASSWORD:      ${{ secrets.PROD_DB_PASSWORD }}
+
+      - name: Compute schema diff
+        id: diff
+        run: |
+          set -o pipefail
+          diff_output=$(supabase db diff --linked --schema public 2>&1 || true)
+          # Trim CLI prelude lines; if anything substantive remains, that's drift.
+          stripped=$(printf '%s\n' "$diff_output" \
+            | grep -Ev '^(Connecting|Finished|No schema changes found|$)' || true)
+          if [ -z "$stripped" ]; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+            echo "Schema is clean — no drift detected."
+          else
+            echo "status=drift" >> "$GITHUB_OUTPUT"
+            {
+              echo 'diff<<DIFF_EOF'
+              printf '%s\n' "$diff_output"
+              echo 'DIFF_EOF'
+            } >> "$GITHUB_OUTPUT"
+            echo "Schema drift detected:"
+            printf '%s\n' "$diff_output"
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Open drift issue
+        if: steps.diff.outputs.status == 'drift'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const diff = `${{ steps.diff.outputs.diff }}`;
+            const today = new Date().toISOString().slice(0, 10);
+            const title = `Schema drift detected — ${today}`;
+            const body = [
+              '## Production schema drift',
+              '',
+              'The daily schema-drift workflow found differences between the',
+              'live PROD database and the migrations on `main`.',
+              '',
+              'Either:',
+              '1. Someone changed PROD outside of migrations — capture it as a new',
+              '   migration in `supabase/migrations/` and re-run the workflow, OR',
+              '2. Apply a missing migration via the `Migrate` workflow.',
+              '',
+              '### Diff output',
+              '',
+              '```sql',
+              diff.slice(0, 30000),
+              '```',
+            ].join('\n');
+
+            // De-dupe — reuse an open drift issue if one already exists.
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              state: 'open',
+              labels: 'schema-drift',
+              per_page: 5,
+            });
+            if (open.length > 0) {
+              await github.rest.issues.createComment({
+                owner:        context.repo.owner,
+                repo:         context.repo.repo,
+                issue_number: open[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner:  context.repo.owner,
+                repo:   context.repo.repo,
+                title,
+                body,
+                labels: ['schema-drift'],
+              });
+            }
+
+      - name: Fail workflow on drift
+        if: steps.diff.outputs.status == 'drift'
+        run: |
+          echo "Schema drift detected — failing the workflow."
+          exit 1

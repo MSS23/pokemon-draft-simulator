@@ -47,11 +47,24 @@ function scrubBreadcrumb(crumb: Sentry.Breadcrumb): Sentry.Breadcrumb | null {
   return crumb
 }
 
+// Tag every event with the deployment environment so we can filter
+// staging/preview noise out of the production Sentry view. Vercel sets
+// VERCEL_ENV to 'production' | 'preview' | 'development'; outside Vercel
+// (local dev, CI), fall back to NODE_ENV.
+const sentryEnvironment =
+  process.env.VERCEL_ENV ??
+  process.env.NODE_ENV ??
+  'development'
+
+// Lower the sampling rate in production to control quota. Staging/preview
+// stays at the full 10% so we get useful debugging signal on PR previews.
+const sentryTracesSampleRate = sentryEnvironment === 'production' ? 0.02 : 0.1
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: isProduction,
-  tracesSampleRate: 0.1,
-  environment: process.env.NODE_ENV,
+  tracesSampleRate: sentryTracesSampleRate,
+  environment: sentryEnvironment,
   beforeSend: scrubEvent,
   beforeBreadcrumb: scrubBreadcrumb,
 })

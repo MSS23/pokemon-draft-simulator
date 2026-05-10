@@ -34,3 +34,34 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key-for-build
+
+      # ---------------------------------------------------------------
+      # Playwright e2e
+      #
+      # When the Vercel deployment for this commit emits a preview URL
+      # into E2E_BASE_URL (set by the Vercel GitHub integration via
+      # repository variables), Playwright targets the preview directly.
+      # Otherwise it falls back to its built-in webServer which serves
+      # `npm run build && npm run start` on localhost:3000.
+      # ---------------------------------------------------------------
+      - name: Install Playwright (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright e2e
+        run: npx playwright test
+        env:
+          E2E_BASE_URL: ${{ vars.VERCEL_PREVIEW_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key-for-build
+        continue-on-error: true
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

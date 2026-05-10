@@ -1,0 +1,67 @@
+# Supabase local-dev config for pokemon-draft-staging.
+#
+# This file pins the local Supabase stack (when running `supabase start`)
+# and identifies the remote project to link against (when running
+# `supabase link`). See https://supabase.com/docs/guides/cli/config for
+# the full schema. Keep the local ports here in sync with anything that
+# also references them (e.g. .env.local for local-stack work).
+
+project_id = "pokemon-draft-staging"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+# Match production: Clerk handles auth, but Supabase auth schema is still
+# present so that JWT verification against Clerk's JWKs works.
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[functions]
+# No edge functions today. Add per-function tables here when we do.
+
+[analytics]
+enabled = false
+
+[experimental]
+# Reserved.
