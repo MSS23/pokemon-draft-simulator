@@ -278,6 +278,9 @@ const PokemonCard = ({
               alt={pokemon.name}
               width={IMAGE_SIZES[size]}
               height={IMAGE_SIZES[size]}
+              sizes={`${IMAGE_SIZES[size]}px`}
+              loading="lazy"
+              decoding="async"
               className={cn(
                 "relative z-[1] cursor-pointer transition-all duration-300 ease-out",
                 "group-hover:scale-110 group-hover:drop-shadow-[0_4px_12px_rgba(0,0,0,0.15)]",
@@ -293,6 +296,10 @@ const PokemonCard = ({
               onClick={(e) => { e.stopPropagation(); onViewDetails?.(pokemon) }}
               onError={handleImageError}
               onLoad={handleImageLoad}
+              // Primary URL is an animated GIF from Showdown — Next's optimizer
+              // would strip the animation. Static fallbacks (PNG sprites) would
+              // benefit from optimization, but the URL switches at runtime so we
+              // keep this disabled for correctness.
               unoptimized
             />
           </>

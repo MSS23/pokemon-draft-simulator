@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'play.pokemonshowdown.com',
+        pathname: '/sprites/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'img.clerk.com',
       },
     ],
@@ -96,6 +101,32 @@ const nextConfig: NextConfig = {
 
   // Security headers
   async headers() {
+    // Baseline CSP applied at the next.config layer as a defense-in-depth fallback.
+    // The per-request CSP set by src/middleware.ts (with a nonce on script-src)
+    // overrides this on routes the middleware matches. This baseline guarantees
+    // that any HTML response — even one not matched by the middleware — still
+    // ships a CSP header. Mirrors the directives in src/middleware.ts buildCSP().
+    const baselineCsp = [
+      "default-src 'self'",
+      // No nonce here — middleware adds the nonce-bearing CSP on page responses.
+      // 'unsafe-inline' on script-src is acceptable as a *fallback* because any
+      // route that actually executes scripts goes through the middleware, which
+      // replaces this header with a nonce-strict version.
+      "script-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev https://clerk.draftpokemon.com https://challenges.cloudflare.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' https: data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://pokeapi.co https://raw.githubusercontent.com https://*.sentry.io https://*.ingest.sentry.io https://us.i.posthog.com https://vitals.vercel-analytics.com https://vercel.live https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://clerk.draftpokemon.com https://api.clerk.com",
+      "frame-src 'self' https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+      "frame-ancestors 'none'",
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+      "upgrade-insecure-requests",
+    ].join('; ')
+
     return [
       {
         source: '/:path*',
@@ -123,6 +154,10 @@ const nextConfig: NextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=()'
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: baselineCsp,
           },
         ],
       },

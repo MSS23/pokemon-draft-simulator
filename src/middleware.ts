@@ -42,16 +42,22 @@ function buildCSP(nonce: string): string {
   const directives = [
     "default-src 'self'",
     `script-src ${scriptSrc}`,
-    // style-src keeps unsafe-inline — required by Radix UI + Tailwind (SEC-F02 deferred)
+    // style-src keeps unsafe-inline — required by Radix UI + Tailwind (SEC-F02 deferred).
+    // Tailwind's runtime + Radix's inline style props make 'nonce-*' impractical for now.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' https://raw.githubusercontent.com https://pokeapi.co https://play.pokemonshowdown.com https://lh3.googleusercontent.com https://cdn.discordapp.com https://img.clerk.com https://img.clerkstatic.com data: blob:",
+    // img-src is permissive on https: because Pokemon sprites come from many CDNs
+    // (Showdown, raw.githubusercontent, official artwork mirrors). Tightening this
+    // would require an enumerated allow-list per format.
+    "img-src 'self' https: data: blob:",
     "font-src 'self' data:",
     [
       "connect-src 'self'",
       "https://*.supabase.co wss://*.supabase.co",
       "https://pokeapi.co",
-      "https://*.sentry.io",
+      "https://raw.githubusercontent.com",
+      "https://*.sentry.io https://*.ingest.sentry.io",
       "https://us.i.posthog.com",
+      "https://vitals.vercel-analytics.com https://vercel.live",
       "https://accounts.google.com",
       "https://discord.com",
       clerkFapiUrl,
@@ -59,8 +65,13 @@ function buildCSP(nonce: string): string {
       "https://clerk.draftpokemon.com https://api.clerk.com",
     ].filter(Boolean).join(' '),
     "frame-src 'self' https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
-    "frame-ancestors 'self'",
+    "frame-ancestors 'none'",
     "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+    "upgrade-insecure-requests",
   ]
 
   return directives.join('; ')
@@ -182,6 +193,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/spectate(.*)',
   '/watch-drafts(.*)',
+  '/lobby(.*)',
   '/draft/(.*)',
   '/join-draft(.*)',
   '/join-tournament(.*)',
