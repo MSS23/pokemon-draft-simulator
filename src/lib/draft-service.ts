@@ -274,24 +274,29 @@ export class DraftService {
           body: JSON.stringify({ roomCode, password }),
         })
 
-        if (!res.ok) {
+        if (res.ok) {
+          const data = await res.json()
+          return data.valid === true
+        }
+
+        // 4xx — application error (Draft not found, malformed body, etc.).
+        // Re-throw so callers can surface a useful message.
+        if (res.status >= 400 && res.status < 500) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || 'Failed to verify password')
         }
 
-        const data = await res.json()
-        return data.valid === true
+        // 5xx — API route is broken or unavailable. Fall through to direct
+        // comparison so the host can still join their own draft.
+        log.warn(`Password API returned ${res.status}; falling back to direct comparison`)
       } catch (err) {
-        // If fetch fails (network error, dev server not running, test environment),
-        // fall through to direct comparison as a safe fallback.
-        // We only re-throw application-level errors (those with HTTP status info).
-        const errName = err instanceof Error ? err.name : ''
         const errMsg = err instanceof Error ? err.message : ''
         const isAppError = errMsg.includes('Failed to verify password') ||
           errMsg.includes('Draft not found')
         if (isAppError) {
           throw err
         }
+        const errName = err instanceof Error ? err.name : ''
         log.warn(`API route unreachable (${errName}), falling back to direct comparison`)
       }
     }

@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
-import { KnockoutService } from '@/lib/knockout-service'
 import { POKEMON_FORMATS, getFormatById } from '@/lib/formats'
 import { notify } from '@/lib/notifications'
 import { validateName } from '@/lib/profanity'
@@ -56,16 +55,26 @@ export default function CreateTournamentPage() {
       const nameCheck = validateName(name, { fieldLabel: 'Tournament name', maxLength: 60 });
       if (!nameCheck.ok) { notify.warning('Invalid tournament name', nameCheck.reason!); setIsCreating(false); return; }
       const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Host'
-      const { league, roomCode } = await KnockoutService.createLobby({
-        name: name.trim(),
-        formatId,
-        tournamentType,
-        matchFormat,
-        hostId: user.id,
-        hostName: displayName,
+      // Server-side route: bypasses RLS via service role key + Clerk auth(),
+      // matching the /api/draft/create flow.
+      const res = await fetch('/api/tournament/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          formatId,
+          tournamentType,
+          matchFormat,
+          hostName: displayName,
+        }),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || `Tournament creation failed (HTTP ${res.status})`)
+      }
+      const { leagueId, roomCode } = (await res.json()) as { leagueId: string; roomCode: string }
       notify.success('Tournament Created!', `Room code: ${roomCode}`)
-      router.push(`/tournament/${league.id}`)
+      router.push(`/tournament/${leagueId}`)
     } catch (err) {
       log.error('Failed to create tournament:', err)
       notify.error('Failed', err instanceof Error ? err.message : 'Could not create tournament')

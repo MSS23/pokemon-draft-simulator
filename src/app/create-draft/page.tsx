@@ -393,37 +393,50 @@ export default function CreateDraftPage() {
 
     setIsCreating(true);
     try {
-      const { DraftService } = await import("@/lib/draft-service");
-      const { roomCode } = await DraftService.createDraft({
-        name: `${formData.userName}'s Draft`,
-        hostId: user.id,
-        hostName: formData.userName,
-        teamName: formData.teamName,
-        settings: {
-          maxTeams: parseInt(formData.maxTeams),
-          draftType: formData.draftType as "tiered" | "points" | "auction",
-          timeLimit: parseInt(formData.timeLimit),
-          pokemonPerTeam: parseInt(formData.pokemonPerTeam),
-          budgetPerTeam: parseInt(formData.budgetPerTeam),
-          formatId: customPricing ? "custom" : formData.formatId,
-          scoringSystem: formData.draftType === 'tiered' ? 'tiered' : 'budget',
-          tierConfig: formData.draftType === 'tiered' ? { tiers: tierConfig } : undefined,
-          createLeague: formData.createLeague,
-          splitIntoConferences: formData.splitIntoConferences,
-          leagueWeeks: parseInt(formData.leagueWeeks),
-        },
-        isPublic: formData.isPublic,
-        description: formData.description || null,
-        tags: formData.tags ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean) : null,
-        password: !formData.isPublic && formData.password ? formData.password : null,
-        customFormat: customPricing
-          ? {
-              name: `${formData.userName}'s Custom Format`,
-              description: formData.description || "Custom Pokemon pricing format",
-              pokemonPricing: customPricing,
-            }
-          : undefined,
+      // Server-side route: bypasses RLS via service role key + Clerk auth().
+      // Avoids the Clerk → Supabase JWT bridge (which 404s when the
+      // "supabase" template isn't configured in the Clerk dashboard).
+      const res = await fetch("/api/draft/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${formData.userName}'s Draft`,
+          hostName: formData.userName,
+          teamName: formData.teamName,
+          settings: {
+            maxTeams: parseInt(formData.maxTeams),
+            draftType: formData.draftType as "tiered" | "points" | "auction",
+            timeLimit: parseInt(formData.timeLimit),
+            pokemonPerTeam: parseInt(formData.pokemonPerTeam),
+            budgetPerTeam: parseInt(formData.budgetPerTeam),
+            formatId: customPricing ? "custom" : formData.formatId,
+            scoringSystem: formData.draftType === "tiered" ? "tiered" : "budget",
+            tierConfig: formData.draftType === "tiered" ? { tiers: tierConfig } : undefined,
+            createLeague: formData.createLeague,
+            splitIntoConferences: formData.splitIntoConferences,
+            leagueWeeks: parseInt(formData.leagueWeeks),
+          },
+          isPublic: formData.isPublic,
+          description: formData.description || null,
+          tags: formData.tags
+            ? formData.tags.split(",").map((t) => t.trim()).filter(Boolean)
+            : null,
+          password: !formData.isPublic && formData.password ? formData.password : null,
+          customFormat: customPricing
+            ? {
+                name: `${formData.userName}'s Custom Format`,
+                description: formData.description || "Custom Pokemon pricing format",
+                pokemonPricing: customPricing,
+              }
+            : undefined,
+        }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Draft creation failed (HTTP ${res.status})`);
+      }
+      const { roomCode } = (await res.json()) as { roomCode: string };
 
       const { grantDraftAccess } = await import("@/lib/draft-access");
       grantDraftAccess(roomCode, true);
