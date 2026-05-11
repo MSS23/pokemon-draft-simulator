@@ -116,7 +116,7 @@ const nextConfig: NextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' https: data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://pokeapi.co https://raw.githubusercontent.com https://*.sentry.io https://*.ingest.sentry.io https://us.i.posthog.com https://vitals.vercel-analytics.com https://vercel.live https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://clerk.draftpokemon.com https://api.clerk.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://pokeapi.co https://raw.githubusercontent.com https://*.sentry.io https://*.ingest.sentry.io https://us.i.posthog.com https://vercel.live https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://clerk.draftpokemon.com https://api.clerk.com",
       "frame-src 'self' https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
       "frame-ancestors 'none'",
       "worker-src 'self' blob:",
@@ -199,6 +199,23 @@ const pwaConfig = withPWA({
         expiration: {
           maxEntries: 1000,
           maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+        },
+        cacheableResponse: {
+          statuses: [0, 200],
+        },
+      },
+    },
+    // COST: Showdown animated GIFs are loaded as raw <img> across tournament
+    // and team-builder views. CacheFirst here means repeat visits skip the
+    // network entirely, cutting Vercel bandwidth egress for warm users.
+    {
+      urlPattern: /^https:\/\/play\.pokemonshowdown\.com\/sprites\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'showdown-sprites',
+        expiration: {
+          maxEntries: 1500,
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days — sprites are immutable
         },
         cacheableResponse: {
           statuses: [0, 200],

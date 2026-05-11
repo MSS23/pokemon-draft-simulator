@@ -1575,27 +1575,29 @@ export class LeagueService {
   static async updateStandings(leagueId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    // Get league settings for point values
-    const settings = await this.getLeagueSettings(leagueId)
+    // COST: settings/matches/standings rows are independent first reads —
+    // fire as one batch to cut 3 sequential round-trips down to 1.
+    const [settings, matchesResult, standingsResult] = await Promise.all([
+      this.getLeagueSettings(leagueId),
+      supabase
+        .from('matches')
+        .select('id, home_team_id, away_team_id, status, home_score, away_score, winner_team_id, completed_at')
+        .eq('league_id', leagueId)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: true }),
+      supabase
+        .from('standings')
+        .select('id, team_id')
+        .eq('league_id', leagueId),
+    ])
+
     const pointsPerWin = settings.pointsPerWin ?? 3
     const pointsPerDraw = settings.pointsPerDraw ?? 1
 
-    // Get all completed matches
-    const { data: matches } = await supabase
-      .from('matches')
-      .select('id, home_team_id, away_team_id, status, home_score, away_score, winner_team_id, completed_at')
-      .eq('league_id', leagueId)
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: true })
-
+    const { data: matches } = matchesResult
     if (!matches) return
 
-    // Get all standings records
-    const { data: standingRows } = await supabase
-      .from('standings')
-      .select('id, team_id')
-      .eq('league_id', leagueId)
-
+    const { data: standingRows } = standingsResult
     if (!standingRows || standingRows.length === 0) return
 
     // Build a map of team stats

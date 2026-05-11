@@ -2,13 +2,19 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { KnockoutService } from '@/lib/knockout-service'
 import { getFormatById } from '@/lib/formats'
 import { MatchRecorderModal } from '@/components/league/MatchRecorderModal'
-import { PlayoffBracket } from '@/components/league/PlayoffBracket'
+// COST: bracket is render-conditional on tournament state — keep its chunk
+// out of the initial bundle.
+const PlayoffBracket = dynamic(
+  () => import('@/components/league/PlayoffBracket').then(m => ({ default: m.PlayoffBracket })),
+  { ssr: false }
+)
 import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import { LoadingScreen } from '@/components/ui/loading-states'
 import { buildTeamColorMap } from '@/utils/team-colors'

@@ -57,7 +57,7 @@ function buildCSP(nonce: string): string {
       "https://raw.githubusercontent.com",
       "https://*.sentry.io https://*.ingest.sentry.io",
       "https://us.i.posthog.com",
-      "https://vitals.vercel-analytics.com https://vercel.live",
+      "https://vercel.live",
       "https://accounts.google.com",
       "https://discord.com",
       clerkFapiUrl,

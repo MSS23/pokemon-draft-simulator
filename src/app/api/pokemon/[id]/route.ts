@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// COST: thin CDN-cached proxy with no Node-only deps — Edge invocations are
+// significantly cheaper than Node Lambda invocations on Vercel.
+export const runtime = 'edge'
+
 const POKEAPI_BASE_URL = 'https://pokeapi.co/api/v2'
 const FETCH_TIMEOUT_MS = 10_000
 

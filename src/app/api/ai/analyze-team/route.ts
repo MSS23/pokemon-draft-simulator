@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { unstable_cache } from 'next/cache'
 import { AIAnalysisService } from '@/lib/ai-analysis-service'
 import { AIAccessControl } from '@/lib/ai-access-control'
 import { LeagueStatsService } from '@/lib/league-stats-service'
@@ -19,6 +20,40 @@ import { createLogger } from '@/lib/logger'
 import type { Pick } from '@/types'
 
 const log = createLogger('AnalyzeTeamAPI')
+
+// COST: AI analysis is deterministic over (picks, stats). Picks change only
+// on user action and the existing per-user rate limit is 10/hr, so a 60s
+// time-based cache is safe and turns hot retries into a no-cost read.
+// Access control is intentionally NOT cached — runs per-request below.
+const getCachedAnalysis = unstable_cache(
+  async (teamId: string) => {
+    if (!supabase) throw new Error('Supabase not available')
+
+    const [picksResult, stats] = await Promise.all([
+      supabase.from('picks').select('*').eq('team_id', teamId),
+      LeagueStatsService.getAdvancedTeamStats(teamId),
+    ])
+
+    const { data: picks } = picksResult
+    if (!picks) return null
+
+    const mappedPicks: Pick[] = picks.map(p => ({
+      id: p.id,
+      draftId: p.draft_id,
+      teamId: p.team_id,
+      pokemonId: p.pokemon_id,
+      pokemonName: p.pokemon_name,
+      cost: p.cost,
+      pickOrder: p.pick_order,
+      round: p.round,
+      createdAt: p.created_at,
+    }))
+
+    return AIAnalysisService.analyzeTeam(teamId, mappedPicks, stats || undefined)
+  },
+  ['analyze-team-v1'],
+  { revalidate: 60, tags: ['team-analysis'] }
+)
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,7 +94,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get team picks
     if (!supabase) {
       return NextResponse.json(
         { error: 'Database not available' },
@@ -67,36 +101,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data: picks } = await supabase
-      .from('picks')
-      .select('*')
-      .eq('team_id', teamId)
-
-    if (!picks) {
+    const analysis = await getCachedAnalysis(teamId)
+    if (!analysis) {
       return NextResponse.json(
         { error: 'Team picks not found' },
         { status: 404 }
       )
     }
-
-    // Get team stats
-    const stats = await LeagueStatsService.getAdvancedTeamStats(teamId)
-
-    // Map snake_case DB rows to camelCase Pick type
-    const mappedPicks: Pick[] = picks.map(p => ({
-      id: p.id,
-      draftId: p.draft_id,
-      teamId: p.team_id,
-      pokemonId: p.pokemon_id,
-      pokemonName: p.pokemon_name,
-      cost: p.cost,
-      pickOrder: p.pick_order,
-      round: p.round,
-      createdAt: p.created_at,
-    }))
-
-    // Run AI analysis
-    const analysis = await AIAnalysisService.analyzeTeam(teamId, mappedPicks, stats || undefined)
 
     return NextResponse.json(analysis)
   } catch (error) {

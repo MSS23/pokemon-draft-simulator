@@ -16,7 +16,6 @@ import { HydrationErrorFilter } from "./hydration-error-filter";
 import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
 import { FloatingFeedbackButton } from "@/components/feedback/FloatingFeedbackButton";
-import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "sonner";
 import { validateEnv } from "@/lib/env";
 
@@ -145,7 +144,6 @@ export default async function RootLayout({
         </AnalyticsProvider>
         </ClerkAppearanceProvider>
         <FloatingFeedbackButton />
-        <Analytics />
       </body>
     </html>
   );

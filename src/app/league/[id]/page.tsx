@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +17,12 @@ import { LeagueService } from '@/lib/league-service'
 import { MatchRecorderModal } from '@/components/league/MatchRecorderModal'
 import { LeagueSettingsModal } from '@/components/league/LeagueSettingsModal'
 import { StartPlayoffsModal } from '@/components/league/StartPlayoffsModal'
-import { PlayoffBracket } from '@/components/league/PlayoffBracket'
+// COST: PlayoffBracket renders only when a playoff exists — lazy-load so
+// non-playoff visitors don't ship the chunk.
+const PlayoffBracket = dynamic(
+  () => import('@/components/league/PlayoffBracket').then(m => ({ default: m.PlayoffBracket })),
+  { ssr: false }
+)
 import { TeamIcon } from '@/components/league/TeamIcon'
 import { importTournament, type Tournament } from '@/lib/tournament-service'
 import { LoadingScreen } from '@/components/ui/loading-states'

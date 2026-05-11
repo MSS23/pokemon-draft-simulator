@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+// COST: thin liveness check — uptime monitors hit this every 30–60s. Edge
+// invocations are cheaper than Node, and a short s-maxage absorbs duplicate
+// pings between probes without compromising freshness.
+export const runtime = 'edge'
+
 interface ServiceCheck {
   status: 'up' | 'down' | 'unconfigured'
 }
@@ -71,5 +76,13 @@ export async function GET() {
   }
 
   const httpStatus = health.status === 'unhealthy' ? 503 : 200
-  return NextResponse.json(health, { status: httpStatus })
+  return NextResponse.json(health, {
+    status: httpStatus,
+    headers: {
+      // Cache healthy responses briefly; never cache failures.
+      'Cache-Control': health.status === 'healthy'
+        ? 'public, s-maxage=30, stale-while-revalidate=60'
+        : 'no-store',
+    },
+  })
 }
