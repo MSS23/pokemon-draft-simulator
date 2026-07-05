@@ -273,7 +273,15 @@ export async function placeBid(
 }
 
 /**
- * Resolve an expired auction
+ * Resolve an expired auction.
+ *
+ * SERVER-AUTHORITATIVE + IDEMPOTENT: delegates to the resolve_auction Postgres
+ * RPC, which row-locks the auction, re-checks status='active' and expiry, then
+ * awards the mon to the standing high bidder, deducts budget, and advances the
+ * turn — all in one transaction. This is safe for EVERY connected client to
+ * call at timer=0: the first effective caller finalizes, the rest no-op. The
+ * previous implementation ran a non-atomic multi-step sequence on every client
+ * simultaneously, which duplicated picks and corrupted budgets under real load.
  */
 export async function resolveAuction(draftId: string, auctionId: string): Promise<void> {
   if (!supabase) throw new Error('Supabase not available')
@@ -284,102 +292,21 @@ export async function resolveAuction(draftId: string, auctionId: string): Promis
   }
   const internalId = draftState.draft.id
 
-  // Get auction details
-  const { data: auction, error: auctionError } = await supabase
-    .from('auctions')
-    .select('*')
-    .eq('id', auctionId)
-    .eq('draft_id', internalId)
-    .single()
+  const { data, error } = await supabase.rpc('resolve_auction', {
+    p_draft_id: internalId,
+    p_auction_id: auctionId,
+  })
 
-  if (auctionError || !auction) {
-    throw new Error('Auction not found')
+  if (error) {
+    log.error('resolve_auction RPC failed:', error)
+    throw new Error('Failed to resolve auction')
   }
 
-  if (auction.status !== 'active') {
-    throw new Error('Auction is not active')
+  // `resolved: false` is a normal, expected outcome when another client already
+  // finalized this auction, or when it is not yet expired — not an error.
+  if (data && !data.resolved) {
+    log.info('resolve_auction no-op', { reason: data.reason })
   }
-
-  // Check if there was a winning bidder
-  if (auction.current_bidder) {
-
-    const pickOrder = draftState.picks.length + 1
-    const currentRound = Math.floor(pickOrder / draftState.teams.length) + 1
-
-    // Create the pick
-    const { error: pickError } = await supabase
-      .from('picks')
-      .insert({
-        draft_id: internalId,
-        team_id: auction.current_bidder,
-        pokemon_id: auction.pokemon_id,
-        pokemon_name: auction.pokemon_name,
-        cost: auction.current_bid,
-        pick_order: pickOrder,
-        round: currentRound
-      })
-
-    if (pickError) {
-      log.error('Error creating pick from auction:', pickError)
-      throw new Error('Failed to create pick from auction')
-    }
-
-    // Update team budget with optimistic locking
-    const { data: team, error: teamFetchError} = await supabase
-      .from('teams')
-      .select('budget_remaining')
-      .eq('id', auction.current_bidder)
-      .single()
-
-    if (teamFetchError || !team) {
-      log.error('Error fetching team budget after auction:', teamFetchError)
-      throw new Error('Failed to fetch team budget after auction')
-    }
-
-    const oldBudget = team.budget_remaining
-    const newBudget = oldBudget - auction.current_bid
-
-    // Use optimistic locking to prevent budget race conditions
-    const { data: budgetUpdateResult, error: teamError } = await supabase
-      .from('teams')
-      .update({ budget_remaining: newBudget })
-      .eq('id', auction.current_bidder)
-      .eq('budget_remaining', oldBudget) // Optimistic lock
-      .select()
-
-    if (teamError || !budgetUpdateResult || budgetUpdateResult.length === 0) {
-      log.error('Error updating team budget after auction (possible race condition):', teamError)
-      throw new Error('Failed to update team budget after auction. Budget may have been modified.')
-    }
-
-    // Verify budget didn't go negative
-    if (budgetUpdateResult[0].budget_remaining < 0) {
-      log.error(`Budget went negative for team ${auction.current_bidder}`)
-      // Rollback budget
-      await supabase
-        .from('teams')
-        .update({ budget_remaining: oldBudget })
-        .eq('id', auction.current_bidder)
-      throw new Error('Insufficient budget for auction win')
-    }
-  }
-
-  // Mark auction as completed
-  const { error: updateError } = await supabase
-    .from('auctions')
-    .update({
-      status: 'completed',
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', auctionId)
-
-  if (updateError) {
-    log.error('Error completing auction:', updateError)
-    throw new Error('Failed to complete auction')
-  }
-
-  // Check if draft should advance to next nomination or end
-  await checkAuctionDraftProgress(draftId)
 }
 
 /**

@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A real-time Pokémon drafting platform for competitive tournament play. Built with Next.js 15, TypeScript, Supabase, and Zustand. Supports snake and auction draft formats with VGC 2024 Regulation H compliance.
+A real-time Pokémon drafting platform for competitive tournament play ("Pokémon Champions Draft League"). Built with Next.js 15, TypeScript, Supabase, Zustand, and **Clerk authentication**. Supports snake and auction draft formats across multiple VGC regulations and Smogon tiers, plus a full **league system** (standings, schedules, trades, waivers, playoffs, commissioner tools) and **tournaments**.
+
+> **Auth note (READ THIS FIRST):** Auth is **Clerk**, not Supabase Auth. Clerk issues a `supabase` JWT template whose `sub` is resolved in Postgres by `public.clerk_user_id()`; every RLS policy and write RPC depends on that bridge. Guests are supported via an **httpOnly cookie** (`guest-{crypto.randomUUID()}`) issued by `/api/guest/session` — NOT via a client-generated `localStorage` id. Older sections below that describe Supabase Auth / `localStorage.guestUserId` are historical; the code has migrated. The live draft/auction/turn-timeout engine is **server-authoritative** (see "Server-authoritative draft engine" below).
 
 **Tech Stack:**
 - **Frontend**: Next.js 15 (App Router), React 18, TypeScript 5
@@ -156,14 +158,17 @@ async function makePick(pokemonId: string) {
 
 ### Component Architecture
 
-**Page Routes:**
+**Page Routes** (~40 total — this list is representative, not exhaustive):
 - `/` - Landing page with draft creation/join
-- `/create-draft` - Draft setup wizard
-- `/join-draft` - Join existing draft by room code
-- `/draft/[id]` - Main draft interface
-- `/draft/[id]/results` - Post-draft results
-- `/spectate/[id]` - Spectator view
-- `/dashboard` - User drafts dashboard
+- `/create-draft`, `/join-draft` - Draft setup / join by room code
+- `/draft/[id]`, `/draft/[id]/results` - Main draft interface + results
+- `/spectate/[id]`, `/spectate/[id]/broadcast` - Spectator view + OBS broadcast mode
+- `/dashboard`, `/my-drafts`, `/history`, `/watch-drafts`, `/profile`, `/settings` - User area (Clerk-protected where personal)
+- **League system**: `/league/[id]` plus `/admin`, `/free-agents`, `/rankings`, `/schedule`, `/stats`, `/trades`, `/weekly-results`, `/matchup/[matchId]` (and `/score`), `/team/[teamId]`
+- **Tournaments**: `/create-tournament`, `/join-tournament`, `/tournament/[id]`, `/match/[id]`, `/lobby`
+- **Auth (Clerk)**: `/sign-in`, `/sign-up` (the `/auth/*` paths are legacy redirect shims)
+
+**Key API routes:** `/api/draft/create`, `/api/draft/[id]/tick` (server-authoritative turn-timeout), `/api/cron/draft-tick` (Vercel Cron backstop), `/api/guest/session`, `/api/health` + `/api/health/bridge` (JWT-bridge probe), `/api/ai/analyze-team`, `/api/user/{export,delete}`.
 
 **Component Organization:**
 - [src/components/ui/](src/components/ui/) - Shadcn/ui components (dialogs, buttons, etc.)
@@ -195,10 +200,17 @@ async function makePick(pokemonId: string) {
 - `useAutoPick` hook ([src/hooks/useAutoPick.ts](src/hooks/useAutoPick.ts)) - Countdown timer for auto-selection
 - `useWishlistSync` - Real-time sync across participants
 
-**Session Management** ([src/lib/user-session.ts](src/lib/user-session.ts)):
-- Guest user support (no auth required)
-- User ID format: `guest-{timestamp}-{random}`
-- Stored in localStorage, persists across sessions
+**Auth & Session Management** (Clerk + guest cookie):
+- **Signed-in users**: Clerk (`@clerk/nextjs`). `src/middleware.ts` (clerkMiddleware) protects `/dashboard`, `/settings`, `/profile`, `/admin`, `/my-drafts` and the auth-required API routes. `AuthContext` maps the Clerk user into a Supabase-User-shaped object for legacy consumers.
+- **Clerk → Supabase bridge**: the browser/server Supabase clients forward Clerk's `supabase`-template JWT; RLS reads identity via `public.clerk_user_id()`. Verify it live with `GET /api/health/bridge` (returns `{bridge:'up'}`).
+- **Guests**: authoritative id is an **httpOnly cookie** (`guest-{crypto.randomUUID()}`) from `/api/guest/session`. `src/lib/user-session.ts` localStorage now holds only non-sensitive display data, not the source-of-truth id.
+
+### Server-authoritative draft engine
+
+Do NOT drive picks/auctions/turn-timeouts purely client-side. The engine is server-authoritative:
+- **Interactive pick**: `make_draft_pick` RPC — requires `clerk_user_id() = p_user_id`, enforces global `UNIQUE (draft_id, pokemon_id)`. Not granted to `anon`.
+- **Auction resolution**: `resolve_auction` RPC — idempotent + expiry-guarded, safe for every client to call at timer=0.
+- **Absent-user progression** (auto-pick from wishlist / turn skip): the `system_make_pick` / `system_advance_turn` RPCs, **service-role only**, invoked by `src/lib/draft-tick.ts` via `POST /api/draft/[id]/tick` (client-triggered) and `GET /api/cron/draft-tick` (Vercel Cron backstop, every minute, guarded by `CRON_SECRET`).
 
 ### Custom Hooks
 
@@ -471,21 +483,19 @@ if (!isLegal) {
 const cost = rulesEngine.getPokemonCost(pokemon)
 ```
 
-### Guest User Pattern
+### Guest User Pattern (current — cookie-based)
 
 ```typescript
-// ✅ Generate IDs client-side for guest users
-const userId = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-// ✅ Store in localStorage for session persistence
-localStorage.setItem('guestUserId', userId)
-
-// ✅ Clean up on logout
-const logout = () => {
-  localStorage.removeItem('guestUserId')
-  // ... other cleanup
-}
+// ✅ The authoritative guest id is an httpOnly cookie issued server-side.
+//    Do NOT mint the id on the client and trust it — that was the old model.
+const res = await fetch('/api/guest/session') // returns Clerk userId if signed in,
+                                              // else sets a guest-{uuid} httpOnly cookie
+// localStorage (src/lib/user-session.ts) holds only display data, never the id of record.
 ```
+
+> Historical: earlier this app generated `guest-{timestamp}-{random}` in the
+> browser and stored it in `localStorage.guestUserId`. That is gone — server
+> RLS/RPCs no longer trust a client-supplied id.
 
 ## Critical Rules & Constraints
 
@@ -860,5 +870,5 @@ Database schema in `supabase-schema.sql` - run in Supabase SQL editor to set up 
 
 ---
 
-**Last Updated**: 2025-01-12
-**Version**: 0.1.2
+**Last Updated**: 2026-07-05
+**Version**: 0.1.1 (see package.json)

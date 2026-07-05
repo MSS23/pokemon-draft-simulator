@@ -47,6 +47,12 @@ export interface DraftRealtimeCallbacks {
   onConnectionChange: (status: ConnectionStatus) => void
   onPresenceChange?: (presence: PresenceState) => void
   onError?: (error: Error) => void
+  /**
+   * Fired after a RE-subscribe (reconnect), not the first connect. Any draft
+   * events that occurred while the socket was down are lost, so the consumer
+   * must refetch full state to catch up.
+   */
+  onResync?: () => void
 }
 
 // ============================================
@@ -61,6 +67,7 @@ export class DraftRealtimeManager {
   private baseReconnectDelay = 1000
   private maxReconnectDelay = 30000
   private isSubscribed = false
+  private hasConnectedBefore = false // Distinguishes first connect from reconnects
   private lastEventIds = new Map<string, number>() // For deduplication
   // Event IDs already include record id + updated_at, so the window only needs to
   // suppress true echoes from Supabase's realtime layer (typically <500ms).
@@ -217,6 +224,18 @@ export class DraftRealtimeManager {
           this.isSubscribed = true
           this.reconnectAttempts = 0
           this.callbacks.onConnectionChange({ status: 'connected' })
+
+          // If this is a RE-subscribe (we were connected before and dropped),
+          // events during the outage were missed — trigger a full state refetch.
+          if (this.hasConnectedBefore) {
+            log.info('Re-subscribed after reconnect — requesting state resync')
+            try {
+              this.callbacks.onResync?.()
+            } catch (err) {
+              log.warn('onResync callback threw:', err)
+            }
+          }
+          this.hasConnectedBefore = true
 
           // Track presence
           try {
@@ -424,7 +443,10 @@ export class DraftRealtimeManager {
           draft_id: bid.draftId,
           id: bid.auctionId,
           current_bid: bid.bidAmount,
-          current_bidder_team_id: bid.teamId
+          // Column is `current_bidder` (was previously mislabeled
+          // `current_bidder_team_id`, which flashed a wrong high-bidder until the
+          // postgres_changes refetch corrected it).
+          current_bidder: bid.teamId
         },
         timestamp: (bid.timestamp as number) || Date.now()
       })

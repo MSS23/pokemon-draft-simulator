@@ -43,19 +43,9 @@ describe('AuctionService', () => {
     })
   })
 
-  describe('placeBid', () => {
-    it('should throw when supabase is null', async () => {
-      await expect(
-        auctionService.placeBid({
-          auctionId: 'auction-1',
-          teamId: 'team-1',
-          teamName: 'Team Alpha',
-          bidAmount: 50,
-          draftId: 'draft-1',
-        })
-      ).rejects.toThrow('Supabase not available')
-    })
-  })
+  // NOTE: AuctionService.placeBid was removed (unused non-atomic footgun).
+  // Bidding goes through DraftService.placeBid (optimistic-locked) +
+  // auctionService.recordBidHistory.
 
   describe('getBidHistory', () => {
     it('should return empty array when supabase is null and no cache', async () => {

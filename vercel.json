@@ -4,6 +4,12 @@
       "main": true
     }
   },
+  "crons": [
+    {
+      "path": "/api/cron/draft-tick",
+      "schedule": "* * * * *"
+    }
+  ],
   "github": {
     "silent": true,
     "autoJobCancelation": true

@@ -181,6 +181,13 @@ export function useDraftRealtime(
     setConnectionStatus(status)
   }, [])
 
+  // Handle resync after a reconnect — refetch full state immediately (not
+  // debounced) since events during the outage were missed.
+  const handleResync = useCallback(() => {
+    if (!isMountedRef.current) return
+    onRefreshNeededRef.current?.()
+  }, [])
+
   // Handle presence changes
   const handlePresenceChange = useCallback((presence: PresenceState) => {
     if (!isMountedRef.current) return
@@ -217,6 +224,7 @@ export function useDraftRealtime(
       onDraftEvent: handleDraftEvent,
       onConnectionChange: handleConnectionChange,
       onPresenceChange: handlePresenceChange,
+      onResync: handleResync,
       onError: handleError
     })
 
@@ -243,6 +251,7 @@ export function useDraftRealtime(
     handleDraftEvent,
     handleConnectionChange,
     handlePresenceChange,
+    handleResync,
     handleError
   ])
 
@@ -261,6 +270,7 @@ export function useDraftRealtime(
       onDraftEvent: handleDraftEvent,
       onConnectionChange: handleConnectionChange,
       onPresenceChange: handlePresenceChange,
+      onResync: handleResync,
       onError: handleError
     })
 
@@ -272,6 +282,7 @@ export function useDraftRealtime(
     handleDraftEvent,
     handleConnectionChange,
     handlePresenceChange,
+    handleResync,
     handleError
   ])
 

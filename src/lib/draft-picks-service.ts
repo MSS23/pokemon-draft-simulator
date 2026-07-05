@@ -427,7 +427,7 @@ export async function validateUserCanPick(draftId: string, userId: string): Prom
 export async function undoLastPick(draftId: string, userId: string): Promise<void> {
   if (!supabase) throw new Error('Supabase not available')
 
-  // Get draft state and check if undos are allowed
+  // Get draft state and check if undos are allowed for this draft.
   const draftState = await getDraftStateLazy(draftId)
   if (!draftState) {
     throw new Error('Draft not found')
@@ -437,63 +437,37 @@ export async function undoLastPick(draftId: string, userId: string): Promise<voi
     throw new Error('Undo is not enabled for this draft')
   }
 
-  // Check if user is host (only host can undo)
+  // Check if user is host (only host can undo). Server-side, the RPC also
+  // enforces owner-or-host via clerk_user_id() — this is the friendly UI guard.
   const participant = draftState.participants.find(p => p.user_id === userId)
   if (!participant?.is_host) {
     throw new Error('Only the host can undo picks')
   }
 
-  // Get the last pick
-  const lastPick = draftState.picks.sort((a, b) => b.pick_order - a.pick_order)[0]
+  // Identify the most recent pick (its team is the target the RPC undoes).
+  const lastPick = draftState.picks.slice().sort((a, b) => b.pick_order - a.pick_order)[0]
   if (!lastPick) {
     throw new Error('No picks to undo')
   }
 
-  // Delete the pick
-  const { error: deleteError } = await (supabase
-    .from('picks'))
-    .delete()
-    .eq('id', lastPick.id)
+  // Delegate to the atomic, JWT-bound undo_last_pick RPC (delete + budget refund
+  // + turn rollback in a single transaction). The old client implementation did
+  // those as three unlocked writes and could corrupt budget/turn under a
+  // concurrent pick or a double-undo.
+  const { data, error } = await supabase.rpc('undo_last_pick', {
+    p_draft_id: draftState.draft.id,
+    p_team_id: lastPick.team_id,
+  })
 
-  if (deleteError) {
-    log.error('Error deleting pick:', deleteError)
+  if (error) {
+    log.error('undo_last_pick RPC failed:', error)
     throw new Error('Failed to undo pick')
   }
 
-  // Restore team budget (read-update pattern since supabase-js doesn't support SQL expressions)
-  const { data: teamBudgetData, error: teamFetchError } = await supabase
-    .from('teams')
-    .select('budget_remaining')
-    .eq('id', lastPick.team_id)
-    .single()
-
-  if (teamFetchError || !teamBudgetData) {
-    log.error('Error fetching team budget for undo:', teamFetchError)
-  } else {
-    const newBudget = teamBudgetData.budget_remaining + lastPick.cost
-    const { error: budgetError } = await supabase
-      .from('teams')
-      .update({ budget_remaining: newBudget })
-      .eq('id', lastPick.team_id)
-
-    if (budgetError) {
-      log.error('Error restoring budget:', budgetError)
-    }
+  const result = data as { success?: boolean; error?: string } | null
+  if (!result?.success) {
+    throw new Error(result?.error || 'Failed to undo pick')
   }
-
-  // Revert draft turn
-  const newTurn = Math.max(1, (draftState.draft.current_turn || 1) - 1)
-  const totalTeams = draftState.teams.length
-  const newRound = Math.floor((newTurn - 1) / totalTeams) + 1
-
-  await (supabase
-    .from('drafts'))
-    .update({
-      current_turn: newTurn,
-      current_round: newRound,
-      status: 'active' // Revert from completed if needed
-    })
-    .eq('id', draftState.draft.id)
 }
 
 /**

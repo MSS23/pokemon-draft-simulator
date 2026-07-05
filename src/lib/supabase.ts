@@ -1435,6 +1435,51 @@ export type Database = {
         Args: { p_draft_id: string; p_turn: number; p_total_teams: number }
         Returns: string
       }
+      resolve_auction: {
+        Args: { p_draft_id: string; p_auction_id: string }
+        Returns: {
+          resolved: boolean
+          reason?: string
+          pickId?: string
+          winner?: string | null
+          isComplete?: boolean
+          newTurn?: number
+          newRound?: number
+        }
+      }
+      system_make_pick: {
+        Args: {
+          p_draft_id: string
+          p_team_id: string
+          p_pokemon_id: string
+          p_pokemon_name: string
+          p_cost: number
+          p_expected_turn: number
+        }
+        Returns: {
+          success: boolean
+          error?: string
+          pickId?: string
+          newTurn?: number
+          isComplete?: boolean
+        }
+      }
+      system_advance_turn: {
+        Args: { p_draft_id: string; p_expected_turn: number }
+        Returns: {
+          success: boolean
+          error?: string
+          skipped?: boolean
+          reason?: string
+          newTurn?: number
+          currentTurn?: number
+          isComplete?: boolean
+        }
+      }
+      whoami: {
+        Args: Record<string, never>
+        Returns: string | null
+      }
     }
     Enums: Record<string, never>
   }

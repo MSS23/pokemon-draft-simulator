@@ -281,31 +281,13 @@ function validateTeamExists(
   return true
 }
 
-function validateBudget(
-  teamsById: Record<string, Team>,
-  teamId: string,
-  cost: number,
-  actionName: string
-): boolean {
-  const team = teamsById[teamId]
-  if (!team) return false
-
-  if (team.budgetRemaining < cost) {
-    log.error(
-      `[${actionName}] Insufficient budget. Required: ${cost}, Available: ${team.budgetRemaining}`
-    )
-    return false
-  }
-  return true
-}
-
 // ============================================
 // ZUSTAND STORE
 // ============================================
 
 export const useDraftStore = create<DraftStore>()(
   subscribeWithSelector(
-    immer((set, get) => ({
+    immer((set, _get) => ({
       ...initialState,
 
       // ============================================
@@ -505,97 +487,18 @@ export const useDraftStore = create<DraftStore>()(
       // ============================================
       // OPTIMISTIC PICK ACTION
       // ============================================
-      makePick: async (teamId, pickData) => {
-        const state = get()
-
-        // Validation
-        if (!validateTeamExists(state.teamsById, teamId, 'makePick')) {
-          throw new Error('Team not found')
-        }
-
-        if (!validateBudget(state.teamsById, teamId, pickData.cost, 'makePick')) {
-          throw new Error('Insufficient budget')
-        }
-
-        // Create optimistic pick
-        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        const optimisticPick: Pick = {
-          ...pickData,
-          id: tempId,
-          draftId: state.draft?.id || '',
-          createdAt: new Date().toISOString()
-        }
-
-        // 1. Optimistic update (instant UI feedback)
-        set((draft) => {
-          // Add pick
-          draft.picksById[tempId] = optimisticPick
-          draft.pickIds.push(tempId)
-
-          // Update team picks index
-          if (!draft.picksByTeamId[teamId]) {
-            draft.picksByTeamId[teamId] = []
-          }
-          draft.picksByTeamId[teamId].push(tempId)
-
-          // Update team budget
-          const team = draft.teamsById[teamId]
-          if (team) {
-            team.budgetRemaining -= pickData.cost
-          }
-
-          // Mark Pokemon as drafted in wishlist
-          Object.values(draft.wishlistItemsById).forEach(item => {
-            if (item.pokemonId === pickData.pokemonId) {
-              item.isAvailable = false
-            }
-          })
-        })
-
-        // 2. Server mutation would go here
-        // This is a placeholder - actual implementation would call DraftService
-        try {
-          // const { data, error } = await supabase.from('picks').insert(...)
-          // if (error) throw error
-
-          // 3. Replace optimistic with real data (if needed)
-          // For now, we'll assume the optimistic pick is correct
-
-          // In production, you would:
-          // set((draft) => {
-          //   delete draft.picksById[tempId]
-          //   draft.picksById[data.id] = data
-          //   draft.pickIds = draft.pickIds.map(id => id === tempId ? data.id : id)
-          //   // Update indexes...
-          // })
-        } catch (error) {
-          // 4. Revert optimistic update on error
-          set((draft) => {
-            // Remove pick
-            delete draft.picksById[tempId]
-            draft.pickIds = draft.pickIds.filter(id => id !== tempId)
-
-            // Remove from team picks index
-            if (draft.picksByTeamId[teamId]) {
-              draft.picksByTeamId[teamId] = draft.picksByTeamId[teamId].filter(id => id !== tempId)
-            }
-
-            // Restore team budget
-            const team = draft.teamsById[teamId]
-            if (team) {
-              team.budgetRemaining += pickData.cost
-            }
-
-            // Restore wishlist availability
-            Object.values(draft.wishlistItemsById).forEach(item => {
-              if (item.pokemonId === pickData.pokemonId) {
-                item.isAvailable = true
-              }
-            })
-          })
-
-          throw error
-        }
+      // DEPRECATED / NOT WIRED. This action never persisted a pick — its server
+      // mutation was a commented-out placeholder, so it would optimistically
+      // mutate the store and silently drop the write. The real, server-
+      // authoritative pick path is DraftService.makePick (make_draft_pick RPC),
+      // invoked via useDraftActions.handleDraftPokemon. This stub throws instead
+      // of silently losing data so nothing accidentally routes picks through it.
+      makePick: async (_teamId, _pickData) => {
+        throw new Error(
+          'draftStore.makePick is not wired — use DraftService.makePick ' +
+          '(via useDraftActions.handleDraftPokemon), which persists through the ' +
+          'atomic make_draft_pick RPC.'
+        )
       },
 
       // ============================================

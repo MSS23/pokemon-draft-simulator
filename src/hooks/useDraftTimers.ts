@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { DraftService } from '@/lib/draft-service'
-import { AutoSkipService } from '@/lib/auto-skip-service'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
 import { draftSounds } from '@/lib/draft-sounds'
@@ -28,7 +27,6 @@ export function useDraftTimers({
   isDrafting,
   isUserTurn,
   draftId,
-  currentTeamId,
   roomCode,
 }: UseDraftTimersParams): DraftTimersResult {
   const [pickTimeRemaining, setPickTimeRemaining] = useState(0)
@@ -111,35 +109,39 @@ export function useDraftTimers({
     return () => clearInterval(interval)
   }, [roomCode])
 
-  // Auto-skip logic
+  // Auto-skip logic.
+  //
+  // Turn-timeout progression is SERVER-AUTHORITATIVE: any connected client that
+  // sees the timer hit 0 POSTs to /api/draft/[id]/tick, which runs the auto-pick
+  // /skip on the server (service role, idempotent). This replaces the old
+  // client-side AutoSkipService path, which could no longer work anyway — a
+  // non-owner client cannot pick for an absent player under the hardened
+  // make_draft_pick / RLS. The Vercel cron backstop covers the all-tabs-closed
+  // case. Concurrent client ticks are harmless (the server no-ops all but one).
   const autoSkipInFlightRef = useRef(false)
   const handleAutoSkip = useCallback(async () => {
-    if (!draftId || !currentTeamId || timeLimit <= 0) return
+    if (!draftId || timeLimit <= 0) return
     if (autoSkipInFlightRef.current) return
     autoSkipInFlightRef.current = true
 
     try {
-      log.info('Timer expired — auto-skipping turn', { draftId, currentTeamId })
-      const result = await AutoSkipService.handleTimeExpired(draftId, currentTeamId)
-
-      if (result.autoPickMade) {
-        notify.info('Auto-Pick', `${result.pokemonName} was auto-picked from wishlist`)
-      } else if (result.skipped) {
-        notify.warning('Turn Skipped', result.reason, { duration: 5000 })
-      }
-
-      if (roomCode) {
-        const refreshed = await DraftService.getDraftState(roomCode)
-        if (refreshed) {
-          // Force a re-render via the caller's state setter
+      log.info('Timer expired — requesting server tick', { draftId })
+      const res = await fetch(`/api/draft/${draftId}/tick`, { method: 'POST' })
+      if (res.ok) {
+        const result = (await res.json()) as { action?: string; detail?: string }
+        if (result.action === 'auto_picked') {
+          notify.info('Auto-Pick', result.detail ? `${result.detail} was auto-picked from wishlist` : 'A Pokémon was auto-picked from the wishlist')
+        } else if (result.action === 'skipped') {
+          notify.warning('Turn Skipped', 'A turn was skipped due to inactivity', { duration: 5000 })
         }
       }
+      // The resulting state change propagates via the realtime subscription.
     } catch (err) {
-      log.info('Auto-skip did not apply (likely already advanced):', err)
+      log.info('Auto-skip tick failed (cron backstop will retry):', err)
     } finally {
       setTimeout(() => { autoSkipInFlightRef.current = false }, 2000)
     }
-  }, [draftId, currentTeamId, timeLimit, roomCode])
+  }, [draftId, timeLimit])
 
   // Auto-skip effect: ANY connected client can trigger the skip when the timer hits 0.
   const autoSkipTimerRef = useRef<NodeJS.Timeout | null>(null)

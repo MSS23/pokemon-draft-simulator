@@ -7,49 +7,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('AuctionService')
 
-/**
- * Send a broadcast event for a bid to all subscribers on the draft channel.
- * SUPA-04: Broadcast migration for bids.
- * Replaces postgres_changes fan-out for bid events.
- */
-async function sendBidBroadcast(
-  draftId: string,
-  auctionId: string,
-  teamId: string,
-  teamName: string,
-  bidAmount: number
-): Promise<void> {
-  if (!supabase) return
-
-  const payload = {
-    draftId,
-    auctionId,
-    teamId,
-    teamName,
-    bidAmount,
-    timestamp: Date.now()
-  }
-
-  // private: true — realtime.messages RLS (migration 029) gates this topic
-  // to draft participants only.
-  const channel = supabase.channel(`draft:${draftId}`, { config: { private: true } })
-
-  try {
-    await channel.send({
-      type: 'broadcast',
-      event: 'bid_placed',
-      payload
-    })
-    log.info('[SUPA-04] Broadcast bid_placed sent for draft:', draftId)
-  } catch (err) {
-    // Non-fatal — postgres_changes for auctions table still delivers updates
-    log.warn('[SUPA-04] Bid broadcast send failed (postgres_changes fallback active):', err)
-  } finally {
-    // Fire-and-forget channel — remove immediately to prevent accumulation
-    supabase.removeChannel(channel)
-  }
-}
-
 export interface PlaceBidParams {
   auctionId: string
   teamId: string
@@ -76,131 +33,6 @@ class AuctionService {
       AuctionService.instance = new AuctionService()
     }
     return AuctionService.instance
-  }
-
-  /**
-   * Place a bid and record it in bid history
-   */
-  async placeBid(params: PlaceBidParams): Promise<void> {
-    if (!supabase) {
-      throw new Error('Supabase not available')
-    }
-
-    const { auctionId, teamId, teamName, bidAmount, draftId } = params
-
-    // Start a transaction-like operation
-    try {
-      // Get the draft UUID from room code (draftId might be room_code)
-      const { DraftService } = await import('./draft-service')
-      const draftState = await DraftService.getDraftState(draftId)
-
-      if (!draftState) {
-        throw new Error('Draft not found')
-      }
-
-      // Validate draft is active and not deleted
-      if (draftState.draft.status !== 'active') {
-        throw new Error(`Draft is not active (status: ${draftState.draft.status})`)
-      }
-
-      if (draftState.draft.deleted_at) {
-        throw new Error('Draft has been deleted')
-      }
-
-      const draftUuid = draftState.draft.id
-
-      // Server-side budget validation - prevent bids exceeding budget
-      const team = draftState.teams.find(t => t.id === teamId)
-      if (!team) {
-        throw new Error('Team not found in draft')
-      }
-
-      // Re-fetch team budget from DB to prevent stale client data
-      const { data: freshTeam, error: teamError } = await supabase
-        .from('teams')
-        .select('budget_remaining')
-        .eq('id', teamId)
-        .single()
-
-      if (teamError || !freshTeam) {
-        throw new Error('Failed to verify team budget')
-      }
-
-      if (bidAmount > freshTeam.budget_remaining) {
-        throw new Error(`Bid of ${bidAmount} exceeds your remaining budget of ${freshTeam.budget_remaining}`)
-      }
-
-      // Validate auction hasn't expired
-      const { data: auction, error: auctionFetchError } = await supabase
-        .from('auctions')
-        .select('auction_end')
-        .eq('id', auctionId)
-        .single()
-
-      if (auctionFetchError || !auction) {
-        throw new Error('Auction not found')
-      }
-
-      if (auction.auction_end && new Date() > new Date(auction.auction_end)) {
-        throw new Error('Auction has expired')
-      }
-
-      // First, record the bid in history
-      const { error: historyError } = await supabase
-        .from('bid_history')
-        .insert({
-          auction_id: auctionId,
-          draft_id: draftUuid,  // Use UUID instead of room_code
-          team_id: teamId,
-          team_name: teamName,
-          bid_amount: bidAmount,
-        })
-
-      if (historyError) {
-        log.error('Error recording bid history:', historyError)
-        throw new Error('Failed to record bid history')
-      }
-
-      // Then update the auction with the new bid
-      const { error: auctionError } = await supabase
-        .from('auctions')
-        .update({
-          current_bid: bidAmount,
-          current_bidder: teamId,
-        })
-        .eq('id', auctionId)
-
-      if (auctionError) {
-        log.error('Error updating auction:', auctionError)
-        throw new Error('Failed to update auction')
-      }
-
-      // SUPA-04: Broadcast bid to all subscribers on the draft channel
-      await sendBidBroadcast(
-        draftUuid,
-        auctionId,
-        teamId,
-        teamName,
-        bidAmount
-      ).catch(err => log.warn('Bid broadcast failed:', err))
-
-      // Update local cache
-      this.addBidToCache(auctionId, {
-        id: `temp-${Date.now()}`,
-        auctionId,
-        teamId,
-        teamName,
-        bidAmount,
-        timestamp: new Date().toISOString(),
-      })
-
-      // Trigger notification
-      this.notifyBidPlaced(teamName, bidAmount, teamId)
-
-    } catch (error) {
-      log.error('Error placing bid:', error)
-      throw error
-    }
   }
 
   /**
@@ -508,9 +340,12 @@ class AuctionService {
 // Export singleton instance
 export const auctionService = AuctionService.getInstance()
 
-// Convenience exports
+// Convenience exports.
+// NOTE: there is intentionally no `placeBid` here. Bidding goes through
+// DraftService.placeBid (draft-auction-methods.placeBid — optimistic-locked)
+// plus auctionService.recordBidHistory. The old non-atomic AuctionService.placeBid
+// was removed (it was an unused last-write-wins footgun).
 export const {
-  placeBid,
   recordBidHistory,
   getBidHistory,
   subscribeToBidHistory,

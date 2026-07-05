@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { feedbackSchema, validateRequestBody } from '@/lib/schemas'
+import { createLogger } from '@/lib/logger'
+
+const log = createLogger('api/feedback')
 
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_FEEDBACK_WEBHOOK_URL
 
@@ -52,6 +55,12 @@ export async function POST(request: NextRequest) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ embeds: [embed] }),
+      })
+    } else {
+      // Webhook not configured — the submission is validated but goes nowhere.
+      // Log loudly so this is visible in monitoring rather than silently dropped.
+      log.warn('DISCORD_FEEDBACK_WEBHOOK_URL is not set — feedback accepted but not delivered', {
+        category, title,
       })
     }
 

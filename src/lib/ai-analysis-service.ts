@@ -141,13 +141,10 @@ export class AIAnalysisService {
       throw new Error('Unable to fetch team statistics')
     }
 
-    // Analyze type coverage (simplified - would need actual Pokemon type data)
-    const _typeCount: { [key: string]: number } = {}
-    const _allTypes = new Set<string>()
-
-    // This is simplified - in production you'd fetch actual Pokemon types from PokeAPI
-    // For now, we'll make educated guesses or use placeholder data
-
+    // NOTE: This analysis is performance/stats-based (heuristic thresholds over
+    // match data), not type-coverage-based. Real per-Pokémon type analysis would
+    // require joining PokeAPI type data and is intentionally not done here — do
+    // not present this as type-coverage analysis in the UI.
     const strengths: string[] = []
     const weaknesses: string[] = []
     const recommendations: string[] = []
@@ -431,21 +428,4 @@ export class AIAnalysisService {
     }
   }
 
-  /**
-   * Generate power rankings for all teams in a league
-   */
-  static async generatePowerRankings(_leagueId: string): Promise<Array<{
-    rank: number
-    previousRank: number
-    teamId: string
-    teamName: string
-    record: string
-    powerScore: number
-    form: string
-    trend: 'up' | 'down' | 'same'
-  }>> {
-    // This would fetch all teams, calculate power scores, and rank them
-    // For now, return empty array as placeholder
-    return []
-  }
 }

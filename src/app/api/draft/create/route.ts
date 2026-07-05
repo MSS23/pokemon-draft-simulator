@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
   if (draftErr || !draft) {
     log.error('drafts insert failed', draftErr)
     return NextResponse.json(
-      { error: `Failed to create draft: ${draftErr?.message ?? 'unknown'}` },
+      { error: 'Failed to create draft' },
       { status: 500 },
     )
   }
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       log.error('draft_passwords insert failed; rolling back draft', pwErr)
       await supabase.from('drafts').delete().eq('id', draftId)
       return NextResponse.json(
-        { error: `Failed to store draft password: ${pwErr.message}` },
+        { error: 'Failed to store draft password' },
         { status: 500 },
       )
     }
@@ -224,7 +224,7 @@ export async function POST(request: NextRequest) {
     log.error('teams insert failed; rolling back draft', teamErr)
     await supabase.from('drafts').delete().eq('id', draftId)
     return NextResponse.json(
-      { error: `Failed to create host team: ${teamErr?.message ?? 'unknown'}` },
+      { error: 'Failed to create host team' },
       { status: 500 },
     )
   }
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
     await supabase.from('teams').delete().eq('id', teamId)
     await supabase.from('drafts').delete().eq('id', draftId)
     return NextResponse.json(
-      { error: `Failed to register host: ${pErr.message}` },
+      { error: 'Failed to register host' },
       { status: 500 },
     )
   }
