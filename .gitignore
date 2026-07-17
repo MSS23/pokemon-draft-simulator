@@ -100,3 +100,7 @@ cleanup-*.bat
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# agent tooling (local, not app code)
+.agents/
+.codex/

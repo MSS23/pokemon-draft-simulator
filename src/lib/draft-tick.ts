@@ -194,12 +194,13 @@ async function tryWishlistAutoPick(
       log.error('system_make_pick failed', { draftId, teamId, error: error.message })
       return null
     }
-    if ((result as { success?: boolean } | null)?.success) {
+    const pickResult = result as { success?: boolean; error?: string } | null
+    if (pickResult?.success) {
       return item.pokemon_name
     }
-    // If the pick failed because the turn already moved, stop — someone else
-    // (client tick / cron) handled it.
-    return null
+    // A full tier or stale wishlist row should not block lower-priority legal
+    // choices. Stop only when another tick already moved this turn.
+    if (pickResult?.error?.toLowerCase().includes('turn')) return null
   }
   return null
 }

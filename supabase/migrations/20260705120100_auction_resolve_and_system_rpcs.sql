@@ -257,13 +257,13 @@ EXCEPTION
 END;
 $$;
 
-COMMENT ON FUNCTION system_make_pick(UUID, UUID, TEXT, TEXT, TEXT, INTEGER, INTEGER) IS
+COMMENT ON FUNCTION system_make_pick(UUID, UUID, TEXT, TEXT, INTEGER, INTEGER) IS
   'Trusted auto-pick on behalf of an absent user. Service role ONLY — invoked '
   'by the draft-tick server route/cron. Same game rules as make_draft_pick '
   'minus the caller-identity check.';
 
-REVOKE EXECUTE ON FUNCTION system_make_pick(UUID, UUID, TEXT, TEXT, TEXT, INTEGER, INTEGER) FROM anon, authenticated, PUBLIC;
-GRANT  EXECUTE ON FUNCTION system_make_pick(UUID, UUID, TEXT, TEXT, TEXT, INTEGER, INTEGER) TO service_role;
+REVOKE EXECUTE ON FUNCTION system_make_pick(UUID, UUID, TEXT, TEXT, INTEGER, INTEGER) FROM anon, authenticated, PUBLIC;
+GRANT  EXECUTE ON FUNCTION system_make_pick(UUID, UUID, TEXT, TEXT, INTEGER, INTEGER) TO service_role;
 
 -- =====================================================================
 -- system_advance_turn: trusted turn skip (no pick made)
@@ -334,6 +334,6 @@ INSERT INTO _migrations (name, description, rollback_sql) VALUES (
   'Add idempotent resolve_auction() (authenticated); add service-role-only '
   'system_make_pick() and system_advance_turn() for the draft-tick scheduler.',
   'DROP FUNCTION IF EXISTS resolve_auction(UUID,UUID); '
-  'DROP FUNCTION IF EXISTS system_make_pick(UUID,UUID,TEXT,TEXT,TEXT,INTEGER,INTEGER); '
+  'DROP FUNCTION IF EXISTS system_make_pick(UUID,UUID,TEXT,TEXT,INTEGER,INTEGER); '
   'DROP FUNCTION IF EXISTS system_advance_turn(UUID,INTEGER);'
 ) ON CONFLICT (name) DO NOTHING;

@@ -130,6 +130,8 @@ export interface DraftSettings {
   pokemonPerTeam?: number
   /** Format ID (e.g., 'vgc-reg-h') */
   formatId?: string
+  /** Exact server-enforced National Dex pool captured at draft creation. */
+  allowedPokemonIds?: string[]
   /** Auction duration in seconds */
   auctionDurationSeconds?: number
   /** Pending timer change (applied on next turn) */

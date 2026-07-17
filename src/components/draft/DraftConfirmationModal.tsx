@@ -17,6 +17,7 @@ import { Sparkles, Zap, Crown, AlertTriangle, Loader2 } from 'lucide-react'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
 import { draftSounds } from '@/lib/draft-sounds'
 import { pickConfirmVariants, useReducedMotion, REDUCED_MOTION_VARIANTS } from '@/lib/draft-animations'
+import { getTypeTextColor } from '@/utils/pokemon'
 
 interface DraftConfirmationModalProps {
   pokemon: Pokemon | null
@@ -153,9 +154,10 @@ export default function DraftConfirmationModal({
                     {pokemon.types.map((type) => (
                       <Badge
                         key={type.name}
-                        className="text-white font-bold px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm uppercase tracking-wide shadow-lg hover:scale-105 transition-transform"
+                        className="font-bold px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm uppercase tracking-wide shadow-lg hover:scale-105 transition-transform"
                         style={{
                           backgroundColor: type.color,
+                          color: getTypeTextColor(type.name),
                           boxShadow: `0 4px 12px ${type.color}50`
                         }}
                       >

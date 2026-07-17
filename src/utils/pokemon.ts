@@ -26,6 +26,12 @@ export const getTypeColor = (typeName: string): string => {
   return TYPE_COLORS[typeName.toLowerCase()] || '#68A090'
 }
 
+/** WCAG-friendly foreground for the official type color. */
+export const getTypeTextColor = (typeName: string): string => {
+  const whiteTextTypes = new Set(['fighting', 'poison', 'ghost', 'dragon', 'dark'])
+  return whiteTextTypes.has(typeName.toLowerCase()) ? '#ffffff' : '#111827'
+}
+
 export const formatPokemonName = (name: string): string => {
   if (!name) return 'Unknown'
   // Handle special cases like Nidoran♂/♀

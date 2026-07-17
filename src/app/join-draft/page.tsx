@@ -144,6 +144,8 @@ function JoinDraftForm() {
         await DraftService.joinAsSpectator({
           roomCode: formData.roomCode,
           userId: user.id,
+          displayName: userDisplayName,
+          password: formData.password,
         });
 
         router.push(`/draft/${formData.roomCode.toLowerCase()}?spectator=true`);
@@ -153,6 +155,8 @@ function JoinDraftForm() {
           roomCode: formData.roomCode,
           userId: user.id,
           teamName: formData.teamName,
+          displayName: userDisplayName,
+          password: formData.password,
         });
 
         // Check if auto-joined as spectator (draft was full/started)

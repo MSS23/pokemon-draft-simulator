@@ -29,9 +29,9 @@ export const createDraftSchema = z.object({
   name: z.string().min(1).max(100).trim(),
   format: z.string().min(1).max(50),
   draftType: z.enum(['tiered', 'points', 'auction']),
-  teamCount: z.number().int().min(2).max(8),
-  budgetPerTeam: z.number().int().min(50).max(200),
-  pokemonPerTeam: z.number().int().min(3).max(15),
+  teamCount: z.number().int().min(2).max(32),
+  budgetPerTeam: z.number().int().min(10).max(5000),
+  pokemonPerTeam: z.number().int().min(1).max(30),
   timeLimit: z.number().int().min(15).max(300).optional(),
   isPublic: z.boolean().optional().default(false),
 })

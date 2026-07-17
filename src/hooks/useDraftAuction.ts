@@ -1,8 +1,13 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Pokemon } from '@/types'
 import { DraftService } from '@/lib/draft-service'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
+import { supabase } from '@/lib/supabase'
+import {
+  calculateDeadlineTimeRemaining,
+  estimateServerClockOffset,
+} from '@/lib/draft-timer'
 
 const log = createLogger('useDraftAuction')
 
@@ -69,6 +74,7 @@ export function useDraftAuction({
 }: UseDraftAuctionParams): DraftAuctionResult {
   const [currentAuction, setCurrentAuction] = useState<AuctionState | null>(null)
   const [auctionTimeRemaining, setAuctionTimeRemaining] = useState(0)
+  const serverClockOffsetMs = useRef(0)
 
   // Load current auction for auction drafts
   useEffect(() => {
@@ -80,10 +86,10 @@ export function useDraftAuction({
         setCurrentAuction(auction)
 
         if (auction && auction.status === 'active') {
-          const endTime = new Date(auction.auction_end).getTime()
-          const now = Date.now()
-          const remaining = Math.max(0, Math.floor((endTime - now) / 1000))
-          setAuctionTimeRemaining(remaining)
+          setAuctionTimeRemaining(calculateDeadlineTimeRemaining({
+            deadline: auction.auction_end,
+            serverClockOffsetMs: serverClockOffsetMs.current,
+          }))
         } else {
           setAuctionTimeRemaining(0)
         }
@@ -95,16 +101,96 @@ export function useDraftAuction({
     loadCurrentAuction()
   }, [isAuctionDraft, roomCode, currentTurn, draftStatus])
 
+  // Price, bidder, status, new nominations and time extensions are live server
+  // state. Subscribe to the auction row itself so every participant sees the
+  // same headline values without reloading.
+  useEffect(() => {
+    if (!isAuctionDraft || !roomCode || !supabase) return
+    let cancelled = false
+    let channel: ReturnType<typeof supabase.channel> | null = null
+
+    const subscribe = async () => {
+      try {
+        const draft = await DraftService.getDraftState(roomCode.toLowerCase())
+        if (!draft || cancelled || !supabase) return
+
+        channel = supabase
+          .channel(`auction-live:${draft.draft.id}`, { config: { private: true } })
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'auctions',
+            filter: `draft_id=eq.${draft.draft.id}`,
+          }, (payload) => {
+            if (payload.eventType === 'DELETE') {
+              const deleted = payload.old as Partial<AuctionState>
+              setCurrentAuction((current) => current?.id === deleted.id ? null : current)
+              return
+            }
+            const nextAuction = payload.new as AuctionState
+            setCurrentAuction(nextAuction)
+            if (nextAuction.status !== 'active') {
+              setTimeout(() => {
+                setCurrentAuction((current) => current?.id === nextAuction.id ? null : current)
+              }, 3000)
+            }
+          })
+          .subscribe()
+      } catch (error) {
+        log.warn('Could not subscribe to live auction state', error)
+      }
+    }
+
+    subscribe()
+    return () => {
+      cancelled = true
+      if (channel && supabase) supabase.removeChannel(channel)
+    }
+  }, [isAuctionDraft, roomCode])
+
+  useEffect(() => {
+    if (!isAuctionDraft || currentAuction?.status !== 'active') {
+      setAuctionTimeRemaining(0)
+      return
+    }
+
+    let cancelled = false
+    const update = () => setAuctionTimeRemaining(calculateDeadlineTimeRemaining({
+      deadline: currentAuction.auction_end,
+      serverClockOffsetMs: serverClockOffsetMs.current,
+    }))
+    const syncClock = async () => {
+      try {
+        const startedAt = Date.now()
+        const result = await DraftService.getServerTime(roomCode)
+        const receivedAt = Date.now()
+        if (!cancelled) {
+          serverClockOffsetMs.current = estimateServerClockOffset(startedAt, receivedAt, result.serverTime)
+          update()
+        }
+      } catch (error) {
+        log.warn('Auction clock sync failed; using device clock as fallback', error)
+      }
+    }
+
+    update()
+    syncClock()
+    const interval = setInterval(update, 1000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [currentAuction?.auction_end, currentAuction?.status, isAuctionDraft, roomCode])
+
   // Calculate current nominating team for auction drafts
   const currentNominatingTeam = useMemo(() => {
     if (!isAuctionDraft || !teams.length || currentAuction) return null
 
-    const totalPicks = teams.reduce((sum, team) => sum + team.picks.length, 0)
-    const currentNominatorIndex = totalPicks % teams.length
+    const currentNominatorIndex = (Math.max(currentTurn ?? 1, 1) - 1) % teams.length
     const sortedTeams = [...teams].sort((a, b) => a.draftOrder - b.draftOrder)
 
     return sortedTeams[currentNominatorIndex] || null
-  }, [isAuctionDraft, teams, currentAuction])
+  }, [isAuctionDraft, teams, currentAuction, currentTurn])
 
   const canNominate = useMemo(() => {
     if (!isAuctionDraft || currentAuction || draftStatus !== 'drafting') return false
@@ -140,6 +226,7 @@ export function useDraftAuction({
         startingBid,
         duration
       )
+      setCurrentAuction(await DraftService.getCurrentAuction(roomCode.toLowerCase()))
       notify.success('Auction Started!', `${pokemon.name} has been nominated for auction`, { duration: 3000 })
       setSelectedPokemon(null)
     } catch (err) {
@@ -153,6 +240,7 @@ export function useDraftAuction({
 
     try {
       await DraftService.placeBid(roomCode.toLowerCase(), userId, currentAuction.id, amount)
+      setCurrentAuction(await DraftService.getCurrentAuction(roomCode.toLowerCase()))
       notify.success('Bid Placed!', `You bid $${amount} on ${currentAuction.pokemon_name}`, { duration: 2000 })
     } catch (err) {
       log.error('Error placing bid:', err)
@@ -176,6 +264,7 @@ export function useDraftAuction({
 
     try {
       await DraftService.extendAuctionTime(roomCode.toLowerCase(), currentAuction.id, seconds)
+      setCurrentAuction(await DraftService.getCurrentAuction(roomCode.toLowerCase()))
       notify.info('Auction Extended', `Added ${seconds} seconds to the auction`, { duration: 2000 })
     } catch (err) {
       log.error('Error extending auction:', err)

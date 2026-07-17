@@ -3,6 +3,10 @@ import { DraftService } from '@/lib/draft-service'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
 import { draftSounds } from '@/lib/draft-sounds'
+import {
+  calculatePickTimeRemaining,
+  estimateServerClockOffset,
+} from '@/lib/draft-timer'
 
 const log = createLogger('useDraftTimers')
 
@@ -29,7 +33,10 @@ export function useDraftTimers({
   draftId,
   roomCode,
 }: UseDraftTimersParams): DraftTimersResult {
-  const [pickTimeRemaining, setPickTimeRemaining] = useState(0)
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0)
+  const [pickTimeRemaining, setPickTimeRemaining] = useState(() =>
+    calculatePickTimeRemaining({ turnStartedAt, timeLimitSeconds: timeLimit }),
+  )
 
   // Pick timer countdown effect
   useEffect(() => {
@@ -38,10 +45,11 @@ export function useDraftTimers({
       return
     }
 
-    const calculateRemaining = () => {
-      const elapsed = Math.floor((Date.now() - new Date(turnStartedAt).getTime()) / 1000)
-      return Math.max(0, timeLimit - elapsed)
-    }
+    const calculateRemaining = () => calculatePickTimeRemaining({
+      turnStartedAt,
+      timeLimitSeconds: timeLimit,
+      serverClockOffsetMs,
+    })
 
     setPickTimeRemaining(calculateRemaining())
 
@@ -50,7 +58,7 @@ export function useDraftTimers({
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [turnStartedAt, timeLimit, isDrafting])
+  }, [turnStartedAt, timeLimit, isDrafting, serverClockOffsetMs])
 
   // Timer sound effects
   const lastSoundTimeRef = useRef<number | null>(null)
@@ -97,8 +105,14 @@ export function useDraftTimers({
 
     const syncTime = async () => {
       try {
-        await DraftService.getServerTime(roomCode.toLowerCase())
-        // Offset is computed but not consumed externally — kept for future use
+        const requestStartedAt = Date.now()
+        const result = await DraftService.getServerTime(roomCode.toLowerCase())
+        const responseReceivedAt = Date.now()
+        setServerClockOffsetMs(estimateServerClockOffset(
+          requestStartedAt,
+          responseReceivedAt,
+          result.serverTime,
+        ))
       } catch (error) {
         log.error('Failed to sync server time:', error)
       }
@@ -145,13 +159,16 @@ export function useDraftTimers({
 
   // Auto-skip effect: ANY connected client can trigger the skip when the timer hits 0.
   const autoSkipTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const expiredTurnHandledRef = useRef<string | null>(null)
   useEffect(() => {
     if (autoSkipTimerRef.current) {
       clearTimeout(autoSkipTimerRef.current)
       autoSkipTimerRef.current = null
     }
 
-    if (!isDrafting || timeLimit <= 0 || pickTimeRemaining > 0) return
+    if (!isDrafting || timeLimit <= 0 || pickTimeRemaining > 0 || !turnStartedAt) return
+    if (expiredTurnHandledRef.current === turnStartedAt) return
+    expiredTurnHandledRef.current = turnStartedAt
 
     const delay = isUserTurn ? 500 : 1000 + Math.random() * 2000
 
@@ -165,7 +182,7 @@ export function useDraftTimers({
         autoSkipTimerRef.current = null
       }
     }
-  }, [pickTimeRemaining, isDrafting, timeLimit, isUserTurn, handleAutoSkip])
+  }, [pickTimeRemaining, isDrafting, timeLimit, isUserTurn, handleAutoSkip, turnStartedAt])
 
   return {
     pickTimeRemaining,

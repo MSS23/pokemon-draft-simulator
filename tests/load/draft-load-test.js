@@ -112,7 +112,7 @@ export function setup() {
  * Default function — the per-VU scenario.
  * Each VU simulates one player making draft picks.
  */
-export default function (data) {
+export default function draftLoadScenario(data) {
   const { supabaseUrl, anonKey, draftId } = data
 
   // VU id is 1-indexed; map to 0-indexed team slot (0–7 for 8 teams)

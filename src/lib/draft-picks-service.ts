@@ -14,6 +14,7 @@ import type { DraftRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 import { analytics } from '@/lib/analytics'
 import type { DraftState } from './draft-service'
+import { normalizePokemonName } from '@/lib/csv-parser'
 
 const log = createLogger('DraftPicksService')
 
@@ -113,6 +114,25 @@ export async function validatePokemonInFormat(
   proposedCost: number
 ): Promise<{ isValid: boolean; reason?: string; validatedCost: number }> {
   try {
+    if (draft.custom_format_id) {
+      const { data: customFormat, error } = await supabase
+        .from('custom_formats')
+        .select('pokemon_pricing')
+        .eq('id', draft.custom_format_id)
+        .single()
+      if (error || !customFormat) {
+        return { isValid: false, reason: 'Custom draft pool could not be loaded', validatedCost: proposedCost }
+      }
+
+      const normalizedName = normalizePokemonName(pokemonName)
+      const pricing = customFormat.pokemon_pricing || {}
+      const matchedEntry = Object.entries(pricing).find(([name]) => normalizePokemonName(name) === normalizedName)
+      if (!matchedEntry) {
+        return { isValid: false, reason: `${pokemonName} is not in this custom draft pool`, validatedCost: proposedCost }
+      }
+      return { isValid: true, validatedCost: matchedEntry[1] }
+    }
+
     // Get format from draft settings
     const formatId = draft.settings?.formatId || DEFAULT_FORMAT
     const format = getFormatById(formatId)
@@ -191,9 +211,10 @@ export async function makePick(draftId: string, userId: string, pokemonId: strin
 
   const validatedCost = formatValidation.validatedCost
 
-  // Tier budget validation for tiered scoring system
+  // Resolve tier membership for a friendly client-side pre-check. The database
+  // repeats this check atomically and owns the actual cap decision.
   const scoringSystem = draftState.draft.settings?.scoringSystem
-  let pickCost = validatedCost
+  const pickCost = validatedCost
   if (scoringSystem === 'tiered') {
     const tierConfig = draftState.draft.settings?.tierConfig as { tiers: import('@/types').TierDefinition[] } | undefined
     if (tierConfig?.tiers?.length) {
@@ -202,11 +223,11 @@ export async function makePick(draftId: string, userId: string, pokemonId: strin
       if (!tier) {
         throw new Error(`${pokemonName} doesn't fit into any tier in this draft.`)
       }
-      // In tiered drafts the deducted cost is the tier's point cost, not the raw format cost
-      pickCost = tier.cost
-      const team = draftState.teams.find(t => t.id === teamId)
-      if (team && team.budget_remaining < pickCost) {
-        throw new Error(`Not enough budget. ${tier.label} costs ${pickCost} pts and you have ${team.budget_remaining} pts remaining.`)
+      const usedSlots = draftState.picks.filter(pick =>
+        pick.team_id === teamId && pick.tier_name?.toUpperCase() === tier.name.toUpperCase()
+      ).length
+      if (usedSlots >= tier.slotsPerTeam) {
+        throw new Error(`${tier.label} is full. Your roster allows ${tier.slotsPerTeam} pick${tier.slotsPerTeam === 1 ? '' : 's'} from this tier.`)
       }
     }
   }
@@ -251,8 +272,11 @@ export async function makePick(draftId: string, userId: string, pokemonId: strin
     if (errorMessage.includes('Maximum picks reached')) {
       throw new Error(`Your team has reached the maximum number of picks (${result.maxPicks || 6}).`)
     }
+    if (errorMessage.includes('Tier cap reached')) {
+      throw new Error(errorMessage)
+    }
     if (errorMessage.includes('already drafted')) {
-      throw new Error('This Pokemon has already been drafted by your team.')
+      throw new Error('This Pokemon has already been drafted in this draft.')
     }
     if (errorMessage.includes('not active')) {
       throw new Error('Draft is not active. It may have been paused or completed.')
@@ -296,10 +320,12 @@ export async function makePick(draftId: string, userId: string, pokemonId: strin
     })
   } catch { /* analytics failure is non-fatal */ }
 
+  const newBudget = Number(result.newBudget ?? result.budgetRemaining ?? 0)
+  const nextTurn = Number(result.nextTurn ?? result.newTurn ?? currentTurn + 1)
   return {
     pickId: result.pickId as string,
-    newBudget: result.newBudget as number,
-    nextTurn: result.nextTurn as number,
+    newBudget,
+    nextTurn,
     isComplete: result.isComplete as boolean
   }
 }

@@ -79,11 +79,11 @@ export interface Draft {
 export interface TierDefinition {
   name: string        // e.g. "S", "A", "B"
   label: string       // e.g. "S Tier"
-  cost: number        // budget points deducted when drafting a pokemon in this tier
+  cost: number        // points shown for Pokemon in this tier
   minCost: number     // pokemon costing >= minCost (format cost) belong to this tier
   color: string       // hex color
-  /** @deprecated use cost instead */
-  slotsPerTeam?: number
+  /** Exact number of roster slots each team may fill from this tier. */
+  slotsPerTeam: number
 }
 
 export interface DraftSettings {
@@ -92,6 +92,8 @@ export interface DraftSettings {
   timeLimit?: number
   pokemonPerTeam?: number
   formatId?: string
+  /** Exact server-enforced National Dex pool captured when the draft is created. */
+  allowedPokemonIds?: string[]
   allowUndos?: boolean
   requireFullRoster?: boolean
   maxPokemonPerTeam?: number
@@ -132,6 +134,7 @@ export interface Pick {
   cost: number
   pickOrder: number
   round: number
+  tierName?: string | null
   createdAt: string
 }
 

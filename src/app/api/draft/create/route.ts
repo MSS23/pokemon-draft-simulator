@@ -17,8 +17,11 @@ import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 import { generateRoomCode } from '@/lib/room-utils'
 import { DEFAULT_FORMAT } from '@/lib/formats'
+import { getServerFormatPoolIds } from '@/lib/server-format-pool'
 import { validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
+import { getPokemonTier, validateTierConfig } from '@/lib/tier-utils'
+import type { TierDefinition } from '@/types'
 
 const log = createLogger('api/draft/create')
 
@@ -34,7 +37,7 @@ interface CreateDraftBody {
     budgetPerTeam?: number
     formatId?: string
     scoringSystem?: 'budget' | 'tiered'
-    tierConfig?: unknown
+    tierConfig?: { tiers: TierDefinition[] }
     createLeague?: boolean
     splitIntoConferences?: boolean
     leagueWeeks?: number
@@ -93,11 +96,22 @@ export async function POST(request: NextRequest) {
   }
 
   const s = body.settings
+  if (!['tiered', 'points', 'auction'].includes(s.draftType)) {
+    return NextResponse.json({ error: 'Invalid draft type' }, { status: 400 })
+  }
   if (!Number.isFinite(s.maxTeams) || s.maxTeams < 2 || s.maxTeams > 32) {
     return NextResponse.json({ error: 'maxTeams must be between 2 and 32' }, { status: 400 })
   }
-  const minPokemon = s.draftType === 'auction' ? 1 : 6
-  if (!Number.isFinite(s.pokemonPerTeam) || s.pokemonPerTeam < minPokemon || s.pokemonPerTeam > 30) {
+  const tierValidation = s.draftType === 'tiered'
+    ? validateTierConfig(s.tierConfig?.tiers || [])
+    : null
+  if (tierValidation && !tierValidation.valid) {
+    return NextResponse.json({ error: tierValidation.errors[0] }, { status: 400 })
+  }
+
+  const pokemonPerTeam = tierValidation?.rosterSize ?? s.pokemonPerTeam
+  const minPokemon = s.draftType === 'auction' || s.draftType === 'tiered' ? 1 : 6
+  if (!Number.isInteger(pokemonPerTeam) || pokemonPerTeam < minPokemon || pokemonPerTeam > 30) {
     return NextResponse.json(
       { error: `pokemonPerTeam must be between ${minPokemon} and 30` },
       { status: 400 },
@@ -107,16 +121,52 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'budgetPerTeam must be between 10 and 5000' }, { status: 400 })
   }
 
+  if (body.customFormat) {
+    const entries = Object.entries(body.customFormat.pokemonPricing || {})
+    if (entries.length < 1 || entries.length > 2000) {
+      return NextResponse.json({ error: 'Custom formats must contain between 1 and 2000 Pokemon.' }, { status: 400 })
+    }
+    if (entries.some(([name, cost]) => !name || !Number.isInteger(cost) || cost < 0 || cost > 5000)) {
+      return NextResponse.json({ error: 'Every custom Pokemon needs an integer point value from 0 to 5000.' }, { status: 400 })
+    }
+
+    if (tierValidation && s.tierConfig) {
+      const perTier = entries.reduce<Record<string, number>>((counts, [, cost]) => {
+        const tier = getPokemonTier(cost, s.tierConfig!.tiers)
+        if (tier) counts[tier.name] = (counts[tier.name] || 0) + 1
+        return counts
+      }, {})
+      const shortTier = s.tierConfig.tiers.find(tier =>
+        tier.slotsPerTeam > 0 && (perTier[tier.name] || 0) < tier.slotsPerTeam * s.maxTeams
+      )
+      if (shortTier) {
+        return NextResponse.json({
+          error: `${shortTier.label} needs at least ${shortTier.slotsPerTeam * s.maxTeams} Pokemon for ${s.maxTeams} teams, but the CSV only supplies ${perTier[shortTier.name] || 0}.`,
+        }, { status: 400 })
+      }
+    }
+  }
+
   // 4. Build the privileged Supabase client
   const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const roomCode = generateRoomCode()
+  let roomCode = generateRoomCode()
   const isAuction = s.draftType === 'auction'
   const isTiered = s.draftType === 'tiered'
   const dbFormat: 'snake' | 'auction' = isAuction ? 'auction' : 'snake'
   const scoringSystem: 'budget' | 'tiered' = isTiered ? 'tiered' : 'budget'
+  const formatId = s.formatId || DEFAULT_FORMAT
+  let allowedPokemonIds: string[] | undefined
+  if (!body.customFormat) {
+    try {
+      allowedPokemonIds = await getServerFormatPoolIds(formatId)
+    } catch (error) {
+      log.error('Could not resolve authoritative format pool', error)
+      return NextResponse.json({ error: 'The selected Pokemon format could not be loaded.' }, { status: 500 })
+    }
+  }
 
   // 5. Optional: insert custom_formats row first (FK target for drafts)
   let customFormatId: string | null = null
@@ -156,9 +206,10 @@ export async function POST(request: NextRequest) {
     current_round: 1,
     settings: {
       timeLimit: s.timeLimit,
-      pokemonPerTeam: s.pokemonPerTeam,
-      maxPokemonPerTeam: s.pokemonPerTeam,
-      formatId: s.formatId || DEFAULT_FORMAT,
+      pokemonPerTeam,
+      maxPokemonPerTeam: pokemonPerTeam,
+      formatId,
+      allowedPokemonIds,
       draftType: s.draftType,
       scoringSystem,
       tierConfig: s.tierConfig,
@@ -174,20 +225,37 @@ export async function POST(request: NextRequest) {
   if (body.password) draftInsert.has_password = true
   if (customFormatId) draftInsert.custom_format_id = customFormatId
 
-  const { data: draft, error: draftErr } = await supabase
-    .from('drafts')
-    .insert(draftInsert)
-    .select('id')
-    .single()
+  let draft: { id: string } | null = null
+  let draftErr: { message?: string; code?: string } | null = null
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    roomCode = generateRoomCode()
+    draftInsert.room_code = roomCode.toLowerCase()
+    const result = await supabase
+      .from('drafts')
+      .insert(draftInsert)
+      .select('id')
+      .single()
+    draft = result.data as { id: string } | null
+    draftErr = result.error
+    if (draft) break
+    if (draftErr?.code !== '23505') break
+  }
 
   if (draftErr || !draft) {
     log.error('drafts insert failed', draftErr)
+    if (customFormatId) await supabase.from('custom_formats').delete().eq('id', customFormatId)
     return NextResponse.json(
       { error: 'Failed to create draft' },
       { status: 500 },
     )
   }
   const draftId = (draft as { id: string }).id
+  const rollbackDraft = async () => {
+    await supabase.from('drafts').delete().eq('id', draftId)
+    if (customFormatId) {
+      await supabase.from('custom_formats').delete().eq('id', customFormatId)
+    }
+  }
 
   // Persist bcrypt hash to the service-role-only draft_passwords table so the
   // hash is never exposed via the anon key (see migration 028).
@@ -199,7 +267,7 @@ export async function POST(request: NextRequest) {
 
     if (pwErr) {
       log.error('draft_passwords insert failed; rolling back draft', pwErr)
-      await supabase.from('drafts').delete().eq('id', draftId)
+      await rollbackDraft()
       return NextResponse.json(
         { error: 'Failed to store draft password' },
         { status: 500 },
@@ -222,7 +290,7 @@ export async function POST(request: NextRequest) {
 
   if (teamErr || !team) {
     log.error('teams insert failed; rolling back draft', teamErr)
-    await supabase.from('drafts').delete().eq('id', draftId)
+    await rollbackDraft()
     return NextResponse.json(
       { error: 'Failed to create host team' },
       { status: 500 },
@@ -245,7 +313,7 @@ export async function POST(request: NextRequest) {
   if (pErr) {
     log.error('participants insert failed; rolling back', pErr)
     await supabase.from('teams').delete().eq('id', teamId)
-    await supabase.from('drafts').delete().eq('id', draftId)
+    await rollbackDraft()
     return NextResponse.json(
       { error: 'Failed to register host' },
       { status: 500 },

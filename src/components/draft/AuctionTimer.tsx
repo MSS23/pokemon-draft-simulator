@@ -7,6 +7,11 @@ import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { draftSounds } from '@/lib/draft-sounds'
 import { getTimerColor, useReducedMotion } from '@/lib/draft-animations'
+import { DraftService } from '@/lib/draft-service'
+import {
+  calculateDeadlineTimeRemaining,
+  estimateServerClockOffset,
+} from '@/lib/draft-timer'
 
 interface AuctionTimerProps {
   auctionEndTime: string | null
@@ -28,6 +33,7 @@ export default function AuctionTimer({
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [totalDuration, setTotalDuration] = useState(0)
   const [hasExpired, setHasExpired] = useState(false)
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0)
   const lastTickSound = useRef(0)
   const reducedMotion = useReducedMotion()
 
@@ -38,9 +44,10 @@ export default function AuctionTimer({
       return
     }
 
-    const now = Date.now()
-    const endTime = new Date(auctionEndTime).getTime()
-    const remaining = Math.max(0, Math.floor((endTime - now) / 1000))
+    const remaining = calculateDeadlineTimeRemaining({
+      deadline: auctionEndTime,
+      serverClockOffsetMs,
+    })
 
     setTimeRemaining(remaining)
 
@@ -60,7 +67,28 @@ export default function AuctionTimer({
       draftSounds.play('auction-sold')
       onTimeExpired()
     }
-  }, [auctionEndTime, isActive, onTimeExpired, hasExpired, totalDuration])
+  }, [auctionEndTime, isActive, onTimeExpired, hasExpired, totalDuration, serverClockOffsetMs])
+
+  useEffect(() => {
+    if (!auctionEndTime || !isActive) return
+    let cancelled = false
+
+    const syncClock = async () => {
+      try {
+        const startedAt = Date.now()
+        const result = await DraftService.getServerTime()
+        const receivedAt = Date.now()
+        if (!cancelled) {
+          setServerClockOffsetMs(estimateServerClockOffset(startedAt, receivedAt, result.serverTime))
+        }
+      } catch {
+        // The database still enforces expiry; device time is a display fallback.
+      }
+    }
+
+    syncClock()
+    return () => { cancelled = true }
+  }, [auctionEndTime, isActive])
 
   // Update timer every second
   useEffect(() => {
@@ -168,7 +196,7 @@ export default function AuctionTimer({
               exit={{ opacity: 0, y: -8, scale: 0.9 }}
               transition={{ duration: 0.2 }}
             >
-              <span className="text-xl md:text-2xl font-black text-red-400">
+              <span className="text-xl md:text-2xl font-black text-destructive">
                 {timeRemaining <= 2 ? 'Going twice...' : 'Going once...'}
               </span>
             </motion.div>
@@ -184,7 +212,7 @@ export default function AuctionTimer({
               animate={{ opacity: 1, scale: 1 }}
               transition={{ type: 'spring', stiffness: 200 }}
             >
-              <span className="text-2xl md:text-3xl font-black text-amber-400">
+              <span className="text-2xl md:text-3xl font-black text-amber-700 dark:text-amber-300">
                 SOLD!
               </span>
             </motion.div>

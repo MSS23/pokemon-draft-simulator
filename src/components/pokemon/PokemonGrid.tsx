@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
-import { Search, Filter, SortAsc, SortDesc, AlertTriangle } from 'lucide-react'
+import { Search, SearchX, Filter, SortAsc, SortDesc, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PokemonGridSkeleton } from '@/components/ui/loading-states'
 import VirtualizedPokemonGrid from './VirtualizedPokemonGrid'
@@ -46,6 +46,7 @@ interface PokemonGridProps {
   // Tiered draft props
   scoringSystem?: 'budget' | 'tiered'
   tierConfig?: { tiers: TierDefinition[] }
+  tierUsage?: Record<string, number>
   draftedByTeamMap?: Record<string, string>
 }
 
@@ -99,12 +100,15 @@ export default function PokemonGrid({
   remainingSlots,
   scoringSystem,
   tierConfig,
+  tierUsage = {},
   draftedByTeamMap = {},
 }: PokemonGridProps) {
   const isTiered = scoringSystem === 'tiered' && tierConfig?.tiers?.length
   const [searchQuery, setSearchQuery] = useState('')
   const deferredSearchQuery = useDeferredValue(searchQuery)
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [generationFilter, setGenerationFilter] = useState<string>('all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [costFilter, setCostFilter] = useState<string>('all')
   const [_tierFilter, _setTierFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('dex')
@@ -132,6 +136,8 @@ export default function PokemonGrid({
   const clearAllFilters = () => {
     setSearchQuery('')
     setTypeFilter('all')
+    setGenerationFilter('all')
+    setCategoryFilter('all')
     setCostFilter('all')
     setSortBy('dex')
     setSortDirection('asc')
@@ -145,6 +151,8 @@ export default function PokemonGrid({
   // Check if any filters are active
   const hasActiveFilters = searchQuery ||
     (typeFilter !== 'all') ||
+    (generationFilter !== 'all') ||
+    (categoryFilter !== 'all') ||
     (costFilter !== 'all') ||
     sortBy !== 'dex' ||
     sortDirection !== 'asc' ||
@@ -153,6 +161,23 @@ export default function PokemonGrid({
     defenseRange[0] > 0 || defenseRange[1] < 255 ||
     speedRange[0] > 0 || speedRange[1] < 255 ||
     bstRange[0] > 0 || bstRange[1] < 800
+
+  const activeFilterCount = [
+    typeFilter !== 'all',
+    generationFilter !== 'all',
+    categoryFilter !== 'all',
+    costFilter !== 'all',
+    hpRange[0] > 0 || hpRange[1] < 255,
+    attackRange[0] > 0 || attackRange[1] < 255,
+    defenseRange[0] > 0 || defenseRange[1] < 255,
+    speedRange[0] > 0 || speedRange[1] < 255,
+    bstRange[0] > 0 || bstRange[1] < 800,
+  ].filter(Boolean).length
+
+  const availableGenerations = useMemo(() =>
+    Array.from(new Set(pokemon.map((entry) => entry.generation).filter((generation): generation is number => !!generation)))
+      .sort((a, b) => a - b),
+  [pokemon])
 
   // Pre-normalize search query (runs once per query change)
   const normalizedSearchQuery = useMemo(() => {
@@ -232,6 +257,8 @@ export default function PokemonGrid({
   const filteredAndSortedPokemon = useMemo(() => {
     const hasFilters = normalizedSearchQuery ||
       typeFilter !== 'all' ||
+      generationFilter !== 'all' ||
+      categoryFilter !== 'all' ||
       costFilter !== 'all' ||
       hpRange[0] > 0 || hpRange[1] < 255 ||
       attackRange[0] > 0 || attackRange[1] < 255 ||
@@ -246,32 +273,34 @@ export default function PokemonGrid({
         // Search filter (most selective - check first)
         if (normalizedSearchQuery) {
           const nameMatch = p.name.toLowerCase().includes(normalizedSearchQuery.original)
-          if (nameMatch) return true // Fast path
-
           const typeMatch = p.types.some(t => t.name.toLowerCase().includes(normalizedSearchQuery.original))
-          if (typeMatch) return true
-
           const abilityMatch = p.abilities?.some(a => {
             const lowerAbility = a.toLowerCase()
             return lowerAbility.includes(normalizedSearchQuery.original) ||
               lowerAbility.replace(/[^a-z0-9]/g, '').includes(normalizedSearchQuery.normalized)
           }) || false
-          if (abilityMatch) return true
-
           const moveMatch = p.moves?.some(m => {
             const moveName = m.name.toLowerCase()
             return moveName.includes(normalizedSearchQuery.original) ||
               moveName.replace(/[^a-z0-9]/g, '').includes(normalizedSearchQuery.normalized) ||
               moveName.replace(/\s+/g, '').includes(normalizedSearchQuery.noSpaces)
           }) || false
+          const dexMatch = p.id === normalizedSearchQuery.original.replace(/^#/, '')
 
-          if (!moveMatch) return false
+          if (!nameMatch && !typeMatch && !abilityMatch && !moveMatch && !dexMatch) return false
         }
 
         // Type filter
         if (typeFilter !== 'all') {
           if (!p.types.some(t => t.name === typeFilter)) return false
         }
+
+        if (generationFilter !== 'all' && p.generation !== Number(generationFilter)) return false
+
+        if (categoryFilter === 'legendary' && !p.isLegendary) return false
+        if (categoryFilter === 'mythical' && !p.isMythical) return false
+        if (categoryFilter === 'paradox' && !p.isParadox) return false
+        if (categoryFilter === 'standard' && (p.isLegendary || p.isMythical || p.isParadox)) return false
 
         // Cost filter
         if (costFilter !== 'all') {
@@ -295,7 +324,7 @@ export default function PokemonGrid({
     }
 
     return result.slice().sort(sortComparator)
-  }, [pokemon, normalizedSearchQuery, typeFilter, costFilter, sortComparator, hpRange, attackRange, defenseRange, speedRange, bstRange])
+  }, [pokemon, normalizedSearchQuery, typeFilter, generationFilter, categoryFilter, costFilter, sortComparator, hpRange, attackRange, defenseRange, speedRange, bstRange])
 
   // Show ALL pokemon (including drafted), wishlisted pinned to top
   const displayPokemon = useMemo(() => {
@@ -373,9 +402,9 @@ export default function PokemonGrid({
                 >
                   <Filter className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Filters</span>
-                  {(typeFilter !== 'all' || costFilter !== 'all') && (
+                  {activeFilterCount > 0 && (
                     <Badge variant="secondary" className="ml-1 sm:ml-2 text-xs">
-                      {[typeFilter !== 'all', costFilter !== 'all'].filter(Boolean).length}
+                      {activeFilterCount}
                     </Badge>
                   )}
                 </Button>
@@ -394,7 +423,7 @@ export default function PokemonGrid({
           </div>
 
           {showFiltersPanel && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4 sm:p-6 bg-card rounded-lg border">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 p-4 sm:p-6 bg-card rounded-xl border shadow-sm">
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-foreground">Type</label>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -408,6 +437,37 @@ export default function PokemonGrid({
                         {type.charAt(0).toUpperCase() + type.slice(1)}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">Generation</label>
+                <Select value={generationFilter} onValueChange={setGenerationFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All generations" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All generations</SelectItem>
+                    {availableGenerations.map((generation) => (
+                      <SelectItem key={generation} value={String(generation)}>Generation {generation}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-foreground">Category</label>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    <SelectItem value="standard">Standard Pokemon</SelectItem>
+                    <SelectItem value="legendary">Legendary</SelectItem>
+                    <SelectItem value="mythical">Mythical</SelectItem>
+                    <SelectItem value="paradox">Paradox</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -453,7 +513,7 @@ export default function PokemonGrid({
               </div>
 
               {/* Stat Range Filters */}
-              <div className="sm:col-span-2 lg:col-span-3 space-y-4 border-t pt-4">
+              <div className="sm:col-span-2 xl:col-span-5 space-y-4 border-t pt-4">
                 <h4 className="font-medium text-sm text-foreground">Filter by Stats</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -532,6 +592,7 @@ export default function PokemonGrid({
       <div className="flex items-center justify-between px-1 text-sm text-muted-foreground">
         <span>
           <span className="font-semibold text-foreground">{availableCount}</span> available
+          <span className="ml-1.5 text-xs">from {pokemon.length} in this format</span>
           {draftedPokemonIds.length > 0 && (
             <span className="ml-1.5 text-xs">({draftedPokemonIds.length} drafted)</span>
           )}
@@ -589,6 +650,7 @@ export default function PokemonGrid({
           draftedByTeamMap={draftedByTeamMap}
           isTiered={!!isTiered}
           tierConfig={tierConfig}
+          tierUsage={tierUsage}
         />
       ) : (
         <div className={cn(
@@ -614,7 +676,7 @@ export default function PokemonGrid({
                   ? (() => {
                       const tier = getPokemonTier(p.cost, tierConfig.tiers)
                       if (!tier) return true
-                      return budgetRemaining !== undefined && tier.cost > budgetRemaining
+                      return (tierUsage[tier.name.toUpperCase()] || 0) >= tier.slotsPerTeam
                     })()
                   : budgetRemaining !== undefined && p.cost > budgetRemaining
               }
@@ -636,8 +698,15 @@ export default function PokemonGrid({
       )}
 
       {displayPokemon.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          No Pokemon found matching your filters
+        <div className="flex flex-col items-center rounded-xl border border-dashed bg-muted/30 px-6 py-12 text-center">
+          <SearchX className="mb-3 h-8 w-8 text-muted-foreground" aria-hidden="true" />
+          <h3 className="font-semibold text-foreground">No Pokemon match these filters</h3>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+            Try another generation or category, or clear the filters to return to the full format pool.
+          </p>
+          <Button variant="outline" size="sm" onClick={clearAllFilters} className="mt-4">
+            Clear filters
+          </Button>
         </div>
       )}
     </div>

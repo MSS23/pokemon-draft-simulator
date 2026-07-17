@@ -195,6 +195,7 @@ export default function AuctionNomination({
               {/* Pokemon preview */}
               <div className="flex items-center gap-4 bg-muted rounded-xl p-3">
                 <div className="w-20 h-20 rounded-xl bg-muted/80 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external Pokemon artwork uses runtime fallbacks */}
                   <img
                     src={getBestPokemonImageUrl(
                       selectedPokemon.id,

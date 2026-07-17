@@ -101,11 +101,14 @@ export function OnTheClockHero({
   const teamColor = currentTeam ? getTeamColor(currentTeam) : getTeamColor({ draftOrder: 1 })
   const isUserTurn = !!userTeamId && currentTeamId === userTeamId
   const isPaused = draftStatus === 'paused'
+  const isUntimed = timeLimit <= 0
 
   // urgency for clock color
   const pct = timeLimit > 0 ? timeRemaining / timeLimit : 1
   const clockTone =
-    timeRemaining <= 5
+    isUntimed
+      ? 'text-white'
+      : timeRemaining <= 5
       ? 'text-red-400'
       : timeRemaining <= 10
       ? 'text-orange-300'
@@ -200,15 +203,16 @@ export function OnTheClockHero({
             </div>
             <div
               className={cn(
-                'font-mono tabular-nums font-black text-4xl sm:text-6xl leading-none transition-colors',
+                'font-mono tabular-nums font-black leading-none transition-colors',
+                isUntimed ? 'text-2xl sm:text-4xl' : 'text-4xl sm:text-6xl',
                 clockTone,
-                timeRemaining > 0 && timeRemaining <= 10 && !isPaused && 'animate-pulse'
+                !isUntimed && timeRemaining > 0 && timeRemaining <= 10 && !isPaused && 'animate-pulse'
               )}
               style={{
                 textShadow: `0 0 24px rgb(${teamColor.rgb} / 0.55)`,
               }}
             >
-              {formatClock(timeRemaining)}
+              {isUntimed ? 'NO LIMIT' : formatClock(timeRemaining)}
             </div>
           </div>
         </div>

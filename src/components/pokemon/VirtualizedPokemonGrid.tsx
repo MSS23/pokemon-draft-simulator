@@ -28,6 +28,7 @@ interface VirtualizedPokemonGridProps {
   draftedByTeamMap?: Record<string, string>
   isTiered?: boolean
   tierConfig?: { tiers: import('@/types').TierDefinition[] }
+  tierUsage?: Record<string, number>
 }
 
 /**
@@ -117,6 +118,7 @@ export default function VirtualizedPokemonGrid({
   draftedByTeamMap = {},
   isTiered,
   tierConfig,
+  tierUsage = {},
 }: VirtualizedPokemonGridProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -211,7 +213,8 @@ export default function VirtualizedPokemonGrid({
                               .sort((a: { minCost: number }, b: { minCost: number }) => b.minCost - a.minCost)
                               .find((t: { minCost: number }) => p.cost >= t.minCost)
                             if (!tier) return true
-                            return budgetRemaining !== undefined && (tier as { cost: number }).cost > budgetRemaining
+                            const typedTier = tier as { name: string; slotsPerTeam: number }
+                            return (tierUsage[typedTier.name.toUpperCase()] || 0) >= typedTier.slotsPerTeam
                           })()
                         : budgetRemaining !== undefined && p.cost > budgetRemaining
                     }

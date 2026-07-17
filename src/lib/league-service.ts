@@ -1252,7 +1252,7 @@ export class LeagueService {
     for (const team of league.teams) {
       const { data: picks } = await supabase
         .from('picks')
-        .select('id, draft_id, team_id, pokemon_id, pokemon_name, cost, pick_order, round, created_at')
+        .select('id, draft_id, team_id, pokemon_id, pokemon_name, cost, tier_name, pick_order, round, created_at')
         .eq('team_id', team.id)
 
       if (picks && picks.length > 0) {
@@ -1266,6 +1266,7 @@ export class LeagueService {
             pokemonId: p.pokemon_id,
             pokemonName: p.pokemon_name,
             cost: p.cost,
+            tierName: p.tier_name,
             pickOrder: p.pick_order,
             round: p.round,
             createdAt: p.created_at,

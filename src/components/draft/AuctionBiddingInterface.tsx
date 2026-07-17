@@ -164,6 +164,8 @@ export default function AuctionBiddingInterface({
     ? teams.find((team) => team.id === currentAuction.current_bidder)
     : null
   const isUserWinning = currentAuction?.current_bidder === userTeamId
+  const currentAuctionId = currentAuction?.id
+  const currentAuctionBid = currentAuction?.current_bid
 
   // Compute max budget for the timer bar
   const maxBudget = Math.max(...teams.map((t) => t.budgetRemaining), 1)
@@ -181,11 +183,10 @@ export default function AuctionBiddingInterface({
 
   // Auto-set bid amount to minimum valid bid
   useEffect(() => {
-    if (currentAuction && !bidAmount) {
-      const minBid = currentAuction.current_bid + 1
-      setBidAmount(minBid.toString())
-    }
-  }, [currentAuction, bidAmount])
+    if (!currentAuctionId || currentAuctionBid === undefined) return
+    const minBid = currentAuctionBid + 1
+    setBidAmount((current) => !current || Number(current) < minBid ? minBid.toString() : current)
+  }, [currentAuctionId, currentAuctionBid])
 
   // Load and subscribe to bid history
   useEffect(() => {
@@ -496,6 +497,7 @@ export default function AuctionBiddingInterface({
                 transition={{ duration: 0.3 }}
               >
                 <div className="w-28 h-28 md:w-36 md:h-36 rounded-2xl bg-muted border border-border flex items-center justify-center overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external Pokemon artwork uses runtime fallbacks */}
                   <img
                     src={getBestPokemonImageUrl(pokemon.id, pokemon.name)}
                     alt={pokemon.name}

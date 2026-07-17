@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -47,43 +47,7 @@ export default function SpectatePage() {
   const [userDraftIds, setUserDraftIds] = useState<Set<string>>(new Set());
   const { user } = useAuth();
 
-  useEffect(() => {
-    loadPublicDrafts();
-
-    // Set up real-time subscription for public drafts
-    if (supabase) {
-      // public-drafts-list is intentionally PUBLIC (no private: true).
-      // The /spectate lobby must work for anonymous visitors browsing
-      // public drafts. The underlying public.drafts SELECT policy already
-      // restricts visibility to drafts where is_public = true, so this
-      // channel never leaks private-draft state. A dedicated
-      // realtime_public_lobby_select_p029 policy grants anon + authenticated
-      // SELECT access on this exact topic.
-      const channel = supabase
-        .channel("public-drafts-list")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "drafts",
-            filter: "is_public=eq.true",
-          },
-          () => {
-            loadPublicDrafts();
-          },
-        )
-        .subscribe();
-
-      return () => {
-        if (supabase) {
-          supabase.removeChannel(channel);
-        }
-      };
-    }
-  }, []);
-
-  const loadPublicDrafts = async () => {
+  const loadPublicDrafts = useCallback(async () => {
     if (!supabase) {
       setLoading(false);
       return;
@@ -124,7 +88,41 @@ export default function SpectatePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadPublicDrafts();
+
+    // Set up real-time subscription for public drafts
+    if (supabase) {
+      // public-drafts-list is intentionally PUBLIC (no private: true).
+      // The /spectate lobby must work for anonymous visitors browsing
+      // public drafts. The underlying public.drafts SELECT policy already
+      // restricts visibility to drafts where is_public = true, so this
+      // channel never leaks private-draft state. A dedicated
+      // realtime_public_lobby_select_p029 policy grants anon + authenticated
+      // SELECT access on this exact topic.
+      const channel = supabase
+        .channel("public-drafts-list")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "drafts",
+            filter: "is_public=eq.true",
+          },
+          () => {
+            loadPublicDrafts();
+          },
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [loadPublicDrafts]);
 
   const handleJoinByCode = () => {
     if (searchCode.trim()) {

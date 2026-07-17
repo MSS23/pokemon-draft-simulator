@@ -49,13 +49,58 @@ export interface ParsedCSVResult {
  * - Removes spaces, hyphens, special characters
  * - Handles common variations (e.g., "Mr. Mime" -> "mrmime")
  */
-function normalizePokemonName(name: string): string {
+export function normalizePokemonName(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[.\s-]+/g, '')
     .replace(/♀/g, 'f')
     .replace(/♂/g, 'm')
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+/** Small RFC-4180 parser: quoted commas, escaped quotes, CRLF and BOM. */
+function parseCSVRows(csvContent: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let cell = ''
+  let quoted = false
+  const source = csvContent.replace(/^\uFEFF/, '')
+
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i]
+    if (char === '"') {
+      if (quoted && source[i + 1] === '"') {
+        cell += '"'
+        i += 1
+      } else {
+        quoted = !quoted
+      }
+    } else if (char === ',' && !quoted) {
+      row.push(cell.trim())
+      cell = ''
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && source[i + 1] === '\n') i += 1
+      row.push(cell.trim())
+      if (row.some(value => value.length > 0)) rows.push(row)
+      row = []
+      cell = ''
+    } else {
+      cell += char
+    }
+  }
+
+  row.push(cell.trim())
+  if (row.some(value => value.length > 0)) rows.push(row)
+  return rows
+}
+
+function normalizeTierName(value: string): string {
+  return value.replace(/\s*tier\s*/gi, '').trim().toUpperCase()
+}
+
+function isMarker(value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  return ['x', '✓', '✗', '✔', 'âœ“', 'âœ—'].includes(normalized)
 }
 
 /**
@@ -94,7 +139,7 @@ function detectTieredFormat(headerParts: string[]): { tierColumns: { col: number
  * Parses a tiered column CSV (e.g. from a Google Sheets draft pool).
  * Each tier header column is followed by a pokemon name column at header_col + 1.
  */
-function parseTieredCSV(lines: string[], tierColumns: { col: number; name: string; cost: number }[], bannedCol: number | null): ParsedCSVResult {
+function parseTieredCSV(rows: string[][], tierColumns: { col: number; name: string; cost: number }[], bannedCol: number | null): ParsedCSVResult {
   const pricing: PokemonPricing = {}
   const banned: string[] = []
   const costs: number[] = []
@@ -107,11 +152,8 @@ function parseTieredCSV(lines: string[], tierColumns: { col: number; name: strin
   }
 
   // Process data rows (skip header)
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]
-    if (!line.trim()) continue
-
-    const parts = line.split(',')
+  for (let i = 1; i < rows.length; i++) {
+    const parts = rows[i]
 
     // Extract pokemon from each tier column
     for (const tier of tierColumns) {
@@ -123,7 +165,7 @@ function parseTieredCSV(lines: string[], tierColumns: { col: number; name: strin
       if (!pokemonName) continue
 
       // Skip checkmarks or other non-name values
-      if (pokemonName === '✓' || pokemonName === '✗' || pokemonName === 'x') continue
+      if (isMarker(pokemonName)) continue
 
       const normalizedName = normalizePokemonName(pokemonName)
 
@@ -142,7 +184,7 @@ function parseTieredCSV(lines: string[], tierColumns: { col: number; name: strin
       const bannedNameCol = bannedCol + 1
       if (bannedNameCol < parts.length) {
         const pokemonName = parts[bannedNameCol]?.trim()
-        if (pokemonName && pokemonName !== '✓' && pokemonName !== '✗') {
+        if (pokemonName && !isMarker(pokemonName)) {
           banned.push(pokemonName)
         }
       }
@@ -189,76 +231,71 @@ function parseTieredCSV(lines: string[], tierColumns: { col: number; name: strin
  */
 export function parseCustomPricingCSV(csvContent: string): ParsedCSVResult {
   try {
-    const lines = csvContent.trim().split('\n')
+    const rows = parseCSVRows(csvContent)
+    if (rows.length === 0) return { success: false, error: 'CSV file is empty' }
 
-    if (lines.length === 0) {
-      return {
-        success: false,
-        error: 'CSV file is empty'
-      }
-    }
-
-    // Parse header (preserve original case for tier detection)
-    const headerRaw = lines[0].trim()
-    const headerParts = headerRaw.split(',').map(h => h.trim())
+    const headerParts = rows[0].map(header => header.trim())
 
     // Check if this is a tiered column format (e.g. "S Tier (60), A Tier (50), ...")
     const tieredFormat = detectTieredFormat(headerParts)
     if (tieredFormat) {
       log.info('Detected tiered column CSV format')
-      return parseTieredCSV(lines, tieredFormat.tierColumns, tieredFormat.bannedCol)
+      return parseTieredCSV(rows, tieredFormat.tierColumns, tieredFormat.bannedCol)
     }
 
-    // Otherwise, parse as simple pokemon,cost format
     const headerLower = headerParts.map(h => h.toLowerCase())
-
-    // Validate header format
     const pokemonColIndex = headerLower.findIndex(h =>
       h === 'pokemon' || h === 'name' || h === 'pokemon_name'
     )
     const costColIndex = headerLower.findIndex(h =>
-      h === 'cost' || h === 'points' || h === 'price' || h === 'value'
+      h === 'cost' || h === 'points' || h === 'price' || h === 'value' ||
+      h === 'tier points' || h === 'tier_points'
+    )
+    const tierColIndex = headerLower.findIndex(h =>
+      h === 'tier' || h === 'tier name' || h === 'tier_name' || h === 'rank' || h === 'grade'
     )
 
-    if (pokemonColIndex === -1 || costColIndex === -1) {
+    if (pokemonColIndex === -1 || (costColIndex === -1 && tierColIndex === -1)) {
       return {
         success: false,
-        error: 'Invalid CSV header. Expected either:\n• Simple format: "pokemon,cost" columns\n• Tiered format: "S Tier (60), A Tier (50), ..." column headers'
+        error: 'Invalid CSV header. Expected "pokemon,cost", "pokemon,tier", or columns such as "S Tier (60)".'
       }
     }
 
-    // Parse data rows
     const pricing: PokemonPricing = {}
     const errors: string[] = []
     const costs: number[] = []
+    const tierCounts: Record<string, number> = {}
+    const tierCosts: Record<string, number> = {}
+    const defaultTierCosts: Record<string, number> = {
+      'S+': 70, S: 60, A: 50, B: 40, C: 30, D: 20, E: 10, F: 0,
+    }
+    const unknownTiers: string[] = []
 
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim()
-
-      // Skip empty lines
-      if (!line) continue
-
-      const parts = line.split(',').map(p => p.trim())
-
-      if (parts.length < 2) {
-        errors.push(`Line ${i + 1}: Invalid format - expected at least 2 columns`)
-        continue
-      }
+    for (let i = 1; i < rows.length; i++) {
+      const parts = rows[i]
 
       const pokemonName = parts[pokemonColIndex]
-      const costStr = parts[costColIndex]
-
-      // Validate pokemon name
-      if (!pokemonName || pokemonName.length === 0) {
+      if (!pokemonName) {
         errors.push(`Line ${i + 1}: Missing Pokemon name`)
         continue
       }
 
-      // Validate and parse cost
-      const cost = parseInt(costStr)
-      if (isNaN(cost)) {
-        errors.push(`Line ${i + 1}: Invalid cost value "${costStr}" for ${pokemonName}`)
-        continue
+      const costValue = costColIndex >= 0 ? (parts[costColIndex] || '') : ''
+      let tierName = tierColIndex >= 0 ? normalizeTierName(parts[tierColIndex] || '') : ''
+      let cost = Number.parseInt(costValue, 10)
+
+      // A two-column "Pokemon,Tier Points" sheet may contain S/A/B labels.
+      if (Number.isNaN(cost)) {
+        tierName = tierName || normalizeTierName(costValue)
+        if (!tierName) {
+          errors.push(`Line ${i + 1}: Add a numeric cost or tier for ${pokemonName}`)
+          continue
+        }
+        if (!(tierName in defaultTierCosts) && !unknownTiers.includes(tierName)) {
+          unknownTiers.push(tierName)
+        }
+        cost = defaultTierCosts[tierName] ?? Math.max(0, 90 - unknownTiers.indexOf(tierName) * 10)
       }
 
       if (cost < 0) {
@@ -266,15 +303,12 @@ export function parseCustomPricingCSV(csvContent: string): ParsedCSVResult {
         continue
       }
 
-      if (cost > 1000) {
+      if (cost > 5000) {
         errors.push(`Line ${i + 1}: Cost seems too high (${cost}) for ${pokemonName}`)
         continue
       }
 
-      // Normalize and store
       const normalizedName = normalizePokemonName(pokemonName)
-
-      // Check for duplicates
       if (pricing[normalizedName] !== undefined) {
         errors.push(`Line ${i + 1}: Duplicate Pokemon "${pokemonName}" (already defined with cost ${pricing[normalizedName]})`)
         continue
@@ -282,9 +316,12 @@ export function parseCustomPricingCSV(csvContent: string): ParsedCSVResult {
 
       pricing[normalizedName] = cost
       costs.push(cost)
+      if (tierName) {
+        tierCounts[tierName] = (tierCounts[tierName] || 0) + 1
+        tierCosts[tierName] = Math.max(tierCosts[tierName] ?? cost, cost)
+      }
     }
 
-    // Check if we have any valid data
     if (Object.keys(pricing).length === 0) {
       return {
         success: false,
@@ -292,7 +329,6 @@ export function parseCustomPricingCSV(csvContent: string): ParsedCSVResult {
       }
     }
 
-    // Calculate statistics
     const stats = {
       totalPokemon: Object.keys(pricing).length,
       minCost: Math.min(...costs),
@@ -300,18 +336,21 @@ export function parseCustomPricingCSV(csvContent: string): ParsedCSVResult {
       avgCost: Math.round(costs.reduce((a, b) => a + b, 0) / costs.length)
     }
 
-    // Warn about errors but still return data if we have some
     if (errors.length > 0) {
       log.warn('CSV parsing completed with warnings:', errors)
     }
 
+    const tiers = Object.keys(tierCounts)
+      .map(name => ({ name: `${name} Tier`, cost: tierCosts[name], count: tierCounts[name] }))
+      .sort((a, b) => b.cost - a.cost)
+
     return {
       success: true,
       data: pricing,
+      tiers: tiers.length > 0 ? tiers : undefined,
       stats,
       error: errors.length > 0 ? `Parsed successfully with ${errors.length} warnings` : undefined
     }
-
   } catch (error) {
     return {
       success: false,

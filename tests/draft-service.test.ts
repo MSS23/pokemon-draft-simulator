@@ -304,7 +304,7 @@ describe('DraftService', () => {
             budgetPerTeam: 100,
           },
         })
-      ).rejects.toThrow('Points and tiered drafts require at least 6 Pokémon')
+      ).rejects.toThrow('Points drafts require at least 6 Pokémon')
     })
 
     it('should handle database errors gracefully', async () => {

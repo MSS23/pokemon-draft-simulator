@@ -72,10 +72,10 @@ export async function validateUserCanNominate(
   }
 
   // Implement turn-based nomination logic for auction drafts
-  const { teams, picks } = draftState
+  const { teams } = draftState
 
-  // Calculate whose turn it is to nominate
-  const totalPicks = picks.length
+  // Calculate whose turn it is to nominate from the authoritative auction turn.
+  // This advances even when an auction ends without a winning bidder.
   const totalTeams = teams.length
 
   if (totalTeams === 0) {
@@ -84,7 +84,7 @@ export async function validateUserCanNominate(
 
   // Determine current nominating team using round-robin
   // Each team nominates once per round in order
-  const currentNominatorIndex = totalPicks % totalTeams
+  const currentNominatorIndex = (Math.max(draftState.draft.current_turn ?? 1, 1) - 1) % totalTeams
   const sortedTeams = [...teams].sort((a, b) => a.draft_order - b.draft_order)
   const currentNominatingTeam = sortedTeams[currentNominatorIndex]
 
@@ -124,9 +124,6 @@ export async function nominatePokemon(
     throw new Error(validation.reason || 'Cannot nominate Pokemon')
   }
 
-  const teamId = validation.teamId!
-  const auctionEnd = new Date(Date.now() + auctionDurationSeconds * 1000)
-
   // Get draft state to validate Pokemon against format
   const draftState = await getDraftStateLazy(draftId)
   if (!draftState) {
@@ -144,23 +141,20 @@ export async function nominatePokemon(
     throw new Error(formatValidation.reason || 'Pokemon is not legal in this format')
   }
 
-  // Create auction
-  const { error } = await (supabase
-    .from('auctions'))
-    .insert({
-      draft_id: draftState.draft.id,
-      pokemon_id: pokemonId,
-      pokemon_name: pokemonName,
-      nominated_by: teamId,
-      current_bid: startingBid,
-      current_bidder: null,
-      auction_end: auctionEnd.toISOString(),
-      status: 'active'
-    })
+  const { data, error } = await supabase.rpc('nominate_auction', {
+    p_draft_id: draftState.draft.id,
+    p_pokemon_id: pokemonId,
+    p_pokemon_name: pokemonName,
+    p_starting_bid: startingBid,
+    p_duration_seconds: auctionDurationSeconds,
+  })
 
   if (error) {
-    log.error('Error creating auction:', error)
-    throw new Error('Failed to nominate Pokemon')
+    log.error('nominate_auction RPC failed:', error)
+    throw new Error(error.message || 'Failed to nominate Pokemon')
+  }
+  if (!data?.success) {
+    throw new Error(data?.error || 'Failed to nominate Pokemon')
   }
 }
 
@@ -175,100 +169,21 @@ export async function placeBid(
 ): Promise<void> {
   if (!supabase) throw new Error('Supabase not available')
 
-  const draftState = await getDraftStateLazy(draftId)
-  if (!draftState) {
-    throw new Error('Draft not found')
-  }
-  const internalId = draftState.draft.id
-
-  // Get user's team first (doesn't change during auction)
+  // Resolve the caller's team, then let the row-locking RPC perform every
+  // mutable validation (expiry, current bid, budget and roster capacity).
   const userTeamId = await getUserTeamLazy(draftId, userId)
   if (!userTeamId) {
     throw new Error('You are not part of this draft')
   }
 
-  // Validate budget
-  const { data: team, error: teamError } = await supabase
-    .from('teams')
-    .select('budget_remaining')
-    .eq('id', userTeamId)
-    .single()
-
-  if (teamError || !team) {
-    throw new Error('Team not found')
-  }
-
-  if (bidAmount > team.budget_remaining) {
-    throw new Error(`Bid exceeds your remaining budget of $${team.budget_remaining}`)
-  }
-
-  // Retry loop with optimistic locking to handle concurrent bids from 20+ players
-  const MAX_RETRIES = 3
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    // Read current auction state
-    const { data: auction, error: auctionError } = await supabase
-      .from('auctions')
-      .select('*')
-      .eq('id', auctionId)
-      .eq('draft_id', internalId)
-      .single()
-
-    if (auctionError || !auction) {
-      throw new Error('Auction not found')
-    }
-
-    if (auction.status !== 'active') {
-      throw new Error('Auction is not active')
-    }
-
-    if (new Date() > new Date(auction.auction_end)) {
-      throw new Error('Auction has expired')
-    }
-
-    if (bidAmount <= auction.current_bid) {
-      throw new Error(`Bid must be higher than current bid of $${auction.current_bid}`)
-    }
-
-    // Optimistic lock: only update if current_bid hasn't changed since we read it.
-    // This prevents a lower bid from overwriting a higher concurrent bid.
-    const { data: updated, error: updateError } = await supabase
-      .from('auctions')
-      .update({
-        current_bid: bidAmount,
-        current_bidder: userTeamId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', auctionId)
-      .eq('current_bid', auction.current_bid) // optimistic lock
-      .select()
-
-    if (updateError) {
-      log.error('Error placing bid:', updateError)
-      throw new Error('Failed to place bid')
-    }
-
-    // If no rows updated, another bid landed between our read and write
-    if (!updated || updated.length === 0) {
-      if (attempt < MAX_RETRIES - 1) {
-        log.info(`Bid conflict on attempt ${attempt + 1}, retrying...`)
-        continue // Re-read auction and re-validate
-      }
-
-      // On final retry failure, re-read to give the user accurate info
-      const { data: latest } = await supabase
-        .from('auctions')
-        .select('current_bid')
-        .eq('id', auctionId)
-        .single()
-
-      if (latest && bidAmount <= latest.current_bid) {
-        throw new Error(`Someone else bid higher! Current bid is now $${latest.current_bid}`)
-      }
-      throw new Error('Bid failed due to high traffic. Please try again.')
-    }
-
-    // Bid succeeded
-    return
+  const { error } = await supabase.rpc('place_bid', {
+    auction_id: auctionId,
+    bidder_team_id: userTeamId,
+    bid_amount: bidAmount,
+  })
+  if (error) {
+    log.error('place_bid RPC failed:', error)
+    throw new Error(error.message || 'Failed to place bid')
   }
 }
 

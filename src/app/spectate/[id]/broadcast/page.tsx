@@ -100,6 +100,7 @@ function PokemonSprite({
   }
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- animated Showdown sprites are intentionally unoptimized
     <img
       src={imgUrl}
       alt={pokemonName ?? `Pokemon #${pokemonId}`}

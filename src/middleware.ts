@@ -9,20 +9,26 @@ import { handleCorsPreflightIfNeeded } from '@/lib/cors'
 // ============================================================================
 
 function generateNonce(): string {
-  // crypto.randomUUID() is available in Next.js Edge runtime
-  return Buffer.from(crypto.randomUUID()).toString('base64')
+  // Both APIs are available in the Next.js Edge runtime.
+  return btoa(crypto.randomUUID())
 }
 
 function buildCSP(nonce: string): string {
-  // Derive Clerk FAPI URL from environment — never hardcode.
-  // Format: https://<clerk-publishable-key-slug>.clerk.accounts.dev
+  // Clerk publishable keys contain a base64-encoded FAPI hostname. Decoding it
+  // keeps sign-in working even when a custom-domain env var was omitted.
   const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || ''
-  const clerkSlug = clerkPublishableKey.startsWith('pk_')
-    ? clerkPublishableKey.split('_')[2]?.split('.')[0]
-    : ''
-  const clerkFapiUrl = clerkSlug
-    ? `https://${clerkSlug}.clerk.accounts.dev`
-    : 'https://*.clerk.accounts.dev'
+  let clerkFapiUrl = 'https://*.clerk.accounts.dev'
+  const encodedFapi = clerkPublishableKey.replace(/^pk_(test|live)_/, '')
+  if (encodedFapi && encodedFapi !== clerkPublishableKey) {
+    try {
+      const base64 = encodedFapi
+        .replace(/-/g, '+')
+        .replace(/_/g, '/')
+        .padEnd(Math.ceil(encodedFapi.length / 4) * 4, '=')
+      const hostname = atob(base64).replace(/\$$/, '')
+      if (/^[a-z0-9.-]+$/i.test(hostname)) clerkFapiUrl = `https://${hostname}`
+    } catch { /* wildcard fallback remains valid */ }
+  }
 
   // Custom Clerk domain if configured (e.g. clerk.draftpokemon.com)
   const clerkDomain = process.env.NEXT_PUBLIC_CLERK_DOMAIN
@@ -32,7 +38,8 @@ function buildCSP(nonce: string): string {
   const scriptSrc = [
     "'self'",
     `'nonce-${nonce}'`,
-    // NOTE: unsafe-eval REMOVED — framer-motion verified to not use eval()
+    // Next's hot-reload runtime requires eval locally; production never does.
+    process.env.NODE_ENV === 'development' ? "'unsafe-eval'" : '',
     // Clerk requires its own domain for FAPI calls and challenges
     clerkFapiUrl,
     clerkDomain,
@@ -64,7 +71,7 @@ function buildCSP(nonce: string): string {
       clerkDomain,
       "https://clerk.draftpokemon.com https://api.clerk.com",
     ].filter(Boolean).join(' '),
-    "frame-src 'self' https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+    ["frame-src 'self' https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://challenges.cloudflare.com", clerkDomain].filter(Boolean).join(' '),
     "frame-ancestors 'none'",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
@@ -122,6 +129,7 @@ try {
     })
     upstashLimiters = {
       drafts: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:drafts' }),
+      joins: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, '1 m'), prefix: 'rl:joins' }),
       tournaments: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:tournaments' }),
       passwordVerify: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:pw-verify' }),
       picks: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:picks' }),
@@ -148,6 +156,7 @@ const RATE_LIMITS: Record<string, { limit: number; window: number; key?: keyof N
   // Auth-sensitive: brute-force surface for short user-chosen draft passwords
   '/api/draft/verify-password': { limit: 5, window: 60000, key: 'passwordVerify' },
   '/api/draft/create': { limit: 10, window: 3600000, key: 'drafts' },
+  '/api/draft/join': { limit: 30, window: 60000, key: 'joins' },
   '/api/tournament/create': { limit: 10, window: 3600000, key: 'tournaments' },
   '/api/user/export': { limit: 5, window: 3600000, key: 'export' },
   '/api/user': { limit: 5, window: 60000, key: 'user' },   // 5/min — tight: delete is destructive

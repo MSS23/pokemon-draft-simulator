@@ -12,7 +12,7 @@
  *  - draft-history-service.ts   — History & results (getDraftHistory, getPublicDrafts)
  */
 import { supabase } from './supabase'
-import { DEFAULT_FORMAT } from '@/lib/formats'
+import { DEFAULT_FORMAT, getFormatById } from '@/lib/formats'
 import { UserSessionService, type DraftParticipation } from '@/lib/user-session'
 import { generateRoomCode } from '@/lib/room-utils'
 import type {
@@ -26,6 +26,7 @@ import type {
 import bcrypt from 'bcryptjs'
 import { createLogger } from '@/lib/logger'
 import { analytics } from '@/lib/analytics'
+import { validateTierConfig } from '@/lib/tier-utils'
 
 // ─── Re-export standalone functions from sub-modules ───────────────────────
 // These allow direct imports (e.g. `import { makePick } from '@/lib/draft-service'`)
@@ -190,6 +191,7 @@ export interface DraftSettings {
   pokemonPerTeam: number
   budgetPerTeam?: number
   formatId?: string
+  allowedPokemonIds?: string[]
   // Scoring system (derived from draftType, kept for backwards compat)
   scoringSystem?: 'budget' | 'tiered'
   tierConfig?: { tiers: import('@/types').TierDefinition[] }
@@ -226,11 +228,15 @@ export interface JoinDraftParams {
   roomCode: string
   userId: string
   teamName: string
+  displayName?: string
+  password?: string
 }
 
 export interface JoinSpectatorParams {
   roomCode: string
   userId: string
+  displayName?: string
+  password?: string
 }
 
 export interface DraftState {
@@ -349,32 +355,19 @@ export class DraftService {
    * Get server-authoritative time with draft timing information
    * This prevents client-side timer drift
    */
-  static async getServerTime(roomCodeOrDraftId: string): Promise<ServerTime> {
+  static async getServerTime(_roomCodeOrDraftId?: string): Promise<ServerTime> {
     try {
-      // Detect if input is a UUID
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(roomCodeOrDraftId)
-
-      const { data: draft } = await supabase
-        .from('drafts')
-        .select('settings, updated_at')
-        .eq(isUuid ? 'id' : 'room_code', isUuid ? roomCodeOrDraftId : roomCodeOrDraftId.toLowerCase())
-        .single()
-
-      if (!draft) {
-        return {
-          serverTime: Date.now(),
-          pickEndsAt: null,
-          auctionEndsAt: null,
-          turnStartedAt: null
-        }
-      }
-
-      // Use database updated_at as server time reference
-      const serverTime = new Date(draft.updated_at).getTime()
+      // drafts.updated_at is mutation time, not current server time. Sync with
+      // a dedicated no-store endpoint so device-clock drift cannot distort the
+      // visible countdown.
+      const response = await fetch('/api/time', { cache: 'no-store' })
+      if (!response.ok) throw new Error(`Clock sync failed (${response.status})`)
+      const payload = await response.json() as { serverTime?: number }
+      if (!Number.isFinite(payload.serverTime)) throw new Error('Clock sync returned invalid time')
 
       return {
-        serverTime,
-        pickEndsAt: null, // Will be calculated on client with server offset
+        serverTime: payload.serverTime as number,
+        pickEndsAt: null,
         auctionEndsAt: null,
         turnStartedAt: null
       }
@@ -405,9 +398,15 @@ export class DraftService {
       throw new Error('You must be logged in to create a draft. Please sign in or create an account.')
     }
 
-    // Validate minimum Pokemon count for snake-based drafts
-    if ((settings.draftType === 'points' || settings.draftType === 'tiered') && settings.pokemonPerTeam < 6) {
-      throw new Error('Points and tiered drafts require at least 6 Pok\u00e9mon per team')
+    const tierValidation = settings.draftType === 'tiered'
+      ? validateTierConfig(settings.tierConfig?.tiers || [])
+      : null
+    if (tierValidation && !tierValidation.valid) {
+      throw new Error(tierValidation.errors[0])
+    }
+    const pokemonPerTeam = tierValidation?.rosterSize ?? settings.pokemonPerTeam
+    if (settings.draftType === 'points' && pokemonPerTeam < 6) {
+      throw new Error('Points drafts require at least 6 Pok\u00e9mon per team')
     }
 
     const roomCode = this.generateRoomCode()
@@ -442,6 +441,8 @@ export class DraftService {
     const dbFormat: 'snake' | 'auction' = settings.draftType === 'auction' ? 'auction' : 'snake'
     const scoringSystem: 'budget' | 'tiered' = settings.draftType === 'tiered' ? 'tiered' : 'budget'
     const isTiered = scoringSystem === 'tiered'
+    const formatId = settings.formatId || DEFAULT_FORMAT
+    const allowedPokemonIds = settings.allowedPokemonIds || getFormatById(formatId)?.ruleset.allowedPokemon
 
     // Create draft - build insert object conditionally based on table columns
     const draftInsert: DraftInsert = {
@@ -456,9 +457,10 @@ export class DraftService {
       current_round: 1,
       settings: {
         timeLimit: settings.timeLimit,
-        pokemonPerTeam: settings.pokemonPerTeam,
-        maxPokemonPerTeam: settings.pokemonPerTeam, // Required for pick validation
-        formatId: settings.formatId || DEFAULT_FORMAT,
+        pokemonPerTeam,
+        maxPokemonPerTeam: pokemonPerTeam, // Required for pick validation
+        formatId,
+        allowedPokemonIds,
         // Store both the user-facing draftType and derived scoringSystem
         draftType: settings.draftType,
         scoringSystem,
@@ -570,8 +572,35 @@ export class DraftService {
     return { roomCode, draftId: roomCode.toLowerCase() }
   }
 
-  static async joinDraft({ roomCode, userId, teamName }: JoinDraftParams): Promise<{ draftId: string; teamId: string; asSpectator?: boolean }> {
+  static async joinDraft({ roomCode, userId, teamName, displayName: suppliedDisplayName, password }: JoinDraftParams): Promise<{ draftId: string; teamId: string; asSpectator?: boolean }> {
     const draftId = roomCode.toLowerCase()
+
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
+      const response = await fetch('/api/draft/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomCode, teamName, displayName: suppliedDisplayName, password, asSpectator: false }),
+      })
+      const result = await response.json().catch(() => ({})) as {
+        error?: string
+        draftId?: string
+        teamId?: string
+        displayName?: string
+        asSpectator?: boolean
+      }
+      if (!response.ok) throw new Error(result.error || 'Failed to join draft')
+
+      UserSessionService.recordDraftParticipation({
+        draftId,
+        userId,
+        teamId: result.teamId || null,
+        teamName: result.asSpectator ? null : teamName,
+        displayName: result.displayName || suppliedDisplayName || 'Player',
+        isHost: false,
+        status: result.asSpectator ? 'spectator' : 'active',
+      })
+      return { draftId, teamId: result.teamId || '', asSpectator: result.asSpectator }
+    }
 
     // Check if draft exists and is joinable
     if (!supabase) throw new Error('Supabase not available')
@@ -747,8 +776,28 @@ export class DraftService {
     return { draftId, teamId: team.id }
   }
 
-  static async joinAsSpectator({ roomCode, userId }: JoinSpectatorParams): Promise<{ draftId: string }> {
+  static async joinAsSpectator({ roomCode, userId, displayName: suppliedDisplayName, password }: JoinSpectatorParams): Promise<{ draftId: string }> {
     const draftId = roomCode.toLowerCase()
+
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
+      const response = await fetch('/api/draft/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomCode, displayName: suppliedDisplayName, password, asSpectator: true }),
+      })
+      const result = await response.json().catch(() => ({})) as { error?: string; displayName?: string }
+      if (!response.ok) throw new Error(result.error || 'Failed to join draft')
+      UserSessionService.recordDraftParticipation({
+        draftId,
+        userId,
+        teamId: null,
+        teamName: null,
+        displayName: result.displayName || suppliedDisplayName || 'Spectator',
+        isHost: false,
+        status: 'spectator',
+      })
+      return { draftId }
+    }
 
     // Check if draft exists
     if (!supabase) throw new Error('Supabase not available')

@@ -36,11 +36,26 @@ export async function GET(request: NextRequest) {
 
   try {
     const db = createServiceRoleClient()
+    const { count: totalActive, error: countError } = await db
+      .from('drafts')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active')
+
+    if (countError) {
+      log.error('Failed to count active drafts', { error: countError.message })
+      return NextResponse.json({ error: 'Query failed' }, { status: 500 })
+    }
+
+    const total = totalActive ?? 0
+    const pageCount = Math.max(1, Math.ceil(total / MAX_DRAFTS_PER_RUN))
+    const page = Math.floor(Date.now() / 60_000) % pageCount
+    const rangeStart = page * MAX_DRAFTS_PER_RUN
     const { data: activeDrafts, error } = await db
       .from('drafts')
       .select('id')
       .eq('status', 'active')
-      .limit(MAX_DRAFTS_PER_RUN)
+      .order('id', { ascending: true })
+      .range(rangeStart, rangeStart + MAX_DRAFTS_PER_RUN - 1)
 
     if (error) {
       log.error('Failed to list active drafts', { error: error.message })
@@ -56,12 +71,12 @@ export async function GET(request: NextRequest) {
       (r) => r.status === 'fulfilled' && r.value.action !== 'none' && r.value.action !== 'not_expired' && r.value.action !== 'not_active'
     ).length
 
-    if (drafts.length >= MAX_DRAFTS_PER_RUN) {
-      log.info(`Cron hit the ${MAX_DRAFTS_PER_RUN}-draft cap — some active drafts were not swept this run`)
+    if (pageCount > 1) {
+      log.info(`Cron swept active-draft page ${page + 1}/${pageCount}`)
     }
 
     return NextResponse.json(
-      { scanned: drafts.length, advanced, capped: drafts.length >= MAX_DRAFTS_PER_RUN },
+      { scanned: drafts.length, advanced, totalActive: total, page: page + 1, pageCount },
       { status: 200, headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (err) {

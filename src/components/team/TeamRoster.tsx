@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, getTypeColor } from '@/utils/pokemon'
 import { PokeballIcon } from '@/components/ui/pokeball-icon'
 import { getTeamColor } from '@/utils/team-colors'
-import { getPokemonTier } from '@/lib/tier-utils'
+import { getPokemonTier, getTierUsage } from '@/lib/tier-utils'
 import RosterCardStack from './RosterCardStack'
 
 interface TeamRosterProps {
@@ -22,6 +22,7 @@ interface TeamRosterProps {
     picks: string[]
     budgetRemaining?: number
     pickCosts?: number[]
+    pickTiers?: Array<string | null>
   }
   isCurrentTeam?: boolean
   isUserTeam?: boolean
@@ -44,6 +45,7 @@ const TeamRoster = memo(function TeamRoster({
   const teamColor = getTeamColor(team.draftOrder - 1)
   const isTiered = scoringSystem === 'tiered' && tierConfig?.tiers?.length
   const [viewMode, setViewMode] = useState<'grid' | 'cards'>('grid')
+  const tierUsage = useMemo(() => getTierUsage(team.pickTiers || []), [team.pickTiers])
 
   const teamPokemon = useMemo(() => {
     if (!allPokemon || !team.picks.length) return []
@@ -86,7 +88,7 @@ const TeamRoster = memo(function TeamRoster({
                 {viewMode === 'grid' ? <Layers className="h-3.5 w-3.5" /> : <Grid2x2 className="h-3.5 w-3.5" />}
               </button>
             )}
-            {team.budgetRemaining !== undefined && (
+            {team.budgetRemaining !== undefined && !isTiered && (
               <Badge variant="outline" className="text-[10px] font-mono h-5 px-1.5">
                 {team.budgetRemaining}pts
               </Badge>
@@ -111,14 +113,38 @@ const TeamRoster = memo(function TeamRoster({
           />
         </div>
 
+        {isTiered && tierConfig && (
+          <div className="mb-3 flex flex-wrap gap-1.5" aria-label="Tier roster limits">
+            {tierConfig.tiers.filter(tier => tier.slotsPerTeam > 0).map(tier => {
+              const used = tierUsage[tier.name.toUpperCase()] || 0
+              const isFull = used >= tier.slotsPerTeam
+              return (
+                <span
+                  key={tier.name}
+                  className={cn(
+                    'inline-flex min-h-6 items-center rounded-full border px-2 text-[10px] font-semibold',
+                    isFull ? 'bg-muted text-muted-foreground' : 'bg-background text-foreground',
+                  )}
+                  style={{ borderColor: `${tier.color}80` }}
+                >
+                  {tier.name} {used}/{tier.slotsPerTeam}
+                </span>
+              )
+            })}
+          </div>
+        )}
+
         {/* Card stack view */}
         {viewMode === 'cards' && isUserTeam && teamPokemon.length >= 2 ? (
           <RosterCardStack pokemon={teamPokemon} />
         ) : (
           /* Grid view (default) */
           <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${maxPokemonPerTeam > 8 ? '56px' : '68px'}, 1fr))` }}>
-            {teamPokemon.map((pokemon) => {
-              const tier = isTiered && tierConfig ? getPokemonTier(pokemon.cost, tierConfig.tiers) : null
+            {teamPokemon.map((pokemon, index) => {
+              const persistedTierName = team.pickTiers?.[index]
+              const tier = isTiered && tierConfig
+                ? tierConfig.tiers.find(item => item.name.toUpperCase() === persistedTierName?.toUpperCase()) || getPokemonTier(pokemon.cost, tierConfig.tiers)
+                : null
               const primaryColor = getTypeColor(pokemon.types[0]?.name || 'normal')
               const secondaryColor = pokemon.types[1] ? getTypeColor(pokemon.types[1].name) : primaryColor
               return (
@@ -200,6 +226,7 @@ const TeamRoster = memo(function TeamRoster({
     prevProps.team.picks.length === nextProps.team.picks.length &&
     prevProps.team.picks.join(',') === nextProps.team.picks.join(',') &&
     prevProps.team.budgetRemaining === nextProps.team.budgetRemaining &&
+    prevProps.team.pickTiers?.join(',') === nextProps.team.pickTiers?.join(',') &&
     prevProps.isCurrentTeam === nextProps.isCurrentTeam &&
     prevProps.isUserTeam === nextProps.isUserTeam
   )

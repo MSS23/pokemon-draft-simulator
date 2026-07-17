@@ -201,15 +201,20 @@ function compileFormat(formatPack: FormatPack, pokemonIndex: PokemonIndex): Comp
 
   // Determine legality for each Pokemon
   for (const [pokemonId, data] of Object.entries(pokemonIndex)) {
-    let isLegal = true
+    const isExplicitlyAllowed = formatPack.explicitAllows.some((allowed) =>
+      allowed === pokemonId || allowed === data.name || allowed === String(data.nationalDex)
+    )
+    let isLegal = formatPack.allowStrategy === 'banlist' || isExplicitlyAllowed
 
     // Check if in explicit ban list
-    if (formatPack.explicitBans.includes(pokemonId) || formatPack.explicitBans.includes(data.name)) {
+    if (formatPack.explicitBans.some((banned) =>
+      banned === pokemonId || banned === data.name || banned === String(data.nationalDex)
+    )) {
       isLegal = false
     }
 
     // Check category bans (unless explicitly allowed)
-    if (isLegal && !formatPack.explicitAllows.includes(pokemonId)) {
+    if (isLegal && !isExplicitlyAllowed) {
       const flags = data.flags
 
       if (formatPack.bannedCategories.legendary && flags.isLegendary) isLegal = false
@@ -238,7 +243,7 @@ function compileFormat(formatPack: FormatPack, pokemonIndex: PokemonIndex): Comp
     }
 
     // Explicit allows override everything
-    if (formatPack.explicitAllows.includes(pokemonId)) {
+    if (isExplicitlyAllowed) {
       isLegal = true
     }
 
@@ -302,6 +307,49 @@ function compileFormat(formatPack: FormatPack, pokemonIndex: PokemonIndex): Comp
 }
 
 /**
+ * Reuse the checked-in catalogue and repair only missing National Dex entries.
+ * This keeps normal builds fast while still guaranteeing a complete 1-1025
+ * index after a transient PokeAPI failure.
+ */
+async function loadOrBuildPokemonIndex(minId: number, maxId: number): Promise<PokemonIndex> {
+  const manifestPath = path.join(OUTPUT_DIR, 'format-manifest.json')
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as { pokemonIndexHash?: string }
+      const cachedPath = manifest.pokemonIndexHash
+        ? path.join(OUTPUT_DIR, `pokemon_index_${manifest.pokemonIndexHash}.json`)
+        : ''
+
+      if (cachedPath && fs.existsSync(cachedPath)) {
+        const cached = JSON.parse(fs.readFileSync(cachedPath, 'utf-8')) as PokemonIndex
+        const presentDexNumbers = new Set(Object.values(cached).map((pokemon) => pokemon.nationalDex))
+        const missing = Array.from(
+          { length: maxId - minId + 1 },
+          (_, index) => minId + index,
+        ).filter((id) => !presentDexNumbers.has(id))
+
+        if (missing.length === 0) {
+          console.log(`Using complete cached Pokemon index (${Object.keys(cached).length} entries)`)
+          return cached
+        }
+
+        if (missing.length <= 50) {
+          console.log(`Repairing ${missing.length} missing Pokemon index entr${missing.length === 1 ? 'y' : 'ies'}: ${missing.join(', ')}`)
+          for (const id of missing) {
+            Object.assign(cached, await buildPokemonIndex(id, id))
+          }
+          return cached
+        }
+      }
+    } catch (error) {
+      console.warn('Cached Pokemon index could not be reused:', error)
+    }
+  }
+
+  return buildPokemonIndex(minId, maxId)
+}
+
+/**
  * Main build function
  */
 async function main() {
@@ -309,8 +357,8 @@ async function main() {
 
   try {
     // Step 1: Build Pokemon index
-    console.log('Step 1: Building Pokemon index from PokeAPI...')
-    const pokemonIndex = await buildPokemonIndex(1, 1025)
+    console.log('Step 1: Loading or repairing the Pokemon index...')
+    const pokemonIndex = await loadOrBuildPokemonIndex(1, 1025)
 
     // Save Pokemon index
     const indexHash = crypto.createHash('md5')

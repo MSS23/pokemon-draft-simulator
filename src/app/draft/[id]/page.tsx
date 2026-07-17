@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Copy, Share2, History, Crown, Clock, CheckCircle2, Eye, Heart } from 'lucide-react'
+import { Copy, Share2, History, Crown, Clock, CheckCircle2, Eye } from 'lucide-react'
 import { DraftService, type DraftState as DBDraftState } from '@/lib/draft-service'
 import { UserSessionService } from '@/lib/user-session'
 import { notify } from '@/lib/notifications'
@@ -37,12 +37,12 @@ import { PickRevealOverlay } from '@/components/draft/PickRevealOverlay'
 import { DraftBoard } from '@/components/draft/DraftBoard'
 import { DraftConnectionStatusBadge } from '@/components/draft/ConnectionStatus'
 import { getMaxAffordableCost } from '@/utils/budget-feasibility'
+import { getTierUsage } from '@/lib/tier-utils'
 import { useDraftSession } from '@/hooks/useDraftSession'
 import { useDraftActions } from '@/hooks/useDraftActions'
 import { useDraftAuction } from '@/hooks/useDraftAuction'
 import { useDraftTimers } from '@/hooks/useDraftTimers'
 import { useDraftActivity } from '@/hooks/useDraftActivity'
-import { useIsMobile } from '@/hooks/useMediaQuery'
 
 // Critical components - load immediately
 import PokemonGrid from '@/components/pokemon/PokemonGrid'
@@ -101,8 +101,6 @@ const AuctionNotifications = dynamic(() => import('@/components/draft/AuctionNot
 
 const WishlistManager = dynamic(() => import('@/components/draft/WishlistManager'), { ssr: false })
 
-const MobileWishlistSheet = dynamic(() => import('@/components/draft/MobileWishlistSheet'), { ssr: false })
-
 const DraftOrderReveal = dynamic(() => import('@/components/draft/DraftOrderReveal'), { ssr: false })
 
 const ConfettiCelebration = dynamic(() => import('@/components/draft/ConfettiCelebration'), { ssr: false })
@@ -121,6 +119,7 @@ interface DraftUIState {
     picks: string[]
     budgetRemaining: number
     pickCosts: number[]
+    pickTiers: Array<string | null>
   }>
   participants: Array<{
     userId: string | null
@@ -166,8 +165,6 @@ export default function DraftRoomPage() {
 
   // Mobile tab state
   const [activeTab, setActiveTab] = useState<MobileTab>('pokemon')
-  const isMobile = useIsMobile()
-  const [isMobileWishlistOpen, setIsMobileWishlistOpen] = useState(false)
 
   // Real draft state from Supabase
   const [draftState, setDraftState] = useState<DraftUIState | null>(null)
@@ -266,6 +263,11 @@ export default function DraftRoomPage() {
     return { maxAffordableCost: maxAffordable, remainingSlots }
   }, [userTeam, availablePokemon, draftState?.draftSettings])
 
+  const userTierUsage = useMemo(
+    () => getTierUsage(userTeam?.pickTiers || []),
+    [userTeam?.pickTiers],
+  )
+
   // --- Transform DB state to UI state ---
   const prevTransformedStateRef = useRef<{ dbStateHash: string, uiState: DraftUIState } | null>(null)
 
@@ -296,7 +298,11 @@ export default function DraftRoomPage() {
         pickCosts: dbState.picks
           .filter(pick => pick.team_id === team.id)
           .sort((a, b) => a.pick_order - b.pick_order)
-          .map(pick => pick.cost)
+          .map(pick => pick.cost),
+        pickTiers: dbState.picks
+          .filter(pick => pick.team_id === team.id)
+          .sort((a, b) => a.pick_order - b.pick_order)
+          .map(pick => pick.tier_name),
       }
     }).sort((a, b) => a.draftOrder - b.draftOrder)
 
@@ -996,7 +1002,7 @@ export default function DraftRoomPage() {
 
         {/* Mobile Tab Bar — only on small screens during active draft */}
         {draftState?.status === 'drafting' && (
-          <div className="flex md:hidden border-b border-border sticky top-[auto] z-20 bg-background mb-2">
+          <div className="sticky top-[7.5rem] z-20 mb-2 flex border-b border-border bg-background/95 backdrop-blur md:hidden" role="tablist" aria-label="Draft room views">
             <button
               className={cn(
                 'flex-1 py-3 text-sm font-medium transition-colors min-h-[44px]',
@@ -1005,6 +1011,8 @@ export default function DraftRoomPage() {
                   : 'text-muted-foreground'
               )}
               onClick={() => setActiveTab('pokemon')}
+              role="tab"
+              aria-selected={activeTab === 'pokemon'}
             >
               Pokemon
             </button>
@@ -1016,6 +1024,8 @@ export default function DraftRoomPage() {
                   : 'text-muted-foreground'
               )}
               onClick={() => setActiveTab('team')}
+              role="tab"
+              aria-selected={activeTab === 'team'}
             >
               My Team
             </button>
@@ -1027,6 +1037,8 @@ export default function DraftRoomPage() {
                   : 'text-muted-foreground'
               )}
               onClick={() => setActiveTab('board')}
+              role="tab"
+              aria-selected={activeTab === 'board'}
             >
               Board
             </button>
@@ -1335,6 +1347,7 @@ export default function DraftRoomPage() {
               showQuickDraft={false}
               scoringSystem={draftState?.draftSettings?.scoringSystem}
               tierConfig={draftState?.draftSettings?.tierConfig}
+              tierUsage={userTierUsage}
               budgetRemaining={userTeam?.budgetRemaining}
               maxAffordableCost={draftState?.status === 'drafting' && draftState?.draftSettings?.scoringSystem !== 'tiered' ? budgetFeasibility?.maxAffordableCost : undefined}
               remainingSlots={draftState?.status === 'drafting' ? budgetFeasibility?.remainingSlots : undefined}
@@ -1381,29 +1394,6 @@ export default function DraftRoomPage() {
           />
         )}
       </div>
-
-      {/* Mobile Wishlist FAB + Bottom Sheet */}
-      {isMobile && draftState?.status === 'drafting' && !isSpectator && draftState?.userTeamId && (
-        <>
-          <button
-            onClick={() => setIsMobileWishlistOpen(!isMobileWishlistOpen)}
-            className="fixed bottom-20 right-4 z-40 h-12 w-12 rounded-full bg-purple-600 text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-            aria-label="Toggle wishlist"
-          >
-            <Heart className="h-5 w-5" />
-          </button>
-          <MobileWishlistSheet
-            wishlist={[]}
-            isConnected={realtimeConnectionStatus.status === 'connected'}
-            totalCost={0}
-            currentBudget={userTeam?.budgetRemaining || 100}
-            isOpen={isMobileWishlistOpen}
-            onToggle={() => setIsMobileWishlistOpen(!isMobileWishlistOpen)}
-            onRemove={() => {}}
-            onReorder={() => {}}
-          />
-        </>
-      )}
 
       {/* Auth modal for join-from-link flow */}
       <AuthModal isOpen={showJoinAuthModal} onClose={() => setShowJoinAuthModal(false)} />

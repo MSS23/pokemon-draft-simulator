@@ -185,6 +185,7 @@ export type Database = {
           pokemon_id: string
           pokemon_name: string
           cost: number
+          tier_name: string | null
           pick_order: number
           round: number
         }
@@ -196,6 +197,7 @@ export type Database = {
           pokemon_id: string
           pokemon_name: string
           cost: number
+          tier_name?: string | null
           pick_order: number
           round: number
         }
@@ -207,6 +209,7 @@ export type Database = {
           pokemon_id?: string
           pokemon_name?: string
           cost?: number
+          tier_name?: string | null
           pick_order?: number
           round?: number
         }
@@ -1376,6 +1379,21 @@ export type Database = {
         Args: { auction_id: string; bidder_team_id: string; bid_amount: number }
         Returns: undefined
       }
+      nominate_auction: {
+        Args: {
+          p_draft_id: string
+          p_pokemon_id: string
+          p_pokemon_name: string
+          p_starting_bid: number
+          p_duration_seconds: number
+        }
+        Returns: {
+          success: boolean
+          error?: string
+          auctionId?: string
+          auctionEnd?: string
+        }
+      }
       promote_to_admin: {
         Args: { p_draft_id: string; p_user_id: string }
         Returns: undefined
@@ -1425,6 +1443,22 @@ export type Database = {
           newBudget?: number
           nextTurn?: number
           isComplete?: boolean
+        }
+      }
+      join_draft_atomic: {
+        Args: {
+          p_draft_id: string
+          p_user_id: string
+          p_display_name: string
+          p_team_name: string | null
+          p_as_spectator: boolean
+        }
+        Returns: {
+          success: boolean
+          error?: string
+          teamId?: string | null
+          asSpectator?: boolean
+          rejoined?: boolean
         }
       }
       recalculate_league_standings: {

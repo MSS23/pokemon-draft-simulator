@@ -7,7 +7,7 @@ import { notify } from '@/lib/notifications'
 import { useLatest } from '@/hooks/useLatest'
 import { useDraftStore } from '@/stores/draftStore'
 import { isPickSafe } from '@/utils/budget-feasibility'
-import { getPokemonTier } from '@/lib/tier-utils'
+import { getPokemonTier, getTierUsage } from '@/lib/tier-utils'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('useDraftActions')
@@ -26,6 +26,7 @@ interface DraftUIState {
     picks: string[]
     budgetRemaining: number
     pickCosts: number[]
+    pickTiers: Array<string | null>
   }>
   participants: Array<{
     userId: string | null
@@ -266,16 +267,16 @@ export function useDraftActions({
       const tierConfig = draftState?.draftSettings?.tierConfig
       if (tierConfig) {
         const tier = getPokemonTier(pokemon.cost, tierConfig.tiers)
-        const tierCost = tier ? tier.cost : null
-        const budget = userTeam?.budgetRemaining ?? 0
-        if (!tier || tierCost === null) {
+        if (!tier) {
           notify.error('Unknown Tier', `${pokemon.name} doesn't fit any tier in your configuration.`, { duration: 5000 })
           return
         }
-        if (budget < tierCost) {
+        const usage = getTierUsage(userTeam?.pickTiers || [])
+        const used = usage[tier.name.toUpperCase()] || 0
+        if (used >= tier.slotsPerTeam) {
           notify.error(
-            'Not Enough Budget',
-            `${tier.label} costs ${tierCost} pts. You have ${budget} pts remaining.`,
+            'Tier Cap Reached',
+            `${tier.label} is full (${used}/${tier.slotsPerTeam}). Choose a Pokemon from a tier with an open slot.`,
             { duration: 5000 }
           )
           return
@@ -301,7 +302,7 @@ export function useDraftActions({
     setConfirmationPokemon(pokemon)
     setIsConfirmationOpen(true)
     setIsDetailsOpen(false)
-  }, [budgetFeasibility, userTeam?.budgetRemaining, availablePokemon, draftState?.draftSettings?.scoringSystem, draftState?.draftSettings?.tierConfig])
+  }, [budgetFeasibility, userTeam?.budgetRemaining, userTeam?.pickTiers, availablePokemon, draftState?.draftSettings?.scoringSystem, draftState?.draftSettings?.tierConfig])
 
   // handleDraftPokemon
   const handleDraftPokemon = useCallback(async (pokemon: Pokemon) => {
@@ -328,7 +329,19 @@ export function useDraftActions({
     if (draftState) {
       const optimisticTeams = draftState.teams.map(t =>
         t.id === targetTeam.id
-          ? { ...t, picks: [...t.picks, pokemon.id], budgetRemaining: t.budgetRemaining - (pokemon.cost || 1) }
+          ? {
+              ...t,
+              picks: [...t.picks, pokemon.id],
+              pickTiers: [
+                ...t.pickTiers,
+                draftState.draftSettings?.scoringSystem === 'tiered'
+                  ? getPokemonTier(pokemon.cost, draftState.draftSettings.tierConfig?.tiers || [])?.name || null
+                  : null,
+              ],
+              budgetRemaining: draftState.draftSettings?.scoringSystem === 'tiered'
+                ? t.budgetRemaining
+                : t.budgetRemaining - (pokemon.cost || 1),
+            }
           : t
       )
       const nextTurn = draftState.currentTurn + 1

@@ -511,81 +511,112 @@ export const isInRegionalDex = (pokemonId: string | number, regions: string[]): 
   }
 }
 
-// Helper function to get format-filtered Pokemon list
-export const fetchPokemonForFormat = async (formatId: string, limit: number = 100): Promise<Pokemon[]> => {
+interface PokemonIndexEntry {
+  name: string
+  nationalDex: number
+  types: string[]
+  stats: PokemonStats
+  abilities: string[]
+  flags: {
+    isLegendary: boolean
+    isMythical: boolean
+    isParadox: boolean
+  }
+}
+
+type PokemonIndex = Record<string, PokemonIndexEntry>
+
+function pokemonFromIndex(
+  pokemonData: PokemonIndexEntry,
+  cost: number,
+): Pokemon {
+  return {
+    id: pokemonData.nationalDex.toString(),
+    name: pokemonData.name
+      .split('-')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join('-'),
+    types: pokemonData.types.map((typeName) => ({
+      name: typeName,
+      color: getTypeColor(typeName),
+    })),
+    stats: pokemonData.stats,
+    abilities: pokemonData.abilities.map((ability) =>
+      ability
+        .replaceAll('-', ' ')
+        .split(' ')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' '),
+    ),
+    sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemonData.nationalDex}.gif`,
+    cost,
+    isLegal: true,
+    isLegendary: pokemonData.flags.isLegendary,
+    isMythical: pokemonData.flags.isMythical,
+    isParadox: pokemonData.flags.isParadox,
+    generation: getGenerationFromDexNumber(pokemonData.nationalDex),
+  }
+}
+
+// Helper function to get a complete, format-filtered Pokemon list. Static
+// catalogue data is the primary path; PokeAPI is only a recovery fallback.
+export const fetchPokemonForFormat = async (formatId: string, limit: number = 1025): Promise<Pokemon[]> => {
   const format = getFormatById(formatId)
   if (!format) {
     throw new Error(`Format ${formatId} not found`)
   }
 
-  // Try to load from pre-built format pack first (much faster!)
+  // Load the master National Dex once. If a compiled pack exists, use it;
+  // otherwise apply the in-memory rules engine to all 1,025 species locally.
   try {
     const startTime = performance.now()
-    const manifest = await fetch('/data/format-manifest.json').then(res => res.json())
+    const manifestResponse = await fetch('/data/format-manifest.json')
+    if (!manifestResponse.ok) throw new Error('Format manifest unavailable')
+    const manifest = await manifestResponse.json()
     const formatEntry = manifest?.formats?.find((f: { id: string; hash: string }) => f.id === formatId)
+    const indexResponse = await fetch(`/data/pokemon_index_${manifest.pokemonIndexHash}.json`)
+    if (!indexResponse.ok) throw new Error('Pokemon index unavailable')
+    const pokemonIndex = await indexResponse.json() as PokemonIndex
 
     if (formatEntry) {
-      // Load both the format pack and the Pokemon index in parallel
-      const [formatPack, pokemonIndex] = await Promise.all([
-        fetch(`/data/format_${formatId}_${formatEntry.hash}.json`).then(res => res.json()),
-        fetch(`/data/pokemon_index_${manifest.pokemonIndexHash}.json`).then(res => res.json())
-      ])
+      const formatPack = await fetch(`/data/format_${formatId}_${formatEntry.hash}.json`).then(res => res.json())
 
       // Validate format pack structure (should have legalPokemon array and costs object)
       if (formatPack && Array.isArray(formatPack.legalPokemon) && formatPack.legalPokemon.length > 0 && formatPack.costs && pokemonIndex) {
         log.info(`✨ Loaded format pack with ${formatPack.legalPokemon.length} legal Pokemon for ${formatId} from pre-built files`)
 
-        // Convert legal Pokemon names to full Pokemon objects using the index
-        // No limit applied here - the pre-built pack is already filtered correctly
-        const pokemonList: Pokemon[] = []
-
-        for (const pokemonName of formatPack.legalPokemon) {
-          const pokemonData = pokemonIndex[pokemonName]
-          if (!pokemonData) {
-            log.warn(`Pokemon ${pokemonName} not found in index`)
-            continue
-          }
-
-          // Convert from index format to Pokemon type
-          const types: PokemonType[] = pokemonData.types.map((typeName: string) => ({
-            name: typeName,
-            color: getTypeColor(typeName)
-          }))
-
-          const pokemon: Pokemon = {
-            id: pokemonData.nationalDex.toString(),
-            name: pokemonData.name.split('-').map((part: string) =>
-              part.charAt(0).toUpperCase() + part.slice(1)
-            ).join('-'),
-            types,
-            stats: pokemonData.stats,
-            abilities: pokemonData.abilities.map((ability: string) =>
-              ability.replace('-', ' ')
-                .split(' ')
-                .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ')
-            ),
-            sprite: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${pokemonData.nationalDex}.gif`,
-            cost: formatPack.costs[pokemonName] || 10,
-            isLegal: true,
-            isLegendary: pokemonData.flags.isLegendary,
-            isMythical: pokemonData.flags.isMythical,
-            generation: getGenerationFromDexNumber(pokemonData.nationalDex)
-          }
-
-          pokemonList.push(pokemon)
-        }
+        const pokemonList = formatPack.legalPokemon
+          .map((pokemonName: string) => {
+            const pokemonData = pokemonIndex[pokemonName]
+            if (!pokemonData) {
+              log.warn(`Pokemon ${pokemonName} not found in index`)
+              return null
+            }
+            return pokemonFromIndex(pokemonData, formatPack.costs[pokemonName] ?? 10)
+          })
+          .filter((pokemon: Pokemon | null): pokemon is Pokemon => pokemon !== null)
 
         const endTime = performance.now()
         const loadTime = Math.round(endTime - startTime)
         // Sanity check: if loadTime is unreasonably large (>60 seconds), just report as fast
         const displayTime = loadTime > 60000 ? '<100' : loadTime.toString()
         log.info(`✅ Loaded ${pokemonList.length} Pokemon from format pack in ${displayTime}ms`)
-        return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))
-      } else {
-        log.warn('Format pack has invalid structure (missing legalPokemon or costs), falling back to API fetching')
+        return pokemonList
+          .sort((a: Pokemon, b: Pokemon) => parseInt(a.id) - parseInt(b.id))
+          .slice(0, limit)
       }
     }
+
+    const rulesEngine = createFormatRulesEngine(formatId)
+    const pokemonList = Object.values(pokemonIndex)
+      .map((pokemonData) => pokemonFromIndex(pokemonData, format.costConfig.minCost))
+      .filter((pokemon) => rulesEngine.isLegal(pokemon))
+      .map((pokemon) => ({ ...pokemon, cost: rulesEngine.getCost(pokemon) }))
+      .sort((a, b) => parseInt(a.id) - parseInt(b.id))
+      .slice(0, limit)
+
+    log.info(`Loaded ${pokemonList.length} Pokemon for ${formatId} from the local National Dex`)
+    return pokemonList
   } catch (error) {
     log.warn('Could not load pre-built format pack, falling back to API fetching:', error)
   }
@@ -603,7 +634,7 @@ export const fetchPokemonForFormat = async (formatId: string, limit: number = 10
   } else {
     // Get allowed generations for other formats
     const allowedGenerations = format.ruleset.allowedGenerations
-    let pokemonRange = { start: 1, end: 1010 }
+    let pokemonRange = { start: 1, end: 1025 }
 
     // Adjust range based on generation restrictions
     if (allowedGenerations.length > 0 && !allowedGenerations.includes(9)) {
@@ -728,31 +759,32 @@ export const fetchPokemonForCustomFormat = async (customFormatId: string): Promi
     }
 
     const pokemonPricing: Record<string, number> = customFormat.pokemon_pricing || {}
-    const pokemonList: Pokemon[] = []
 
     // Helper to normalize Pokemon names for matching
     const normalizeName = (name: string) =>
-      name.toLowerCase().replace(/[.\s-]+/g, '').replace(/♀/g, 'f').replace(/♂/g, 'm')
+      name.toLowerCase().replace(/♀/g, 'f').replace(/♂/g, 'm').replace(/[^a-z0-9]+/g, '')
 
-    // Fetch Pokemon by normalized names from the pricing data
-    const pokemonNames = Object.keys(pokemonPricing)
+    const manifestResponse = await fetch('/data/format-manifest.json')
+    if (!manifestResponse.ok) throw new Error('Pokemon catalogue manifest unavailable')
+    const manifest = await manifestResponse.json() as { pokemonIndexHash: string }
+    const indexResponse = await fetch(`/data/pokemon_index_${manifest.pokemonIndexHash}.json`)
+    if (!indexResponse.ok) throw new Error('Pokemon catalogue unavailable')
+    const pokemonIndex = await indexResponse.json() as PokemonIndex
 
-    for (const pokemonName of pokemonNames) {
-      try {
-        // Try to fetch by name (PokeAPI accepts normalized names)
-        const normalizedName = normalizeName(pokemonName)
-        const pokemon = await fetchPokemon(normalizedName)
+    const indexByIdentifier = new Map<string, PokemonIndexEntry>()
+    for (const entry of Object.values(pokemonIndex)) {
+      indexByIdentifier.set(normalizeName(entry.name), entry)
+      indexByIdentifier.set(String(entry.nationalDex), entry)
+    }
 
-        if (pokemon) {
-          // Override the cost with custom pricing
-          pokemon.cost = pokemonPricing[pokemonName]
-          pokemon.isLegal = true
-          pokemonList.push(pokemon)
-        }
-      } catch (error) {
-        log.warn(`Failed to fetch Pokemon "${pokemonName}" for custom format:`, error)
-        // Continue with other Pokemon
+    const pokemonList: Pokemon[] = []
+    for (const [pokemonName, cost] of Object.entries(pokemonPricing)) {
+      const entry = indexByIdentifier.get(normalizeName(pokemonName))
+      if (!entry) {
+        log.warn(`Pokemon "${pokemonName}" from custom format was not found in the National Dex`)
+        continue
       }
+      pokemonList.push(pokemonFromIndex(entry, cost))
     }
 
     return pokemonList.sort((a, b) => parseInt(a.id) - parseInt(b.id))

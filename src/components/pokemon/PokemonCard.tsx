@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { Pokemon } from '@/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getPokemonCardClass } from '@/utils/pokemon'
+import { getPokemonCardClass, getTypeTextColor } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
 import { usePendingActionFeedback } from '@/hooks/useOptimisticUpdates'
 import { usePokemonImage } from '@/hooks/usePokemonImage'
@@ -328,10 +328,10 @@ const PokemonCard = ({
               key={type.name}
               size={size !== 'sm' ? "sm" : undefined}
               className={cn(
-                "text-white font-semibold shadow-sm border-0 rounded-full",
+                "font-semibold shadow-sm border-0 rounded-full",
                 size === 'sm' && "text-[9px] px-1 py-0"
               )}
-              style={{ backgroundColor: type.color }}
+              style={{ backgroundColor: type.color, color: getTypeTextColor(type.name) }}
             >
               {type.name.toUpperCase()}
             </Badge>
