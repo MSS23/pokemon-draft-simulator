@@ -19,7 +19,7 @@ const log = createLogger('api/health/bridge')
  *
  *   - 200 { bridge: 'up' }        — signed in AND whoami() === Clerk userId
  *   - 200 { bridge: 'down', ... } — signed in but whoami() is null/mismatched
- *                                    (JWT template misconfigured or secret drift)
+ *                                    (Clerk third-party auth is not configured)
  *   - 401                         — not signed in (cannot probe)
  *
  * A `down` result while signed in is a P0 alert: writes are silently running in

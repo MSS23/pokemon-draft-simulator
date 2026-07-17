@@ -1531,13 +1531,11 @@ if (typeof window !== 'undefined') {
 
 /**
  * Bridge Clerk → Supabase: when a user is signed into Clerk, every Supabase
- * request carries a Clerk-issued JWT. The "supabase" JWT template in Clerk
- * dashboard must be configured (HS256 signed with the Supabase JWT secret)
- * for this to authenticate; otherwise PostgREST treats the request as anon.
+ * request carries the normal Clerk session token. Supabase must have Clerk
+ * enabled as a third-party auth provider so PostgREST can validate it.
  *
  * The callback is non-throwing — if Clerk isn't loaded (SSR, anon visitor,
- * or template not configured) we return null and Supabase falls back to the
- * anon key.
+ * or no active session) we return null and Supabase falls back to the anon key.
  */
 async function getClerkSupabaseToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null
@@ -1550,7 +1548,11 @@ async function getClerkSupabaseToken(): Promise<string | null> {
   const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk
   if (!clerk?.session) return null
   try {
-    return await clerk.session.getToken({ template: 'supabase' })
+    // Clerk's custom "supabase" JWT template was deprecated in April 2025.
+    // Requesting that missing template causes a 404 + retry storm for every
+    // PostgREST call. The cached session token is what Supabase's native Clerk
+    // third-party provider expects.
+    return await clerk.session.getToken()
   } catch {
     return null
   }

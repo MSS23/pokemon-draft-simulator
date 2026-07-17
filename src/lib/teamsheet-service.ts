@@ -41,7 +41,7 @@ export class TeamSheetService {
       .from('drafts')
       .select('settings')
       .eq('id', draftId)
-      .single()
+      .maybeSingle()
 
     if (readErr || !draft) throw new Error('Tournament not found')
 
@@ -68,12 +68,16 @@ export class TeamSheetService {
   static async getTeamSheet(draftId: string, teamId: string): Promise<TeamSheet | null> {
     if (!supabase) return null
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('drafts')
       .select('settings')
       .eq('id', draftId)
-      .single()
+      .maybeSingle()
 
+    if (error) {
+      log.warn('Could not load team sheet:', error)
+      return null
+    }
     if (!data?.settings) return null
     const settings = data.settings as Record<string, unknown>
     const teamSheets = (settings.teamSheets ?? {}) as Record<string, TeamSheet>
@@ -86,12 +90,16 @@ export class TeamSheetService {
   static async getAllTeamSheets(draftId: string): Promise<Record<string, TeamSheet>> {
     if (!supabase) return {}
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('drafts')
       .select('settings')
       .eq('id', draftId)
-      .single()
+      .maybeSingle()
 
+    if (error) {
+      log.warn('Could not load tournament team sheets:', error)
+      return {}
+    }
     if (!data?.settings) return {}
     const settings = data.settings as Record<string, unknown>
     return (settings.teamSheets ?? {}) as Record<string, TeamSheet>

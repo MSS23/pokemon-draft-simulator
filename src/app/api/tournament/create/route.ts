@@ -55,8 +55,11 @@ export async function POST(request: NextRequest) {
   const hostCheck = validateName(body.hostName, { fieldLabel: 'Host name', maxLength: 50 })
   if (!hostCheck.ok) return NextResponse.json({ error: hostCheck.reason }, { status: 400 })
 
-  if (!['single-elimination', 'double-elimination'].includes(body.tournamentType)) {
-    return NextResponse.json({ error: 'Invalid tournamentType' }, { status: 400 })
+  if (body.tournamentType !== 'single-elimination') {
+    return NextResponse.json(
+      { error: 'Double elimination is not available yet. Choose single elimination.' },
+      { status: 400 },
+    )
   }
   if (!['best_of_1', 'best_of_3'].includes(body.matchFormat)) {
     return NextResponse.json({ error: 'Invalid matchFormat' }, { status: 400 })

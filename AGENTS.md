@@ -6,7 +6,7 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 A real-time Pokémon drafting platform for competitive tournament play ("Pokémon Champions Draft League"). Built with Next.js 15, TypeScript, Supabase, Zustand, and **Clerk authentication**. Supports snake and auction draft formats across multiple VGC regulations and Smogon tiers, plus a full **league system** (standings, schedules, trades, waivers, playoffs, commissioner tools) and **tournaments**.
 
-> **Auth note (READ THIS FIRST):** Auth is **Clerk**, not Supabase Auth. Clerk issues a `supabase` JWT template whose `sub` is resolved in Postgres by `public.clerk_user_id()`; every RLS policy and write RPC depends on that bridge. Guests are supported via an **httpOnly cookie** (`guest-{crypto.randomUUID()}`) issued by `/api/guest/session` — NOT via a client-generated `localStorage` id. Older sections below that describe Supabase Auth / `localStorage.guestUserId` are historical; the code has migrated. The live draft/auction/turn-timeout engine is **server-authoritative** (see "Server-authoritative draft engine" below).
+> **Auth note (READ THIS FIRST):** Auth is **Clerk**, not Supabase Auth. The app forwards Clerk's normal session token to Supabase's native Clerk third-party auth provider; its `sub` is resolved in Postgres by `public.clerk_user_id()`. Do **not** request the deprecated custom `supabase` JWT template. Every RLS policy and write RPC depends on this bridge. Guests are supported via an **httpOnly cookie** (`guest-{crypto.randomUUID()}`) issued by `/api/guest/session` — NOT via a client-generated `localStorage` id. Older sections below that describe Supabase Auth / `localStorage.guestUserId` are historical; the code has migrated. The live draft/auction/turn-timeout engine is **server-authoritative** (see "Server-authoritative draft engine" below).
 
 **Tech Stack:**
 - **Frontend**: Next.js 15 (App Router), React 18, TypeScript 5
@@ -202,7 +202,7 @@ async function makePick(pokemonId: string) {
 
 **Auth & Session Management** (Clerk + guest cookie):
 - **Signed-in users**: Clerk (`@clerk/nextjs`). `src/middleware.ts` (clerkMiddleware) protects `/dashboard`, `/settings`, `/profile`, `/admin`, `/my-drafts` and the auth-required API routes. `AuthContext` maps the Clerk user into a Supabase-User-shaped object for legacy consumers.
-- **Clerk → Supabase bridge**: the browser/server Supabase clients forward Clerk's `supabase`-template JWT; RLS reads identity via `public.clerk_user_id()`. Verify it live with `GET /api/health/bridge` (returns `{bridge:'up'}`).
+- **Clerk → Supabase bridge**: the browser/server Supabase clients forward Clerk's normal session token to Supabase's native Clerk third-party provider; RLS reads identity via `public.clerk_user_id()`. Verify it live with `GET /api/health/bridge` (returns `{bridge:'up'}`).
 - **Guests**: authoritative id is an **httpOnly cookie** (`guest-{crypto.randomUUID()}`) from `/api/guest/session`. `src/lib/user-session.ts` localStorage now holds only non-sensitive display data, not the source-of-truth id.
 
 ### Server-authoritative draft engine

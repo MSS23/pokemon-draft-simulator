@@ -476,12 +476,13 @@ export class KnockoutService {
   static async getTournament(leagueId: string): Promise<Tournament | null> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('leagues')
       .select('settings')
       .eq('id', leagueId)
-      .single()
+      .maybeSingle()
 
+    if (error) throw new Error(`Could not load tournament: ${error.message}`)
     if (!data?.settings) return null
     const settings = data.settings as Record<string, unknown>
     if (!settings.tournament) return null
@@ -506,12 +507,13 @@ export class KnockoutService {
     if (!supabase) throw new Error('Supabase not configured')
 
     // Fetch league with teams
-    const { data: rawLeague } = await supabase
+    const { data: rawLeague, error: leagueError } = await supabase
       .from('leagues')
       .select('*, league_teams(team:teams(*))')
       .eq('id', leagueId)
-      .single()
+      .maybeSingle()
 
+    if (leagueError) throw new Error(`Could not load tournament: ${leagueError.message}`)
     if (!rawLeague) return null
 
     const leagueRow = rawLeague as unknown as LeagueRow & {
@@ -544,12 +546,14 @@ export class KnockoutService {
     if (tournament.completedAt) tournament.completedAt = new Date(tournament.completedAt)
 
     // Get matches
-    const { data: rawMatchRows } = await supabase
+    const { data: rawMatchRows, error: matchesError } = await supabase
       .from('matches')
       .select('id, league_id, week_number, match_number, home_team_id, away_team_id, scheduled_date, status, home_score, away_score, winner_team_id, battle_format, youtube_url, notes, created_at, updated_at, completed_at')
       .eq('league_id', leagueId)
       .order('week_number')
       .order('match_number')
+
+    if (matchesError) throw new Error(`Could not load tournament matches: ${matchesError.message}`)
 
     const teamMap = new Map(teams.map(t => [t.id, t]))
     const defaultTeam = (id: string): Team => ({
@@ -751,12 +755,16 @@ export class KnockoutService {
   static async isCommissioner(leagueId: string, userId: string): Promise<boolean> {
     if (!supabase) return false
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('leagues')
       .select('settings')
       .eq('id', leagueId)
-      .single()
+      .maybeSingle()
 
+    if (error) {
+      log.warn('Could not check tournament commissioner:', error)
+      return false
+    }
     if (!data?.settings) return false
     const settings = data.settings as Record<string, unknown>
     return settings.commissionerId === userId

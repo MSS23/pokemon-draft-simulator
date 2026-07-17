@@ -32,9 +32,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 /**
- * Build a Supabase client that forwards the current Clerk session's
- * "supabase" JWT on every request. Returns an anon-keyed client if the
- * caller is signed out — same behaviour as the browser client.
+ * Build a Supabase client that forwards the current Clerk session token on
+ * every request. Returns an anon-keyed client if the caller is signed out —
+ * the same behaviour as the browser client.
  */
 export async function createClerkSupabaseClientServer(): Promise<SupabaseClient<Database>> {
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -44,7 +44,7 @@ export async function createClerkSupabaseClientServer(): Promise<SupabaseClient<
   let cachedToken: string | null = null
   try {
     const { getToken } = await auth()
-    cachedToken = await getToken({ template: 'supabase' })
+    cachedToken = await getToken()
   } catch {
     cachedToken = null
   }

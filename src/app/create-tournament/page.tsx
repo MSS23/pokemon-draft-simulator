@@ -207,18 +207,19 @@ export default function CreateTournamentPage() {
                       <p className="text-xs text-muted-foreground">Lose once and you&apos;re out</p>
                     </button>
                     <button
-                      onClick={() => setTournamentType('double-elimination')}
-                      className={`p-3 border-2 rounded-lg text-left transition-colors ${
-                        tournamentType === 'double-elimination'
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-muted-foreground/30'
-                      }`}
+                      type="button"
+                      disabled
+                      aria-describedby="double-elimination-status"
+                      className="p-3 border-2 rounded-lg text-left border-border opacity-60 cursor-not-allowed"
                     >
                       <div className="flex items-center gap-2 mb-1">
                         <GitBranch className="h-4 w-4 rotate-180" />
                         <span className="font-semibold text-sm">Double Elimination</span>
+                        <Badge variant="outline" size="sm" className="text-[10px]">Coming soon</Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">Two losses to be eliminated</p>
+                      <p id="double-elimination-status" className="text-xs text-muted-foreground">
+                        Unavailable until loser-bracket advancement is production-ready
+                      </p>
                     </button>
                   </div>
                 </div>

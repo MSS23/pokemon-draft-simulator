@@ -138,64 +138,66 @@ export function startTournament(tournament: Tournament): Tournament {
  * Generate Single Elimination Bracket
  */
 function generateSingleEliminationBracket(participants: Participant[]): Round[] {
-  // Add byes if not power of 2
-  const nextPowerOf2 = Math.pow(2, Math.ceil(Math.log2(participants.length)))
-  const byesNeeded = nextPowerOf2 - participants.length
-
-  const paddedParticipants = [...participants]
-  for (let i = 0; i < byesNeeded; i++) {
-    paddedParticipants.push({
-      id: `bye-${i}`,
-      name: 'BYE',
-      seed: participants.length + i + 1,
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      matchPoints: 0,
-    })
+  if (participants.length < 2) {
+    throw new Error('A tournament needs at least 2 participants')
   }
 
+  const bracketSize = 2 ** Math.ceil(Math.log2(participants.length))
+  const totalRounds = Math.log2(bracketSize)
+  const firstRoundMatchCount = bracketSize / 2
+  const byesNeeded = bracketSize - participants.length
   const rounds: Round[] = []
-  const totalRounds = Math.log2(nextPowerOf2)
-  let currentRoundParticipants = [...paddedParticipants]
-  let matchIdCounter = 1
 
-  for (let roundNum = 1; roundNum <= totalRounds; roundNum++) {
-    const roundName = getRoundName(roundNum, totalRounds)
-    const matches: Match[] = []
-
-    for (let i = 0; i < currentRoundParticipants.length; i += 2) {
-      const match: Match = {
-        id: `match-${matchIdCounter++}`,
-        roundNumber: roundNum,
-        matchNumber: Math.floor(i / 2) + 1,
-        participant1: currentRoundParticipants[i],
-        participant2: currentRoundParticipants[i + 1],
-        status: currentRoundParticipants[i + 1]?.name === 'BYE' ? 'bye' : 'pending',
-        nextMatchId: roundNum < totalRounds ? `match-${matchIdCounter + Math.floor(i / 4)}` : undefined,
-      }
-
-      // Auto-advance byes
-      if (match.status === 'bye') {
-        match.winner = match.participant1
-        match.status = 'completed'
-      }
-
-      matches.push(match)
-    }
+  // Build every round up front. The previous implementation only constructed
+  // later rounds from already-known bye winners, so a four-player tournament
+  // had no final at all.
+  for (let roundNumber = 1; roundNumber <= totalRounds; roundNumber++) {
+    const matchCount = bracketSize / 2 ** roundNumber
+    const matches: Match[] = Array.from({ length: matchCount }, (_, index) => ({
+      id: `round-${roundNumber}-match-${index + 1}`,
+      roundNumber,
+      matchNumber: index + 1,
+      status: 'pending' as MatchStatus,
+      nextMatchId: roundNumber < totalRounds
+        ? `round-${roundNumber + 1}-match-${Math.floor(index / 2) + 1}`
+        : undefined,
+    }))
 
     rounds.push({
-      roundNumber: roundNum,
-      name: roundName,
+      roundNumber,
+      name: getRoundName(roundNumber, totalRounds),
       matches,
     })
-
-    // Set up next round participants (winners only)
-    currentRoundParticipants = matches
-      .filter(m => m.winner)
-      .map(m => m.winner!)
   }
 
+  // Distribute byes so every bye advances a real participant; this avoids
+  // creating BYE-vs-BYE matches for non-power-of-two fields.
+  const firstRound = rounds[0]
+  for (let index = 0; index < firstRoundMatchCount; index++) {
+    const match = firstRound.matches[index]
+    if (index < byesNeeded) {
+      const participant = participants[index]
+      match.participant1 = participant
+      match.participant2 = {
+        id: `bye-${index + 1}`,
+        name: 'BYE',
+        seed: participants.length + index + 1,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        matchPoints: 0,
+      }
+      match.winner = participant
+      match.status = 'completed'
+    } else {
+      const participantIndex = byesNeeded + (index - byesNeeded) * 2
+      match.participant1 = participants[participantIndex]
+      match.participant2 = participants[participantIndex + 1]
+    }
+  }
+
+  // Seed bye winners into their exact next-round slot.
+  advanceWinners(rounds, 'single-elimination')
   return rounds
 }
 
@@ -203,34 +205,8 @@ function generateSingleEliminationBracket(participants: Participant[]): Round[] 
  * Generate Double Elimination Bracket
  */
 function generateDoubleEliminationBracket(participants: Participant[]): Round[] {
-  const rounds: Round[] = []
-
-  // Winners bracket
-  const winnersRounds = generateSingleEliminationBracket(participants)
-  winnersRounds.forEach(round => {
-    round.bracket = 'winners'
-    rounds.push(round)
-  })
-
-  // Losers bracket (simplified - would need more complex logic for full implementation)
-  const losersRoundCount = (winnersRounds.length - 1) * 2
-  for (let i = 1; i <= losersRoundCount; i++) {
-    rounds.push({
-      roundNumber: winnersRounds.length + i,
-      name: `Losers Round ${i}`,
-      matches: [],
-      bracket: 'losers',
-    })
-  }
-
-  // Grand finals
-  rounds.push({
-    roundNumber: rounds.length + 1,
-    name: 'Grand Finals',
-    matches: [],
-  })
-
-  return rounds
+  void participants
+  throw new Error('Double-elimination tournaments are not available yet')
 }
 
 /**
@@ -355,6 +331,16 @@ export function reportMatchResult(
   winnerId: string,
   score?: { participant1: number; participant2: number }
 ): Tournament {
+  const targetMatch = tournament.rounds
+    .flatMap(round => round.matches)
+    .find(match => match.id === matchId)
+
+  if (!targetMatch) throw new Error('Tournament match not found')
+  if (targetMatch.status === 'completed') return tournament
+  if (targetMatch.participant1?.id !== winnerId && targetMatch.participant2?.id !== winnerId) {
+    throw new Error('Winner is not a participant in this match')
+  }
+
   const updatedRounds = tournament.rounds.map(round => ({
     ...round,
     matches: round.matches.map(match => {
@@ -396,7 +382,7 @@ export function reportMatchResult(
   if (allMatchesComplete) {
     const finalRound = updatedRounds[updatedRounds.length - 1]
     const finalMatch = finalRound.matches[0]
-    tournamentWinner = finalMatch.winner
+    tournamentWinner = finalMatch?.winner
   }
 
   return {
@@ -420,10 +406,11 @@ function advanceWinners(rounds: Round[], format: TournamentFormat) {
           const nextMatch = nextRound.matches.find(m => m.id === match.nextMatchId)
 
           if (nextMatch) {
-            if (!nextMatch.participant1) {
-              nextMatch.participant1 = match.winner
-            } else if (!nextMatch.participant2) {
-              nextMatch.participant2 = match.winner
+            const useFirstSlot = match.matchNumber % 2 === 1
+            const current = useFirstSlot ? nextMatch.participant1 : nextMatch.participant2
+            if (!current || current.id === match.winner.id) {
+              if (useFirstSlot) nextMatch.participant1 = match.winner
+              else nextMatch.participant2 = match.winner
             }
           }
         }

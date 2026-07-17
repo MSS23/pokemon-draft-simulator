@@ -32,9 +32,6 @@ interface StartPlayoffsModalProps {
 
 const FORMAT_OPTIONS: { value: TournamentFormat; label: string; desc: string }[] = [
   { value: 'single-elimination', label: 'Single Elimination', desc: 'Lose once and you\'re out' },
-  { value: 'double-elimination', label: 'Double Elimination', desc: 'Must lose twice to be eliminated' },
-  { value: 'swiss', label: 'Swiss System', desc: 'Everyone plays, paired by record' },
-  { value: 'round-robin', label: 'Round Robin', desc: 'Everyone plays everyone' },
 ]
 
 export function StartPlayoffsModal({
@@ -92,7 +89,7 @@ export function StartPlayoffsModal({
             Start Playoffs
           </DialogTitle>
           <DialogDescription>
-            Configure playoff format and select qualifying teams.
+            Select the qualifying teams for a production-ready single-elimination bracket.
           </DialogDescription>
         </DialogHeader>
 

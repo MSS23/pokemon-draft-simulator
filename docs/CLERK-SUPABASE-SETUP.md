@@ -1,123 +1,75 @@
-# Clerk → Supabase JWT bridge — setup checklist
+# Clerk → Supabase authentication — production checklist
 
-This is a one-time configuration that lets PostgREST identify your
-Clerk-authenticated users via Postgres RLS. After completing every step,
-`auth.jwt() ->> 'sub'` (and the `public.clerk_user_id()` helper) will
-return the Clerk user id for every signed-in request.
+This one-time configuration lets Supabase validate Clerk session tokens so
+PostgREST, Realtime, and Postgres RLS can identify signed-in users through
+`auth.jwt() ->> 'sub'` and `public.clerk_user_id()`.
 
-**Do these in order.** Steps 1 + 2 must be live before you run the SQL
-migration in step 3, otherwise you'll lock yourself out.
+The legacy Clerk `supabase` JWT template was deprecated in April 2025. Do not
+create or request that template. A missing template returns 404 and can create
+a retry storm on every Supabase request.
 
----
+## 1. Activate Clerk's Supabase integration
 
-## 1. Configure the JWT template in Clerk
+1. Open the Clerk dashboard for the production Clerk instance.
+2. Open the Supabase integration setup and select **Activate Supabase integration**.
+3. Copy the Clerk instance domain shown by Clerk.
 
-1. Open the Clerk dashboard for this project.
-2. Go to **Configure → JWT Templates → New template**.
-3. Pick the official **Supabase** template (Clerk has a preset). If the
-   preset isn't visible, create a **Blank** template and use these
-   values manually:
-   - **Name**: `supabase` (must be exactly this — the app code reads
-     `getToken({ template: 'supabase' })`)
-   - **Signing algorithm**: `HS256`
-   - **Signing key**: paste your **Supabase JWT secret** from Supabase
-     dashboard → **Project Settings → API → JWT Settings → JWT Secret**
-   - **Token lifetime**: 60 seconds is fine (Clerk auto-refreshes; the
-     app calls `getToken()` per request anyway)
-   - **Claims**: leave the defaults. The Clerk user id ends up in `sub`,
-     which is what RLS reads.
-4. **Save**.
+Activation adds the `role: authenticated` claim to normal Clerk session
+tokens. The application retrieves this token with `getToken()` and never
+shares the Supabase JWT secret with Clerk.
 
-## 2. Verify the app code is deployed
+## 2. Register Clerk in Supabase
 
-These two changes ship in this PR — confirm they're in the running build:
+1. Open the production Supabase dashboard.
+2. Go to **Authentication → Sign In / Providers**.
+3. Add **Clerk** as a third-party provider.
+4. Paste the Clerk instance domain copied in step 1 and save.
 
-- `src/lib/supabase.ts` — the browser singleton now passes an
-  `accessToken: getClerkSupabaseToken` callback to `createClient(...)`.
-  That callback reads `window.Clerk.session.getToken({ template: 'supabase' })`
-  on every request.
-- `src/lib/supabase-server.ts` — new file. Exports
-  `createClerkSupabaseClientServer()` for use inside Next.js route
-  handlers and server actions, plus `createServiceRoleClient()` for
-  privileged server work.
+Both dashboards must point at the same production Clerk instance used by
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`.
 
-> If your route handlers currently `import { supabase } from '@/lib/supabase'`,
-> they're using the **browser** client and will hit Supabase as anon
-> from the server. Refactor those to use the new
-> `createClerkSupabaseClientServer()` helper for proper auth.
+## 3. Verify the deployed client code
 
-## 3. Smoke-test that JWTs are reaching Supabase
+- `src/lib/supabase.ts` passes `window.Clerk.session.getToken()` through the
+  Supabase client's `accessToken` callback.
+- `src/lib/supabase-server.ts` uses `(await auth()).getToken()` for server-side
+  Clerk-authenticated requests.
+- Trusted server workflows use `createServiceRoleClient()` only after Clerk
+  authentication and authorization have already succeeded.
 
-In the browser console of any signed-in page:
+Never import the browser Supabase singleton into a route handler that needs
+the calling user's identity.
 
-```js
-const { data, error } = await window.supabase
-  .rpc('clerk_user_id')   // helper added by the migration
-// or before the migration:
-const { data: row } = await window.supabase
-  .from('user_profiles').select('*').limit(1)
+## 4. Apply and verify database identity helpers
+
+Apply the repository's Supabase migrations in timestamp order. They create
+`public.clerk_user_id()` and the `public.whoami()` health probe, then bind RLS
+policies and write RPCs to the Clerk `sub`.
+
+While signed in to production, request:
+
+```text
+GET /api/health/bridge
 ```
 
-You can also temporarily add a debug component:
+The expected response is:
 
-```tsx
-const { data } = await supabase
-  .from('drafts')                       // any table you have read access to
-  .select('id')
-  .limit(1)
-console.log('JWT-aware request worked', data)
+```json
+{ "bridge": "up" }
 ```
 
-In the Supabase dashboard → **Logs → Postgres**, run:
+A signed-in `bridge: down` response is a production incident: confirm the
+Clerk integration is active, the Clerk domain is registered in Supabase, and
+the deployment uses the matching production Clerk keys.
 
-```sql
-select current_setting('request.jwt.claims', true)::json ->> 'sub'
-```
+## 5. Troubleshooting
 
-— this should return your Clerk user id when called from a
-signed-in browser session.
-
-## 4. Apply the SQL migration
-
-Once steps 1–3 are confirmed working:
-
-```sql
--- in Supabase SQL editor
-\i migrations/fix-supabase-linter-warnings-clerk-final.sql
-```
-
-(Or paste the file's contents directly.)
-
-The migration:
-
-- Adds the `public.clerk_user_id()` helper.
-- Replaces every permissive `*_insert` policy with
-  `WITH CHECK (clerk_user_id() IS NOT NULL)`.
-- Tightens `push_subscriptions` to self-only access by Clerk user id.
-
-## 5. After applying — what to watch for
-
-| Symptom | Cause | Fix |
+| Symptom | Likely cause | Fix |
 |---|---|---|
-| All writes return 403 | JWT template not deployed yet | Re-check step 1; verify in browser DevTools that requests carry `Authorization: Bearer eyJ…` headers |
-| Guest writes fail (e.g. creating a draft as a guest) | Direct INSERT bypassing the SECURITY DEFINER RPC | Migrate the affected flow to use the RPC, OR drop the policy for that specific table |
-| Server route writes fail | Server code still uses the browser singleton | Switch to `createClerkSupabaseClientServer()` |
-| `auth.jwt()` returns null inside a function called by an RPC | The RPC is `SECURITY DEFINER` — it loses caller context | Pass the Clerk user id as a parameter instead of reading it from JWT |
+| Clerk `/tokens/supabase` returns 404 | Deployed code still requests the deprecated template | Deploy code that calls `getToken()` with no template |
+| Supabase returns 401/403 for signed-in users | Clerk is not registered as a Supabase third-party provider | Repeat steps 1 and 2 for the production instances |
+| `whoami()` returns null | Supabase received no valid Clerk session token | Check `/api/health/bridge`, environment keys, and provider domain |
+| Server route writes fail | Route uses an anonymous/browser client | Use `createClerkSupabaseClientServer()` or an authenticated service-role workflow |
+| Guest writes fail | The flow bypasses the server-authoritative guest endpoint/RPC | Route the action through its cookie-authenticated server endpoint |
 
-## 6. Optional follow-up — defence-in-depth in RPCs
-
-The `*_security_definer_function_executable` lint warnings on app-facing
-RPCs (`make_draft_pick`, `place_bid`, etc.) are structural and remain. To
-make them safer without changing behaviour, add this guard at the top of
-each RPC body:
-
-```sql
-IF public.clerk_user_id() IS NULL THEN
-  RAISE EXCEPTION 'unauthenticated' USING ERRCODE = '42501';
-END IF;
-```
-
-This prevents anonymous callers (who'd otherwise pass an arbitrary
-`p_user_id` through PostgREST) from invoking the function at all.
-Guest mode breaks at this point — only do this once guests have
-been migrated to authenticated accounts.
+Do not log bearer tokens or expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.

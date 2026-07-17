@@ -413,8 +413,8 @@ export default function CreateDraftPage() {
     setIsCreating(true);
     try {
       // Server-side route: bypasses RLS via service role key + Clerk auth().
-      // Avoids the Clerk → Supabase JWT bridge (which 404s when the
-      // "supabase" template isn't configured in the Clerk dashboard).
+      // Keeps creation available even if the native Clerk → Supabase bridge
+      // is temporarily unavailable or misconfigured.
       const res = await fetch("/api/draft/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

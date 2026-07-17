@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LeagueService } from '@/lib/league-service'
+import { KnockoutService } from '@/lib/knockout-service'
 import { MatchKOService } from '@/lib/match-ko-service'
 import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
@@ -38,6 +39,7 @@ interface MatchRecorderModalProps {
   onSuccess: () => void
   currentUserTeamId?: string | null
   isCommissioner?: boolean
+  advanceTournamentBracket?: boolean
 }
 
 interface GameResult {
@@ -72,6 +74,7 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   onSuccess,
   currentUserTeamId,
   isCommissioner = false,
+  advanceTournamentBracket = false,
 }: MatchRecorderModalProps) {
   const [currentStep, setCurrentStep] = useState<'games' | 'kos' | 'confirm'>('games')
   const [games, setGames] = useState<GameResult[]>([])
@@ -313,6 +316,12 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
 
         // If confirmed (both teams agreed), also record KOs
         if (result.status === 'confirmed') {
+          if (advanceTournamentBracket && matchWinner) {
+            await KnockoutService.reportResult(match.leagueId, match.id, matchWinner, {
+              home: homeScore,
+              away: awayScore,
+            })
+          }
           await recordKOs(matchWinner)
           onSuccess()
         }
@@ -335,6 +344,12 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
           winnerTeamId: matchWinner,
           status: 'completed',
         })
+        if (advanceTournamentBracket && matchWinner) {
+          await KnockoutService.reportResult(match.leagueId, match.id, matchWinner, {
+            home: homeScore,
+            away: awayScore,
+          })
+        }
         await saveReplayUrls()
         await recordKOs(matchWinner)
         onSuccess()

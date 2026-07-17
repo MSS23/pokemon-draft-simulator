@@ -5,8 +5,8 @@
  * bypass RLS and Clerk's server-side `auth()` to authenticate the host.
  *
  * Why this exists: when the Clerk → Supabase JWT bridge is misconfigured
- * (e.g. the "supabase" JWT template isn't set up in the Clerk dashboard, or
- * Supabase's native third-party auth integration isn't enabled), every
+ * (for example, Supabase's native Clerk third-party auth integration isn't
+ * enabled), every
  * client-side write hits anon-key RLS and fails with code 42501. This route
  * lets the host create a draft without depending on that bridge.
  */

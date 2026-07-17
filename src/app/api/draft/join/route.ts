@@ -43,8 +43,10 @@ export async function POST(request: NextRequest) {
   const db = createServiceRoleClient()
   const { data: draft, error: draftError } = await db
     .from('drafts')
-    .select('id, has_password')
-    .eq('room_code', roomCode)
+    .select('id, has_password, settings')
+    // Older draft rooms use lowercase codes while tournament rooms use
+    // uppercase. Room codes are user-facing and intentionally case-insensitive.
+    .ilike('room_code', roomCode)
     .maybeSingle()
 
   if (draftError || !draft) {
@@ -62,6 +64,47 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
     if (!passwordRow || !(await bcrypt.compare(body.password, passwordRow.password))) {
       return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 })
+    }
+  }
+
+  const settings = (draft.settings ?? {}) as Record<string, unknown>
+  const isTournament = settings.tournamentOnly === true
+  let leagueId: string | null = null
+
+  if (isTournament) {
+    const { data: league, error: leagueError } = await db
+      .from('leagues')
+      .select('id, status')
+      .eq('draft_id', draft.id)
+      .maybeSingle()
+
+    if (leagueError || !league) {
+      return NextResponse.json({ error: 'Tournament lobby not found.' }, { status: 404 })
+    }
+    if (league.status !== 'scheduled') {
+      return NextResponse.json({ error: 'This tournament has already started.' }, { status: 409 })
+    }
+    leagueId = league.id
+
+    // Tournament joins before the atomic join RPC existed created a team but
+    // no participant row. Treat that legacy team as a rejoin instead of
+    // creating a duplicate team for the same Clerk user.
+    const { data: existingTeam } = await db
+      .from('teams')
+      .select('id')
+      .eq('draft_id', draft.id)
+      .eq('owner_id', userId)
+      .maybeSingle()
+
+    if (existingTeam) {
+      return NextResponse.json({
+        draftId: roomCode,
+        leagueId,
+        teamId: existingTeam.id,
+        asSpectator: false,
+        displayName: body.displayName?.trim() || `Player-${userId.slice(0, 6)}`,
+        rejoined: true,
+      })
     }
   }
 
@@ -95,6 +138,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     draftId: roomCode,
+    leagueId,
     teamId: data.teamId || '',
     asSpectator: data.asSpectator === true,
     displayName,

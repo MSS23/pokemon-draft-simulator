@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,11 +28,26 @@ import { TeamSheetView } from '@/components/tournament/TeamSheetView'
 import { TournamentMatchView } from '@/components/tournament/TournamentMatchView'
 import {
   ArrowLeft, Trophy, Swords, Copy, Check, Crown, Users, Play, Loader2, FileText, ClipboardList, Eye,
+  AlertCircle, RefreshCw,
 } from 'lucide-react'
 import type { League, Match, Team, Pick } from '@/types'
 import type { Tournament } from '@/lib/tournament-service'
 
 const log = createLogger('TournamentPage')
+const TOURNAMENT_REQUEST_TIMEOUT_MS = 12_000
+
+async function withTournamentTimeout<T>(request: PromiseLike<T>, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), TOURNAMENT_REQUEST_TIMEOUT_MS)
+  })
+
+  try {
+    return await Promise.race([Promise.resolve(request), timeout])
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
 
 export default function TournamentPage() {
   const params = useParams()
@@ -67,16 +82,28 @@ export default function TournamentPage() {
 
   // OTS Match View (player-facing)
   const [viewingMatch, setViewingMatch] = useState<(Match & { homeTeam: Team; awayTeam: Team }) | null>(null)
+  const loadInFlightRef = useRef(false)
+  const hasLoadedRef = useRef(false)
 
   const { user } = useAuth()
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (showLoading = true) => {
+    // Prevent overlapping requests when a slow network crosses the lobby's
+    // refresh interval. Overlaps were multiplying Clerk and PostgREST calls.
+    if (loadInFlightRef.current) return
+    loadInFlightRef.current = true
+
     try {
-      setIsLoading(true)
-      setError(null)
+      if (showLoading) {
+        setIsLoading(true)
+        setError(null)
+      }
 
       // First try loading as an active tournament
-      const data = await KnockoutService.getFullTournament(tournamentId)
+      const data = await withTournamentTimeout(
+        KnockoutService.getFullTournament(tournamentId),
+        'The tournament service took too long to respond. Check your connection and try again.',
+      )
 
       if (data) {
         // Active tournament with bracket
@@ -87,7 +114,10 @@ export default function TournamentPage() {
 
         // Load team rosters
         const teamIds = data.league.teams.map(t => t.id)
-        const picks = await KnockoutService.getTeamPicks(teamIds)
+        const picks = await withTournamentTimeout(
+          KnockoutService.getTeamPicks(teamIds),
+          'Player rosters took too long to load.',
+        )
         setTeamPicks(picks)
 
         // Get room code from settings
@@ -96,7 +126,10 @@ export default function TournamentPage() {
 
         // Load team sheets
         try {
-          const sheets = await TeamSheetService.getAllTeamSheets(data.league.draftId)
+          const sheets = await withTournamentTimeout(
+            TeamSheetService.getAllTeamSheets(data.league.draftId),
+            'Team sheets took too long to load.',
+          )
           setTeamSheets(sheets)
         } catch { /* ignore */ }
 
@@ -110,12 +143,13 @@ export default function TournamentPage() {
         const { supabase } = await import('@/lib/supabase')
         if (!supabase) { setError('Not connected'); return }
 
-        const { data: leagueRow } = await supabase
+        const { data: leagueRow, error: leagueError } = await withTournamentTimeout(supabase
           .from('leagues')
           .select('*')
           .eq('id', tournamentId)
-          .single()
+          .maybeSingle(), 'The tournament lobby took too long to load.')
 
+        if (leagueError) throw new Error(`Could not load tournament: ${leagueError.message}`)
         if (!leagueRow) { setError('Tournament not found'); return }
 
         const settings = (leagueRow.settings ?? {}) as Record<string, unknown>
@@ -127,17 +161,21 @@ export default function TournamentPage() {
           setRoomCode(code)
 
           // Load players from teams table via draft
-          const { data: teamRows } = await supabase
+          const { data: teamRows, error: teamsError } = await withTournamentTimeout(supabase
             .from('teams')
             .select('id, name, owner_id')
             .eq('draft_id', leagueRow.draft_id)
-            .order('draft_order')
+            .order('draft_order'), 'The tournament player list took too long to load.')
 
+          if (teamsError) throw new Error(`Could not load tournament players: ${teamsError.message}`)
           setLobbyPlayers(teamRows?.map(t => ({ id: t.id, name: t.name, ownerId: t.owner_id })) || [])
 
           // Load team sheets
           try {
-            const sheets = await TeamSheetService.getAllTeamSheets(leagueRow.draft_id)
+            const sheets = await withTournamentTimeout(
+              TeamSheetService.getAllTeamSheets(leagueRow.draft_id),
+              'Team sheets took too long to load.',
+            )
             setTeamSheets(sheets)
           } catch { /* ignore */ }
 
@@ -179,23 +217,30 @@ export default function TournamentPage() {
         } catch { /* ignore */ }
       }
       if (userId) {
-        const result = await KnockoutService.isCommissioner(tournamentId, userId)
+        const result = await withTournamentTimeout(
+          KnockoutService.isCommissioner(tournamentId, userId),
+          'Tournament permissions took too long to load.',
+        )
         setIsCommissioner(result)
       }
+      hasLoadedRef.current = true
     } catch (err) {
       log.error('Error loading tournament:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load tournament')
+      if (showLoading || !hasLoadedRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to load tournament')
+      }
     } finally {
-      setIsLoading(false)
+      loadInFlightRef.current = false
+      if (showLoading) setIsLoading(false)
     }
   }, [tournamentId, user?.id])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { void loadData(true) }, [loadData])
 
   // Poll lobby for new players
   useEffect(() => {
     if (!isLobby) return
-    const interval = setInterval(loadData, 5000)
+    const interval = setInterval(() => { void loadData(false) }, 5000)
     return () => clearInterval(interval)
   }, [isLobby, loadData])
 
@@ -210,9 +255,19 @@ export default function TournamentPage() {
     if (!user) return
     setIsStarting(true)
     try {
-      await KnockoutService.beginTournament(tournamentId, user.id)
-      notify.success('Tournament Started!', 'Bracket generated')
-      await loadData()
+      const response = await fetch('/api/tournament/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leagueId: tournamentId }),
+      })
+      const result = await response.json().catch(() => ({})) as { error?: string; convertedToSingle?: boolean }
+      if (!response.ok) throw new Error(result.error || 'Could not start tournament')
+      if (result.convertedToSingle) {
+        notify.success('Tournament Started!', 'Converted to a production-ready single-elimination bracket')
+      } else {
+        notify.success('Tournament Started!', 'Bracket generated')
+      }
+      await loadData(false)
     } catch (err) {
       log.error('Failed to start tournament:', err)
       notify.error('Failed', err instanceof Error ? err.message : 'Could not start tournament')
@@ -266,14 +321,26 @@ export default function TournamentPage() {
 
   if (error || !league) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader><CardTitle>Error</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">{error || 'Tournament not found'}</p>
-            <Button onClick={() => router.push('/')} className="w-full">
-              <ArrowLeft className="h-4 w-4 mr-2" />Go Home
-            </Button>
+      <div className="min-h-screen bg-background pokemon-bg flex items-center justify-center p-4">
+        <Card className="w-full max-w-md border-destructive/30">
+          <CardHeader className="space-y-3">
+            <div className="h-11 w-11 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
+              <AlertCircle className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <CardTitle>Tournament unavailable</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {error || 'Tournament not found'}
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button onClick={() => { void loadData(true) }} className="min-h-11">
+                <RefreshCw className="h-4 w-4 mr-2" aria-hidden="true" />Try again
+              </Button>
+              <Button variant="outline" onClick={() => router.push('/dashboard')} className="min-h-11">
+                <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />Dashboard
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -390,6 +457,17 @@ export default function TournamentPage() {
           )}
 
           {/* Start Button */}
+          {tournamentType === 'double-elimination' && isCommissioner && (
+            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+                <p className="leading-5 text-muted-foreground">
+                  This lobby was created with the old unfinished double-elimination option. Starting it will safely
+                  convert it to the tested single-elimination bracket so every round can complete.
+                </p>
+              </div>
+            </div>
+          )}
           {isCommissioner && (
             <Button
               className="w-full h-12 text-base"
@@ -401,7 +479,7 @@ export default function TournamentPage() {
               ) : lobbyPlayers.length < 2 ? (
                 <><Users className="h-5 w-5 mr-2" />Need at least 2 players</>
               ) : (
-                <><Play className="h-5 w-5 mr-2" />Start Tournament ({lobbyPlayers.length} players)</>
+                <><Play className="h-5 w-5 mr-2" />{tournamentType === 'double-elimination' ? 'Convert & Start' : 'Start Tournament'} ({lobbyPlayers.length} players)</>
               )}
             </Button>
           )}
@@ -704,6 +782,7 @@ export default function TournamentPage() {
             awayTeamPicks={awayTeamPicks}
             currentUserTeamId={userTeamId}
             isCommissioner={isCommissioner}
+            advanceTournamentBracket
             onSuccess={handleMatchRecorded}
           />
         )}

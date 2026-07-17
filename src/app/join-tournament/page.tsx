@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
-import { KnockoutService } from '@/lib/knockout-service'
 import { notify } from '@/lib/notifications'
 import { validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
@@ -36,13 +35,21 @@ export default function JoinTournamentPage() {
       const finalName = (playerName.trim() || displayName).trim();
       const nameCheck = validateName(finalName, { fieldLabel: 'Your name', maxLength: 50 });
       if (!nameCheck.ok) { notify.error('Invalid name', nameCheck.reason!); setIsJoining(false); return; }
-      const { league } = await KnockoutService.joinTournament({
-        roomCode: roomCode.trim().toUpperCase(),
-        playerName: finalName,
-        userId: user.id,
+      const response = await fetch('/api/draft/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomCode: roomCode.trim(),
+          teamName: finalName,
+          displayName: finalName,
+          asSpectator: false,
+        }),
       })
+      const result = await response.json().catch(() => ({})) as { leagueId?: string; error?: string }
+      if (!response.ok) throw new Error(result.error || 'Could not join tournament')
+      if (!result.leagueId) throw new Error('Tournament lobby could not be resolved')
       notify.success('Joined!', 'You\'re in the tournament')
-      router.push(`/tournament/${league.id}`)
+      router.push(`/tournament/${result.leagueId}`)
     } catch (err) {
       log.error('Failed to join tournament:', err)
       notify.error('Failed', err instanceof Error ? err.message : 'Could not join tournament')

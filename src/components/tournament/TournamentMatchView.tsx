@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, toShowdownName } from '@/utils/pokemon'
 import { notify } from '@/lib/notifications'
 import { LeagueService } from '@/lib/league-service'
+import { KnockoutService } from '@/lib/knockout-service'
 import { createLogger } from '@/lib/logger'
 import {
   Swords, Trophy, X, Check, Loader2, Shield,
@@ -204,12 +205,22 @@ export const TournamentMatchView = memo(function TournamentMatchView({
       const finalAwayScore = awayWins
       const winnerId = homeWins > awayWins ? match.homeTeamId : match.awayTeamId
 
-      await LeagueService.submitMatchResult(
+      const result = await LeagueService.submitMatchResult(
         match.id,
         currentUserTeamId,
         { homeScore: finalHomeScore, awayScore: finalAwayScore, winnerTeamId: winnerId }
       )
-      notify.success('Result Submitted', 'Waiting for opponent confirmation')
+      if (result.status === 'confirmed') {
+        await KnockoutService.reportResult(match.leagueId, match.id, winnerId, {
+          home: finalHomeScore,
+          away: finalAwayScore,
+        })
+        notify.success('Result Confirmed', 'The winner advanced in the bracket')
+      } else if (result.status === 'disputed') {
+        notify.warning('Result Disputed', 'The submitted results do not match')
+      } else {
+        notify.success('Result Submitted', 'Waiting for opponent confirmation')
+      }
       onResultRecorded()
       onClose()
     } catch (err) {
