@@ -16,7 +16,6 @@ import { useState, useEffect, useCallback, useMemo, useRef, useTransition } from
 import dynamic from 'next/dynamic'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { usePokemonListByFormat } from '@/hooks/usePokemon'
-import { Pokemon } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -311,7 +310,8 @@ export default function DraftRoomPage() {
 
     const currentTurn = dbState.draft.current_turn || 1
     const totalTeams = teams.length
-    const maxRounds = dbState.draft.settings?.maxPokemonPerTeam || 10
+    // Same key-fallback chain the server RPCs use (place_bid/resolve_auction)
+    const maxRounds = dbState.draft.settings?.maxPokemonPerTeam ?? dbState.draft.settings?.pokemonPerTeam ?? 10
 
     let currentTeamId = ''
     if (totalTeams > 0 && currentTurn) {
@@ -366,7 +366,7 @@ export default function DraftRoomPage() {
         return {
           maxTeams: dbState.draft.max_teams,
           timeLimit: dbState.draft.settings?.timeLimit ?? 0,
-          pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam || 6,
+          pokemonPerTeam: dbState.draft.settings?.pokemonPerTeam ?? dbState.draft.settings?.maxPokemonPerTeam ?? 6,
           draftType,
           formatId: dbState.draft.settings?.formatId,
           customFormatId: dbState.draft.custom_format_id ?? undefined,
@@ -1128,7 +1128,7 @@ export default function DraftRoomPage() {
               onEndDraft={actions.handleEndDraft}
               onResetDraft={actions.handleResetDraft}
               onDeleteDraft={actions.handleDeleteDraft}
-              onAdvanceTurn={actions.handleAdvanceTurn}
+              onAdvanceTurn={isAuctionDraft ? undefined : actions.handleAdvanceTurn}
               onSetTimer={actions.handleSetTimer}
               onEnableProxyPicking={actions.noopCallback}
               onDisableProxyPicking={actions.noopCallback}
@@ -1165,8 +1165,6 @@ export default function DraftRoomPage() {
                         timeRemaining={auction.auctionTimeRemaining}
                         isUserTurn={true}
                         onPlaceBid={auction.handlePlaceBid}
-                        onNominatePokemon={(pokemon: Pokemon) => auction.handleNominatePokemon(pokemon, 1, 300)}
-                        draftId={roomCode?.toLowerCase() || ''}
                       />
                     </div>
                     <div>

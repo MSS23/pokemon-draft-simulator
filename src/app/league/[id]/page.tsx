@@ -37,6 +37,7 @@ import type { League, Match, Standing, Team, Pick, ExtendedLeagueSettings } from
 import type { PickRow } from '@/types/supabase-helpers'
 import { CommissionerService, type Announcement } from '@/lib/commissioner-service'
 import { createLogger } from '@/lib/logger'
+import { notify } from '@/lib/notifications'
 import { buildTeamColorMap } from '@/utils/team-colors'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -754,7 +755,20 @@ export default function LeaguePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <PlayoffBracket tournament={playoffTournament} />
+                <PlayoffBracket
+                  tournament={playoffTournament}
+                  onReportResult={isCommissioner ? async (matchId, winnerId) => {
+                    try {
+                      const updated = await LeagueService.reportPlayoffResult(leagueId, matchId, winnerId)
+                      setPlayoffTournament(updated)
+                      if (updated.winner) {
+                        notify.success('Champion crowned!', `${updated.winner.name} wins the playoffs`)
+                      }
+                    } catch (err) {
+                      notify.error('Failed to record result', err instanceof Error ? err.message : 'Unknown error')
+                    }
+                  } : undefined}
+                />
               </CardContent>
             </Card>
           </div>

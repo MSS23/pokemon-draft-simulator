@@ -29,6 +29,8 @@ interface CreateLeagueModalProps {
   draftId: string
   draftName: string
   teamCount: number
+  /** Prefill from the draft's leagueWeeks setting, if the host chose one */
+  defaultWeeks?: number
   onSuccess: (leagueId: string) => void
 }
 
@@ -38,10 +40,11 @@ export function CreateLeagueModal({
   draftId,
   draftName,
   teamCount,
+  defaultWeeks,
   onSuccess,
 }: CreateLeagueModalProps) {
   const [leagueName, setLeagueName] = useState(`${draftName} Season 1`)
-  const [totalWeeks, setTotalWeeks] = useState(10)
+  const [totalWeeks, setTotalWeeks] = useState(defaultWeeks || 10)
   const [matchFormat, setMatchFormat] = useState<'best_of_1' | 'best_of_3'>('best_of_3')
   const [splitConferences, setSplitConferences] = useState(false)
   const [freeAgentPicksAllowed, setFreeAgentPicksAllowed] = useState(3)
@@ -50,6 +53,9 @@ export function CreateLeagueModal({
   const createInFlightRef = useRef(false)
 
   const canSplitConferences = teamCount >= 4
+  const weekOptions = Array.from(
+    new Set([6, 8, 10, 12, 14, 16, 18, 20, ...(defaultWeeks ? [defaultWeeks] : [])])
+  ).sort((a, b) => a - b)
 
   const handleCreate = async () => {
     // Ref guard prevents double-submission (state updates are async)
@@ -130,7 +136,7 @@ export function CreateLeagueModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[6, 8, 10, 12, 14, 16, 18, 20].map((weeks) => (
+                {weekOptions.map((weeks) => (
                   <SelectItem key={weeks} value={String(weeks)}>
                     {weeks} weeks
                   </SelectItem>

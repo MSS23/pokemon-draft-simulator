@@ -50,8 +50,6 @@ interface AuctionBiddingInterfaceProps {
   timeRemaining: number
   isUserTurn: boolean
   onPlaceBid: (amount: number) => Promise<void>
-  onNominatePokemon: (pokemon: Pokemon) => Promise<void>
-  draftId: string
   className?: string
 }
 
@@ -143,8 +141,6 @@ export default function AuctionBiddingInterface({
   timeRemaining,
   isUserTurn,
   onPlaceBid,
-  onNominatePokemon: _onNominatePokemon,
-  draftId,
   className,
 }: AuctionBiddingInterfaceProps) {
   const [bidAmount, setBidAmount] = useState('')
@@ -250,17 +246,7 @@ export default function AuctionBiddingInterface({
       // Play bid sound
       draftSounds.play('bid-placed')
 
-      try {
-        await auctionService.recordBidHistory({
-          auctionId: currentAuction.id,
-          teamId: userTeam.id,
-          teamName: userTeam.name,
-          bidAmount: amount,
-          draftId: draftId,
-        })
-      } catch (historyErr) {
-        log.warn('Failed to record bid history:', historyErr)
-      }
+      // Bid history is recorded server-side by the place_bid RPC.
 
       notificationService.notifyBidPlaced(
         userTeam.name,
@@ -288,7 +274,7 @@ export default function AuctionBiddingInterface({
     } finally {
       setIsPlacingBid(false)
     }
-  }, [currentAuction, userTeam, isPlacingBid, bidAmount, onPlaceBid, draftId])
+  }, [currentAuction, userTeam, isPlacingBid, bidAmount, onPlaceBid])
 
   const canBid = useCallback(() => {
     if (

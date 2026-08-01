@@ -103,6 +103,33 @@ describe('processDraftTick', () => {
     expect(res.action).toBe('not_expired')
   })
 
+  it('skips an expired nomination turn when no auction is active', async () => {
+    dbConfig.tables.drafts = [{ data: activeSnake({ format: 'auction' }) }]
+    dbConfig.tables.auctions = [{ data: null }]
+    dbConfig.rpc.system_skip_nomination = { data: { skipped: true, newTurn: 4 } }
+
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('nomination_skipped')
+  })
+
+  it('waits out a nomination window that has not expired', async () => {
+    dbConfig.tables.drafts = [
+      { data: activeSnake({ format: 'auction', turn_started_at: new Date().toISOString() }) },
+    ]
+    dbConfig.tables.auctions = [{ data: null }]
+
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('not_expired')
+  })
+
+  it('does not skip a nomination when the draft has no time limit', async () => {
+    dbConfig.tables.drafts = [{ data: activeSnake({ format: 'auction', settings: {} }) }]
+    dbConfig.tables.auctions = [{ data: null }]
+
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('none')
+  })
+
   it('does not act on a snake turn whose timer has not expired', async () => {
     dbConfig.tables.drafts = [{ data: activeSnake({ turn_started_at: new Date().toISOString() }) }]
     const res = await processDraftTick('draft-1')

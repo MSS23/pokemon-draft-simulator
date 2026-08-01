@@ -21,7 +21,6 @@ import { cn } from '@/lib/utils'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, formatPokemonName } from '@/utils/pokemon'
 import { TEAM_COLORS, buildTeamColorMap } from '@/utils/team-colors'
 import { PokeballIcon } from '@/components/ui/pokeball-icon'
-import TournamentSchedule from '@/components/tournament/TournamentSchedule'
 import { ShareableRecapCard } from './ShareableRecapCard'
 import { DraftReplay } from './DraftReplay'
 import { DraftRecapAnimation } from './DraftRecapAnimation'
@@ -202,12 +201,11 @@ export default function DraftResults({
       </Card>
 
       <div className="w-full">
-        <div className="grid w-full grid-cols-5 mb-6 gap-1">
+        <div className="grid w-full grid-cols-4 mb-6 gap-1">
           {[
             { id: 'recap', label: 'Draft Recap' },
             { id: 'replay', label: 'Replay' },
             { id: 'rosters', label: 'Team Rosters' },
-            { id: 'tournament', label: 'Tournament' },
             { id: 'sharecard', label: 'Share Card' },
           ].map((tab) => (
             <Button
@@ -448,17 +446,6 @@ export default function DraftResults({
               })
             }
           </div>
-        )}
-
-        {/* Tournament */}
-        {activeTab === 'tournament' && (
-          <TournamentSchedule
-            teams={teams.map(team => ({
-              id: team.id,
-              name: team.name,
-              userName: team.userName
-            }))}
-          />
         )}
 
         {/* Share Card */}

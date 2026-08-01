@@ -453,7 +453,7 @@ function DraftCard({ draft, onClick, isHost, onDelete }: { draft: DraftWithTeam;
 
               {draft.status === 'completed' && (
                 <p className="text-sm text-blue-600 dark:text-blue-400">
-                  Draft complete{draft.settings?.createLeague ? ' • League created' : ''}
+                  Draft complete
                 </p>
               )}
             </div>

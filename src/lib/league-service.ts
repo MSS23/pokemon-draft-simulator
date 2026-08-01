@@ -320,20 +320,6 @@ export class LeagueService {
   ): Promise<Match[]> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    // Build all unique matchup pairs (round-robin)
-    const allPairs: [Team, Team][] = []
-    for (let i = 0; i < teams.length; i++) {
-      for (let j = i + 1; j < teams.length; j++) {
-        allPairs.push([teams[i], teams[j]])
-      }
-    }
-
-    // Shuffle pairs for randomization
-    for (let i = allPairs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [allPairs[i], allPairs[j]] = [allPairs[j], allPairs[i]]
-    }
-
     // Use circle method for round-robin scheduling (handles even/odd teams)
     const roundRobinRounds = this.buildRoundRobinRounds(teams)
 
@@ -1233,6 +1219,28 @@ export class LeagueService {
   static async getPlayoffState(leagueId: string): Promise<unknown | null> {
     const settings = await this.getLeagueSettings(leagueId)
     return (settings as Record<string, unknown>).playoff ?? null
+  }
+
+  /**
+   * Report a playoff match result and advance the bracket (commissioner action).
+   * Returns the updated tournament so callers can update UI without a refetch.
+   */
+  // ponytail: read-modify-write on settings JSONB — fine for a single-commissioner
+  // action; move brackets to their own table/RPC if multiple writers ever exist.
+  static async reportPlayoffResult(
+    leagueId: string,
+    matchId: string,
+    winnerId: string,
+    score?: { participant1: number; participant2: number }
+  ): Promise<import('./tournament-service').Tournament> {
+    const state = await this.getPlayoffState(leagueId)
+    if (!state) throw new Error('No playoff bracket exists for this league')
+
+    const { importTournament, reportMatchResult, exportTournament } = await import('./tournament-service')
+    const tournament = importTournament(JSON.stringify(state))
+    const updated = reportMatchResult(tournament, matchId, winnerId, score)
+    await this.savePlayoffState(leagueId, JSON.parse(exportTournament(updated)))
+    return updated
   }
 
   /**

@@ -57,7 +57,8 @@ interface DraftControlsProps {
   onEndDraft: () => void
   onResetDraft?: () => void
   onDeleteDraft?: () => void
-  onAdvanceTurn: () => void
+  /** Omit for auction drafts — nomination turns advance server-side only. */
+  onAdvanceTurn?: () => void
   onSetTimer: (seconds: number) => void
   onEnableProxyPicking?: () => void
   onDisableProxyPicking?: () => void
@@ -156,7 +157,7 @@ const DraftControls = memo(function DraftControls({
       confirmLabel: 'Skip Turn',
       variant: 'default',
       onConfirm: () => {
-        onAdvanceTurn()
+        onAdvanceTurn?.()
         notify.warning('Turn Skipped', 'The current turn has been skipped')
       },
     })
@@ -272,10 +273,12 @@ const DraftControls = memo(function DraftControls({
                     <span className="hidden sm:inline">Undo</span>
                   </Button>
                 )}
-                <Button onClick={handleAdvanceTurn} variant="outline" size="sm" className="h-9 text-xs flex-shrink-0">
-                  <SkipForward className="h-3.5 w-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline">Skip</span>
-                </Button>
+                {onAdvanceTurn && (
+                  <Button onClick={handleAdvanceTurn} variant="outline" size="sm" className="h-9 text-xs flex-shrink-0">
+                    <SkipForward className="h-3.5 w-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline">Skip</span>
+                  </Button>
+                )}
                 <Button onClick={handlePauseDraft} variant="outline" size="sm" className="h-9 w-9 p-0 flex-shrink-0">
                   <Pause className="h-3.5 w-3.5" />
                 </Button>

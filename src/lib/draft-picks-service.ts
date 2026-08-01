@@ -534,39 +534,13 @@ export async function undoPickById(draftId: string, userId: string, pickId: stri
   await undoLastPick(draftId, userId)
 }
 
+// NOTE: AFK auto-skip is server-authoritative (system_advance_turn via
+// draft-tick); the old client-side autoSkipTurn was removed with it.
+
 /**
- * Auto-skip a turn when time expires (AFK handling)
+ * Host-only manual turn advance for SNAKE drafts. Auction turn progression is
+ * owned by resolve_auction / system_skip_nomination — never call this there.
  */
-export async function autoSkipTurn(draftId: string): Promise<void> {
-  if (!supabase) throw new Error('Supabase not available')
-
-  try {
-    // Get current draft state
-    const draftState = await getDraftStateLazy(draftId)
-    if (!draftState) {
-      log.warn(`Auto-skip aborted: Draft ${draftId} not found or has ended`)
-      return // Don't throw, just return silently
-    }
-
-    if (draftState.draft.status !== 'active') {
-      log.warn(`Auto-skip aborted: Draft ${draftId} is not active (status: ${draftState.draft.status})`)
-      return // Don't throw for non-active drafts
-    }
-
-    // Simply advance to the next turn without making a pick
-    // This effectively skips the current team's turn
-    await advanceTurn(draftId)
-
-    log.info(`Auto-skipped turn ${draftState.draft.current_turn} for draft ${draftId}`)
-  } catch (error) {
-    log.error(`Auto-skip failed for draft ${draftId}:`, error)
-    // Re-throw only if it's not a "not found" error
-    if (error instanceof Error && !error.message?.includes('not found')) {
-      throw error
-    }
-  }
-}
-
 export async function advanceTurn(draftId: string): Promise<void> {
   if (!supabase) throw new Error('Supabase not available')
 

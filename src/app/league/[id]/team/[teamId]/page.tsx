@@ -99,8 +99,8 @@ export default function TeamDetailPage() {
       const { supabase } = await import('@/lib/supabase')
       if (!supabase) throw new Error('Supabase not available')
 
-      // Determine viewer identity
-      const userId = authUser?.id || localStorage.getItem('guestUserId')
+      // Determine viewer identity (Clerk only — team ownership requires sign-in)
+      const userId = authUser?.id ?? null
 
       // Load team
       const { data: teamData, error: teamError } = await supabase

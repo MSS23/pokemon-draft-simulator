@@ -43,7 +43,7 @@ export function useDraftSession({
   const [showJoinAuthModal, setShowJoinAuthModal] = useState(false)
   const [isJoiningFromLink, setIsJoiningFromLink] = useState(false)
 
-  // Priority: 1) Supabase auth ID, 2) stored participation, 3) stored session, 4) sessionStorage, 5) guest ID
+  // Priority: 1) Clerk user ID, 2) stored participation, 3) stored session, 4) sessionStorage, 5) guest ID
   const userId = useMemo(() => {
     if (authUser?.id) {
       return authUser.id
@@ -94,7 +94,7 @@ export function useDraftSession({
 
   return {
     userId,
-    isHost: isHostParam,
+    isHost: isHostParam || viewerRole === 'host',
     isSpectator: isSpectatorParam,
     isAdmin,
     showJoinAuthModal,

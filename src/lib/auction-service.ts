@@ -7,14 +7,6 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('AuctionService')
 
-export interface PlaceBidParams {
-  auctionId: string
-  teamId: string
-  teamName: string
-  bidAmount: number
-  draftId: string
-}
-
 export interface BidHistoryEntry {
   id: string
   auctionId: string
@@ -33,50 +25,6 @@ class AuctionService {
       AuctionService.instance = new AuctionService()
     }
     return AuctionService.instance
-  }
-
-  /**
-   * Record a bid in the history table only (no auction update)
-   * Use this when DraftService.placeBid handles the auction update
-   */
-  async recordBidHistory(params: PlaceBidParams): Promise<void> {
-    if (!supabase) {
-      throw new Error('Supabase not available')
-    }
-
-    const { auctionId, teamId, teamName, bidAmount, draftId } = params
-
-    // Get draft UUID from room code
-    const { DraftService } = await import('./draft-service')
-    const draftState = await DraftService.getDraftState(draftId)
-    if (!draftState) {
-      throw new Error('Draft not found')
-    }
-
-    const { error: historyError } = await supabase
-      .from('bid_history')
-      .insert({
-        auction_id: auctionId,
-        draft_id: draftState.draft.id,
-        team_id: teamId,
-        team_name: teamName,
-        bid_amount: bidAmount,
-      })
-
-    if (historyError) {
-      log.error('Error recording bid history:', historyError)
-      throw new Error('Failed to record bid history')
-    }
-
-    // Update local cache
-    this.addBidToCache(auctionId, {
-      id: `temp-${Date.now()}`,
-      auctionId,
-      teamId,
-      teamName,
-      bidAmount,
-      timestamp: new Date().toISOString(),
-    })
   }
 
   /**
@@ -197,7 +145,10 @@ class AuctionService {
         },
         (payload) => {
           const auction = payload.new as AuctionRow
-          this.notifyAuctionStarted(auction.pokemon_name, auction.nominated_by, userTeamId)
+          // Skip-marker rows insert as already-completed; only real lots notify.
+          if (auction.status === 'active') {
+            this.notifyAuctionStarted(auction.pokemon_name, auction.nominated_by, userTeamId)
+          }
         }
       )
       .on(
@@ -341,12 +292,9 @@ class AuctionService {
 export const auctionService = AuctionService.getInstance()
 
 // Convenience exports.
-// NOTE: there is intentionally no `placeBid` here. Bidding goes through
-// DraftService.placeBid (draft-auction-methods.placeBid — optimistic-locked)
-// plus auctionService.recordBidHistory. The old non-atomic AuctionService.placeBid
-// was removed (it was an unused last-write-wins footgun).
+// NOTE: there is intentionally no `placeBid` or `recordBidHistory` here.
+// Bidding goes through the place_bid RPC, which records bid history itself.
 export const {
-  recordBidHistory,
   getBidHistory,
   subscribeToBidHistory,
   subscribeToAuctionUpdates,

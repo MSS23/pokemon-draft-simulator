@@ -343,50 +343,7 @@ export async function setAuctionTimerDuration(
   }
 }
 
-/**
- * Check auction draft progress and advance if needed
- */
-export async function checkAuctionDraftProgress(draftId: string): Promise<void> {
-  const draftState = await getDraftStateLazy(draftId)
-  if (!draftState) return
-  if (!supabase) return
-
-  const internalId = draftState.draft.id
-  const maxPicks = Number(draftState.draft.settings?.pokemonPerTeam || 10)
-  const totalPossiblePicks = draftState.teams.length * maxPicks
-  const currentPicks = draftState.picks.length
-
-  // Check if draft is complete
-  if (currentPicks >= totalPossiblePicks) {
-    const { error } = await supabase
-      .from('drafts')
-      .update({
-        status: 'completed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', internalId)
-
-    if (error) {
-      log.error('Error completing auction draft:', error)
-    }
-
-    // League creation is handled on the results page so the host can configure settings first
-  }
-
-  // Update current turn/round for auction drafts
-  const currentTurn = currentPicks + 1
-  const currentRound = Math.floor(currentPicks / draftState.teams.length) + 1
-
-  const { error: turnError } = await supabase
-    .from('drafts')
-    .update({
-      current_turn: currentTurn,
-      current_round: currentRound,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', internalId)
-
-  if (turnError) {
-    log.error('Error updating auction draft turn:', turnError)
-  }
-}
+// NOTE: turn/round progression and draft completion for auction drafts are
+// owned exclusively by the resolve_auction / system_skip_nomination RPCs.
+// The old client-side checkAuctionDraftProgress recomputed current_turn from
+// pick count, which diverged from the server the first time a lot went unsold.

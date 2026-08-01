@@ -40,7 +40,6 @@ export {
   getUserTeam,
   undoLastPick,
   undoPickById,
-  autoSkipTurn,
   advanceTurn,
   validatePokemonInFormat,
 } from './draft-picks-service'
@@ -60,7 +59,6 @@ export {
   markDraftCompleted,
   markDraftAbandoned,
   adjustTeamBudget,
-  createLeagueForCompletedDraft,
   validateDraftCanStart,
 } from './draft-lifecycle-service'
 
@@ -72,7 +70,6 @@ export {
   getCurrentAuction,
   setAuctionTimerDuration,
   validateUserCanNominate,
-  checkAuctionDraftProgress,
 } from './draft-auction-methods'
 
 export {
@@ -92,7 +89,6 @@ import {
   getUserTeam as _getUserTeam,
   undoLastPick as _undoLastPick,
   undoPickById as _undoPickById,
-  autoSkipTurn as _autoSkipTurn,
   advanceTurn as _advanceTurn,
   validatePokemonInFormat as _validatePokemonInFormat,
 } from './draft-picks-service'
@@ -112,7 +108,6 @@ import {
   markDraftCompleted as _markDraftCompleted,
   markDraftAbandoned as _markDraftAbandoned,
   adjustTeamBudget as _adjustTeamBudget,
-  createLeagueForCompletedDraft as _createLeagueForCompletedDraft,
   validateDraftCanStart as _validateDraftCanStart,
 } from './draft-lifecycle-service'
 
@@ -124,7 +119,6 @@ import {
   getCurrentAuction as _getCurrentAuction,
   setAuctionTimerDuration as _setAuctionTimerDuration,
   validateUserCanNominate as _validateUserCanNominate,
-  checkAuctionDraftProgress as _checkAuctionDraftProgress,
 } from './draft-auction-methods'
 
 import {
@@ -1049,7 +1043,6 @@ export class DraftService {
   static getUserTeam = _getUserTeam
   static undoLastPick = _undoLastPick
   static undoPickById = _undoPickById
-  static autoSkipTurn = _autoSkipTurn
   static advanceTurn = _advanceTurn
   private static validatePokemonInFormat = _validatePokemonInFormat
 
@@ -1068,7 +1061,6 @@ export class DraftService {
   static markDraftCompleted = _markDraftCompleted
   static markDraftAbandoned = _markDraftAbandoned
   static adjustTeamBudget = _adjustTeamBudget
-  private static createLeagueForCompletedDraft = _createLeagueForCompletedDraft
   private static validateDraftCanStart = _validateDraftCanStart
 
   // Auction
@@ -1079,7 +1071,6 @@ export class DraftService {
   static getCurrentAuction = _getCurrentAuction
   static setAuctionTimerDuration = _setAuctionTimerDuration
   private static validateUserCanNominate = _validateUserCanNominate
-  private static checkAuctionDraftProgress = _checkAuctionDraftProgress
 
   // History
   static getDraftHistory = _getDraftHistory

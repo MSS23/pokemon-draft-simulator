@@ -7,7 +7,6 @@
 import { supabase } from './supabase'
 import { UserSessionService } from '@/lib/user-session'
 import type { DraftRow, TeamRow, ParticipantRow } from '@/types/supabase-helpers'
-import type { DraftSettings as DraftSettingsJson } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 import { analytics } from '@/lib/analytics'
 import type { DraftState } from './draft-service'
@@ -297,6 +296,17 @@ export async function resetDraft(draftId: string): Promise<void> {
   if (bidsError) {
     log.error('Error deleting bids:', bidsError)
     // Don't throw - bids might not exist
+  }
+
+  // Re-mark wishlisted Pokemon as available again (picks are gone now)
+  const { error: wishlistError } = await (supabase
+    .from('wishlist_items'))
+    .update({ is_available: true })
+    .eq('draft_id', draftState.draft.id)
+
+  if (wishlistError) {
+    log.error('Error resetting wishlists:', wishlistError)
+    // Don't throw - wishlists might not exist
   }
 
   // Reset team budgets and picks
@@ -657,39 +667,5 @@ export async function adjustTeamBudget(
   }
 }
 
-/**
- * Create league(s) for a completed draft
- */
-export async function createLeagueForCompletedDraft(
-  draftId: string,
-  settings: DraftSettingsJson
-): Promise<void> {
-  if (!supabase) throw new Error('Supabase not available')
-
-  try {
-    const { LeagueService } = await import('./league-service')
-
-    const leagueWeeks = settings.leagueWeeks || 4
-    const splitIntoConferences = settings.splitIntoConferences || false
-
-    const { leagues } = await LeagueService.createLeagueFromDraft(draftId, {
-      splitIntoConferences,
-      totalWeeks: leagueWeeks,
-      matchFormat: 'best_of_3',
-      maxMatchesPerWeek: 1
-    })
-
-    // Initialize Pokemon status tracking and league settings for each league
-    for (const league of leagues) {
-      await LeagueService.initializeLeaguePokemonStatus(league.id)
-      await LeagueService.updateLeagueSettings(league.id, {
-        matchFormat: 'best_of_3',
-      })
-    }
-
-    log.info('League created successfully for draft:', draftId)
-  } catch (error) {
-    log.error('Failed to create league:', error)
-    throw error
-  }
-}
+// NOTE: league creation happens on the results page via CreateLeagueModal →
+// LeagueService.createLeagueFromDraft, where the host confirms settings.

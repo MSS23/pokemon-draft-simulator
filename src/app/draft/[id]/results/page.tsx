@@ -424,6 +424,7 @@ export default function DraftResultsPage() {
             draftId={draftState.draft.id}
             draftName={draftState.draft.name}
             teamCount={draftState.teams.length}
+            defaultWeeks={Number(draftState.draft.settings?.leagueWeeks) || undefined}
             onSuccess={handleLeagueSuccess}
           />
         )}

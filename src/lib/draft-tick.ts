@@ -24,7 +24,7 @@ const log = createLogger('draftTick')
 
 export interface TickResult {
   draftId: string
-  action: 'none' | 'auction_resolved' | 'auto_picked' | 'skipped' | 'not_expired' | 'not_active'
+  action: 'none' | 'auction_resolved' | 'auto_picked' | 'skipped' | 'nomination_skipped' | 'not_expired' | 'not_active'
   detail?: string
 }
 
@@ -58,7 +58,32 @@ export async function processDraftTick(draftId: string): Promise<TickResult> {
       .maybeSingle()
 
     if (!auction) {
-      return { draftId, action: 'none', detail: 'No active auction' }
+      // No active auction means we are waiting on a nomination. If the team on
+      // the clock has run out the nomination window, skip their turn so an AFK
+      // nominator cannot deadlock the draft.
+      const nominationLimit = Number(
+        (draft.settings as Record<string, unknown> | null)?.timeLimit ?? 0
+      )
+      if (!nominationLimit || nominationLimit <= 0 || !draft.turn_started_at || draft.current_turn == null) {
+        return { draftId, action: 'none', detail: 'No active auction' }
+      }
+      const nominationElapsed =
+        (Date.now() - new Date(draft.turn_started_at).getTime()) / 1000
+      if (nominationElapsed < nominationLimit) {
+        return { draftId, action: 'not_expired', detail: 'Awaiting nomination' }
+      }
+      const { data: skipResult, error: skipError } = await db.rpc('system_skip_nomination', {
+        p_draft_id: draft.id,
+        p_expected_turn: draft.current_turn,
+      })
+      if (skipError) {
+        log.error('system_skip_nomination failed', { draftId, error: skipError.message })
+        return { draftId, action: 'none', detail: skipError.message }
+      }
+      const skipped = skipResult as { skipped?: boolean; reason?: string } | null
+      return skipped?.skipped
+        ? { draftId, action: 'nomination_skipped' }
+        : { draftId, action: 'none', detail: skipped?.reason }
     }
 
     // resolve_auction guards expiry itself; calling early is a safe no-op.

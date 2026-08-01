@@ -1498,6 +1498,15 @@ export type Database = {
           isComplete?: boolean
         }
       }
+      system_skip_nomination: {
+        Args: { p_draft_id: string; p_expected_turn: number }
+        Returns: {
+          skipped: boolean
+          reason?: string
+          team?: string | null
+          newTurn?: number
+        }
+      }
       system_advance_turn: {
         Args: { p_draft_id: string; p_expected_turn: number }
         Returns: {
