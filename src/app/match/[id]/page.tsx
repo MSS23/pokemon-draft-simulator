@@ -204,7 +204,7 @@ export default function MatchDetailPage() {
 
             {/* Showdown Replays */}
             {(() => {
-              const notes = match.notes ? (typeof match.notes === 'string' ? JSON.parse(match.notes) : match.notes) : null
+              const notes = typeof match.notes === 'string' ? LeagueService.parseMatchNotes(match.notes) : match.notes
               const urls = notes?.replayUrls as Record<string, string> | undefined
               if (!urls || Object.keys(urls).length === 0) return null
               return (

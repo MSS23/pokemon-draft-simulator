@@ -142,24 +142,34 @@ export class TradeService {
   ): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const newStatus = accepted
-      ? (requireCommissionerApproval ? 'accepted' : 'accepted')
-      : 'rejected'
+    const newStatus = accepted ? 'accepted' : 'rejected'
 
-    const { data, error } = await (supabase as SupabaseAny)
-      .from('trades')
-      .update({
-        status: newStatus,
-        responded_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', tradeId)
-      .select('league_id')
-      .single()
+    // Server-side authz: respond_to_trade verifies the caller owns a team in
+    // the trade OTHER than the proposer (or is the commissioner), so a
+    // proposer can no longer self-accept at the DB level.
+    const { error: rpcError } = await (supabase as SupabaseAny)
+      .rpc('respond_to_trade', { p_trade_id: tradeId, p_response: newStatus })
 
-    if (error) {
-      log.error('Failed to respond to trade:', error)
-      throw new Error('Failed to respond to trade: ' + error?.message || 'Unknown error')
+    if (rpcError && rpcError.code === 'PGRST202') {
+      // Migration not applied yet — legacy status-guarded direct update
+      const { data, error } = await (supabase as SupabaseAny)
+        .from('trades')
+        .update({
+          status: newStatus,
+          responded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tradeId)
+        .eq('status', 'proposed')
+        .select('league_id')
+        .single()
+      if (error || !data) {
+        log.error('Failed to respond to trade:', error)
+        throw new Error('Trade is no longer open for a response')
+      }
+    } else if (rpcError) {
+      log.error('respond_to_trade failed:', rpcError)
+      throw new Error(rpcError.message || 'Failed to respond to trade')
     }
 
     // If accepted and no commissioner approval needed, execute immediately
@@ -167,7 +177,14 @@ export class TradeService {
       await this.executeTrade(tradeId)
     }
 
-    this.broadcastTradeUpdate(data.league_id, accepted ? 'accepted' : 'rejected', tradeId)
+    const { data: trade } = await (supabase as SupabaseAny)
+      .from('trades')
+      .select('league_id')
+      .eq('id', tradeId)
+      .single()
+    if (trade) {
+      this.broadcastTradeUpdate(trade.league_id, accepted ? 'accepted' : 'rejected', tradeId)
+    }
   }
 
   /**
@@ -176,92 +193,27 @@ export class TradeService {
   static async executeTrade(tradeId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    try {
-      // Try the RPC function first (atomic)
-      const { error: rpcError } = await (supabase as SupabaseAny)
-        .rpc('execute_trade', { trade_uuid: tradeId })
+    // The RPC is the ONLY execution path: it atomically validates ownership
+    // of every pick and involved-party authorization. (The old client-side
+    // fallback silently no-op'd under RLS and marked failed trades completed.)
+    const { error: rpcError } = await (supabase as SupabaseAny)
+      .rpc('execute_trade', { trade_uuid: tradeId })
 
-      if (rpcError) {
-        log.warn('RPC execute_trade failed, falling back to manual swap:', rpcError)
-        await this.executeTradeManually(tradeId)
-        return
-      }
-
-      // Fetch league_id for broadcast
-      const { data: trade } = await (supabase as SupabaseAny)
-        .from('trades')
-        .select('league_id')
-        .eq('id', tradeId)
-        .single()
-
-      if (trade) {
-        this.broadcastTradeUpdate(trade.league_id, 'completed', tradeId)
-      }
-    } catch (err) {
-      log.error('Failed to execute trade:', err)
-      throw new Error('Failed to execute trade')
+    if (rpcError) {
+      log.error('execute_trade failed:', rpcError)
+      throw new Error(rpcError.message || 'Failed to execute trade')
     }
-  }
 
-  /**
-   * Manual fallback for trade execution if RPC not available
-   */
-  private static async executeTradeManually(tradeId: string): Promise<void> {
-    if (!supabase) throw new Error('Supabase not configured')
-
-    const { data: trade, error } = await (supabase as SupabaseAny)
+    // Fetch league_id for broadcast
+    const { data: trade } = await (supabase as SupabaseAny)
       .from('trades')
-      .select('id, league_id, team_a_id, team_b_id, team_a_gives, team_b_gives, status')
+      .select('league_id')
       .eq('id', tradeId)
       .single()
 
-    if (error || !trade) {
-      throw new Error('Trade not found')
+    if (trade) {
+      this.broadcastTradeUpdate(trade.league_id, 'completed', tradeId)
     }
-
-    if (trade.status !== 'accepted') {
-      throw new Error(`Trade must be accepted to execute (current: ${trade.status})`)
-    }
-
-    // Swap team A's picks to team B
-    for (const pickId of (trade.team_a_gives || [])) {
-      const { error: swapErr } = await supabase
-        .from('picks')
-        .update({ team_id: trade.team_b_id })
-        .eq('id', pickId)
-        .eq('team_id', trade.team_a_id)
-
-      if (swapErr) {
-        log.error(`Failed to swap pick ${pickId} from A to B:`, swapErr)
-        throw new Error(`Failed to swap pick ${pickId}`)
-      }
-    }
-
-    // Swap team B's picks to team A
-    for (const pickId of (trade.team_b_gives || [])) {
-      const { error: swapErr } = await supabase
-        .from('picks')
-        .update({ team_id: trade.team_a_id })
-        .eq('id', pickId)
-        .eq('team_id', trade.team_b_id)
-
-      if (swapErr) {
-        log.error(`Failed to swap pick ${pickId} from B to A:`, swapErr)
-        throw new Error(`Failed to swap pick ${pickId}`)
-      }
-    }
-
-    // Mark completed
-    await (supabase as SupabaseAny)
-      .from('trades')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', tradeId)
-
-    this.broadcastTradeUpdate(trade.league_id, 'completed', tradeId)
   }
 
   /**
@@ -270,23 +222,37 @@ export class TradeService {
   static async cancelTrade(tradeId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    const { data, error } = await (supabase as SupabaseAny)
-      .from('trades')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', tradeId)
-      .eq('status', 'proposed')
-      .select('league_id')
-      .single()
+    // Server-side authz: only the proposing team's owner or the commissioner
+    const { error: rpcError } = await (supabase as SupabaseAny)
+      .rpc('cancel_trade', { p_trade_id: tradeId })
 
-    if (error) {
-      log.error('Failed to cancel trade:', error)
-      throw new Error('Failed to cancel trade: ' + error?.message || 'Unknown error')
+    if (rpcError && rpcError.code === 'PGRST202') {
+      // Migration not applied yet — legacy status-guarded direct update
+      const { error } = await (supabase as SupabaseAny)
+        .from('trades')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tradeId)
+        .eq('status', 'proposed')
+      if (error) {
+        log.error('Failed to cancel trade:', error)
+        throw new Error('Failed to cancel trade: ' + (error?.message || 'Unknown error'))
+      }
+    } else if (rpcError) {
+      log.error('cancel_trade failed:', rpcError)
+      throw new Error(rpcError.message || 'Failed to cancel trade')
     }
 
-    this.broadcastTradeUpdate(data.league_id, 'cancelled', tradeId)
+    const { data: trade } = await (supabase as SupabaseAny)
+      .from('trades')
+      .select('league_id')
+      .eq('id', tradeId)
+      .single()
+    if (trade) {
+      this.broadcastTradeUpdate(trade.league_id, 'cancelled', tradeId)
+    }
   }
 
   /**
@@ -322,52 +288,72 @@ export class TradeService {
   ): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    if (approved) {
-      // Set to 'accepted' so executeTrade (and its RPC) can run — it requires this status
-      const { data, error } = await (supabase as SupabaseAny)
-        .from('trades')
-        .update({
-          commissioner_approved: true,
-          commissioner_id: commissionerId,
-          commissioner_notes: notes || null,
-          status: 'accepted',
-          responded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tradeId)
-        .select('league_id')
-        .single()
+    // Verify the caller actually is this league's commissioner before writing
+    const { data: tradeRow } = await (supabase as SupabaseAny)
+      .from('trades')
+      .select('league_id, status')
+      .eq('id', tradeId)
+      .single()
+    if (!tradeRow) throw new Error('Trade not found')
+    const { LeagueService } = await import('./league-service')
+    const isCommish = await LeagueService.isLeagueCommissioner(tradeRow.league_id, commissionerId)
+    if (!isCommish) throw new Error('Only the league commissioner can approve trades')
 
-      if (error) {
-        log.error('Failed to approve trade:', error)
-        throw new Error('Failed to approve trade: ' + error?.message || 'Unknown error')
+    // Server-side authz: approve_trade re-verifies the caller is this
+    // league's commissioner and enforces the status guards atomically.
+    const { error: rpcError } = await (supabase as SupabaseAny)
+      .rpc('approve_trade', { p_trade_id: tradeId, p_approved: approved, p_notes: notes || null })
+
+    if (rpcError && rpcError.code === 'PGRST202') {
+      // Migration not applied yet — legacy status-guarded direct updates
+      if (approved) {
+        // Status guard: only an 'accepted' trade can be approved — a rejected
+        // or cancelled trade must not be resurrected by approval.
+        const { data, error } = await (supabase as SupabaseAny)
+          .from('trades')
+          .update({
+            commissioner_approved: true,
+            commissioner_id: commissionerId,
+            commissioner_notes: notes || null,
+            responded_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', tradeId)
+          .eq('status', 'accepted')
+          .select('league_id')
+          .single()
+        if (error || !data) {
+          log.error('Failed to approve trade:', error)
+          throw new Error('Trade is not in an approvable state')
+        }
+      } else {
+        const { error } = await (supabase as SupabaseAny)
+          .from('trades')
+          .update({
+            commissioner_approved: false,
+            commissioner_id: commissionerId,
+            commissioner_notes: notes || null,
+            status: 'rejected',
+            responded_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', tradeId)
+        if (error) {
+          log.error('Failed to reject trade:', error)
+          throw new Error('Failed to reject trade: ' + (error?.message || 'Unknown error'))
+        }
       }
+    } else if (rpcError) {
+      log.error('approve_trade failed:', rpcError)
+      throw new Error(rpcError.message || (approved ? 'Trade is not in an approvable state' : 'Failed to reject trade'))
+    }
 
+    if (approved) {
       // Execute the pick swap (sets status → 'completed' on success)
       await this.executeTrade(tradeId)
-
-      this.broadcastTradeUpdate(data.league_id, 'completed', tradeId)
+      this.broadcastTradeUpdate(tradeRow.league_id, 'completed', tradeId)
     } else {
-      const { data, error } = await (supabase as SupabaseAny)
-        .from('trades')
-        .update({
-          commissioner_approved: false,
-          commissioner_id: commissionerId,
-          commissioner_notes: notes || null,
-          status: 'rejected',
-          responded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', tradeId)
-        .select('league_id')
-        .single()
-
-      if (error) {
-        log.error('Failed to reject trade:', error)
-        throw new Error('Failed to reject trade: ' + error?.message || 'Unknown error')
-      }
-
-      this.broadcastTradeUpdate(data.league_id, 'rejected', tradeId)
+      this.broadcastTradeUpdate(tradeRow.league_id, 'rejected', tradeId)
     }
 
     const { error: approvalError } = await (supabase as SupabaseAny)
@@ -401,16 +387,34 @@ export class TradeService {
   ): Promise<TradeWithDetails> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    // Reject the original trade
-    await (supabase as SupabaseAny)
-      .from('trades')
-      .update({
-        status: 'countered',
-        responded_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', originalTradeId)
-      .eq('status', 'proposed')
+    // Close the original trade as 'countered'. respond_to_trade enforces the
+    // status guard AND that the caller is the receiving side (or commissioner).
+    const { error: rpcError } = await (supabase as SupabaseAny)
+      .rpc('respond_to_trade', { p_trade_id: originalTradeId, p_response: 'countered' })
+
+    if (rpcError && rpcError.code === 'PGRST202') {
+      // Migration not applied yet — legacy status-guarded direct update
+      const { data: closed, error: closeError } = await (supabase as SupabaseAny)
+        .from('trades')
+        .update({
+          status: 'countered',
+          responded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', originalTradeId)
+        .eq('status', 'proposed')
+        .select('id')
+      if (closeError) {
+        log.error('Failed to close original trade for counter:', closeError)
+        throw new Error('Failed to counter trade: ' + (closeError?.message || 'Unknown error'))
+      }
+      if (!closed || closed.length === 0) {
+        throw new Error('Original trade is no longer open to counter')
+      }
+    } else if (rpcError) {
+      log.error('respond_to_trade (counter) failed:', rpcError)
+      throw new Error(rpcError.message || 'Original trade is no longer open to counter')
+    }
 
     // Create counter-offer with reference to original
     const { data, error } = await (supabase as SupabaseAny)

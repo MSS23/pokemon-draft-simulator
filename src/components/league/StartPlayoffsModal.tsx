@@ -46,7 +46,17 @@ export function StartPlayoffsModal({
   const [topN, setTopN] = useState(Math.min(standings.length, 8))
   const [isStarting, setIsStarting] = useState(false)
 
-  const qualifiedTeams = standings.slice(0, topN)
+  // Defensive sort: standings rows may arrive with null/stale ranks, and
+  // seeding from an unordered list produced a random bracket
+  const qualifiedTeams = [...standings]
+    .sort((a, b) => {
+      if (a.rank && b.rank) return a.rank - b.rank
+      if (a.rank) return -1
+      if (b.rank) return 1
+      if (b.wins !== a.wins) return b.wins - a.wins
+      return (b.pointDifferential ?? 0) - (a.pointDifferential ?? 0)
+    })
+    .slice(0, topN)
 
   const handleStart = async () => {
     setIsStarting(true)

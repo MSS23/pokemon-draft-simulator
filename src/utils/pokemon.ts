@@ -55,15 +55,47 @@ export const getStatColor = (stat: number): string => {
   return '#DDD'                     // Gray for low
 }
 
-// Convert a Pokemon name to Pokemon Showdown's sprite naming convention
-// Showdown strips most special chars but preserves hyphens for regional forms
+// Species whose (PokeAPI-style) name contains hyphens that belong to the
+// species itself — Showdown collapses these entirely (ho-oh → hooh,
+// great-tusk → greattusk), unlike forme hyphens (urshifu-rapid-strike →
+// urshifu-rapidstrike, which keeps ONE dash between species and forme).
+const HYPHENATED_SPECIES = [
+  'nidoran-f', 'nidoran-m', 'mr-mime', 'mime-jr', 'mr-rime', 'ho-oh',
+  'porygon-z', 'type-null', 'jangmo-o', 'hakamo-o', 'kommo-o',
+  'tapu-koko', 'tapu-lele', 'tapu-bulu', 'tapu-fini',
+  'great-tusk', 'scream-tail', 'brute-bonnet', 'flutter-mane', 'slither-wing',
+  'sandy-shocks', 'iron-treads', 'iron-bundle', 'iron-hands', 'iron-jugulis',
+  'iron-moth', 'iron-thorns', 'wo-chien', 'chien-pao', 'ting-lu', 'chi-yu',
+  'roaring-moon', 'iron-valiant', 'walking-wake', 'iron-leaves',
+  'gouging-fire', 'raging-bolt', 'iron-boulder', 'iron-crown',
+]
+
+// Convert a Pokemon name to Pokemon Showdown's sprite naming convention.
+// Verified against live sprite URLs: greattusk.gif, hooh.gif, mrmime.gif,
+// urshifu-rapidstrike.gif all 200; the hyphenated variants 404.
 export const toShowdownName = (pokemonName: string): string => {
-  return pokemonName
+  const name = pokemonName
     .toLowerCase()
     .replace(/♀/g, 'f')
     .replace(/♂/g, 'm')
     .replace(/[.':\s]+/g, '')       // Strip dots, apostrophes, colons, spaces
     .replace(/é/g, 'e')             // Flabébé -> flabebe
+
+  if (!name.includes('-')) return name
+
+  // Species-internal hyphens collapse fully; a trailing forme keeps one dash
+  for (const species of HYPHENATED_SPECIES) {
+    if (name === species) return name.replace(/-/g, '')
+    if (name.startsWith(species + '-')) {
+      const forme = name.slice(species.length + 1).replace(/-/g, '')
+      return name.slice(0, species.length).replace(/-/g, '') + (forme ? `-${forme}` : '')
+    }
+  }
+
+  // Otherwise the first hyphen separates species from forme; forme hyphens collapse
+  const [base, ...rest] = name.split('-')
+  const forme = rest.join('')
+  return forme ? `${base}-${forme}` : base
 }
 
 // Pokemon GIF and sprite URL functions with fallback chain

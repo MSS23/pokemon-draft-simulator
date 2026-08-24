@@ -573,7 +573,7 @@ export default function LeaguePage() {
                   <div>#</div>
                   <div>Team</div>
                   <div className="text-center">Record</div>
-                  <div className="text-right hidden sm:block">Pts</div>
+                  <div className="text-right hidden sm:block">PF</div>
                   <div className="text-right">+/-</div>
                   <div className="text-right hidden sm:block" title="Strength of Schedule (avg opponent winning %)">SoS</div>
                 </div>
@@ -814,6 +814,7 @@ export default function LeaguePage() {
             awayTeamPicks={awayTeamPicks}
             currentUserTeamId={userTeamId}
             isCommissioner={isCommissioner}
+            advanceTournamentBracket={league.leagueType === 'knockout'}
             onSuccess={() => { setSelectedMatch(null); loadLeagueData() }}
           />
         )}

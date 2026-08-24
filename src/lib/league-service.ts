@@ -70,9 +70,6 @@ function mapMatchRow(m: MatchRow): Match {
  * Map a raw teams row to the camelCase Team domain type, including the
  * Milestone B identity fields (logo_url, abbreviation, coach_display_name,
  * discord_handle, division_name).
- *
- * NOTE: existing code in this file casts `team as unknown as Team` directly,
- * which leaves snake_case keys at runtime. New code should call this helper.
  */
 export function mapTeamRowFull(row: TeamRow & {
   logo_url?: string | null
@@ -212,6 +209,17 @@ export class LeagueService {
         leagueA.id, conferenceATeams, conferenceBTeams, leagueConfig
       )
       allMatches.push(...crossMatches)
+
+      // Cross matches are appended AFTER the regular season — extend
+      // total_weeks so advanceToNextWeek doesn't complete the league before
+      // those weeks are ever reached.
+      const maxCrossWeek = crossMatches.reduce((max, m) => Math.max(max, m.weekNumber), 0)
+      if (maxCrossWeek > leagueConfig.totalWeeks) {
+        await supabase
+          .from('leagues')
+          .update({ total_weeks: maxCrossWeek })
+          .eq('id', leagueA.id)
+      }
     } else {
       // Create single league
       const league = await this.createSingleLeague(
@@ -414,9 +422,10 @@ export class LeagueService {
       }
 
       // Pair remaining: i-th from top with i-th from bottom
+      // (rotating has n-1 entries, so the last index is n-2)
       for (let i = 1; i < n / 2; i++) {
         const team1 = rotating[i]
-        const team2 = rotating[n - 2 - i]
+        const team2 = rotating[n - 1 - i]
         if (team1.id !== 'BYE' && team2.id !== 'BYE') {
           roundMatches.push([team1, team2])
         }
@@ -481,7 +490,7 @@ export class LeagueService {
         awayScore: 0,
         winnerTeamId: null,
         battleFormat: config.matchFormat || 'best_of_3',
-        notes: 'Cross-conference'
+        notes: JSON.stringify({ note: 'Cross-conference' })
       })
     }
 
@@ -540,10 +549,19 @@ export class LeagueService {
       points_against: 0
     }))
 
-    const { error: insertError } = await supabase.from('standings').insert(standings)
-    if (insertError) {
-      log.error('Error initializing standings:', insertError)
-      throw new Error(`Failed to initialize standings: ${insertError.message}`)
+    // standings has no client INSERT policy — go through the SECURITY DEFINER RPC
+    const { error: rpcError } = await supabase.rpc('initialize_league_standings' as never, {
+      p_league_id: leagueId,
+    } as never)
+
+    if (rpcError) {
+      // Fallback for environments where the migration isn't applied yet
+      log.warn('initialize_league_standings RPC unavailable, falling back to direct insert:', rpcError)
+      const { error: insertError } = await supabase.from('standings').insert(standings)
+      if (insertError) {
+        log.error('Error initializing standings:', insertError)
+        throw new Error(`Failed to initialize standings: ${insertError.message}`)
+      }
     }
   }
 
@@ -588,8 +606,8 @@ export class LeagueService {
       matches: matches.map((m: MatchWithJoins) => ({
         ...mapMatchRow(m),
         league: mapLeagueRow(m.league),
-        homeTeam: m.home_team as unknown as Team,
-        awayTeam: m.away_team as unknown as Team,
+        homeTeam: mapTeamRowFull(m.home_team),
+        awayTeam: mapTeamRowFull(m.away_team),
       }))
     }
   }
@@ -668,7 +686,7 @@ export class LeagueService {
         currentStreak: s.current_streak,
         updatedAt: s.updated_at,
         strengthOfSchedule: sos,
-        team: s.team as unknown as Team,
+        team: mapTeamRowFull(s.team),
       }
     })
   }
@@ -687,14 +705,15 @@ export class LeagueService {
   ): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
+    const status = result.status || 'completed'
     const { error } = await supabase
       .from('matches')
       .update({
         home_score: result.homeScore,
         away_score: result.awayScore,
         winner_team_id: result.winnerTeamId,
-        status: result.status || 'completed',
-        completed_at: result.status === 'completed' ? new Date().toISOString() : null,
+        status,
+        completed_at: status === 'completed' ? new Date().toISOString() : null,
         updated_at: new Date().toISOString()
       })
       .eq('id', matchId)
@@ -717,6 +736,41 @@ export class LeagueService {
           log.error('Failed to update standings after match result:', err)
         }
       }
+    }
+  }
+
+  /**
+   * Reschedule an unplayed match. RLS restricts this to the two involved
+   * team owners or the commissioner.
+   */
+  static async rescheduleMatch(matchId: string, scheduledDate: string | null): Promise<void> {
+    if (!supabase) throw new Error('Supabase not configured')
+
+    const { data, error } = await supabase
+      .from('matches')
+      .update({
+        scheduled_date: scheduledDate,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', matchId)
+      .in('status', ['scheduled', 'in_progress'])
+      .select('id')
+
+    if (error) throw new Error(`Failed to reschedule match: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Only an unplayed match can be rescheduled')
+  }
+
+  /**
+   * Parse matches.notes, which may be a JSON blob (submission state) or a
+   * legacy plain-text note (e.g. 'Cross-conference'). Never throws.
+   */
+  static parseMatchNotes(notes: string | null | undefined): Record<string, unknown> {
+    if (!notes) return {}
+    try {
+      const parsed = JSON.parse(notes)
+      return parsed && typeof parsed === 'object' ? parsed : { note: String(parsed) }
+    } catch {
+      return { note: notes }
     }
   }
 
@@ -748,20 +802,37 @@ export class LeagueService {
     const isHome = submittingTeamId === match.home_team_id
     const isAway = submittingTeamId === match.away_team_id
     if (!isHome && !isAway) throw new Error('Team is not part of this match')
+    if (match.status === 'completed') throw new Error('Match result has already been confirmed')
 
-    // Read existing notes as submission state
-    const notes = match.notes ? JSON.parse(match.notes) : {}
-    const submissions = notes.submissions || {}
-
-    // Store this team's submission
     const side = isHome ? 'home' : 'away'
-    submissions[side] = {
+    const submission = {
       homeScore: result.homeScore,
       awayScore: result.awayScore,
       winnerTeamId: result.winnerTeamId,
       submittedAt: new Date().toISOString(),
     }
 
+    // Atomic server-side merge: enforces side ownership and prevents two
+    // concurrent submissions from clobbering each other in matches.notes.
+    type Submission = typeof submission
+    let notes: Record<string, unknown>
+    const { data: mergedNotes, error: rpcError } = await supabase.rpc('submit_match_side' as never, {
+      p_match_id: matchId,
+      p_side: side,
+      p_submission: submission,
+    } as never)
+
+    if (!rpcError && mergedNotes) {
+      notes = mergedNotes as Record<string, unknown>
+    } else if (rpcError && rpcError.code === 'PGRST202') {
+      // Migration not applied yet — legacy non-atomic merge
+      notes = this.parseMatchNotes(match.notes)
+      notes.submissions = { ...((notes.submissions as Record<string, Submission>) || {}), [side]: submission }
+    } else {
+      throw new Error(rpcError?.message || 'Failed to submit match result')
+    }
+
+    const submissions = (notes.submissions || {}) as Record<string, Submission>
     const otherSide = isHome ? 'away' : 'home'
 
     // Check if the other team has already submitted
@@ -892,8 +963,8 @@ export class LeagueService {
     return {
       ...mapMatchRow(match),
       league: mapLeagueRow(match.league),
-      homeTeam: match.home_team as unknown as Team,
-      awayTeam: match.away_team as unknown as Team,
+      homeTeam: mapTeamRowFull(match.home_team),
+      awayTeam: mapTeamRowFull(match.away_team),
     }
   }
 
@@ -921,7 +992,7 @@ export class LeagueService {
 
     return {
       ...mapLeagueRow(league),
-      teams: league.league_teams.map((lt: { team: TeamRow }) => lt.team as unknown as Team)
+      teams: league.league_teams.map((lt: { team: TeamRow }) => mapTeamRowFull(lt.team))
     }
   }
 
@@ -1015,7 +1086,7 @@ export class LeagueService {
 
     return {
       ...mapLeagueRow(sibling),
-      teams: sibling.league_teams.map((lt: { team: TeamRow }) => lt.team as unknown as Team)
+      teams: sibling.league_teams.map((lt: { team: TeamRow }) => mapTeamRowFull(lt.team))
     }
   }
 
@@ -1089,8 +1160,8 @@ export class LeagueService {
       })
       .map((m: MatchWithTeams) => ({
         ...mapMatchRow(m),
-        homeTeam: m.home_team as unknown as Team,
-        awayTeam: m.away_team as unknown as Team,
+        homeTeam: mapTeamRowFull(m.home_team),
+        awayTeam: mapTeamRowFull(m.away_team),
       }))
   }
 
@@ -1113,17 +1184,20 @@ export class LeagueService {
     // Cast to ExtendedLeagueSettings since the JSON column stores extended fields
     const s = league.settings as unknown as Partial<ExtendedLeagueSettings> | null
 
+    // Spread the raw settings FIRST so non-whitelisted keys (playoff, tournament,
+    // announcements, waiver config, roomCode, ...) survive read-modify-write saves.
     return {
-      matchFormat: s?.matchFormat || 'best_of_3',
-      pointsPerWin: s?.pointsPerWin || 3,
-      pointsPerDraw: s?.pointsPerDraw || 1,
+      ...(s ?? {}),
+      matchFormat: s?.matchFormat ?? 'best_of_3',
+      pointsPerWin: s?.pointsPerWin ?? 3,
+      pointsPerDraw: s?.pointsPerDraw ?? 1,
       commissionerId: s?.commissionerId ?? undefined,
       freeAgentPicksAllowed: s?.freeAgentPicksAllowed ?? 3,
       enableTrades: s?.enableTrades ?? true,
       tradeDeadlineWeek: s?.tradeDeadlineWeek ?? undefined,
       weeklyTradeDeadline: s?.weeklyTradeDeadline ?? true,
       adminOverrideTradeDeadline: s?.adminOverrideTradeDeadline ?? false,
-      requireCommissionerApproval: s?.requireCommissionerApproval || false,
+      requireCommissionerApproval: s?.requireCommissionerApproval ?? false,
     }
   }
 
@@ -1330,7 +1404,7 @@ export class LeagueService {
 
     return (data as unknown as PublicLeagueJoin[]).map(row => ({
       ...mapLeagueRow(row),
-      teams: row.league_teams.map((lt: { team: TeamRow }) => lt.team as unknown as Team),
+      teams: row.league_teams.map((lt: { team: TeamRow }) => mapTeamRowFull(lt.team)),
       teamCount: row.league_teams.length,
       draftFormat: row.drafts.format,
     }))
@@ -1581,8 +1655,52 @@ export class LeagueService {
    * Recalculate standings for all teams in a league based on completed matches.
    * Updates W/L/D, points_for/against, point_differential, rank, and streak.
    */
+  /**
+   * If this league is one half of a split-conference pair, recalculate the
+   * sibling conference's standings too (cross-conference matches are stored
+   * in one league row but count for both). Best-effort.
+   */
+  private static async recalcSiblingConference(leagueId: string): Promise<void> {
+    if (!supabase) return
+    try {
+      const { data: me } = await supabase
+        .from('leagues')
+        .select('draft_id, league_type')
+        .eq('id', leagueId)
+        .single()
+      if (!me || !String(me.league_type || '').startsWith('split_conference')) return
+
+      const { data: sibling } = await supabase
+        .from('leagues')
+        .select('id')
+        .eq('draft_id', me.draft_id)
+        .neq('id', leagueId)
+        .in('league_type', ['split_conference_a', 'split_conference_b'])
+        .maybeSingle()
+      if (!sibling) return
+
+      await supabase.rpc('recalculate_league_standings', { p_league_id: sibling.id })
+    } catch (err) {
+      log.warn('Failed to recalc sibling conference standings:', err)
+    }
+  }
+
   static async updateStandings(leagueId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
+
+    // standings has no client UPDATE policy — the SECURITY DEFINER RPC is the
+    // only write path that actually lands. The client-side computation below
+    // is kept only as a fallback for environments missing the migration.
+    const { error: rpcError } = await supabase.rpc('recalculate_league_standings', {
+      p_league_id: leagueId,
+    })
+    if (!rpcError) {
+      // Cross-conference matches count for both conferences — keep the
+      // sibling conference's standings in sync too.
+      await this.recalcSiblingConference(leagueId)
+      return
+    }
+    log.warn('recalculate_league_standings RPC failed, falling back to client-side:', rpcError)
 
     // COST: settings/matches/standings rows are independent first reads —
     // fire as one batch to cut 3 sequential round-trips down to 1.
@@ -1747,8 +1865,8 @@ export class LeagueService {
     for (const m of matches) {
       const mapped = {
         ...mapMatchRow(m),
-        homeTeam: m.home_team as unknown as Team,
-        awayTeam: m.away_team as unknown as Team,
+        homeTeam: mapTeamRowFull(m.home_team),
+        awayTeam: mapTeamRowFull(m.away_team),
       }
       if (!weekMap.has(m.week_number)) weekMap.set(m.week_number, [])
       weekMap.get(m.week_number)!.push(mapped)

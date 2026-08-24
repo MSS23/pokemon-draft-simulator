@@ -630,8 +630,15 @@ export default function TournamentPage() {
               {activeMatches.map(match => {
                 const homeColors = teamColorMap.get(match.homeTeamId)
                 const awayColors = teamColorMap.get(match.awayTeamId)
-                const homePicks = teamPicks[match.homeTeamId] || []
-                const awayPicks = teamPicks[match.awayTeamId] || []
+                // Room-code tournaments have no picks — fall back to team sheets
+                const sheetToPicks = (teamId: string) =>
+                  (teamSheets[teamId] || []).map((mon, i) => ({
+                    id: `${teamId}-sheet-${i}`,
+                    pokemonId: '0',
+                    pokemonName: mon.name,
+                  }))
+                const homePicks = (teamPicks[match.homeTeamId]?.length ? teamPicks[match.homeTeamId] : sheetToPicks(match.homeTeamId)) as Array<{ id: string; pokemonId: string; pokemonName: string }>
+                const awayPicks = (teamPicks[match.awayTeamId]?.length ? teamPicks[match.awayTeamId] : sheetToPicks(match.awayTeamId)) as Array<{ id: string; pokemonId: string; pokemonName: string }>
 
                 return (
                   <div key={match.id} className="border rounded-lg overflow-hidden">
@@ -804,6 +811,7 @@ export default function TournamentPage() {
             onClose={() => setViewingSheet(null)}
             playerName={viewingSheet.name}
             sheet={viewingSheet.sheet}
+            isOwner={viewingSheet.teamId === userTeamId}
           />
         )}
 

@@ -3,10 +3,11 @@
  * Centralizes image loading, error handling, and fallback logic
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   getBestPokemonImageUrl,
   getPokemonAnimatedBackupUrl,
+  getPokemonSpriteUrl,
 } from '@/utils/pokemon'
 
 export interface PokemonImageConfig {
@@ -41,16 +42,27 @@ export function usePokemonImage({
   const [imageError, setImageError] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
-  // GIF-only: Showdown animated → PokeAPI showdown animated
+  // Reset the fallback chain when the Pokemon changes — otherwise a component
+  // reused for a new Pokemon stays stuck on the previous one's error state.
+  useEffect(() => {
+    setFallbackAttempt(0)
+    setImageError(false)
+    setIsLoading(true)
+  }, [pokemonId, pokemonName])
+
+  // Showdown animated → PokeAPI showdown animated → static PNG (always exists)
   const getImageUrl = useCallback(() => {
     if (fallbackAttempt === 0) {
       return getBestPokemonImageUrl(pokemonId, pokemonName)
     }
-    return getPokemonAnimatedBackupUrl(pokemonId)
+    if (fallbackAttempt === 1) {
+      return getPokemonAnimatedBackupUrl(pokemonId)
+    }
+    return getPokemonSpriteUrl(pokemonId)
   }, [pokemonId, pokemonName, fallbackAttempt])
 
   const handleImageError = useCallback(() => {
-    if (fallbackAttempt < 1) {
+    if (fallbackAttempt < 2) {
       setFallbackAttempt(prev => prev + 1)
       setImageError(false)
     } else {

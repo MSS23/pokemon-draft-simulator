@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { DraftState } from '@/lib/draft-service'
 import { useDraftStateWithRealtime } from '@/hooks/useDraftRealtime'
 import { getTeamColor, type TeamColorSet } from '@/utils/team-colors'
-import { getBestPokemonImageUrl, formatPokemonName } from '@/utils/pokemon'
+import { getBestPokemonImageUrl, getPokemonAnimatedBackupUrl, getPokemonSpriteUrl, formatPokemonName } from '@/utils/pokemon'
 import { getTimerColor } from '@/lib/draft-animations'
 import { cn } from '@/lib/utils'
 import { createLogger } from '@/lib/logger'
@@ -45,15 +45,15 @@ function getCurrentTeamFromTurn(
 function buildDraftGrid(
   draftState: DraftState,
   maxRounds: number
-): { teamId: string; pokemonId: string | null }[][] {
+): { teamId: string; pokemonId: string | null; pokemonName: string | null }[][] {
   const sorted = [...draftState.teams].sort(
     (a, b) => (a.draft_order ?? 0) - (b.draft_order ?? 0)
   )
 
-  const grid: { teamId: string; pokemonId: string | null }[][] = []
+  const grid: { teamId: string; pokemonId: string | null; pokemonName: string | null }[][] = []
 
   for (let row = 0; row < maxRounds; row++) {
-    const rowCells: { teamId: string; pokemonId: string | null }[] = []
+    const rowCells: { teamId: string; pokemonId: string | null; pokemonName: string | null }[] = []
     for (const team of sorted) {
       const teamPicks = draftState.picks
         .filter((p) => p.team_id === team.id)
@@ -65,6 +65,7 @@ function buildDraftGrid(
       rowCells.push({
         teamId: team.id,
         pokemonId: pick ? pick.pokemon_id : null,
+        pokemonName: pick ? pick.pokemon_name : null,
       })
     }
     grid.push(rowCells)
@@ -85,8 +86,14 @@ function PokemonSprite({
   pokemonName?: string
   size?: number
 }) {
-  const [errored, setErrored] = useState(false)
-  const imgUrl = getBestPokemonImageUrl(pokemonId, pokemonName)
+  const [fallbackLevel, setFallbackLevel] = useState(0)
+  const errored = fallbackLevel > 2
+  const imgUrl =
+    fallbackLevel === 0
+      ? getBestPokemonImageUrl(pokemonId, pokemonName)
+      : fallbackLevel === 1
+        ? getPokemonAnimatedBackupUrl(pokemonId)
+        : getPokemonSpriteUrl(pokemonId)
 
   if (errored) {
     return (
@@ -108,18 +115,20 @@ function PokemonSprite({
       height={size}
       className="object-contain drop-shadow-lg"
       style={{ imageRendering: 'pixelated' }}
-      onError={() => setErrored(true)}
+      onError={() => setFallbackLevel((prev) => prev + 1)}
     />
   )
 }
 
 function PickCell({
   pokemonId,
+  pokemonName,
   isCurrentPick,
   teamColor,
   accentColor,
 }: {
   pokemonId: string | null
+  pokemonName: string | null
   isCurrentPick: boolean
   teamColor: TeamColorSet
   accentColor: string | null
@@ -160,7 +169,7 @@ function PickCell({
       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
       className="flex flex-col items-center justify-center gap-1 min-h-[88px]"
     >
-      <PokemonSprite pokemonId={pokemonId} size={64} />
+      <PokemonSprite pokemonId={pokemonId} pokemonName={pokemonName ?? undefined} size={64} />
       <span
         className="text-[11px] font-semibold leading-tight text-center truncate max-w-[80px]"
         style={{
@@ -168,7 +177,7 @@ function PickCell({
           color: '#fff',
         }}
       >
-        {formatPokemonName(pokemonId)}
+        {formatPokemonName(pokemonName ?? pokemonId)}
       </span>
     </motion.div>
   )
@@ -558,6 +567,7 @@ export default function BroadcastPage() {
                     >
                       <PickCell
                         pokemonId={cell.pokemonId}
+                        pokemonName={cell.pokemonName}
                         isCurrentPick={isCurrentCell}
                         teamColor={teamColor}
                         accentColor={accentColor}

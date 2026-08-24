@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { Pokemon } from '@/types'
 import {
@@ -13,7 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { getStatColor, getBestPokemonImageUrl, getPokemonAnimatedBackupUrl } from '@/utils/pokemon'
+import { getStatColor, getBestPokemonImageUrl, getPokemonAnimatedBackupUrl, getPokemonSpriteUrl } from '@/utils/pokemon'
 import { cn } from '@/lib/utils'
 
 interface PokemonDetailsModalProps {
@@ -43,16 +43,25 @@ export default function PokemonDetailsModal({
   const [fallbackAttempt, setFallbackAttempt] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Reset the fallback chain when a different Pokemon is shown — the modal is
+  // a single long-lived instance, so stale error state bled between Pokemon.
+  useEffect(() => {
+    setFallbackAttempt(0)
+    setImageError(false)
+    setIsLoading(true)
+  }, [pokemon?.id])
+
   if (!pokemon) return null
 
-  // GIF-only fallback chain
+  // Showdown animated → PokeAPI animated → static PNG (always exists)
   const getImageUrl = () => {
     if (fallbackAttempt === 0) return getBestPokemonImageUrl(pokemon.id, pokemon.name)
-    return getPokemonAnimatedBackupUrl(pokemon.id)
+    if (fallbackAttempt === 1) return getPokemonAnimatedBackupUrl(pokemon.id)
+    return getPokemonSpriteUrl(pokemon.id)
   }
 
   const handleImageError = () => {
-    if (fallbackAttempt < 1) {
+    if (fallbackAttempt < 2) {
       setFallbackAttempt(prev => prev + 1)
       setImageError(false)
     } else {

@@ -288,19 +288,18 @@ export class WeeklyHighlightsService {
         const awayScore = match.away_score || 0
         const scoreDiff = Math.abs(homeScore - awayScore)
 
-        // Dominant win (3+ game difference)
-        if (scoreDiff >= 3) {
-          const winner = match.winner_team_id === match.home_team_id
-            ? match.home_team
-            : match.away_team
-          const loser = match.winner_team_id === match.home_team_id
-            ? match.away_team
-            : match.home_team
+        // Dominant win (3+ game difference) — skip draws (no winner recorded)
+        if (scoreDiff >= 3 && match.winner_team_id) {
+          const winnerIsHome = match.winner_team_id === match.home_team_id
+          const winner = winnerIsHome ? match.home_team : match.away_team
+          const loser = winnerIsHome ? match.away_team : match.home_team
+          const winnerScore = winnerIsHome ? homeScore : awayScore
+          const loserScore = winnerIsHome ? awayScore : homeScore
 
           const highlight = await this.createHighlight(leagueId, weekNumber, {
             type: 'dominant_win',
             title: `${winner.name} Dominates!`,
-            description: `${winner.name} crushes ${loser.name} ${homeScore}-${awayScore} in a dominant performance`,
+            description: `${winner.name} crushes ${loser.name} ${winnerScore}-${loserScore} in a dominant performance`,
             icon: '💪',
             teamId: winner.id,
             matchId: match.id
@@ -320,8 +319,8 @@ export class WeeklyHighlightsService {
           highlights.push(highlight)
         }
 
-        // Shutout
-        if (homeScore === 0 || awayScore === 0) {
+        // Shutout: winner concedes zero across a multi-game series
+        if (match.winner_team_id && (homeScore === 0) !== (awayScore === 0) && homeScore + awayScore >= 2) {
           const winner = homeScore > 0 ? match.home_team : match.away_team
           const highlight = await this.createHighlight(leagueId, weekNumber, {
             type: 'shutout',
@@ -343,32 +342,44 @@ export class WeeklyHighlightsService {
         picks: { pokemon_name: string; team_id: string; teams: { name: string } }
       }
 
-      const { data: rawTopKOs } = await supabase
+      // Aggregate kills per SCORER across the week (the old query grabbed a
+      // single arbitrary row keyed on the victim column, so the "KO Leader"
+      // was usually a Pokemon that got knocked out)
+      const { data: rawWeekKOs } = await supabase
         .from('match_pokemon_kos')
         .select(`
-          pick_id,
+          scorer_pick_id,
           ko_count,
-          matches!inner(league_id, week_number),
-          picks!inner(pokemon_name, team_id, teams(name))
+          matches!inner(league_id, week_number)
         `)
         .eq('matches.league_id', leagueId)
         .eq('matches.week_number', weekNumber)
-        .order('ko_count', { ascending: false })
-        .limit(1)
-        .single()
+        .not('scorer_pick_id', 'is', null)
 
-      const topKOs = rawTopKOs as unknown as KOWithPick | null
+      const killTotals = new Map<string, number>()
+      for (const row of (rawWeekKOs ?? []) as unknown as Array<{ scorer_pick_id: string; ko_count: number | null }>) {
+        killTotals.set(row.scorer_pick_id, (killTotals.get(row.scorer_pick_id) || 0) + (row.ko_count || 1))
+      }
+      const topEntry = [...killTotals.entries()].sort((a, b) => b[1] - a[1])[0]
 
-      if (topKOs) {
-        const highlight = await this.createHighlight(leagueId, weekNumber, {
-          type: 'pokemon_milestone',
-          title: 'KO Leader!',
-          description: `${topKOs.picks.pokemon_name} from ${topKOs.picks.teams.name} racks up ${topKOs.ko_count} KOs this week`,
-          icon: '⚡',
-          pickId: topKOs.pick_id,
-          teamId: topKOs.picks.team_id
-        })
-        highlights.push(highlight)
+      if (topEntry) {
+        const { data: topPick } = await supabase
+          .from('picks')
+          .select('id, pokemon_name, team_id, teams(name)')
+          .eq('id', topEntry[0])
+          .single()
+        const pickInfo = topPick as unknown as { id: string; pokemon_name: string; team_id: string; teams: { name: string } } | null
+        if (pickInfo) {
+          const highlight = await this.createHighlight(leagueId, weekNumber, {
+            type: 'pokemon_milestone',
+            title: 'KO Leader!',
+            description: `${pickInfo.pokemon_name} from ${pickInfo.teams.name} racks up ${topEntry[1]} KOs this week`,
+            icon: '⚡',
+            pickId: pickInfo.id,
+            teamId: pickInfo.team_id
+          })
+          highlights.push(highlight)
+        }
       }
 
       // Check for Pokemon eliminations

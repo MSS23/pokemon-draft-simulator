@@ -11,7 +11,7 @@
 
 import { supabase } from './supabase'
 import { createLogger } from '@/lib/logger'
-import type { MatchPokemonKORow, TeamPokemonStatusRow } from '@/types/supabase-helpers'
+import type { TeamPokemonStatusRow } from '@/types/supabase-helpers'
 
 const log = createLogger('LeagueStatsService')
 
@@ -227,20 +227,16 @@ export class LeagueStatsService {
           .select('*')
           .eq('pick_id', pickId)
           .single(),
+        // Kills this Pokemon scored (scorer_pick_id = the killer)
         supabase
           .from('match_pokemon_kos')
-          .select('ko_count')
+          .select('ko_count, match_id')
+          .eq('scorer_pick_id', pickId),
+        // Times this Pokemon fainted (pick_id = the victim)
+        supabase
+          .from('match_pokemon_kos')
+          .select('ko_count, match_id')
           .eq('pick_id', pickId),
-        supabase
-          .from('match_pokemon_kos')
-          .select(`
-            ko_count,
-            match:matches!inner(
-              home_team_id,
-              away_team_id
-            )
-          `)
-          .neq('pick_id', pickId), // KOs by OTHER Pokemon
         supabase
           .from('matches')
           .select(`
@@ -256,19 +252,17 @@ export class LeagueStatsService {
             away_team:teams!matches_away_team_id_fkey(id, name)
           `)
           .or(`home_team_id.eq.${pick.team_id},away_team_id.eq.${pick.team_id}`)
+          .eq('status', 'completed')
           .order('week_number', { ascending: true }),
       ])
 
       const status: TeamPokemonStatusRow | null = statusResponse?.data ?? null
-      const kosGiven: Pick<MatchPokemonKORow, 'ko_count'>[] | null = kosGivenResponse?.data ?? null
-      const kosTaken = (kosTakenResponse?.data ?? []) as unknown as Array<{
-        ko_count: number
-        match: { home_team_id: string; away_team_id: string }
-      }>
+      const kosGiven = (kosGivenResponse?.data ?? []) as Array<{ ko_count: number; match_id: string }>
+      const kosTaken = (kosTakenResponse?.data ?? []) as Array<{ ko_count: number; match_id: string }>
       const matches = (matchesResponse?.data ?? []) as unknown as MatchWithTeams[]
 
-      const totalKOsGiven = kosGiven?.reduce((sum, ko) => sum + ko.ko_count, 0) || 0
-      const totalKOsTaken = kosTaken.reduce((sum, ko) => sum + ko.ko_count, 0) || 0
+      const totalKOsGiven = kosGiven.reduce((sum, ko) => sum + (ko.ko_count || 1), 0)
+      const totalKOsTaken = kosTaken.reduce((sum, ko) => sum + (ko.ko_count || 1), 0)
 
       const matchHistory = matches.map((match) => {
         const isHome = match.home_team_id === pick.team_id
@@ -281,11 +275,13 @@ export class LeagueStatsService {
           result = match.winner_team_id === pick.team_id ? 'won' : 'lost'
         }
 
-        // Get KOs for this specific match
-        const matchKOs = kosGiven?.filter(() =>
-          matches.some((m) => m.id === match.id)
-        ) || []
-        const matchKOsGiven = matchKOs.reduce((sum, ko) => sum + ko.ko_count, 0)
+        // KOs scored/taken in this specific match
+        const matchKOsGiven = kosGiven
+          .filter((ko) => ko.match_id === match.id)
+          .reduce((sum, ko) => sum + (ko.ko_count || 1), 0)
+        const matchKOsTaken = kosTaken
+          .filter((ko) => ko.match_id === match.id)
+          .reduce((sum, ko) => sum + (ko.ko_count || 1), 0)
 
         return {
           matchId: match.id,
@@ -295,7 +291,7 @@ export class LeagueStatsService {
           opponentTeam: opponent.name,
           result,
           kosGiven: matchKOsGiven,
-          kosTaken: 0  // Would need more complex query
+          kosTaken: matchKOsTaken,
         }
       })
 
@@ -313,7 +309,7 @@ export class LeagueStatsService {
         matchesWon,
         matchesLost,
         matchesDrawn,
-        winRate: status?.matches_played ? matchesWon / status.matches_played : 0,
+        winRate: matchHistory.length > 0 ? matchesWon / matchHistory.length : 0,
         totalKOsGiven,
         totalKOsTaken,
         koRatio: totalKOsTaken > 0 ? totalKOsGiven / totalKOsTaken : totalKOsGiven,
@@ -616,7 +612,11 @@ export class LeagueStatsService {
           .from('standings')
           .select('wins, losses, draws, points_for, points_against')
           .eq('team_id', teamId)
-          .single(),
+          // a team can have standings rows in more than one league — .single()
+          // would error and blank the whole stats card
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
         supabase
           .from('matches')
           .select('id, home_team_id, away_team_id, home_score, away_score, winner_team_id')
@@ -640,19 +640,28 @@ export class LeagueStatsService {
       const pickIds = picks?.map((p) => p.id) || []
       const pokemonStatuses = pokemonStatusesResponse?.data
 
-      const kosGivenResponse = await supabase
-        .from('match_pokemon_kos')
-        .select('ko_count')
-        .in('pick_id', pickIds)
+      // Kills = scorer_pick_id (this team's Pokemon scored), faints = pick_id
+      const [kosGivenResponse, kosTakenResponse] = await Promise.all([
+        supabase
+          .from('match_pokemon_kos')
+          .select('ko_count')
+          .in('scorer_pick_id', pickIds),
+        supabase
+          .from('match_pokemon_kos')
+          .select('ko_count')
+          .in('pick_id', pickIds),
+      ])
 
       const kosGiven = kosGivenResponse?.data
+      const kosTaken = kosTakenResponse?.data
 
       const activePokemon = pokemonStatuses?.filter((p) => p.status === 'alive').length || 0
       const faintedPokemon = pokemonStatuses?.filter((p) => p.status === 'fainted').length || 0
       const deadPokemon = pokemonStatuses?.filter((p) => p.status === 'dead').length || 0
       const totalPokemon = pokemonStatuses?.length || 1
 
-      const totalKOsGiven = kosGiven?.reduce((sum, ko) => sum + ko.ko_count, 0) || 0
+      const totalKOsGiven = kosGiven?.reduce((sum, ko) => sum + (ko.ko_count || 1), 0) || 0
+      const totalKOsTaken = kosTaken?.reduce((sum, ko) => sum + (ko.ko_count || 1), 0) || 0
 
       const wins = standing?.wins || 0
       const losses = standing?.losses || 0
@@ -691,8 +700,8 @@ export class LeagueStatsService {
         offensiveRating,
         totalPointsAgainst,
         avgPointsAgainst,
-        totalKOsTaken: 0,
-        avgKOsTaken: 0,
+        totalKOsTaken,
+        avgKOsTaken: matchesPlayed > 0 ? totalKOsTaken / matchesPlayed : 0,
         defensiveRating,
         pointDifferential,
         avgPointDifferential: matchesPlayed > 0 ? pointDifferential / matchesPlayed : 0,
@@ -719,12 +728,14 @@ export class LeagueStatsService {
     }
 
     try {
+      // leagueId is a leagues.id — resolve teams via league_teams, not
+      // teams.draft_id (which is a drafts.id and never matches)
       const teamsResponse = await supabase
-        .from('teams')
-        .select('id')
-        .eq('draft_id', leagueId)
+        .from('league_teams')
+        .select('team_id')
+        .eq('league_id', leagueId)
 
-      const teams = teamsResponse?.data
+      const teams = (teamsResponse?.data ?? []).map((t) => ({ id: t.team_id }))
 
       if (!teams) return []
 
@@ -783,17 +794,24 @@ export class LeagueStatsService {
 
       const leagueMatchIds = (matchIds ?? []).map(m => m.id)
 
+      // Deaths keyed by pick_id (victim), kills keyed by scorer_pick_id —
+      // derived from event rows, not the total_kos counter (which drifted)
       const deathCounts = new Map<string, number>()
+      const killCounts = new Map<string, number>()
       if (leagueMatchIds.length > 0) {
-        // Get all KOs in league matches, grouped by pick_id (as victim)
         const { data: koData } = await supabase
           .from('match_pokemon_kos')
-          .select('pick_id, ko_count')
+          .select('pick_id, scorer_pick_id, ko_count')
           .in('match_id', leagueMatchIds)
 
         if (koData) {
-          for (const ko of koData) {
-            deathCounts.set(ko.pick_id, (deathCounts.get(ko.pick_id) || 0) + ko.ko_count)
+          for (const ko of koData as Array<{ pick_id: string | null; scorer_pick_id: string | null; ko_count: number | null }>) {
+            if (ko.pick_id) {
+              deathCounts.set(ko.pick_id, (deathCounts.get(ko.pick_id) || 0) + (ko.ko_count || 1))
+            }
+            if (ko.scorer_pick_id) {
+              killCounts.set(ko.scorer_pick_id, (killCounts.get(ko.scorer_pick_id) || 0) + (ko.ko_count || 1))
+            }
           }
         }
       }
@@ -801,7 +819,7 @@ export class LeagueStatsService {
       const stats: LeaguePokemonStat[] = records.map(record => {
         const matchesPlayed = record.matches_played || 0
         const matchesWon = record.matches_won || 0
-        const totalKOs = record.total_kos || 0
+        const totalKOs = killCounts.get(record.pick_id) || 0
         const totalDeaths = deathCounts.get(record.pick_id) || 0
 
         return {

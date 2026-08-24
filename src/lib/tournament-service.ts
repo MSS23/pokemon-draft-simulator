@@ -145,7 +145,6 @@ function generateSingleEliminationBracket(participants: Participant[]): Round[] 
   const bracketSize = 2 ** Math.ceil(Math.log2(participants.length))
   const totalRounds = Math.log2(bracketSize)
   const firstRoundMatchCount = bracketSize / 2
-  const byesNeeded = bracketSize - participants.length
   const rounds: Round[] = []
 
   // Build every round up front. The previous implementation only constructed
@@ -170,29 +169,44 @@ function generateSingleEliminationBracket(participants: Participant[]): Round[] 
     })
   }
 
-  // Distribute byes so every bye advances a real participant; this avoids
-  // creating BYE-vs-BYE matches for non-power-of-two fields.
+  // Standard seeded bracket order (e.g. size 8 → 1v8, 4v5, 2v7, 3v6): keeps
+  // seeds 1 and 2 in opposite halves and gives byes to the TOP seeds. The old
+  // code packed all byes into the first slots, so with 6 players seeds 1 and 2
+  // both landed in the same semi-final.
+  let seedSlots = [1]
+  while (seedSlots.length < bracketSize) {
+    const mirror = seedSlots.length * 2 + 1
+    seedSlots = seedSlots.flatMap(s => [s, mirror - s])
+  }
+
   const firstRound = rounds[0]
   for (let index = 0; index < firstRoundMatchCount; index++) {
     const match = firstRound.matches[index]
-    if (index < byesNeeded) {
-      const participant = participants[index]
-      match.participant1 = participant
+    const seedA = seedSlots[index * 2]
+    const seedB = seedSlots[index * 2 + 1]
+    const pA = participants[seedA - 1]
+    const pB = participants[seedB - 1]
+
+    if (pA && pB) {
+      match.participant1 = pA
+      match.participant2 = pB
+    } else {
+      // One side is beyond the field — a bye that advances the real seed.
+      // (Each seeded pair sums to bracketSize+1, so exactly one side is real
+      // whenever byesNeeded > 0.)
+      const real = (pA ?? pB)!
+      match.participant1 = real
       match.participant2 = {
         id: `bye-${index + 1}`,
         name: 'BYE',
-        seed: participants.length + index + 1,
+        seed: pA ? seedB : seedA,
         wins: 0,
         losses: 0,
         draws: 0,
         matchPoints: 0,
       }
-      match.winner = participant
+      match.winner = real
       match.status = 'completed'
-    } else {
-      const participantIndex = byesNeeded + (index - byesNeeded) * 2
-      match.participant1 = participants[participantIndex]
-      match.participant2 = participants[participantIndex + 1]
     }
   }
 

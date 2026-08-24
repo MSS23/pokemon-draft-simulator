@@ -22,6 +22,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LeagueService } from '@/lib/league-service'
 import { KnockoutService } from '@/lib/knockout-service'
 import { MatchKOService } from '@/lib/match-ko-service'
+import { computeCanonicalScore, buildMatchGameRows } from '@/lib/match-score'
 import { supabase } from '@/lib/supabase'
 import { createLogger } from '@/lib/logger'
 
@@ -86,8 +87,8 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   const [error, setError] = useState<string | null>(null)
   const [submissionResult, setSubmissionResult] = useState<'pending' | 'confirmed' | 'disputed' | null>(null)
 
-  const totalGames = match.battleFormat === 'best_of_1' ? 1 : 3
-  const winsNeeded = match.battleFormat === 'best_of_1' ? 1 : 2
+  const totalGames = match.battleFormat === 'best_of_1' ? 1 : match.battleFormat === 'best_of_5' ? 5 : 3
+  const winsNeeded = Math.ceil((totalGames + 1) / 2)
 
   const isUserInMatch = currentUserTeamId === match.homeTeamId || currentUserTeamId === match.awayTeamId
   const userSide = currentUserTeamId === match.homeTeamId ? 'home' : currentUserTeamId === match.awayTeamId ? 'away' : null
@@ -280,7 +281,8 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
         .eq('id', match.id)
         .single()
 
-      const notes = matchRow?.notes ? JSON.parse(matchRow.notes) : {}
+      // Tolerates legacy plain-text notes (e.g. 'Cross-conference')
+      const notes = LeagueService.parseMatchNotes(matchRow?.notes) as Record<string, unknown>
       notes.replayUrls = filteredUrls
 
       await supabase
@@ -298,8 +300,14 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
 
     try {
       const matchWinner = calculateMatchWinner()
-      const homeScore = games.filter(g => g.winnerTeamId === match.homeTeamId && !g.isDnf).length
-      const awayScore = games.filter(g => g.winnerTeamId === match.awayTeamId && !g.isDnf).length
+      // Canonical score unit: total KOs when rosters exist (matches what the
+      // live KO scorer submits, so dual-confirmation agrees across tools);
+      // games won only for rosterless room-code tournaments. W/L always
+      // comes from winnerTeamId, never the score.
+      const hasRosters = homeTeamPicks.length > 0 || awayTeamPicks.length > 0
+      const { home: homeScore, away: awayScore } = computeCanonicalScore(
+        games, gameKOs, match.homeTeamId, match.awayTeamId, hasRosters
+      )
 
       if (isUserInMatch && currentUserTeamId) {
         // Dual-confirmation: submit from this team's perspective
@@ -336,8 +344,6 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
         }
       } else if (isCommissioner) {
         // Commissioner-only direct update path
-        const homeScore = games.filter(g => g.winnerTeamId === match.homeTeamId && !g.isDnf).length
-        const awayScore = games.filter(g => g.winnerTeamId === match.awayTeamId && !g.isDnf).length
         await LeagueService.updateMatchResult(match.id, {
           homeScore,
           awayScore,
@@ -368,29 +374,41 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   }
 
   const recordKOs = async (matchWinner: string | null) => {
-    // Record KOs per game with correct game_number
+    // Persist per-game winners/scores (Bo3/Bo5 detail used to be lost)
+    const hasRosters = homeTeamPicks.length > 0 || awayTeamPicks.length > 0
+    await MatchKOService.saveGameResults(
+      buildMatchGameRows(match.id, games, gameKOs, match.homeTeamId, match.awayTeamId, hasRosters)
+    )
+
+    // Record per game: kills carry scorer attribution (scorer_pick_id), faints
+    // are victim rows (pick_id). The old code wrote the killer's pick into the
+    // victim column, which inverted every kill/death stat downstream.
     for (const game of playedGames) {
       const data = gameKOs[game.gameNumber]
       if (!data) continue
 
-      for (const ko of data.home) {
-        await MatchKOService.recordPokemonKO(
-          match.id,
-          game.gameNumber,
-          ko.pickId,
-          ko.koCount,
-          ko.isDeath
-        )
-      }
-
-      for (const ko of data.away) {
-        await MatchKOService.recordPokemonKO(
-          match.id,
-          game.gameNumber,
-          ko.pickId,
-          ko.koCount,
-          ko.isDeath
-        )
+      for (const side of ['home', 'away'] as const) {
+        const teamId = side === 'home' ? match.homeTeamId : match.awayTeamId
+        for (const ko of data[side]) {
+          if (ko.koCount > 0) {
+            await MatchKOService.recordKillTally({
+              matchId: match.id,
+              gameNumber: game.gameNumber,
+              scorerPickId: ko.pickId,
+              scorerTeamId: teamId,
+              kills: ko.koCount,
+            })
+          }
+          if (ko.faintedCount > 0) {
+            await MatchKOService.recordPokemonKO(
+              match.id,
+              game.gameNumber,
+              ko.pickId,
+              ko.faintedCount,
+              ko.isDeath
+            )
+          }
+        }
       }
     }
 
@@ -408,6 +426,10 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   /** Validate KO data for all played games. Returns array of error strings. */
   const validateKOs = (): string[] => {
     const errors: string[] = []
+
+    // Room-code tournaments have no picks rows (teams come from team sheets),
+    // so there is nothing to log KOs against — skip KO validation entirely.
+    if (homeTeamPicks.length === 0 && awayTeamPicks.length === 0) return errors
 
     for (const game of playedGames) {
       const data = gameKOs[game.gameNumber]

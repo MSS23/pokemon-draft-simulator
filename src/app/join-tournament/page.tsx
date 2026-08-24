@@ -45,10 +45,15 @@ export default function JoinTournamentPage() {
           asSpectator: false,
         }),
       })
-      const result = await response.json().catch(() => ({})) as { leagueId?: string; error?: string }
+      const result = await response.json().catch(() => ({})) as { leagueId?: string; error?: string; asSpectator?: boolean }
       if (!response.ok) throw new Error(result.error || 'Could not join tournament')
       if (!result.leagueId) throw new Error('Tournament lobby could not be resolved')
-      notify.success('Joined!', 'You\'re in the tournament')
+      // The join RPC downgrades to spectator when the room is full or already started
+      if (result.asSpectator) {
+        notify.info('Joined as spectator', 'The tournament is full or has already started, so you are watching, not playing.')
+      } else {
+        notify.success('Joined!', 'You\'re in the tournament')
+      }
       router.push(`/tournament/${result.leagueId}`)
     } catch (err) {
       log.error('Failed to join tournament:', err)

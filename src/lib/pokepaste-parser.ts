@@ -131,8 +131,20 @@ export function parsePokePaste(text: string): PokemonSet[] {
  * Fetch and parse a PokePaste URL
  */
 export async function fetchPokePaste(url: string): Promise<PokemonSet[]> {
-  // Normalize URL: pokepast.es/abc123 -> pokepast.es/abc123/raw
-  let rawUrl = url.trim()
+  const trimmed = url.trim()
+
+  // pokepast.es sends no CORS headers, so browser fetches must go through
+  // our /api/pokepaste proxy. (A bare "pokepast.es/abc" also used to be
+  // fetched as a RELATIVE path against our own origin — the proxy
+  // normalizes the scheme server-side.)
+  if (typeof window !== 'undefined') {
+    const response = await fetch(`/api/pokepaste?url=${encodeURIComponent(trimmed)}`)
+    if (!response.ok) throw new Error('Failed to fetch PokePaste')
+    return parsePokePaste(await response.text())
+  }
+
+  // Server-side: fetch directly. Normalize pokepast.es/abc123 -> .../raw
+  let rawUrl = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
   if (rawUrl.includes('pokepast.es')) {
     rawUrl = rawUrl.replace(/\/+$/, '')
     if (!rawUrl.endsWith('/raw')) rawUrl += '/raw'

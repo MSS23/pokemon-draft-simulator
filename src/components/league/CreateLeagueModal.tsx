@@ -76,14 +76,16 @@ export function CreateLeagueModal({
 
       const leagueId = leagues[0].id
 
-      // Update league settings with extended options
-      await LeagueService.updateLeagueSettings(leagueId, {
-        matchFormat,
-        freeAgentPicksAllowed,
-      })
-
-      // Initialize Pokemon status for all teams
-      await LeagueService.initializeLeaguePokemonStatus(leagueId)
+      // Apply extended settings + Pokemon status to EVERY created league
+      // (split-conference creation returns two leagues; Conference B used to
+      // be skipped and had no team_pokemon_status rows at all)
+      for (const league of leagues) {
+        await LeagueService.updateLeagueSettings(league.id, {
+          matchFormat,
+          freeAgentPicksAllowed,
+        })
+        await LeagueService.initializeLeaguePokemonStatus(league.id)
+      }
 
       onSuccess(leagueId)
       onClose()

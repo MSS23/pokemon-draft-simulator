@@ -47,6 +47,7 @@ export default function FreeAgentsPage() {
   const [dropPickId, setDropPickId] = useState<string | null>(null)
   const [isClaiming, setIsClaiming] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
+  const [lockReason, setLockReason] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -112,9 +113,22 @@ export default function FreeAgentsPage() {
         }
       }
 
-      // Check if free agent claims are locked (first game played)
-      const locked = await WaiverService.hasFirstGameBeenPlayed(leagueId)
-      setIsLocked(locked)
+      // Locked when: rosters locked, deadline passed, or (pre-season leagues
+      // only) the first match has been played. Leagues with
+      // allowInSeasonWaivers keep free agency open all season.
+      const waiverSettings = await WaiverService.getWaiverSettings(leagueId)
+      const pastDeadline = !!waiverSettings.waiverDeadline &&
+        Date.now() > new Date(waiverSettings.waiverDeadline).getTime()
+      const seasonStarted = waiverSettings.allowInSeasonWaivers
+        ? false
+        : await WaiverService.hasFirstGameBeenPlayed(leagueId)
+      setIsLocked(waiverSettings.rosterLocked || pastDeadline || seasonStarted)
+      setLockReason(
+        waiverSettings.rosterLocked ? 'Rosters are currently locked by the commissioner.' :
+        pastDeadline ? 'The free agency deadline has passed.' :
+        seasonStarted ? 'Free agent claims are locked — a match has already been played.' :
+        null
+      )
 
       // Load waiver settings
       const settings = await LeagueService.getLeagueSettings(leagueId)
@@ -373,7 +387,7 @@ export default function FreeAgentsPage() {
                   {!canClaim && (
                     <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
                       <Lock className="h-3 w-3" />
-                      {!userTeamId ? 'You are not part of this league.' : isLocked ? 'Free agent claims are locked — a match has already been played.' : `Free agent pick limit reached (${maxClaims} allowed).`}
+                      {!userTeamId ? 'You are not part of this league.' : isLocked ? (lockReason || 'Free agent claims are locked.') : `Free agent pick limit reached (${maxClaims} allowed).`}
                     </p>
                   )}
                   {!dropPickId && userTeamPicks.length > 0 && (

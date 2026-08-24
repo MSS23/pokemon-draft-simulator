@@ -11,10 +11,8 @@
  */
 
 import { supabase } from './supabase'
-import { createLogger } from '@/lib/logger'
 import type { WaiverClaim, Pick } from '@/types'
 
-const log = createLogger('WaiverService')
 
 
 interface WaiverClaimRow {
@@ -91,134 +89,46 @@ export class WaiverService {
       throw new Error(`Insufficient budget. Need ${netCost} pts extra (${pokemonCost} claim - ${dropRefund} refund), have ${team.budget_remaining || 0} pts`)
     }
 
-    // Check if first game has been played — locks free agent claims
-    const firstGamePlayed = await this.hasFirstGameBeenPlayed(leagueId)
-    if (firstGamePlayed) {
-      throw new Error('Free agent claims are locked once the first match has been played')
-    }
-
-    // Check claim limits
+    // Advisory pre-checks for friendlier errors — the RPC re-checks all of
+    // these atomically and is the actual gate.
     const settings = await this.getWaiverSettings(leagueId)
+    if (settings.rosterLocked) {
+      throw new Error('Rosters are currently locked by the commissioner')
+    }
+    if (settings.waiverDeadline && Date.now() > new Date(settings.waiverDeadline).getTime()) {
+      throw new Error('The free agency deadline has passed')
+    }
+    if (!settings.allowInSeasonWaivers) {
+      // Pre-season window: locked once any match has been played
+      const firstGamePlayed = await this.hasFirstGameBeenPlayed(leagueId)
+      if (firstGamePlayed) {
+        throw new Error('Free agent claims are locked once the first match has been played')
+      }
+    }
     const maxClaims = settings.freeAgentPicksAllowed ?? settings.maxWaiverClaimsPerSeason ?? 3
     const existingClaims = await this.getTeamClaimsThisSeason(teamId, leagueId)
     if (existingClaims >= maxClaims) {
       throw new Error(`Free agent pick limit reached (${maxClaims} allowed before first game)`)
     }
 
-    const { data: claim, error } = await supabase
-      .from('waiver_claims')
-      .insert({
-        league_id: leagueId,
-        team_id: teamId,
-        claimed_pokemon_id: pokemonId,
-        claimed_pokemon_name: pokemonName,
-        dropped_pick_id: dropPickId || null,
-        status: 'pending',
-        claimed_at: new Date().toISOString(),
-      })
-      .select()
-      .single()
+    // Atomic server-side claim: verifies team ownership, drop-pick ownership,
+    // budget, claim limits, and swaps the roster + budget in one transaction.
+    // (The old client-side flow was FK-blocked on the pick delete and
+    // permission-denied on the budget update, both silently.)
+    const { data: claimId, error } = await supabase.rpc('process_waiver_claim' as never, {
+      p_league_id: leagueId,
+      p_team_id: teamId,
+      p_pokemon_id: pokemonId,
+      p_pokemon_name: pokemonName,
+      p_pokemon_cost: pokemonCost,
+      p_drop_pick_id: dropPickId,
+    } as never)
 
     if (error) throw new Error(`Failed to submit claim: ${error?.message || 'Unknown error'}`)
 
-    const claimRow = claim as WaiverClaimRow
-
-    // Auto-process FCFS claims immediately
-    if (settings.waiverPriority === 'fcfs' || !settings.waiverPriority) {
-      await this.processWaiverClaim(claimRow.id, team.draft_id, pokemonCost, dropRefund)
-    }
-
-    return this.mapClaim(claimRow)
-  }
-
-  /**
-   * Process (execute) a waiver claim
-   */
-  static async processWaiverClaim(
-    claimId: string,
-    draftId: string,
-    pokemonCost: number,
-    dropRefund: number
-  ): Promise<void> {
-    if (!supabase) throw new Error('Supabase not available')
-
-    // Get claim details
-    const { data: rawClaim } = await supabase
-      .from('waiver_claims')
-      .select('id, league_id, team_id, claimed_pokemon_id, claimed_pokemon_name, dropped_pick_id, status, waiver_priority, claimed_at, processed_at, notes, created_at')
-      .eq('id', claimId)
-      .single()
-
-    const claim = rawClaim as WaiverClaimRow | null
-    if (!claim) throw new Error('Claim not found')
-    if (claim.status !== 'pending') throw new Error('Claim already processed')
-
-    // Delete dropped pick if applicable
-    if (claim.dropped_pick_id) {
-      await supabase
-        .from('picks')
-        .delete()
-        .eq('id', claim.dropped_pick_id)
-    }
-
-    // Insert new pick
-    const { data: maxOrder } = await supabase
-      .from('picks')
-      .select('pick_order')
-      .eq('draft_id', draftId)
-      .order('pick_order', { ascending: false })
-      .limit(1)
-      .single()
-
-    const nextOrder = ((maxOrder?.pick_order) || 0) + 1
-
-    const { error: pickError } = await supabase
-      .from('picks')
-      .insert({
-        draft_id: draftId,
-        team_id: claim.team_id,
-        pokemon_id: claim.claimed_pokemon_id,
-        pokemon_name: claim.claimed_pokemon_name,
-        cost: pokemonCost,
-        pick_order: nextOrder,
-        round: 0, // Waiver round
-      })
-
-    if (pickError) throw new Error(`Failed to insert pick: ${pickError.message}`)
-
-    // Update team budget via direct SQL
-    const netCost = pokemonCost - dropRefund
-    const { data: currentTeam } = await supabase
-      .from('teams')
-      .select('budget_remaining')
-      .eq('id', claim.team_id)
-      .single()
-
-    if (currentTeam) {
-      await supabase
-        .from('teams')
-        .update({
-          budget_remaining: (currentTeam.budget_remaining || 0) - netCost,
-        })
-        .eq('id', claim.team_id)
-    }
-
-    // Mark claim as completed
-    await supabase
-      .from('waiver_claims')
-      .update({
-        status: 'completed',
-        processed_at: new Date().toISOString(),
-      })
-      .eq('id', claimId)
-
-    log.info(`Waiver claim ${claimId} processed: ${claim.claimed_pokemon_name} to team ${claim.team_id}`)
-
     // Broadcast roster invalidation so league pages refresh
     try {
-      // private: true — gated by realtime.messages RLS (migration 029):
-      // league team owners + commissioner only.
-      const ch = supabase.channel(`league-roster-invalidate:${claim.league_id}`, { config: { private: true } })
+      const ch = supabase.channel(`league-roster-invalidate:${leagueId}`, { config: { private: true } })
       ch.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           ch.send({ type: 'broadcast', event: 'trade_update', payload: { event: 'waiver_completed', claimId } })
@@ -227,6 +137,15 @@ export class WaiverService {
         }
       })
     } catch { /* non-critical */ }
+
+    const { data: rawClaim } = await supabase
+      .from('waiver_claims')
+      .select('id, league_id, team_id, claimed_pokemon_id, claimed_pokemon_name, dropped_pick_id, status, waiver_priority, claimed_at, processed_at, notes, created_at')
+      .eq('id', claimId as unknown as string)
+      .single()
+
+    if (!rawClaim) throw new Error('Claim processed but could not be reloaded')
+    return this.mapClaim(rawClaim as WaiverClaimRow)
   }
 
   /**
@@ -257,7 +176,8 @@ export class WaiverService {
       .select('id', { count: 'exact', head: true })
       .eq('league_id', leagueId)
       .eq('team_id', teamId)
-      .in('status', ['completed', 'pending', 'approved'])
+      // 'pending' excluded: a claim that failed mid-processing must not burn a slot
+      .in('status', ['completed', 'approved'])
 
     if (error) throw new Error(`Failed to count claims: ${error?.message || 'Unknown error'}`)
 
@@ -310,11 +230,14 @@ export class WaiverService {
     return (count ?? 0) > 0
   }
 
-  private static async getWaiverSettings(leagueId: string): Promise<{
+  static async getWaiverSettings(leagueId: string): Promise<{
     enableWaivers: boolean
     maxWaiverClaimsPerSeason: number
     freeAgentPicksAllowed: number | undefined
     waiverPriority: 'fcfs' | 'inverse_standings'
+    allowInSeasonWaivers: boolean
+    waiverDeadline: string | null
+    rosterLocked: boolean
   }> {
     if (!supabase) throw new Error('Supabase not available')
 
@@ -331,6 +254,9 @@ export class WaiverService {
       maxWaiverClaimsPerSeason: (settings.maxWaiverClaimsPerSeason as number) ?? 3,
       freeAgentPicksAllowed: settings.freeAgentPicksAllowed as number | undefined,
       waiverPriority: (settings.waiverPriority as 'fcfs' | 'inverse_standings') ?? 'fcfs',
+      allowInSeasonWaivers: (settings.allowInSeasonWaivers as boolean) ?? false,
+      waiverDeadline: (settings.waiverDeadline as string) || null,
+      rosterLocked: (settings.rosterLocked as boolean) ?? false,
     }
   }
 

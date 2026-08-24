@@ -186,36 +186,65 @@ describe('TradeService', () => {
       })
     })
 
-    it('should set status to rejected when not accepted', async () => {
+    it('should route the response through the respond_to_trade RPC', async () => {
+      mockSupabase.rpc.mockResolvedValue({ error: null })
+
+      // Post-response league_id fetch for the broadcast
+      const mockSingle = vi.fn().mockResolvedValue({
+        data: { league_id: 'league-1' },
+        error: null,
+      })
+      const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
+      mockSupabase.from.mockReturnValue({ select: mockSelect })
+
+      await TradeService.respondToTrade('trade-1', false)
+
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('respond_to_trade', {
+        p_trade_id: 'trade-1',
+        p_response: 'rejected',
+      })
+    })
+
+    it('should fall back to the legacy status-guarded update when the RPC is missing', async () => {
+      mockSupabase.rpc.mockResolvedValue({ error: { code: 'PGRST202', message: 'not found' } })
+
       const mockSingle = vi.fn().mockResolvedValue({
         data: { league_id: 'league-1' },
         error: null,
       })
       const mockSelect = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect })
+      // update().eq('id').eq('status','proposed').select().single()
+      const mockStatusEq = vi.fn().mockReturnValue({ select: mockSelect })
+      const mockEq = vi.fn().mockReturnValue({ eq: mockStatusEq })
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq })
-      mockSupabase.from.mockReturnValue({ update: mockUpdate })
+      // Also serves the post-response league_id fetch
+      const mockLeagueSingle = vi.fn().mockResolvedValue({ data: { league_id: 'league-1' }, error: null })
+      const mockLeagueEq = vi.fn().mockReturnValue({ single: mockLeagueSingle })
+      const mockLeagueSelect = vi.fn().mockReturnValue({ eq: mockLeagueEq })
+      let call = 0
+      mockSupabase.from.mockImplementation(() => {
+        call++
+        return call === 1 ? { update: mockUpdate } : { select: mockLeagueSelect }
+      })
 
       await TradeService.respondToTrade('trade-1', false)
 
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'rejected' })
       )
+      // Only a live proposal may be responded to
+      expect(mockStatusEq).toHaveBeenCalledWith('status', 'proposed')
     })
 
-    it('should throw when update fails', async () => {
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'Update failed' },
+    it('should throw when the trade is no longer open', async () => {
+      mockSupabase.rpc.mockResolvedValue({
+        error: { code: 'P0001', message: 'Trade is no longer open for a response (current: accepted)' },
       })
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect })
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq })
-      mockSupabase.from.mockReturnValue({ update: mockUpdate })
 
       await expect(
         TradeService.respondToTrade('trade-1', true)
-      ).rejects.toThrow('Failed to respond to trade')
+      ).rejects.toThrow('Trade is no longer open for a response')
     })
   })
 
@@ -262,49 +291,17 @@ describe('TradeService', () => {
       })
     })
 
-    it('should fall back to manual swap when RPC fails', async () => {
-      // RPC fails
+    it('should surface the RPC error instead of silently falling back', async () => {
+      // The old client-side "manual swap" fallback destroyed the RPC's
+      // ownership validation and marked failed trades as completed.
       mockSupabase.rpc.mockResolvedValue({
-        error: { message: 'RPC not available' },
+        error: { message: 'Pick pick-A not found on team A' },
       })
 
-      // Manual swap: fetch trade, then swap picks, then mark completed
-      const tradeData = {
-        id: 'trade-1',
-        league_id: 'league-1',
-        team_a_id: 'team-1',
-        team_b_id: 'team-2',
-        team_a_gives: ['pick-A'],
-        team_b_gives: ['pick-B'],
-        status: 'accepted',
-      }
-
-      let fromCallCount = 0
-      mockSupabase.from.mockImplementation(() => {
-        fromCallCount++
-        if (fromCallCount === 1) {
-          // Fetch trade for manual execution
-          return {
-            select: vi.fn().mockReturnValue({
-              eq: vi.fn().mockReturnValue({
-                single: vi.fn().mockResolvedValue({ data: tradeData, error: null }),
-              }),
-            }),
-          }
-        }
-        // Pick updates and trade status update
-        return {
-          update: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              eq: vi.fn().mockResolvedValue({ error: null }),
-            }),
-          }),
-        }
-      })
-
-      await TradeService.executeTrade('trade-1')
-
-      expect(mockSupabase.rpc).toHaveBeenCalled()
+      await expect(TradeService.executeTrade('trade-1')).rejects.toThrow(
+        'Pick pick-A not found on team A'
+      )
+      expect(mockSupabase.from).not.toHaveBeenCalledWith('picks')
     })
   })
 
@@ -332,16 +329,38 @@ describe('TradeService', () => {
       })
     })
 
-    it('should update trade status to cancelled', async () => {
+    it('should route the cancel through the cancel_trade RPC', async () => {
+      mockSupabase.rpc.mockResolvedValue({ error: null })
+
       const mockSingle = vi.fn().mockResolvedValue({
         data: { league_id: 'league-1' },
         error: null,
       })
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect })
+      const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
+      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
+      mockSupabase.from.mockReturnValue({ select: mockSelect })
+
+      await TradeService.cancelTrade('trade-1')
+
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('cancel_trade', {
+        p_trade_id: 'trade-1',
+      })
+    })
+
+    it('should fall back to the legacy update when the RPC is missing', async () => {
+      mockSupabase.rpc.mockResolvedValue({ error: { code: 'PGRST202', message: 'not found' } })
+
+      const mockEqStatus = vi.fn().mockResolvedValue({ error: null })
       const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus })
       const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId })
-      mockSupabase.from.mockReturnValue({ update: mockUpdate })
+      const mockLeagueSingle = vi.fn().mockResolvedValue({ data: { league_id: 'league-1' }, error: null })
+      const mockLeagueEq = vi.fn().mockReturnValue({ single: mockLeagueSingle })
+      const mockLeagueSelect = vi.fn().mockReturnValue({ eq: mockLeagueEq })
+      let call = 0
+      mockSupabase.from.mockImplementation(() => {
+        call++
+        return call === 1 ? { update: mockUpdate } : { select: mockLeagueSelect }
+      })
 
       await TradeService.cancelTrade('trade-1')
 
@@ -351,18 +370,12 @@ describe('TradeService', () => {
     })
 
     it('should throw when cancel fails', async () => {
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'Cannot cancel' },
+      mockSupabase.rpc.mockResolvedValue({
+        error: { code: '42501', message: 'Only the proposing team owner or the commissioner can cancel this trade' },
       })
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockEqStatus = vi.fn().mockReturnValue({ select: mockSelect })
-      const mockEqId = vi.fn().mockReturnValue({ eq: mockEqStatus })
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId })
-      mockSupabase.from.mockReturnValue({ update: mockUpdate })
 
       await expect(TradeService.cancelTrade('trade-1')).rejects.toThrow(
-        'Failed to cancel trade'
+        'Only the proposing team owner or the commissioner can cancel this trade'
       )
     })
   })
@@ -499,15 +512,20 @@ describe('TradeService', () => {
       })
     })
 
-    it('should reject trade when approved is false', async () => {
-      // First call: update trade status to rejected
-      const mockSingle = vi.fn().mockResolvedValue({
-        data: { league_id: 'league-1' },
+    it('should reject trade through the approve_trade RPC when approved is false', async () => {
+      // approveTrade now verifies the caller is the commissioner first
+      const { LeagueService } = await import('@/lib/league-service')
+      vi.spyOn(LeagueService, 'isLeagueCommissioner').mockResolvedValue(true)
+
+      mockSupabase.rpc.mockResolvedValue({ error: null })
+
+      // First call: fetch the trade for the commissioner check
+      const mockTradeSingle = vi.fn().mockResolvedValue({
+        data: { league_id: 'league-1', status: 'accepted' },
         error: null,
       })
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockEq = vi.fn().mockReturnValue({ select: mockSelect })
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq })
+      const mockTradeEq = vi.fn().mockReturnValue({ single: mockTradeSingle })
+      const mockTradeSelect = vi.fn().mockReturnValue({ eq: mockTradeEq })
 
       // Second call: insert trade_approvals
       const mockInsert = vi.fn().mockResolvedValue({ error: null })
@@ -516,14 +534,48 @@ describe('TradeService', () => {
       mockSupabase.from.mockImplementation(() => {
         fromCallCount++
         if (fromCallCount === 1) {
-          return { update: mockUpdate }
+          return { select: mockTradeSelect }
         }
         return { insert: mockInsert }
       })
 
       await TradeService.approveTrade('trade-1', 'commissioner-1', false, 'Unfair trade')
 
-      // Should update with rejected status
+      // The status change goes through the SECURITY DEFINER RPC
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('approve_trade', {
+        p_trade_id: 'trade-1',
+        p_approved: false,
+        p_notes: 'Unfair trade',
+      })
+    })
+
+    it('should fall back to the legacy rejected update when the RPC is missing', async () => {
+      const { LeagueService } = await import('@/lib/league-service')
+      vi.spyOn(LeagueService, 'isLeagueCommissioner').mockResolvedValue(true)
+
+      mockSupabase.rpc.mockResolvedValue({ error: { code: 'PGRST202', message: 'not found' } })
+
+      const mockTradeSingle = vi.fn().mockResolvedValue({
+        data: { league_id: 'league-1', status: 'accepted' },
+        error: null,
+      })
+      const mockTradeEq = vi.fn().mockReturnValue({ single: mockTradeSingle })
+      const mockTradeSelect = vi.fn().mockReturnValue({ eq: mockTradeEq })
+
+      const mockEq = vi.fn().mockResolvedValue({ error: null })
+      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq })
+      const mockInsert = vi.fn().mockResolvedValue({ error: null })
+
+      let fromCallCount = 0
+      mockSupabase.from.mockImplementation(() => {
+        fromCallCount++
+        if (fromCallCount === 1) return { select: mockTradeSelect }
+        if (fromCallCount === 2) return { update: mockUpdate }
+        return { insert: mockInsert }
+      })
+
+      await TradeService.approveTrade('trade-1', 'commissioner-1', false, 'Unfair trade')
+
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           commissioner_approved: false,

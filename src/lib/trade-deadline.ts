@@ -47,7 +47,8 @@ export function formatTradeDeadline(): string {
   const daysUntil = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
   if (daysUntil <= 1) {
-    return 'Tomorrow (Sunday) - Last day to trade'
+    // All of Sunday is locked, so Saturday is the last tradeable day
+    return 'Today is the last day to trade (locks Sunday)'
   }
 
   return `${daysUntil} days until deadline (Sunday)`

@@ -9,6 +9,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { TeamSheetService, type TeamSheetPokemon, type TeamSheet } from '@/lib/teamsheet-service'
+import { parsePokePaste } from '@/lib/pokepaste-parser'
 import { notify } from '@/lib/notifications'
 import { Loader2, Plus, Trash2, ClipboardPaste } from 'lucide-react'
 
@@ -196,77 +197,39 @@ export function TeamSheetModal({ isOpen, onClose, draftId, teamId, existingSheet
   )
 }
 
-/** Parse a Pokepaste/Showdown export into TeamSheetPokemon[] */
+/**
+ * Parse a Pokepaste/Showdown export into TeamSheetPokemon[].
+ * Delegates to the shared parser (src/lib/pokepaste-parser.ts), which handles
+ * "Nickname (Species) (F)", gender markers, and "=== [format] ===" headers —
+ * the duplicated parser this replaced returned "F" as the species name.
+ */
 function parsePokepaste(text: string): TeamSheetPokemon[] {
-  const pokemon: TeamSheetPokemon[] = []
-  const blocks = text.trim().split(/\n\s*\n/)
+  const toStats = (
+    src: Record<string, number>,
+    defaultVal: number
+  ): { hp: number; atk: number; def: number; spa: number; spd: number; spe: number } => ({
+    hp: src.hp ?? defaultVal,
+    atk: src.atk ?? defaultVal,
+    def: src.def ?? defaultVal,
+    spa: src.spa ?? defaultVal,
+    spd: src.spd ?? defaultVal,
+    spe: src.spe ?? defaultVal,
+  })
 
-  for (const block of blocks) {
-    const lines = block.trim().split('\n').map(l => l.trim()).filter(Boolean)
-    if (lines.length === 0) continue
-
-    const mon: TeamSheetPokemon = { name: '', item: '', ability: '', teraType: '', moves: ['', '', '', ''] }
-    let moveIdx = 0
-
-    // First line: "Pokemon @ Item" or "Nickname (Pokemon) @ Item"
-    const firstLine = lines[0]
-    const atMatch = firstLine.match(/^(.+?)\s*@\s*(.+)$/)
-    if (atMatch) {
-      mon.name = cleanPokemonName(atMatch[1])
-      mon.item = atMatch[2].trim()
-    } else {
-      mon.name = cleanPokemonName(firstLine)
-    }
-
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i]
-      if (line.startsWith('Ability:')) {
-        mon.ability = line.replace('Ability:', '').trim()
-      } else if (line.startsWith('Tera Type:')) {
-        mon.teraType = line.replace('Tera Type:', '').trim()
-      } else if (line.startsWith('Level:')) {
-        mon.level = parseInt(line.replace('Level:', '').trim(), 10) || 50
-      } else if (line.startsWith('EVs:')) {
-        mon.evs = parseStatLine(line.replace('EVs:', '').trim())
-      } else if (line.startsWith('IVs:')) {
-        mon.ivs = parseStatLine(line.replace('IVs:', '').trim(), 31)
-      } else if (line.match(/^(\w+)\s+Nature$/)) {
-        mon.nature = line.replace(/\s+Nature$/, '').trim()
-      } else if (line.startsWith('-') && moveIdx < 4) {
-        mon.moves[moveIdx++] = line.replace(/^-\s*/, '').trim()
-      }
-    }
-
-    if (mon.name) pokemon.push(mon)
-  }
-
-  return pokemon
-}
-
-/** Parse "252 HP / 4 Def / 252 SpD" into stat object */
-function parseStatLine(text: string, defaultVal = 0): { hp: number; atk: number; def: number; spa: number; spd: number; spe: number } {
-  const stats = { hp: defaultVal, atk: defaultVal, def: defaultVal, spa: defaultVal, spd: defaultVal, spe: defaultVal }
-  const statMap: Record<string, keyof typeof stats> = {
-    hp: 'hp', atk: 'atk', def: 'def', spa: 'spa', spd: 'spd', spe: 'spe',
-    'sp. atk': 'spa', 'sp. def': 'spd', 'sp.atk': 'spa', 'sp.def': 'spd',
-    spatk: 'spa', spdef: 'spd', speed: 'spe', attack: 'atk', defense: 'def',
-    'special attack': 'spa', 'special defense': 'spd',
-  }
-  const parts = text.split('/')
-  for (const part of parts) {
-    const m = part.trim().match(/^(\d+)\s+(.+)$/)
-    if (m) {
-      const key = statMap[m[2].trim().toLowerCase()]
-      if (key) stats[key] = parseInt(m[1], 10)
-    }
-  }
-  return stats
-}
-
-function cleanPokemonName(raw: string): string {
-  // Handle "Nickname (Pokemon)" format
-  const parenMatch = raw.match(/\(([^)]+)\)\s*$/)
-  if (parenMatch) return parenMatch[1].trim()
-  // Handle gender suffix
-  return raw.replace(/\s*\(M\)\s*$/, '').replace(/\s*\(F\)\s*$/, '').trim()
+  return parsePokePaste(text).map(set => ({
+    name: set.name,
+    item: set.item ?? '',
+    ability: set.ability ?? '',
+    teraType: set.teraType ?? '',
+    moves: [
+      set.moves[0] ?? '',
+      set.moves[1] ?? '',
+      set.moves[2] ?? '',
+      set.moves[3] ?? '',
+    ] as [string, string, string, string],
+    nature: set.nature,
+    evs: Object.keys(set.evs).length > 0 ? toStats(set.evs, 0) : undefined,
+    ivs: Object.keys(set.ivs).length > 0 ? toStats(set.ivs, 31) : undefined,
+    level: set.level ?? 50,
+  }))
 }

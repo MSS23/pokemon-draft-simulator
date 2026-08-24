@@ -13,7 +13,7 @@
  * Read-only; full league spectator-friendly.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, Fragment } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { ArrowLeft, ChevronRight, Calendar } from 'lucide-react'
@@ -36,10 +36,11 @@ interface KOEventRow {
   match_id: string
   scorer_pick_id: string | null
   scorer_team_id: string | null
-  pick_id: string
+  pick_id: string | null
   team_id: string | null
   pokemon_name: string | null
   pokemon_id: string
+  ko_count: number | null
 }
 
 interface WeekCell {
@@ -91,31 +92,41 @@ export default function WeeklyResultsPage() {
 
         if (!mounted) return
         if (rawMatches) {
-          type MatchWithTeams = Match & {
-            home_team: Team
-            away_team: Team
+          type MatchWithTeams = {
+            id: string
             week_number: number
+            match_number: number | null
+            scheduled_date: string | null
+            status: Match['status']
             home_score: number | null
             away_score: number | null
+            winner_team_id: string | null
+            battle_format: Match['battleFormat'] | null
+            notes: string | null
+            created_at: string
+            updated_at: string
+            completed_at: string | null
+            home_team: Team
+            away_team: Team
           }
           setMatches(
             (rawMatches as unknown as MatchWithTeams[]).map(m => ({
               id: m.id,
               leagueId: leagueId,
               weekNumber: m.week_number,
-              matchNumber: 1,
+              matchNumber: m.match_number ?? 1,
               homeTeamId: (m.home_team as Team).id,
               awayTeamId: (m.away_team as Team).id,
-              scheduledDate: m.scheduledDate ?? null,
+              scheduledDate: m.scheduled_date ?? null,
               status: m.status,
               homeScore: m.home_score ?? 0,
               awayScore: m.away_score ?? 0,
-              winnerTeamId: m.winnerTeamId ?? null,
-              battleFormat: m.battleFormat ?? 'best_of_3',
+              winnerTeamId: m.winner_team_id ?? null,
+              battleFormat: m.battle_format ?? 'best_of_3',
               notes: m.notes ?? null,
-              createdAt: m.createdAt,
-              updatedAt: m.updatedAt,
-              completedAt: m.completedAt ?? null,
+              createdAt: m.created_at,
+              updatedAt: m.updated_at,
+              completedAt: m.completed_at ?? null,
               homeTeam: m.home_team as Team,
               awayTeam: m.away_team as Team,
             }))
@@ -127,7 +138,7 @@ export default function WeeklyResultsPage() {
         if (matchIds.length > 0) {
           const { data: koData } = await supabase
             .from('match_pokemon_kos')
-            .select('id, match_id, scorer_pick_id, scorer_team_id, pick_id, team_id, pokemon_name, pokemon_id')
+            .select('id, match_id, scorer_pick_id, scorer_team_id, pick_id, team_id, pokemon_name, pokemon_id, ko_count')
             .in('match_id', matchIds)
           if (mounted && koData) setKoEvents(koData as unknown as KOEventRow[])
         }
@@ -195,9 +206,11 @@ export default function WeeklyResultsPage() {
 
     for (const m of matches) {
       const isCompleted = m.status === 'completed'
-      const homeWin = isCompleted && m.homeScore > m.awayScore
-      const awayWin = isCompleted && m.awayScore > m.homeScore
-      const draw    = isCompleted && m.homeScore === m.awayScore
+      // Derive W/L/D from winner_team_id (what standings use) — score
+      // comparison disagreed on forfeits/overrides with equal scores
+      const homeWin = isCompleted && m.winnerTeamId === m.homeTeamId
+      const awayWin = isCompleted && m.winnerTeamId === m.awayTeamId
+      const draw    = isCompleted && !m.winnerTeamId
 
       const homeCell: WeekCell = {
         matchId: m.id,
@@ -234,11 +247,12 @@ export default function WeeklyResultsPage() {
             pokemonId: pick?.pokemonId ?? '',
             name: pick?.pokemonName ?? '—',
           }
-          existing.kills += 1
+          existing.kills += ko.ko_count || 1
           cell.perPokemon.set(key, existing)
         }
-        // Victim side gets a death on their pokemon
-        if (ko.team_id) {
+        // Victim side gets a death on their pokemon (kill-tally rows carry a
+        // null pick_id and are not faints)
+        if (ko.pick_id && ko.team_id) {
           const cell = ko.team_id === m.homeTeamId ? homeCell : awayCell
           const pick = pickMap.get(ko.pick_id)
           const key = ko.pick_id
@@ -248,7 +262,7 @@ export default function WeeklyResultsPage() {
             pokemonId: pick?.pokemonId ?? ko.pokemon_id,
             name: pick?.pokemonName ?? ko.pokemon_name ?? '—',
           }
-          existing.deaths += 1
+          existing.deaths += ko.ko_count || 1
           cell.perPokemon.set(key, existing)
         }
       }
@@ -347,8 +361,8 @@ export default function WeeklyResultsPage() {
                     const cells: Map<number, WeekCell> = teamWeekGrid.get(team.id) ?? new Map<number, WeekCell>()
                     const isExpanded = expandedTeam === team.id
                     return (
-                      <>
-                        <tr key={team.id} className="border-t border-border hover:bg-muted/20">
+                      <Fragment key={team.id}>
+                        <tr className="border-t border-border hover:bg-muted/20">
                           <th
                             scope="row"
                             className="sticky left-0 z-10 px-3 py-2 text-left whitespace-nowrap border-r border-border backdrop-blur-sm cursor-pointer"
@@ -471,12 +485,12 @@ export default function WeeklyResultsPage() {
                               )
                             })}
                             <td className="border-l border-border bg-muted/40 sticky right-0 px-2 py-2 text-[10px] text-muted-foreground">
-                              <div>K: <span className="text-emerald-600 dark:text-emerald-400 tabular-nums">{totals.pf}</span></div>
-                              <div>D: <span className="text-red-600 dark:text-red-400 tabular-nums">{totals.pa}</span></div>
+                              <div>PF: <span className="text-emerald-600 dark:text-emerald-400 tabular-nums">{totals.pf}</span></div>
+                              <div>PA: <span className="text-red-600 dark:text-red-400 tabular-nums">{totals.pa}</span></div>
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     )
                   })}
                 </tbody>

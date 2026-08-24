@@ -489,6 +489,9 @@ describe('LeagueService', () => {
     })
 
     it('should return pending when only one team has submitted', async () => {
+      // submit_match_side RPC unavailable → legacy merge fallback
+      mockSupabase.rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202', message: 'function not found' } })
+
       // First call: match fetch
       const mockSingle = vi.fn().mockResolvedValue({
         data: {

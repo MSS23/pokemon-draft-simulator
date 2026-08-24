@@ -4,7 +4,6 @@ import type { LeagueRow, MatchRow, TeamRow, PickRow } from '@/types/supabase-hel
 import {
   createTournament,
   startTournament,
-  reportMatchResult,
   type Tournament,
   type TournamentFormat,
 } from './tournament-service'
@@ -578,101 +577,22 @@ export class KnockoutService {
     winnerId: string,
     score: { home: number; away: number }
   ): Promise<Tournament> {
-    if (!supabase) throw new Error('Supabase not configured')
-
-    // Get current tournament state
-    const tournament = await this.getTournament(leagueId)
-    if (!tournament) throw new Error('Tournament not found')
-
-    // Find the tournament match that corresponds to this DB match
-    const { data: dbMatch } = await supabase
-      .from('matches')
-      .select('id, league_id, week_number, match_number, home_team_id, away_team_id, scheduled_date, status, home_score, away_score, winner_team_id, battle_format, youtube_url, notes, created_at, updated_at, completed_at')
-      .eq('id', matchId)
-      .single()
-
-    if (!dbMatch) throw new Error('Match not found')
-
-    // Find the tournament bracket match by participants
-    const tournamentMatch = tournament.rounds
-      .flatMap(r => r.matches)
-      .find(m =>
-        (m.participant1?.teamId === dbMatch.home_team_id && m.participant2?.teamId === dbMatch.away_team_id) ||
-        (m.participant1?.teamId === dbMatch.away_team_id && m.participant2?.teamId === dbMatch.home_team_id)
-      )
-
-    if (!tournamentMatch) throw new Error('Bracket match not found')
-
-    // Report result in tournament logic
-    const p1Score = tournamentMatch.participant1?.teamId === dbMatch.home_team_id ? score.home : score.away
-    const p2Score = tournamentMatch.participant1?.teamId === dbMatch.home_team_id ? score.away : score.home
-
-    const updated = reportMatchResult(tournament, tournamentMatch.id, winnerId, {
-      participant1: p1Score,
-      participant2: p2Score,
+    // Server-side: leagues.settings (where the bracket lives) is
+    // commissioner-only under RLS, so a participant's client-side save
+    // silently updated 0 rows and the bracket never advanced. The API route
+    // verifies the caller is in the match (or is the host) and persists with
+    // the service role.
+    const response = await fetch('/api/tournament/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leagueId, matchId, winnerId, score }),
     })
 
-    // Update DB match
-    const { error: matchError } = await supabase
-      .from('matches')
-      .update({
-        status: 'completed',
-        home_score: score.home,
-        away_score: score.away,
-        winner_team_id: winnerId,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', matchId)
-
-    if (matchError) throw new Error('Failed to update match')
-
-    // Determine current round from tournament state
-    const currentRound = this.getCurrentRound(updated)
-
-    // Update settings JSONB — read current to preserve other fields
-    const { data: currentLeague } = await supabase
-      .from('leagues')
-      .select('settings')
-      .eq('id', leagueId)
-      .single()
-
-    if (currentLeague) {
-      const existingSettings = (currentLeague.settings || {}) as Record<string, unknown>
-      const { error: updateError } = await supabase
-        .from('leagues')
-        .update({
-          current_week: currentRound,
-          status: updated.status === 'completed' ? 'completed' : 'active',
-          settings: {
-            ...existingSettings,
-            tournament: JSON.parse(JSON.stringify(updated)),
-          },
-        })
-        .eq('id', leagueId)
-
-      if (updateError) throw new Error('Failed to save bracket state')
+    const payload = await response.json().catch(() => null) as { tournament?: Tournament; error?: string } | null
+    if (!response.ok || !payload?.tournament) {
+      throw new Error(payload?.error || 'Failed to report match result')
     }
-
-    // Create DB matches for newly-unlocked bracket matches
-    const settings = (currentLeague?.settings || {}) as Record<string, unknown>
-    const matchFormat = (settings.matchFormat as string) || 'best_of_3'
-    await this.syncMatchesToDb(leagueId, updated, matchFormat)
-
-    return updated
-  }
-
-  /**
-   * Get current active round number
-   */
-  private static getCurrentRound(tournament: Tournament): number {
-    for (const round of tournament.rounds) {
-      const hasPending = round.matches.some(
-        m => m.status === 'pending' || m.status === 'in-progress'
-      )
-      if (hasPending) return round.roundNumber
-    }
-    // All done — return last round
-    return tournament.rounds.length
+    return payload.tournament
   }
 
   /**

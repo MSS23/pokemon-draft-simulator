@@ -122,11 +122,13 @@ export default function PowerRankingsPage() {
 
           if (!stats || !form) return null
 
-          // Calculate power score (0-100)
+          // Calculate power score (0-100). A team with no completed matches
+          // scores 0 — its flat defensiveRating of 100 used to catapult it
+          // above every team that had actually played.
           const winRate = stats.matchesPlayed > 0 ? stats.wins / stats.matchesPlayed : 0
           const recentWinRate = form.last5Wins / Math.max(form.form.length, 1)
 
-          const powerScore =
+          const powerScore = stats.matchesPlayed === 0 ? 0 :
             (winRate * 30) +  // 30% weight on overall win rate
             (recentWinRate * 20) +  // 20% on recent form
             (stats.offensiveRating * 2.5) +  // 25% on offense

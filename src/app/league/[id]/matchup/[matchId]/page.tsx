@@ -5,13 +5,15 @@ import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { LeagueService } from '@/lib/league-service'
+import { LeagueService, mapTeamRowFull } from '@/lib/league-service'
 import { LeagueStatsService } from '@/lib/league-stats-service'
 import { MatchKOService } from '@/lib/match-ko-service'
 import { MatchRecorderModal } from '@/components/league/MatchRecorderModal'
 import { PokemonStatusBadge } from '@/components/league/PokemonStatusBadge'
 import { LoadingScreen } from '@/components/ui/loading-states'
-import { ArrowLeft, Trophy, Swords, TrendingUp, Shield, Zap } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { notify } from '@/lib/notifications'
+import { ArrowLeft, Trophy, Swords, TrendingUp, Shield, Zap, CalendarClock, X } from 'lucide-react'
 import type { League, Match, Team, Pick, TeamPokemonStatus } from '@/types'
 import { PokemonSprite } from '@/components/ui/pokemon-sprite'
 import type { HeadToHeadRecord, TeamFormIndicator } from '@/lib/league-stats-service'
@@ -61,12 +63,13 @@ function getTypeCoverage(picks: Pick[], pokemonTypes: Map<string, string[]>): Ma
       const chart = TYPE_EFFECTIVENESS[atkType] || {}
       for (const [defType, mult] of Object.entries(chart)) {
         const existing = coverage.get(defType)
-        // Keep the best (highest) multiplier for SE, or worst (lowest) for NVE
+        // Keep the best (highest) multiplier for SE, or worst (lowest) for NVE.
+        // NB: a stored 0 (immunity) is falsy — compare against undefined.
         if (mult >= 2) {
-          if (!existing || mult > existing) coverage.set(defType, mult)
-        } else if (mult < 1 && (!existing || existing < 1)) {
+          if (existing === undefined || mult > existing) coverage.set(defType, mult)
+        } else if (mult < 1 && (existing === undefined || existing < 1)) {
           // Only store NVE/immune if no SE coverage exists for this type
-          if (!existing || mult < existing) coverage.set(defType, mult)
+          if (existing === undefined || mult < existing) coverage.set(defType, mult)
         }
       }
     }
@@ -81,6 +84,14 @@ function formatMultiplier(mult: number): string {
   if (mult === 2) return 'x2'
   if (mult === 4) return 'x4'
   return `x${mult}`
+}
+
+/** ISO timestamp → value for a datetime-local input (local time, minutes precision) */
+function toDatetimeLocal(iso: string | null): string {
+  const d = iso ? new Date(iso) : new Date()
+  if (isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function getMultiplierColor(mult: number): string {
@@ -113,6 +124,10 @@ export default function MatchupPreviewPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isCommissioner, setIsCommissioner] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [matchGames, setMatchGames] = useState<Awaited<ReturnType<typeof MatchKOService.getMatchGames>>>([])
+  const [showReschedule, setShowReschedule] = useState(false)
+  const [rescheduleDate, setRescheduleDate] = useState('')
+  const [savingReschedule, setSavingReschedule] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -148,8 +163,18 @@ export default function MatchupPreviewPage() {
           .single()
         if (matchErr || !matchData) { router.push(`/league/${leagueId}`); return }
 
-        const homeTeam = leagueData.teams.find(t => t.id === matchData.home_team_id)
-        const awayTeam = leagueData.teams.find(t => t.id === matchData.away_team_id)
+        // Cross-conference opponents are not in this league's team list —
+        // fall back to fetching the team row directly instead of redirecting.
+        const resolveTeam = async (teamId: string) => {
+          const found = leagueData.teams.find(t => t.id === teamId)
+          if (found) return found
+          const { data: row } = await supabase!.from('teams').select('*').eq('id', teamId).single()
+          return row ? mapTeamRowFull(row) : null
+        }
+        const [homeTeam, awayTeam] = await Promise.all([
+          resolveTeam(matchData.home_team_id),
+          resolveTeam(matchData.away_team_id),
+        ])
         if (!homeTeam || !awayTeam) { router.push(`/league/${leagueId}`); return }
 
         const fullMatch = {
@@ -173,6 +198,9 @@ export default function MatchupPreviewPage() {
           awayTeam,
         }
         setMatch(fullMatch)
+
+        // Per-game results (Bo3/Bo5 breakdown), best-effort
+        MatchKOService.getMatchGames(matchId).then(setMatchGames).catch(() => {})
 
         // Load picks for both teams
         const { data: picks } = await supabase
@@ -249,6 +277,23 @@ export default function MatchupPreviewPage() {
     if (match.awayTeam.ownerId === currentUserId) return match.awayTeamId
     return undefined
   }, [currentUserId, match])
+
+  const handleReschedule = async () => {
+    if (!match || !rescheduleDate) return
+    setSavingReschedule(true)
+    try {
+      const iso = new Date(rescheduleDate).toISOString()
+      await LeagueService.rescheduleMatch(matchId, iso)
+      setMatch(prev => prev ? { ...prev, scheduledDate: iso } : prev)
+      setShowReschedule(false)
+      notify.success('Match rescheduled', new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }))
+    } catch (err) {
+      log.error('Failed to reschedule match:', err)
+      notify.error('Reschedule failed', err instanceof Error ? err.message : 'Try again')
+    } finally {
+      setSavingReschedule(false)
+    }
+  }
 
   if (isLoading) return <LoadingScreen title="Loading Matchup..." description="Preparing matchup preview." />
   if (!league || !match) return null
@@ -342,6 +387,49 @@ export default function MatchupPreviewPage() {
                 >
                   {match.status.replace('_', ' ')}
                 </Badge>
+                {match.status === 'completed' && matchGames.length > 0 && (
+                  <div className="mt-2 text-xs text-muted-foreground tabular-nums">
+                    {matchGames.map(g => `G${g.gameNumber} ${g.homeTeamScore}-${g.awayTeamScore}`).join(' · ')}
+                  </div>
+                )}
+                {match.status !== 'completed' && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {match.scheduledDate
+                      ? new Date(match.scheduledDate).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+                      : 'No date set'}
+                  </div>
+                )}
+                {match.status !== 'completed' && (currentUserTeamId || isCommissioner) && (
+                  showReschedule ? (
+                    <div className="mt-2 flex items-center justify-center gap-1">
+                      <Input
+                        type="datetime-local"
+                        value={rescheduleDate}
+                        onChange={(e) => setRescheduleDate(e.target.value)}
+                        className="h-8 text-xs w-auto"
+                      />
+                      <Button size="sm" className="h-8" disabled={savingReschedule || !rescheduleDate} onClick={handleReschedule}>
+                        Save
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setShowReschedule(false)}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-1 h-7 text-xs"
+                      onClick={() => {
+                        setRescheduleDate(toDatetimeLocal(match.scheduledDate))
+                        setShowReschedule(true)
+                      }}
+                    >
+                      <CalendarClock className="h-3.5 w-3.5 mr-1" />
+                      Reschedule
+                    </Button>
+                  )
+                )}
               </div>
 
               <div className="flex-1 text-center">

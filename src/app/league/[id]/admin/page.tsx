@@ -58,8 +58,10 @@ export default function CommissionerPage() {
   // Commissioner settings state
   const [rosterLocked, setRosterLocked] = useState(false)
   const [waiverDeadline, setWaiverDeadline] = useState('')
+  const [allowInSeasonWaivers, setAllowInSeasonWaivers] = useState(false)
   const [savingRosterLock, setSavingRosterLock] = useState(false)
   const [savingWaiverDeadline, setSavingWaiverDeadline] = useState(false)
+  const [savingInSeasonWaivers, setSavingInSeasonWaivers] = useState(false)
 
   const loadData = useCallback(async () => {
     try {
@@ -91,6 +93,7 @@ export default function CommissionerPage() {
       const settings = leagueData.settings || {}
       setRosterLocked(!!settings.rosterLocked)
       setWaiverDeadline((settings.waiverDeadline as string) || '')
+      setAllowInSeasonWaivers(!!settings.allowInSeasonWaivers)
       setMatches(matchesData)
       setStandings(standingsData)
       setPendingTrades(tradesData)
@@ -245,6 +248,33 @@ export default function CommissionerPage() {
     } catch (err) {
       log.error('Failed to advance week:', err)
       notify.error('Advance Failed', err instanceof Error ? err.message : 'Unknown error')
+    }
+  }
+
+  const handleToggleInSeasonWaivers = async () => {
+    if (!supabase || !leagueId || !league) return
+    setSavingInSeasonWaivers(true)
+    try {
+      const newState = !allowInSeasonWaivers
+      const updatedSettings = { ...league.settings, allowInSeasonWaivers: newState }
+      const { error } = await supabase
+        .from('leagues')
+        .update({ settings: updatedSettings })
+        .eq('id', leagueId)
+      if (error) throw error
+      setAllowInSeasonWaivers(newState)
+      setLeague(prev => prev ? { ...prev, settings: updatedSettings } : prev)
+      notify.success(
+        newState ? 'In-Season Claims Enabled' : 'In-Season Claims Disabled',
+        newState
+          ? 'Free agent claims stay open all season (until the deadline, if set).'
+          : 'Free agent claims lock once the first match has been played.'
+      )
+    } catch (err) {
+      log.error('Failed to toggle in-season waivers:', err)
+      notify.error('Failed', err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setSavingInSeasonWaivers(false)
     }
   }
 
@@ -670,7 +700,7 @@ export default function CommissionerPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Advance Week?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Advancing the week will lock the current week&apos;s unplayed matches as forfeits. This action cannot be undone.
+                          Advancing the week moves the league to the next gameweek. Unplayed matches stay open and can still be reported. This action cannot be undone.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -681,7 +711,7 @@ export default function CommissionerPage() {
                   </AlertDialog>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Advancing the week will lock the current week&apos;s unplayed matches as forfeits.
+                  Advancing the week moves the league to the next gameweek; unplayed matches stay open.
                 </p>
               </CardContent>
             </Card>
@@ -696,6 +726,24 @@ export default function CommissionerPage() {
                 <CardDescription>Set deadlines for free agent claims</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">In-season claims</p>
+                    <p className="text-xs text-muted-foreground">
+                      {allowInSeasonWaivers
+                        ? 'Free agency stays open all season (until the deadline, if set).'
+                        : 'Free agency locks once the first match has been played.'}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={allowInSeasonWaivers ? 'default' : 'outline'}
+                    onClick={handleToggleInSeasonWaivers}
+                    disabled={savingInSeasonWaivers}
+                  >
+                    {allowInSeasonWaivers ? 'Enabled' : 'Disabled'}
+                  </Button>
+                </div>
                 <div className="flex items-center gap-3">
                   <Label htmlFor="waiver-deadline" className="text-sm whitespace-nowrap">Waiver Deadline</Label>
                   <Input

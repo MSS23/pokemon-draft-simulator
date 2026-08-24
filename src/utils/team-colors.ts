@@ -23,7 +23,10 @@ export const TEAM_COLORS: TeamColorSet[] = [
 ]
 
 export function getTeamColor(index: number): TeamColorSet {
-  return TEAM_COLORS[index % TEAM_COLORS.length]
+  // Guard negative indexes (e.g. findIndex miss for a cross-conference
+  // opponent): JS % keeps the sign, and TEAM_COLORS[-1] would crash callers.
+  const i = ((index % TEAM_COLORS.length) + TEAM_COLORS.length) % TEAM_COLORS.length
+  return TEAM_COLORS[i]
 }
 
 export function buildTeamColorMap(teamIds: string[]): Map<string, TeamColorSet> {

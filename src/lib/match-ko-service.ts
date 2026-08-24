@@ -9,6 +9,7 @@ import { supabase } from './supabase'
 import { createLogger } from './logger'
 
 const log = createLogger('MatchKOService')
+
 import type {
   MatchPokemonKO,
   TeamPokemonStatus,
@@ -80,12 +81,10 @@ export class MatchKOService {
       throw new Error(`Failed to record Pokemon KO: ${error?.message || 'Unknown error'}`)
     }
 
-    // If death, mark Pokemon as dead in status table
+    // If death, mark Pokemon as dead in status table.
+    // (No KO-counter bump here: pick_id is the VICTIM — faints are not kills.)
     if (isDeath) {
       await this.markPokemonDead(pickId, matchId, details)
-    } else {
-      // Otherwise, update KO stats in status table
-      await this.incrementKOCount(pickId, koCount)
     }
 
     return {
@@ -123,8 +122,15 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    // Update status to 'dead'
-    const { data, error } = await supabase
+    // Scope by league: (pick_id, league_id) is the table's unique key, and a
+    // draft's picks can appear in more than one league (e.g. league + knockout).
+    const { data: match } = await supabase
+      .from('matches')
+      .select('league_id')
+      .eq('id', matchId)
+      .single()
+
+    let query = supabase
       .from('team_pokemon_status')
       .update({
         status: 'dead' as const,
@@ -133,8 +139,8 @@ export class MatchKOService {
         death_details: details || null,
       })
       .eq('pick_id', pickId)
-      .select()
-      .single()
+    if (match?.league_id) query = query.eq('league_id', match.league_id)
+    const { data, error } = await query.select().single()
 
     if (error) {
       throw new Error(`Failed to mark Pokemon as dead: ${error?.message || 'Unknown error'}`)
@@ -299,7 +305,7 @@ export class MatchKOService {
     })
 
     // If RPC doesn't exist, use manual update
-    if (error && error.code === '42883') {
+    if (error && (error.code === '42883' || error.code === 'PGRST202')) {
       const { data: current, error: fetchError } = await supabase
         .from('team_pokemon_status')
         .select('matches_played, matches_won')
@@ -323,40 +329,6 @@ export class MatchKOService {
       }
     } else if (error) {
       throw new Error(`Failed to update Pokemon match stats: ${error?.message || 'Unknown error'}`)
-    }
-  }
-
-  /**
-   * Increment KO count for a Pokemon
-   *
-   * @private
-   */
-  private static async incrementKOCount(pickId: string, koCount: number): Promise<void> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized')
-    }
-
-    const { data: current, error: fetchError } = await supabase
-      .from('team_pokemon_status')
-      .select('total_kos')
-      .eq('pick_id', pickId)
-      .single()
-
-    if (fetchError) {
-      // If status doesn't exist yet, skip (will be initialized later)
-      log.warn('KO count status not found for pick, skipping:', fetchError.message)
-      return
-    }
-
-    const { error: updateError } = await supabase
-      .from('team_pokemon_status')
-      .update({
-        total_kos: (current.total_kos || 0) + koCount,
-      })
-      .eq('pick_id', pickId)
-
-    if (updateError) {
-      throw new Error(`Failed to increment KO count: ${updateError.message}`)
     }
   }
 
@@ -405,37 +377,55 @@ export class MatchKOService {
       throw new Error('Supabase client not initialized')
     }
 
-    // Join query returns a shape not in generated types, so we cast the result
-    type LeaderboardRecord = {
-      pick_id: string
-      team_id: string
-      total_kos: number
-      matches_played: number
-      picks: { pokemon_id: string; pokemon_name: string }
-    }
-
-    const { data, error } = await supabase
-      .from('team_pokemon_status')
-      .select('pick_id, team_id, total_kos, matches_played, picks!inner(pokemon_id, pokemon_name)')
+    // Derive kills from the KO event log (scorer_pick_id = the killer) instead
+    // of the team_pokemon_status.total_kos counter, which drifted whenever an
+    // undo happened or the counter update was blocked by RLS.
+    const { data: matches, error: matchError } = await supabase
+      .from('matches')
+      .select('id')
       .eq('league_id', leagueId)
-      .gt('total_kos', 0)
-      .order('total_kos', { ascending: false })
-      .limit(limit)
+    if (matchError) {
+      throw new Error(`Failed to get KO leaderboard: ${matchError.message}`)
+    }
+    if (!matches || matches.length === 0) return []
+
+    const { data: koRows, error } = await supabase
+      .from('match_pokemon_kos')
+      .select('scorer_pick_id, scorer_team_id, ko_count')
+      .in('match_id', matches.map(m => m.id))
+      .not('scorer_pick_id', 'is', null)
 
     if (error) {
       throw new Error(`Failed to get KO leaderboard: ${error?.message || 'Unknown error'}`)
     }
 
-    const records = (data ?? []) as unknown as LeaderboardRecord[]
+    const kills = new Map<string, { teamId: string; total: number }>()
+    for (const row of (koRows ?? []) as Array<{ scorer_pick_id: string; scorer_team_id: string | null; ko_count: number | null }>) {
+      const entry = kills.get(row.scorer_pick_id) || { teamId: row.scorer_team_id || '', total: 0 }
+      entry.total += row.ko_count || 1
+      kills.set(row.scorer_pick_id, entry)
+    }
+    if (kills.size === 0) return []
 
-    return records.map((record) => ({
-      pickId: record.pick_id,
-      pokemonId: record.picks.pokemon_id,
-      pokemonName: record.picks.pokemon_name,
-      totalKos: record.total_kos || 0,
-      matchesPlayed: record.matches_played || 0,
-      teamId: record.team_id,
-    }))
+    const pickIds = Array.from(kills.keys())
+    const [{ data: picks }, { data: statuses }] = await Promise.all([
+      supabase.from('picks').select('id, pokemon_id, pokemon_name').in('id', pickIds),
+      supabase.from('team_pokemon_status').select('pick_id, matches_played').eq('league_id', leagueId).in('pick_id', pickIds),
+    ])
+    const pickMap = new Map((picks ?? []).map(p => [p.id, p]))
+    const playedMap = new Map((statuses ?? []).map(s => [s.pick_id, s.matches_played || 0]))
+
+    return Array.from(kills.entries())
+      .sort((a, b) => b[1].total - a[1].total)
+      .slice(0, limit)
+      .map(([pickId, entry]) => ({
+        pickId,
+        pokemonId: pickMap.get(pickId)?.pokemon_id || '',
+        pokemonName: pickMap.get(pickId)?.pokemon_name || 'Unknown',
+        totalKos: entry.total,
+        matchesPlayed: playedMap.get(pickId) || 0,
+        teamId: entry.teamId,
+      }))
   }
 
   /**
@@ -547,9 +537,107 @@ export class MatchKOService {
       throw new Error(`Failed to record KO: ${error?.message ?? 'unknown'}`)
     }
 
-    // Best-effort: bump victim's faint counter and scorer's KO counter.
-    void this.incrementKOCount(params.scorerPickId, 1)
     return { id: data.id }
+  }
+
+  /**
+   * Record a per-game kill total for one Pokemon (used by the match recorder
+   * modal, which collects totals rather than individual scorer→victim events).
+   * Kill rows carry scorer_* attribution and a NULL pick_id so they are never
+   * mistaken for faints; death/faint totals go through recordPokemonKO instead.
+   */
+  static async recordKillTally(params: {
+    matchId: string
+    gameNumber: number
+    scorerPickId: string
+    scorerTeamId: string
+    kills: number
+    recordedBy?: string | null
+  }): Promise<void> {
+    if (!supabase) throw new Error('Supabase client not initialized')
+    if (params.kills <= 0) return
+
+    const { data: scorer, error: scorerErr } = await supabase
+      .from('picks')
+      .select('pokemon_id, pokemon_name')
+      .eq('id', params.scorerPickId)
+      .single()
+    if (scorerErr || !scorer) {
+      throw new Error(`Scorer pick not found: ${scorerErr?.message ?? 'missing'}`)
+    }
+
+    const { error } = await supabase
+      .from('match_pokemon_kos')
+      .insert({
+        match_id: params.matchId,
+        game_number: params.gameNumber,
+        pick_id: null,
+        pokemon_id: scorer.pokemon_id,
+        pokemon_name: scorer.pokemon_name,
+        team_id: params.scorerTeamId,
+        scorer_pick_id: params.scorerPickId,
+        scorer_team_id: params.scorerTeamId,
+        recorded_by: params.recordedBy ?? null,
+        ko_count: params.kills,
+        is_death: false,
+      } as never)
+    if (error) {
+      throw new Error(`Failed to record kill tally: ${error.message}`)
+    }
+  }
+
+  /**
+   * Persist per-game results into match_games (Bo3/Bo5 game winners used to
+   * be collapsed into matches.home_score/away_score and lost). Upsert keyed
+   * on (match_id, game_number) so re-recording a match overwrites cleanly.
+   * Best-effort: display-grade data, so failures are logged, not thrown.
+   */
+  static async saveGameResults(
+    rows: Array<{
+      match_id: string
+      game_number: number
+      winner_team_id: string | null
+      home_team_score: number
+      away_team_score: number
+    }>
+  ): Promise<void> {
+    if (!supabase || rows.length === 0) return
+    const { error } = await supabase
+      .from('match_games')
+      .upsert(rows.map(r => ({ ...r, completed_at: new Date().toISOString() })) as never,
+        { onConflict: 'match_id,game_number' })
+    if (error) {
+      // Pre-migration environments lack the unique index the upsert needs —
+      // fall back to plain inserts (duplicates on re-record are tolerable).
+      const { error: insertError } = await supabase
+        .from('match_games')
+        .insert(rows.map(r => ({ ...r, completed_at: new Date().toISOString() })) as never)
+      if (insertError) {
+        log.warn('Failed to save per-game results:', insertError)
+      }
+    }
+  }
+
+  /** Per-game results for a match, ordered by game number. */
+  static async getMatchGames(matchId: string): Promise<Array<{
+    gameNumber: number
+    winnerTeamId: string | null
+    homeTeamScore: number
+    awayTeamScore: number
+  }>> {
+    if (!supabase) return []
+    const { data, error } = await supabase
+      .from('match_games')
+      .select('game_number, winner_team_id, home_team_score, away_team_score')
+      .eq('match_id', matchId)
+      .order('game_number', { ascending: true })
+    if (error || !data) return []
+    return data.map(g => ({
+      gameNumber: g.game_number,
+      winnerTeamId: g.winner_team_id,
+      homeTeamScore: g.home_team_score || 0,
+      awayTeamScore: g.away_team_score || 0,
+    }))
   }
 
   /**
@@ -634,7 +722,7 @@ export class MatchKOService {
       rpc: (n: string, a: Record<string, unknown>) => Promise<{ data: TallyRow[] | null; error: { code?: string; message: string } | null }>
     }).rpc('tally_match_score', { p_match_id: matchId })
 
-    if (rpcResult.error && rpcResult.error.code !== '42883') {
+    if (rpcResult.error && rpcResult.error.code !== '42883' && rpcResult.error.code !== 'PGRST202') {
       // Real failure (not "function does not exist")
       throw new Error(`Failed to tally match score: ${rpcResult.error.message}`)
     }

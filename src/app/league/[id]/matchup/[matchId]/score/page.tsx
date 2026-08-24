@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowLeft, Crosshair, Undo2, Check, Trophy, Loader2, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { LeagueService } from '@/lib/league-service'
+import { LeagueService, mapTeamRowFull } from '@/lib/league-service'
 import { MatchKOService } from '@/lib/match-ko-service'
 import { UserSessionService } from '@/lib/user-session'
 import { useAuth } from '@/contexts/AuthContext'
@@ -99,8 +99,18 @@ export default function MatchScorePage() {
           .single()
         if (mErr || !m) { router.push(`/league/${leagueId}`); return }
 
-        const home = leagueData.teams.find(t => t.id === m.home_team_id)
-        const away = leagueData.teams.find(t => t.id === m.away_team_id)
+        // Cross-conference opponents are not in this league's team list —
+        // fetch the team row directly instead of redirecting.
+        const resolveTeam = async (teamId: string) => {
+          const found = leagueData.teams.find(t => t.id === teamId)
+          if (found) return found
+          const { data: row } = await supabase!.from('teams').select('*').eq('id', teamId).single()
+          return row ? mapTeamRowFull(row) : null
+        }
+        const [home, away] = await Promise.all([
+          resolveTeam(m.home_team_id),
+          resolveTeam(m.away_team_id),
+        ])
         if (!home || !away) { router.push(`/league/${leagueId}`); return }
 
         if (mounted) {
@@ -272,13 +282,39 @@ export default function MatchScorePage() {
   }
 
   async function handleSubmitFinal() {
-    if (!match || !userTeamId) return
+    if (!match) return
     setSubmitting(true)
     try {
       const winnerId =
         score.home > score.away ? match.homeTeamId :
         score.away > score.home ? match.awayTeamId :
         null
+
+      // The live scorer scores a single game — persist it as game 1 so the
+      // match keeps per-game detail like modal-recorded matches do.
+      const saveGameRow = () => MatchKOService.saveGameResults([{
+        match_id: matchId,
+        game_number: 1,
+        winner_team_id: winnerId,
+        home_team_score: score.home,
+        away_team_score: score.away,
+      }])
+
+      // A commissioner who owns neither team records the result directly
+      // (the dual-confirmation flow needs a submitting side).
+      if (!userTeamId) {
+        if (!isCommissioner) return
+        await LeagueService.updateMatchResult(matchId, {
+          homeScore: score.home,
+          awayScore: score.away,
+          winnerTeamId: winnerId,
+          status: 'completed',
+        })
+        await saveGameRow()
+        notify.success('Match recorded', 'Result saved and standings updated')
+        router.push(`/league/${leagueId}/matchup/${matchId}`)
+        return
+      }
 
       const res = await LeagueService.submitMatchResult(matchId, userTeamId, {
         homeScore: score.home,
@@ -287,6 +323,7 @@ export default function MatchScorePage() {
       })
 
       if (res.status === 'confirmed') {
+        await saveGameRow()
         notify.success('Match confirmed!', 'Both teams agree — standings updated')
         router.push(`/league/${leagueId}/matchup/${matchId}`)
       } else if (res.status === 'pending') {

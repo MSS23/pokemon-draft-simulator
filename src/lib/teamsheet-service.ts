@@ -29,36 +29,67 @@ export class TeamSheetService {
     if (!supabase) throw new Error('Supabase not configured')
     if (sheet.length < 1 || sheet.length > 6) throw new Error('Team must have 1-6 Pokemon')
 
-    // Validate each Pokemon has required fields
+    // Validate each Pokemon has required fields, and no duplicates
+    const seen = new Set<string>()
     for (const mon of sheet) {
       if (!mon.name.trim()) throw new Error('Each Pokemon must have a name')
       if (!mon.ability.trim()) throw new Error(`${mon.name} needs an ability`)
       if (mon.moves.filter(m => m.trim()).length < 1) throw new Error(`${mon.name} needs at least 1 move`)
+      const key = mon.name.trim().toLowerCase()
+      if (seen.has(key)) throw new Error(`${mon.name} appears more than once`)
+      seen.add(key)
     }
 
-    // Read current settings
-    const { data: draft, error: readErr } = await supabase
-      .from('drafts')
-      .select('settings')
-      .eq('id', draftId)
-      .maybeSingle()
+    // Draft leagues: sheet entries must come from the team's drafted roster
+    const { data: picks } = await supabase
+      .from('picks')
+      .select('pokemon_name')
+      .eq('team_id', teamId)
+    if (picks && picks.length > 0) {
+      const roster = new Set(picks.map(p => p.pokemon_name.trim().toLowerCase()))
+      for (const mon of sheet) {
+        if (!roster.has(mon.name.trim().toLowerCase())) {
+          throw new Error(`${mon.name} is not on this team's drafted roster`)
+        }
+      }
+    }
 
-    if (readErr || !draft) throw new Error('Tournament not found')
+    // Owner-scoped atomic write (RLS blocks direct drafts.settings updates
+    // for non-hosts, and read-modify-write raced between players)
+    const { error: rpcError } = await supabase.rpc('submit_team_sheet' as never, {
+      p_draft_id: draftId,
+      p_team_id: teamId,
+      p_sheet: sheet,
+    } as never)
 
-    const settings = (draft.settings ?? {}) as Record<string, unknown>
-    const teamSheets = (settings.teamSheets ?? {}) as Record<string, TeamSheet>
-    teamSheets[teamId] = sheet
+    if (rpcError && rpcError.code === 'PGRST202') {
+      // Migration not applied yet — legacy read-modify-write fallback
+      const { data: draft, error: readErr } = await supabase
+        .from('drafts')
+        .select('settings')
+        .eq('id', draftId)
+        .maybeSingle()
+      if (readErr || !draft) throw new Error('Tournament not found')
 
-    const { error: updateErr } = await supabase
-      .from('drafts')
-      .update({
-        settings: { ...settings, teamSheets } as Record<string, unknown>,
-      })
-      .eq('id', draftId)
+      const settings = (draft.settings ?? {}) as Record<string, unknown>
+      const teamSheets = (settings.teamSheets ?? {}) as Record<string, TeamSheet>
+      teamSheets[teamId] = sheet
 
-    if (updateErr) {
-      log.error('Failed to save team sheet:', updateErr)
-      throw new Error('Failed to save team sheet')
+      const { error: updateErr, data: updated } = await supabase
+        .from('drafts')
+        .update({ settings: { ...settings, teamSheets } as Record<string, unknown> })
+        .eq('id', draftId)
+        .select('id')
+      if (updateErr) {
+        log.error('Failed to save team sheet:', updateErr)
+        throw new Error('Failed to save team sheet')
+      }
+      if (!updated || updated.length === 0) {
+        throw new Error('Not allowed to save this team sheet')
+      }
+    } else if (rpcError) {
+      log.error('Failed to save team sheet:', rpcError)
+      throw new Error(rpcError.message || 'Failed to save team sheet')
     }
   }
 

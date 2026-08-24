@@ -11,7 +11,7 @@ import { useState, useCallback, useMemo, memo } from 'react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, toShowdownName } from '@/utils/pokemon'
+import { getPokemonAnimatedUrl, toShowdownName } from '@/utils/pokemon'
 import { notify } from '@/lib/notifications'
 import { LeagueService } from '@/lib/league-service'
 import { KnockoutService } from '@/lib/knockout-service'
@@ -96,13 +96,14 @@ const OTSPokemonCard = memo(function OTSPokemonCard({
             alt={mon.name}
             className="w-[72px] h-[72px] sm:w-[80px] sm:h-[80px] object-contain drop-shadow-[0_2px_8px_rgba(255,255,255,0.08)] transition-transform duration-300 group-hover:scale-110"
             onError={(e) => {
+              // Name-keyed fallbacks only — teamsheet mons carry no dex id
               const target = e.target as HTMLImageElement
               if (!target.dataset.fallback) {
                 target.dataset.fallback = '1'
-                target.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${showdownName}.gif`
+                target.src = `https://play.pokemonshowdown.com/sprites/gen5ani/${showdownName}.gif`
               } else if (target.dataset.fallback === '1') {
                 target.dataset.fallback = '2'
-                target.src = `https://play.pokemonshowdown.com/sprites/gen5ani/${showdownName}.gif`
+                target.src = `https://play.pokemonshowdown.com/sprites/dex/${showdownName}.png`
               }
             }}
             loading="lazy"
@@ -314,10 +315,11 @@ export const TournamentMatchView = memo(function TournamentMatchView({
                       alt={mon.name}
                       className="w-6 h-6 object-contain"
                       onError={(e) => {
+                        // Name-keyed fallback — '0' is not a real dex id
                         const target = e.target as HTMLImageElement
                         if (!target.dataset.fallback) {
                           target.dataset.fallback = '1'
-                          target.src = getPokemonAnimatedBackupUrl('0')
+                          target.src = `https://play.pokemonshowdown.com/sprites/dex/${toShowdownName(mon.name)}.png`
                         }
                       }}
                       loading="lazy"
