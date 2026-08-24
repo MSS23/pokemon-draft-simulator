@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { SignInButton, useClerk } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import { createLogger } from '@/lib/logger'
+import { COUNTRIES } from '@/lib/countries'
 import {
   isPushSupported,
   getPushPermissionStatus,
@@ -35,6 +36,7 @@ interface UserProfile {
   bio: string | null
   twitter_profile: string | null
   twitch_channel: string | null
+  nationality: string | null
 }
 
 export default function SettingsPage() {
@@ -123,6 +125,7 @@ export default function SettingsPage() {
         bio: null,
         twitter_profile: null,
         twitch_channel: null,
+        nationality: null,
       })
     }
 
@@ -149,6 +152,7 @@ export default function SettingsPage() {
         bio: profile.bio,
         twitter_profile: profile.twitter_profile,
         twitch_channel: profile.twitch_channel,
+        nationality: profile.nationality || null,
         updated_at: new Date().toISOString(),
       })
       if (dbError) throw dbError
@@ -297,15 +301,32 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="favorite">Favorite Pokémon</Label>
-                  <Input
-                    id="favorite"
-                    value={profile.favorite_pokemon || ''}
-                    onChange={e => setProfile({ ...profile, favorite_pokemon: e.target.value })}
-                    placeholder="Pikachu"
-                  />
-                  <p className="text-xs text-muted-foreground">Shown on your public profile with its animated sprite.</p>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="favorite">Favorite Pokémon</Label>
+                    <Input
+                      id="favorite"
+                      value={profile.favorite_pokemon || ''}
+                      onChange={e => setProfile({ ...profile, favorite_pokemon: e.target.value })}
+                      placeholder="Pikachu"
+                    />
+                    <p className="text-xs text-muted-foreground">Shown on your public profile with its animated sprite.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nationality">Nationality</Label>
+                    <select
+                      id="nationality"
+                      value={profile.nationality || ''}
+                      onChange={e => setProfile({ ...profile, nationality: e.target.value || null })}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="">Not set</option>
+                      {COUNTRIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">Shown as a flag on your profile and league standings.</p>
+                  </div>
                 </div>
 
                 <Separator />

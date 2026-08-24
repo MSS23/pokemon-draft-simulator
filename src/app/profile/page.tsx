@@ -14,6 +14,9 @@ import { AuthModal } from '@/components/auth/AuthModal'
 import { getPokemonAnimatedUrl, toShowdownName } from '@/utils/pokemon'
 import { Settings, Trophy, Swords, CalendarDays, Twitter, Twitch, Star } from 'lucide-react'
 import { Loader2 } from 'lucide-react'
+import { countryFlag, countryName } from '@/lib/countries'
+import { PlayerProfileService, type PlayerCareer } from '@/lib/player-profile-service'
+import { SeasonHistory } from '@/components/profile/SeasonHistory'
 
 interface UserProfile {
   user_id: string
@@ -24,6 +27,7 @@ interface UserProfile {
   bio: string | null
   twitter_profile: string | null
   twitch_channel: string | null
+  nationality?: string | null
   created_at?: string
 }
 
@@ -49,6 +53,7 @@ export default function ProfilePage() {
     activeLeagues: 0,
   })
   const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [career, setCareer] = useState<PlayerCareer | null>(null)
 
   useEffect(() => {
     if (authLoading) return
@@ -140,6 +145,9 @@ export default function ProfilePage() {
 
     setStats({ totalDrafts, picksMade, leagueWins: wins, leagueLosses: losses, leagueDraws: draws, activeLeagues })
     setLoading(false)
+
+    // Titles + season history (best-effort; page renders without it)
+    PlayerProfileService.getCareer(userId).then(setCareer).catch(() => {})
   }
 
   if (authLoading || loading) {
@@ -222,7 +230,14 @@ export default function ProfilePage() {
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
-                    <h1 className="text-2xl font-bold tracking-tight">{displayName}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                      {displayName}
+                      {profile?.nationality && (
+                        <span title={countryName(profile.nationality)} className="text-2xl leading-none">
+                          {countryFlag(profile.nationality)}
+                        </span>
+                      )}
+                    </h1>
                     {profile?.username && profile.username !== displayName && (
                       <p className="text-sm text-muted-foreground">@{profile.username}</p>
                     )}
@@ -281,7 +296,7 @@ export default function ProfilePage() {
         </Card>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-4 text-center">
               <div className="flex justify-center mb-2">
@@ -333,7 +348,22 @@ export default function ProfilePage() {
               <p className="text-xs text-muted-foreground mt-0.5">Active Leagues</p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardContent className="p-4 text-center">
+              <div className="flex justify-center mb-2">
+                <div className="h-8 w-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                  <Trophy className="h-4 w-4 text-yellow-500" />
+                </div>
+              </div>
+              <p className="text-3xl font-bold tracking-tight tabular-nums leading-none">{career?.titles ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Titles Won</p>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Season-by-season history with drafted teams */}
+        {career && <SeasonHistory seasons={career.seasons} />}
 
         {/* Account Info */}
         <Card>
@@ -373,6 +403,9 @@ export default function ProfilePage() {
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/history">Draft History</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/player/${user.id}`}>Public Profile</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/settings">Settings</Link>

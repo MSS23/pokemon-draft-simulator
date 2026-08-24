@@ -489,6 +489,7 @@ export type Database = {
           total_drafts_created: number
           total_drafts_participated: number
           favorite_pokemon: string | null
+          nationality: string | null
           stats: Record<string, unknown> | null
           preferences: Record<string, unknown> | null
         }
@@ -507,6 +508,7 @@ export type Database = {
           total_drafts_created?: number
           total_drafts_participated?: number
           favorite_pokemon?: string | null
+          nationality?: string | null
           stats?: Record<string, unknown> | null
           preferences?: Record<string, unknown> | null
         }
@@ -525,6 +527,7 @@ export type Database = {
           total_drafts_created?: number
           total_drafts_participated?: number
           favorite_pokemon?: string | null
+          nationality?: string | null
           stats?: Record<string, unknown> | null
           preferences?: Record<string, unknown> | null
         }

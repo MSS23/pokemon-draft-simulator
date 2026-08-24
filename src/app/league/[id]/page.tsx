@@ -39,6 +39,8 @@ import { CommissionerService, type Announcement } from '@/lib/commissioner-servi
 import { createLogger } from '@/lib/logger'
 import { notify } from '@/lib/notifications'
 import { buildTeamColorMap } from '@/utils/team-colors'
+import { countryFlag } from '@/lib/countries'
+import { PlayerProfileService } from '@/lib/player-profile-service'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
@@ -73,8 +75,18 @@ export default function LeaguePage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [fixtureRosters, setFixtureRosters] = useState<Record<string, { home: Pick[]; away: Pick[] }>>({})
   const [fullSchedule, setFullSchedule] = useState<{ weekNumber: number; matches: (Match & { homeTeam: Team; awayTeam: Team })[] }[]>([])
+  const [ownerFlags, setOwnerFlags] = useState<Map<string, string>>(new Map())
 
   const { user } = useAuth()
+
+  // Owner nationality flags for the standings tables (best-effort)
+  useEffect(() => {
+    const ownerIds = [...new Set(
+      [...standings, ...siblingStandings].map(s => s.team?.ownerId).filter(Boolean) as string[]
+    )]
+    if (ownerIds.length === 0) return
+    PlayerProfileService.getNationalities(ownerIds).then(setOwnerFlags).catch(() => {})
+  }, [standings, siblingStandings])
 
   // Subscribe to trade events to invalidate cached rosters
   useEffect(() => {
@@ -601,7 +613,12 @@ export default function LeaguePage() {
                       <div className="flex items-center gap-2.5 min-w-0">
                         <TeamIcon teamName={standing.team.name} teamIndex={teamIndex >= 0 ? teamIndex : index} size="md" />
                         <div className="min-w-0">
-                          <div className="font-semibold text-sm truncate">{standing.team.name}</div>
+                          <div className="font-semibold text-sm truncate">
+                            {standing.team.name}
+                            {standing.team.ownerId && ownerFlags.get(standing.team.ownerId) && (
+                              <span className="ml-1.5">{countryFlag(ownerFlags.get(standing.team.ownerId))}</span>
+                            )}
+                          </div>
                           {standing.currentStreak && (
                             <Badge
                               variant={standing.currentStreak.startsWith('W') ? 'default' : 'destructive'}
