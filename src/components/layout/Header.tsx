@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
-import { SignInButton, UserButton } from '@clerk/nextjs'
+import { UserButton } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { HelpCircle } from 'lucide-react'
@@ -62,11 +62,11 @@ export function Header() {
                 }}
               />
             ) : (
-              <SignInButton mode="modal">
-                <Button variant="brand" size="sm" className="rounded-xl">
-                  Sign In
-                </Button>
-              </SignInButton>
+              // Plain link rather than Clerk's modal SignInButton: the modal is a
+              // no-op until clerk-js hydrates and breaks in in-app webviews.
+              <Button asChild variant="brand" size="sm" className="rounded-xl">
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
             )}
           </div>
         </div>

@@ -15,13 +15,13 @@ import {
   MessageSquareText,
 } from 'lucide-react'
 import { SidebarSection } from './SidebarSection'
+import Link from 'next/link'
 import { SidebarLink } from './SidebarLink'
 import { supabase } from '@/lib/supabase'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useRouter } from 'next/navigation'
-import { SignInButton } from '@clerk/nextjs'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface LeagueInfo {
@@ -118,15 +118,9 @@ export function Sidebar() {
             </div>
           </div>
         ) : (
-          <SignInButton mode="modal">
-            <Button
-              className="w-full"
-              size="sm"
-              variant="brand"
-            >
-              Sign In
-            </Button>
-          </SignInButton>
+          <Button asChild className="w-full" size="sm" variant="brand">
+            <Link href="/sign-in">Sign In</Link>
+          </Button>
         )}
       </div>
 
