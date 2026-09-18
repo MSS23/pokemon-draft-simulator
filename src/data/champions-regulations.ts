@@ -7,6 +7,8 @@
  * Sources:
  * - M-A: https://web-view.app.pokemonchampions.jp/battle/pages/events/rs177501629259kmzbny/en/pokemon.html
  * - M-B: https://web-view.app.pokemonchampions.jp/battle/pages/events/rs178066986988lmoqpm/en/pokemon.html
+ * - M-C: https://www.pokemon.com/us/news/get-ready-for-regulation-set-m-c-in-pokemon-champions
+ *        (roster cross-checked against https://www.serebii.net/pokemonchampions/rankedbattle/regulationm-c.shtml)
  */
 export const CHAMPIONS_MA_DEX_NUMBERS = [
   3, 6, 9, 15, 18, 24, 25, 26, 36, 38, 59, 65, 68, 71, 80, 94, 115,
@@ -36,6 +38,23 @@ export const CHAMPIONS_MB_DEX_NUMBERS = [
   ...CHAMPIONS_MB_ADDED_DEX_NUMBERS,
 ].sort((a, b) => a - b)
 
+/**
+ * The 23 species introduced to the eligible pool in Regulation M-C. The six
+ * new Mega Evolutions (Salamence, Golisopod, Baxcalibur, Absol Z, Garchomp Z,
+ * Lucario Z) and alternate forms (Alolan Persian, Low Key Toxtricity, female
+ * Indeedee) collapse onto these species.
+ */
+export const CHAMPIONS_MC_ADDED_DEX_NUMBERS = [
+  40, 53, 83, 122, 317, 373, 673, 768, 812, 815, 818, 828, 849, 853, 863,
+  865, 871, 876, 923, 930, 931, 943, 998,
+] as const
+
+export const CHAMPIONS_MC_DEX_NUMBERS = [
+  ...CHAMPIONS_MB_DEX_NUMBERS,
+  ...CHAMPIONS_MC_ADDED_DEX_NUMBERS,
+].sort((a, b) => a - b)
+
 export const CHAMPIONS_MA_DEX_IDS = CHAMPIONS_MA_DEX_NUMBERS.map(String)
 export const CHAMPIONS_MB_DEX_IDS = CHAMPIONS_MB_DEX_NUMBERS.map(String)
+export const CHAMPIONS_MC_DEX_IDS = CHAMPIONS_MC_DEX_NUMBERS.map(String)
 

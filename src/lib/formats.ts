@@ -4,6 +4,7 @@
 import {
   CHAMPIONS_MA_DEX_IDS,
   CHAMPIONS_MB_DEX_IDS,
+  CHAMPIONS_MC_DEX_IDS,
 } from '@/data/champions-regulations'
 
 export interface PokemonFormat {
@@ -365,7 +366,7 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
     id: 'vgc-reg-mb',
     name: 'Pokemon Champions Regulation M-B',
     shortName: 'Champions M-B',
-    description: 'Current official Pokemon Champions M-B pool (Jun 17-Sep 2, 2026): 208 draftable species, including 22 additions to M-A.',
+    description: 'Official Pokemon Champions M-B pool (Jun 17-Sep 2, 2026): 208 draftable species, including 22 additions to M-A.',
     generation: 9,
     gameType: 'doubles',
     category: 'vgc',
@@ -397,6 +398,49 @@ export const POKEMON_FORMATS: PokemonFormat[] = [
       lastUpdated: '2026-06-17',
       season: 'Pokemon Champions Regulation M-B',
       source: 'https://champions-news.pokemon-home.com/en/page/776.html',
+      popularity: 5,
+      complexity: 4,
+    },
+  },
+
+  // Pokemon Champions Regulation M-C: M-B plus the 23 species (and six new
+  // Mega Evolutions) added in the September 2026 regulation update.
+  {
+    id: 'vgc-reg-mc',
+    name: 'Pokemon Champions Regulation M-C',
+    shortName: 'Champions M-C',
+    description: 'Current official Pokemon Champions M-C pool (Sep 8-Dec 1, 2026): 231 draftable species, including 23 additions to M-B such as Rillaboom, Salamence and Baxcalibur.',
+    generation: 9,
+    gameType: 'doubles',
+    category: 'vgc',
+    ruleset: {
+      speciesClause: true,
+      itemClause: true,
+      bannedPokemon: [],
+      allowedPokemon: CHAMPIONS_MC_DEX_IDS,
+      bannedTiers: [],
+      allowedGenerations: [],
+      legendaryPolicy: 'allowed',
+      mythicalPolicy: 'allowed',
+      paradoxPolicy: 'allowed',
+      bannedAbilities: [],
+      bannedItems: [],
+      bannedMoves: [],
+    },
+    costConfig: {
+      type: 'hybrid',
+      bstTiers: {
+        680: 50, 600: 35, 550: 30, 500: 25, 450: 20, 400: 15, 350: 10, 300: 7, 0: 4,
+      },
+      costMultiplier: 1.0,
+      minCost: 4,
+      maxCost: 50,
+    },
+    meta: {
+      isOfficial: true,
+      lastUpdated: '2026-09-08',
+      season: 'Pokemon Champions Regulation M-C',
+      source: 'https://www.pokemon.com/us/news/get-ready-for-regulation-set-m-c-in-pokemon-champions',
       popularity: 5,
       complexity: 4,
     },
@@ -965,7 +1009,7 @@ export function getPopularFormats(): PokemonFormat[] {
 }
 
 // Default format
-export const DEFAULT_FORMAT = 'vgc-reg-mb'
+export const DEFAULT_FORMAT = 'vgc-reg-mc'
 
 /**
  * Merge Showdown data with local formats

@@ -5,6 +5,8 @@ import {
   CHAMPIONS_MA_DEX_IDS,
   CHAMPIONS_MB_ADDED_DEX_NUMBERS,
   CHAMPIONS_MB_DEX_IDS,
+  CHAMPIONS_MC_ADDED_DEX_NUMBERS,
+  CHAMPIONS_MC_DEX_IDS,
 } from '@/data/champions-regulations'
 import { createFormatRulesEngine } from '@/domain/rules'
 import { fetchPokemonForFormat } from '@/lib/pokemon-api'
@@ -37,6 +39,8 @@ describe('Pokemon Champions regulation pools', () => {
     expect(new Set(CHAMPIONS_MA_DEX_IDS).size).toBe(186)
     expect(new Set(CHAMPIONS_MB_DEX_IDS).size).toBe(208)
     expect(CHAMPIONS_MB_ADDED_DEX_NUMBERS).toHaveLength(22)
+    expect(new Set(CHAMPIONS_MC_DEX_IDS).size).toBe(231)
+    expect(CHAMPIONS_MC_ADDED_DEX_NUMBERS).toHaveLength(23)
   })
 
   it('keeps the M-A and M-B allowlists distinct', () => {
@@ -49,6 +53,13 @@ describe('Pokemon Champions regulation pools', () => {
     expect(mb.isLegal(pokemon(45))).toBe(true)
     expect(mb.isLegal(pokemon(1000))).toBe(true) // Gholdengo: introduced in M-B
     expect(mb.isLegal(pokemon(1))).toBe(false) // Bulbasaur is not listed
+
+    const mc = createFormatRulesEngine('vgc-reg-mc')
+    expect(mc.isLegal(pokemon(45))).toBe(true) // M-B additions carry forward
+    expect(mb.isLegal(pokemon(812))).toBe(false) // Rillaboom: introduced in M-C
+    expect(mc.isLegal(pokemon(812))).toBe(true)
+    expect(mc.isLegal(pokemon(373))).toBe(true) // Salamence: introduced in M-C
+    expect(mc.isLegal(pokemon(1))).toBe(false)
   })
 })
 
@@ -96,5 +107,6 @@ describe('checked-in National Dex catalogue', () => {
     await expect(getServerFormatPoolIds('unrestricted')).resolves.toHaveLength(1025)
     await expect(getServerFormatPoolIds('vgc-reg-ma')).resolves.toHaveLength(186)
     await expect(getServerFormatPoolIds('vgc-reg-mb')).resolves.toHaveLength(208)
+    await expect(getServerFormatPoolIds('vgc-reg-mc')).resolves.toHaveLength(231)
   })
 })
