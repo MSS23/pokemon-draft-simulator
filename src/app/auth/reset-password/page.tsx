@@ -11,7 +11,7 @@ export default function ResetPasswordPage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace('/auth/login')
+    router.replace('/sign-in')
   }, [router])
 
   return (

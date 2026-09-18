@@ -105,7 +105,7 @@ export default function CreateTournamentPage() {
               <p className="text-sm text-muted-foreground">Sign in to create and manage tournaments.</p>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => router.push('/')} className="flex-1">Go Back</Button>
-                <Button onClick={() => router.push('/auth/login')} className="flex-1">Sign In</Button>
+                <Button onClick={() => router.push('/sign-in')} className="flex-1">Sign In</Button>
               </div>
             </CardContent>
           </Card>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -17,7 +18,6 @@ import { supabase } from "@/lib/supabase";
 import { SidebarLayout } from "@/components/layout/SidebarLayout";
 import { createLogger } from '@/lib/logger'
 import { useAuth } from '@/contexts/AuthContext'
-import { SignInButton } from '@clerk/nextjs'
 
 const log = createLogger('SpectatePage')
 
@@ -390,15 +390,12 @@ export default function SpectatePage() {
                             Rejoin
                           </Button>
                         ) : !user ? (
-                          <SignInButton mode="modal">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                            >
+                          <Button asChild size="sm" variant="outline">
+                            <Link href="/sign-in">
                               <LogIn className="h-4 w-4 mr-1" />
                               Join
-                            </Button>
-                          </SignInButton>
+                            </Link>
+                          </Button>
                         ) : (
                           <Button
                             size="sm"

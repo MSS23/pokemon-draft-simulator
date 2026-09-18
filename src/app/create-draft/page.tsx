@@ -513,7 +513,7 @@ export default function CreateDraftPage() {
               <Button variant="outline" onClick={() => router.push("/")} className="flex-1">
                 Go Back
               </Button>
-              <Button onClick={() => router.push("/auth/login")} className="flex-1">
+              <Button onClick={() => router.push("/sign-in")} className="flex-1">
                 Sign In
               </Button>
             </CardFooter>

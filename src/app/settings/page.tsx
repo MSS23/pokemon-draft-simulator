@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -15,7 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import { User, Shield, Bell, Eye, Trash2, Download, MapPin, Smartphone, ExternalLink } from 'lucide-react'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { useAuth } from '@/contexts/AuthContext'
-import { SignInButton, useClerk } from '@clerk/nextjs'
+import { useClerk } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import { createLogger } from '@/lib/logger'
 import { COUNTRIES } from '@/lib/countries'
@@ -197,11 +198,9 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">Sign in to manage your settings.</p>
             </CardHeader>
             <CardContent>
-              <SignInButton mode="modal">
-                <Button variant="brand" className="w-full">
-                  Sign In
-                </Button>
-              </SignInButton>
+              <Button asChild variant="brand" className="w-full">
+                <Link href="/sign-in">Sign In</Link>
+              </Button>
             </CardContent>
           </Card>
         </div>
