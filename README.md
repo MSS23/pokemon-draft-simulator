@@ -1,251 +1,90 @@
-# Pokémon Draft League
+# Pokémon Champions Draft League
 
-A comprehensive real-time Pokémon drafting platform with official VGC 2024 Regulation H compliance, supporting competitive snake and auction draft formats for tournament-level play.
+Real-time, multiplayer Pokémon draft-league platform: run a snake, tiered or
+auction draft with friends, then play out a full league season (schedule,
+standings, trades, waivers, playoffs) or a tournament. Live at
+**[draftpokemon.com](https://draftpokemon.com)**.
 
-## ✨ Key Features
+## Features
 
-### 🏆 Tournament-Ready Formats
-- **VGC 2024 Regulation H**: Official format with complete legendary/mythical/paradox banlist
-- **VGC 2024 Regulation G**: Previous regulation with paradox Pokémon allowed
-- **Smogon Tiers**: OU, UU, RU formats across multiple generations
-- **Custom Formats**: Budget-balanced and unrestricted competitive play
+- **Draft types** — snake (points budget), tiered (per-tier slot caps), and
+  auction (nominate + live bidding).
+- **Formats** — Pokémon Champions Regulation **M-C** (default, current
+  official pool, Sep 8 – Dec 1 2026), M-B and M-A; VGC Regulations A, C, E, F,
+  G, H, I; Smogon Gen 9 OU / Gen 6 OU / Gen 6 RU; Budget Balanced;
+  Unrestricted; or a custom CSV price list (optionally from usage-based
+  pricing templates). Defined in `src/lib/formats.ts`, Champions allowlists in
+  `src/data/champions-regulations.ts`.
+- **Server-authoritative engine** — picks, budgets, tier caps, auction
+  resolution and turn timeouts are enforced in Postgres RPCs
+  (`make_draft_pick`, `resolve_auction`, `system_*`). Per-species costs for
+  built-in formats are written to `pokemon_tiers` at draft creation so the
+  server, not the client, decides what a pick costs.
+- **Realtime** — Supabase Realtime keeps every participant in sync; a Vercel
+  Cron backstop (`/api/cron/draft-tick`, every minute) auto-picks from
+  wishlists or skips absent players.
+- **Accounts or guests** — Clerk sign-in, or play as a guest via an httpOnly
+  cookie issued by `/api/guest/session`. Share a 6-character room code.
+- **Leagues & tournaments** — schedules, KO-based scoring, trades with
+  DB-enforced consent, waivers/free agency, playoffs, player profiles.
 
-### ⚡ Real-Time Multiplayer
-- **Live synchronization** across all participants with Supabase WebSockets
-- **Snake draft** format with automatic turn progression and visual indicators
-- **Auction draft** format with real-time bidding and countdown timers
-- **Guest user support** with shareable draft links - no registration required
-- **Auto-pick system** with customizable wishlist and countdown functionality
+## Stack
 
-### 🔍 Advanced Pokémon Tools
-- **Comprehensive search** with type, cost, stats, and ability filtering
-- **1000+ Pokémon database** with complete move data and official sprites
-- **Real-time legality validation** for tournament compliance
-- **Team building tools** with budget tracking and composition analysis
-- **Mobile-optimized** responsive design with dark/light themes
+Next.js 15 (App Router) · React 18 · TypeScript · Supabase (Postgres, RLS,
+Realtime) · Clerk · Zustand · TanStack Query · Tailwind + Radix/shadcn ·
+Upstash rate limiting · Sentry · PostHog · next-pwa · Vitest · Playwright.
+Pokémon data ships as a pre-built National Dex index in `public/data/`
+(`npm run build:formats`), with `@pkmn/*` and `@smogon/calc` for sets/calcs.
 
-### 🎯 Strategic Features
-- **Wishlist management** with priority-based auto-picking
-- **Budget optimization** tools with cost-per-point analysis
-- **Team coverage analysis** showing type effectiveness and synergy
-- **Draft results comparison** with detailed team breakdowns
-- **Export functionality** for team lists and draft summaries
-
-## Tech Stack
-
-- **Frontend**: Next.js 15 with TypeScript
-- **Styling**: Tailwind CSS + Shadcn UI
-- **Database**: Supabase (PostgreSQL with real-time subscriptions)
-- **State Management**: Zustand
-- **Data Fetching**: React Query
-- **Pokemon Data**: PokéAPI
-
-## Setup Instructions
-
-### 1. Supabase Configuration
-
-1. Create a new Supabase project at [supabase.com](https://supabase.com)
-2. Go to Project Settings > API
-3. Copy your project URL and anon key
-4. Update `.env.local` with your credentials:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-```
-
-### 2. Database Schema
-
-Run the following SQL in your Supabase SQL editor to create the necessary tables:
-
-```sql
--- Enable RLS
-ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-jwt-secret';
-
--- Create tables
-CREATE TABLE drafts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  name TEXT NOT NULL,
-  host_id TEXT NOT NULL,
-  format TEXT CHECK (format IN ('snake', 'auction')) NOT NULL,
-  ruleset TEXT DEFAULT 'regulation-h',
-  budget_per_team INTEGER DEFAULT 100,
-  max_teams INTEGER DEFAULT 8,
-  status TEXT CHECK (status IN ('setup', 'active', 'completed', 'paused')) DEFAULT 'setup',
-  current_turn INTEGER,
-  current_round INTEGER DEFAULT 1,
-  settings JSONB DEFAULT '{}'::jsonb
-);
-
-CREATE TABLE teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  draft_id UUID REFERENCES drafts(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  owner_id TEXT,
-  budget_remaining INTEGER DEFAULT 100,
-  draft_order INTEGER NOT NULL
-);
-
-CREATE TABLE picks (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  draft_id UUID REFERENCES drafts(id) ON DELETE CASCADE,
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  pokemon_id TEXT NOT NULL,
-  pokemon_name TEXT NOT NULL,
-  cost INTEGER NOT NULL,
-  pick_order INTEGER NOT NULL,
-  round INTEGER NOT NULL
-);
-
-CREATE TABLE participants (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  draft_id UUID REFERENCES drafts(id) ON DELETE CASCADE,
-  user_id TEXT,
-  display_name TEXT NOT NULL,
-  team_id UUID REFERENCES teams(id),
-  is_host BOOLEAN DEFAULT FALSE,
-  last_seen TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE pokemon_tiers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  draft_id UUID REFERENCES drafts(id) ON DELETE CASCADE,
-  pokemon_id TEXT NOT NULL,
-  pokemon_name TEXT NOT NULL,
-  cost INTEGER NOT NULL,
-  is_legal BOOLEAN DEFAULT TRUE
-);
-
-CREATE TABLE auctions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  draft_id UUID REFERENCES drafts(id) ON DELETE CASCADE,
-  pokemon_id TEXT NOT NULL,
-  pokemon_name TEXT NOT NULL,
-  nominated_by UUID REFERENCES teams(id),
-  current_bid INTEGER DEFAULT 0,
-  current_bidder UUID REFERENCES teams(id),
-  auction_end TIMESTAMPTZ NOT NULL,
-  status TEXT CHECK (status IN ('active', 'completed', 'cancelled')) DEFAULT 'active'
-);
-
-CREATE TABLE bid_history (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  auction_id UUID REFERENCES auctions(id) ON DELETE CASCADE,
-  draft_id UUID REFERENCES drafts(id) ON DELETE CASCADE,
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  team_name TEXT NOT NULL,
-  bid_amount INTEGER NOT NULL
-);
-
--- Create indexes
-CREATE INDEX bid_history_auction_id_idx ON bid_history(auction_id);
-CREATE INDEX bid_history_draft_id_idx ON bid_history(draft_id);
-CREATE INDEX bid_history_team_id_idx ON bid_history(team_id);
-
--- Enable RLS on all tables
-ALTER TABLE drafts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE picks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE participants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pokemon_tiers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE bid_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE auctions ENABLE ROW LEVEL SECURITY;
-
--- Create RLS policies (allow all for now - tighten in production)
-CREATE POLICY "Enable all access for drafts" ON drafts FOR ALL USING (true);
-CREATE POLICY "Enable all access for teams" ON teams FOR ALL USING (true);
-CREATE POLICY "Enable all access for picks" ON picks FOR ALL USING (true);
-CREATE POLICY "Enable all access for participants" ON participants FOR ALL USING (true);
-CREATE POLICY "Enable all access for pokemon_tiers" ON pokemon_tiers FOR ALL USING (true);
-CREATE POLICY "Enable all access for auctions" ON auctions FOR ALL USING (true);
-CREATE POLICY "Enable all access for bid_history" ON bid_history FOR ALL USING (true);
-```
-
-### 3. Install Dependencies
+## Local setup
 
 ```bash
-npm install
+cp .env.example .env.local   # fill in Supabase + Clerk keys (see comments)
+npm ci
+npm run dev                  # http://localhost:3000
 ```
 
-### 4. Run Development Server
+Required env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` (server routes), `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`,
+`CLERK_SECRET_KEY`, `CRON_SECRET` (cron route), `NEXT_PUBLIC_SITE_URL`.
+Everything else in `.env.example` is optional.
 
-```bash
-npm run dev
+**Database.** The only schema source of truth is `supabase/migrations/`
+(applied by `.github/workflows/migrate.yml`: staging automatically, production
+behind manual approval). A fresh project can be built by running that folder
+in order — `00000000000000_bootstrap.sql` refuses to run on an existing
+database. Never run anything in `migrations/_archive/`. Clerk ↔ Supabase auth
+setup: [`docs/CLERK-SUPABASE-SETUP.md`](docs/CLERK-SUPABASE-SETUP.md);
+staging: [`docs/STAGING_SETUP.md`](docs/STAGING_SETUP.md).
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server |
+| `npm run build` | Production build (also regenerates `public/sw.js`) |
+| `npm run lint` / `npm run typecheck` | ESLint / `tsc --noEmit` |
+| `npm run test:run` | Vitest unit tests (no DB needed) |
+| `npm run e2e` | Playwright smoke tests (needs a running app) |
+| `npm run build:formats` | Recompile format packs from `data/formats/*.json` |
+| `make help` | Supabase staging/prod/local helpers |
+
+## Layout
+
+```
+src/app/            routes + API routes (draft create/join/tick, cron, guest, tournament…)
+src/components/     UI (draft, league, tournament, shadcn ui/)
+src/lib/            services: draft, auction, league, trade, draft-tick, formats…
+src/domain/rules/   format legality + cost engine
+src/stores/         Zustand draft store
+supabase/migrations RLS policies + RPCs (source of truth)
+tests/              Vitest suites     e2e/  Playwright
+docs/               setup guides, change logs, archived audits, reviews
 ```
 
-The app will be available at `http://localhost:3000`.
-
-## Project Structure
-
-```
-src/
-├── app/                 # Next.js app router pages
-├── components/          # Reusable UI components
-│   ├── ui/             # Shadcn UI components
-│   ├── draft/          # Draft-specific components
-│   ├── pokemon/        # Pokemon-related components
-│   └── team/           # Team-related components
-├── hooks/              # Custom React hooks
-├── lib/                # Library configurations
-├── stores/             # Zustand state stores
-├── types/              # TypeScript type definitions
-└── utils/              # Utility functions
-```
-
-## Usage
-
-1. **Create a Draft**: Set up a new draft with your preferred format and rules
-2. **Share the Link**: Invite participants using the shareable draft link
-3. **Join Teams**: Participants join and create/claim teams
-4. **Start Drafting**: Begin the real-time draft process
-5. **Make Picks**: Take turns selecting Pokémon (snake) or bid on them (auction)
-
-## 🎯 VGC 2024 Regulation H Rules
-
-The application implements the **official VGC 2024 Regulation H ruleset** with complete accuracy:
-
-### Banned Pokémon Categories
-- **ALL Legendary Pokémon** (including previous generations transferable via HOME)
-- **ALL Mythical Pokémon** (Mew, Celebi, Jirachi, Pecharunt, etc.)
-- **ALL Paradox Pokémon** (Great Tusk, Iron Valiant, Flutter Mane, etc.)
-- **Special forms** (Galarian Birds, Therian forms, Origin forms)
-
-### Allowed Pokédex
-- **Paldea Pokédex**: #001-375, #388-392
-- **Kitakami Pokédex**: #001-196 (The Teal Mask DLC)
-- **Blueberry Academy Pokédex**: #001-235 (The Indigo Disk DLC)
-
-### Battle Rules
-- Species Clause: No duplicate Pokémon species
-- Item Clause: No duplicate held items
-- All Pokémon set to Level 50
-- Must be obtained in Scarlet/Violet or transferred from HOME
-
-### Cost System
-- **Balanced tier system** based on base stat totals
-- **30 points**: 600+ BST (Pseudo-legendaries)
-- **25 points**: 550-599 BST (Very strong)
-- **20 points**: 500-549 BST (Strong)
-- **15 points**: 450-499 BST (Above average)
-- **10 points**: 400-449 BST (Average)
-- **Lower tiers**: 3-8 points for budget options
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+More detail for contributors and agents: [`CLAUDE.md`](CLAUDE.md). Latest
+review and open suggestions: [`docs/REVIEW-2026-10-10.md`](docs/REVIEW-2026-10-10.md).
 
 ## License
 
-MIT License - feel free to use this project for your own Pokémon draft leagues!
+MIT

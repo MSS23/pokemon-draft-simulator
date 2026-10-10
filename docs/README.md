@@ -1,36 +1,9 @@
-# Documentation
+# Docs
 
-This folder contains comprehensive documentation for the Pokémon Draft League application.
+- [REVIEW-2026-10-10.md](REVIEW-2026-10-10.md) — latest review: live findings, changes, open suggestions
+- [CLERK-SUPABASE-SETUP.md](CLERK-SUPABASE-SETUP.md) — Clerk ↔ Supabase auth bridge
+- [STAGING_SETUP.md](STAGING_SETUP.md) — staging Supabase/Clerk/Vercel setup
+- [changes/](changes/) — dated change logs (2026-08-23 audit, 2026-08-24 market-readiness)
+- [archive/](archive/) — superseded July 2026 audits (PRODUCTION-READINESS, GO-LIVE-ACTION-PLAN); kept for history, their action items are done or tracked in the latest review
 
-## Quick Links
-
-### 🚀 Getting Started
-- [Quick Start Guide](setup/QUICK_START_PRODUCTION.md) - Fast production deployment
-- [Supabase Setup Guide](setup/SUPABASE_SETUP_GUIDE.md) - Database migration instructions
-- [Deployment Guide](setup/DEPLOYMENT.md) - Full deployment documentation
-- [Troubleshooting Guide](setup/TROUBLESHOOTING.md) - Common issues and solutions
-
-### ✨ Features
-- [Feature Usage Guide](features/FEATURE_USAGE_GUIDE.md) - How to use advanced features
-- [Complete Features List](features/FEATURES.md) - All implemented features
-- [MVP Features](features/MVP_FEATURES.md) - Core functionality breakdown
-
-### 📚 Reference
-- [Main README](../README.md) - Project overview and setup
-- [Database Migrations](../database/migrations/) - SQL schema files
-- [Type Definitions](../src/types/index.ts) - TypeScript interfaces
-
-## Project Structure
-
-```
-docs/
-├── setup/              # Setup and deployment guides
-├── features/           # Feature documentation
-└── archive/            # Deprecated/historical docs
-```
-
-## Need Help?
-
-- Check the [Troubleshooting Guide](setup/TROUBLESHOOTING.md) first
-- Review the [Supabase Setup Guide](setup/SUPABASE_SETUP_GUIDE.md) for database issues
-- See the [Feature Usage Guide](features/FEATURE_USAGE_GUIDE.md) for how-to instructions
+Schema source of truth: [`../supabase/migrations/`](../supabase/migrations/). Contributor guide: [`../CLAUDE.md`](../CLAUDE.md).
