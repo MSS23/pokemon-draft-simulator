@@ -109,7 +109,7 @@ export const CREATE_DRAFT_TOUR_STEPS: TourStep[] = [
   },
   {
     message: () =>
-      `Choose a Pokémon format — this controls which Pokémon are legal. VGC Regulation H is the official competitive standard. You can also upload a custom CSV!`,
+      `Choose a Pokémon format — this controls which Pokémon are legal. Pokémon Champions Regulation M-C is the current official format (the default). You can also upload a custom CSV!`,
     targetId: 'tour-create-format',
   },
   {

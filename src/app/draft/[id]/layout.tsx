@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const roomCode = id?.toUpperCase() || ''
 
   return {
-    title: `Draft ${roomCode} — Pokemon Draft League`,
+    title: `Draft ${roomCode}`,
     description: `Join or spectate draft room ${roomCode}`,
     openGraph: {
       title: `Draft Room ${roomCode}`,

@@ -2,7 +2,8 @@ import { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://draftpokemon.com'
+  // trim(): the production env value carries a trailing newline
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://draftpokemon.com').trim().replace(/\/$/, '')
 
   // Static pages
   const staticPages: MetadataRoute.Sitemap = [
@@ -98,25 +99,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             lastModified: new Date(league.updated_at || Date.now()),
             changeFrequency: 'weekly',
             priority: 0.6,
-          })
-        }
-      }
-
-      // Completed drafts (results pages are public)
-      const { data: drafts } = await supabase
-        .from('drafts')
-        .select('id, updated_at')
-        .eq('status', 'completed')
-        .order('updated_at', { ascending: false })
-        .limit(500)
-
-      if (drafts) {
-        for (const draft of drafts) {
-          dynamicPages.push({
-            url: `${baseUrl}/draft/${draft.id}/results`,
-            lastModified: new Date(draft.updated_at || Date.now()),
-            changeFrequency: 'monthly',
-            priority: 0.4,
           })
         }
       }

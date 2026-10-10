@@ -42,7 +42,7 @@ const TRUST_PROPS = [
 ]
 
 const STEPS = [
-  { num: '01', title: 'Pick your format', desc: 'VGC Reg H, Smogon tiers, or fully custom — choose a template or build your own ruleset with custom bans and costs.' },
+  { num: '01', title: 'Pick your format', desc: 'Pokémon Champions M-C, past VGC regulations, Smogon tiers, or fully custom — choose a template or build your own ruleset with custom bans and costs.' },
   { num: '02', title: 'Share the room code', desc: 'Send a 6-character code to your group. No account needed to join as a guest.' },
   { num: '03', title: 'Draft in real-time', desc: 'Snake or auction with turn timer, wishlist queue, and auto-pick. Budget tracking keeps it competitive.' },
 ]
@@ -57,7 +57,7 @@ const FEATURES = [
   {
     icon: Trophy,
     title: 'Community-driven formats',
-    desc: 'VGC Regulation H, Smogon OU, National Dex, and custom rulesets. Auto-enforced ban lists and cost tiers so nobody sneaks in a restricted legendary.',
+    desc: 'Pokémon Champions M-C, VGC Regulations A–I, Smogon OU, and custom rulesets. Auto-enforced ban lists and cost tiers so nobody sneaks in a restricted legendary.',
     accent: 'from-violet-500 to-purple-600',
   },
   {
@@ -200,7 +200,7 @@ export default function Home() {
             {
               icon: Plus,
               title: 'Create a Draft',
-              desc: 'Pick VGC Reg H, Smogon, or a custom format. Set budget, team count, and share a 6-character room code.',
+              desc: 'Pick Champions M-C, a past VGC regulation, Smogon, or a custom format. Set budget, team count, and share a 6-character room code.',
               accent: 'from-primary to-[hsl(var(--brand-to))]',
             },
             {

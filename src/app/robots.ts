@@ -1,7 +1,8 @@
 import { MetadataRoute } from 'next'
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://draftpokemon.com'
+  // trim(): the production env value carries a trailing newline
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://draftpokemon.com').trim().replace(/\/$/, '')
 
   return {
     rules: [

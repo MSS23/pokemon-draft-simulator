@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Create a Draft',
-  description: 'Set up a Pokemon draft in under a minute. Choose VGC Reg H, Smogon, or custom formats. Snake draft, auction, or tiered — invite your group with a room code.',
+  description: 'Set up a Pokemon draft in under a minute. Choose Pokémon Champions M-C, past VGC regulations, Smogon, or custom formats. Snake draft, auction, or tiered — invite your group with a room code.',
   openGraph: {
     title: 'Create a Draft — Pokemon Draft',
     description: 'Set up a Pokemon draft in under a minute. VGC, Smogon, or custom formats with snake, auction, or tiered drafting.',

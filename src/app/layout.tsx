@@ -35,7 +35,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://draftpokemon.com"),
+  metadataBase: new URL((process.env.NEXT_PUBLIC_SITE_URL || "https://draftpokemon.com").trim()),
   title: {
     default: "Pokémon Champions Draft League — The #1 Draft Platform for Competitive Pokemon",
     template: "%s | Pokémon Champions Draft League",
@@ -74,9 +74,6 @@ export const metadata: Metadata = {
     images: ["https://draftpokemon.com/og-image"],
   },
   manifest: "/manifest.json",
-  alternates: {
-    canonical: "https://draftpokemon.com",
-  },
 };
 
 export const viewport: Viewport = {

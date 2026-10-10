@@ -2,7 +2,7 @@ import { SignUp } from '@clerk/nextjs'
 import Link from 'next/link'
 
 export const metadata = {
-  title: 'Sign up — Pokémon Champions Draft League',
+  title: 'Sign up',
   description: 'Create an account to host drafts, join leagues, and run tournaments.',
 }
 

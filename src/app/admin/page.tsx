@@ -122,9 +122,9 @@ export default function AdminPage() {
                   <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
                     <div className="w-2 h-2 mt-2 rounded-full bg-green-500" />
                     <div>
-                      <p className="font-medium text-sm">VGC 2024 Regulation H</p>
+                      <p className="font-medium text-sm">Pokémon Champions Regulation M-C (default)</p>
                       <p className="text-xs text-muted-foreground">
-                        Official VGC format - Paldea, Kitakami, Blueberry Academy Pokédex
+                        Official Champions allowlist (231 species, Sep 8 – Dec 1, 2026)
                       </p>
                     </div>
                   </div>

@@ -24,7 +24,7 @@ const TECH_STACK = [
 export const revalidate = 86400
 
 export const metadata: Metadata = {
-  title: 'About Pokémon Champions Draft League — The Free Draft Platform for Competitive Pokemon',
+  title: 'About — The Free Draft Platform for Competitive Pokemon',
   description: 'Pokémon Champions Draft League is the go-to draft platform for competitive Pokemon communities. Real-time snake drafts, auctions, full league seasons with standings, trades, and playoffs. Free and open source.',
   openGraph: {
     title: 'About Pokémon Champions Draft League',
