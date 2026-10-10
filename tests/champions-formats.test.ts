@@ -10,8 +10,10 @@ import {
 } from '@/data/champions-regulations'
 import { createFormatRulesEngine } from '@/domain/rules'
 import { fetchPokemonForFormat } from '@/lib/pokemon-api'
-import { getServerFormatPoolIds } from '@/lib/server-format-pool'
+import { getServerFormatPool } from '@/lib/server-format-pool'
 import type { Pokemon } from '@/types'
+
+const getServerFormatPoolIds = async (id: string) => (await getServerFormatPool(id)).ids
 
 function pokemon(id: number): Pokemon {
   return {
@@ -108,5 +110,22 @@ describe('checked-in National Dex catalogue', () => {
     await expect(getServerFormatPoolIds('vgc-reg-ma')).resolves.toHaveLength(186)
     await expect(getServerFormatPoolIds('vgc-reg-mb')).resolves.toHaveLength(208)
     await expect(getServerFormatPoolIds('vgc-reg-mc')).resolves.toHaveLength(231)
+  })
+
+  it('server pick costs match the costs the client displays', async () => {
+    const dataDir = join(process.cwd(), 'public', 'data')
+    const read = (file: string) => JSON.parse(readFileSync(join(dataDir, file), 'utf8'))
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      const file = url.split('/').pop()!.split('?')[0]
+      return { ok: true, json: async () => read(file) }
+    }))
+
+    for (const formatId of ['vgc-reg-mc', 'vgc-reg-h', 'unrestricted']) {
+      const client = await fetchPokemonForFormat(formatId)
+      const clientCost = new Map(client.map((p) => [p.id, p.cost]))
+      const { entries } = await getServerFormatPool(formatId)
+      expect(entries.length).toBe(client.length)
+      for (const e of entries) expect([formatId, e.id, e.cost]).toEqual([formatId, e.id, clientCost.get(e.id)])
+    }
   })
 })

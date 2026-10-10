@@ -17,7 +17,7 @@ import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 import { generateRoomCode } from '@/lib/room-utils'
 import { DEFAULT_FORMAT } from '@/lib/formats'
-import { getServerFormatPoolIds } from '@/lib/server-format-pool'
+import { getServerFormatPool, type ServerFormatPool } from '@/lib/server-format-pool'
 import { validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
 import { getPokemonTier, validateTierConfig } from '@/lib/tier-utils'
@@ -159,9 +159,11 @@ export async function POST(request: NextRequest) {
   const scoringSystem: 'budget' | 'tiered' = isTiered ? 'tiered' : 'budget'
   const formatId = s.formatId || DEFAULT_FORMAT
   let allowedPokemonIds: string[] | undefined
+  let formatPool: ServerFormatPool | undefined
   if (!body.customFormat) {
     try {
-      allowedPokemonIds = await getServerFormatPoolIds(formatId)
+      formatPool = await getServerFormatPool(formatId)
+      allowedPokemonIds = formatPool.ids
     } catch (error) {
       log.error('Could not resolve authoritative format pool', error)
       return NextResponse.json({ error: 'The selected Pokemon format could not be loaded.' }, { status: 500 })
@@ -272,6 +274,26 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to store draft password' },
         { status: 500 },
       )
+    }
+  }
+
+  // Persist authoritative per-species costs. make_draft_pick/system_make_pick
+  // read pokemon_tiers first and only fall back to the client-submitted cost
+  // when no row exists, so without this a participant could pick at any price.
+  if (formatPool && formatPool.entries.length > 0) {
+    const { error: tiersErr } = await supabase
+      .from('pokemon_tiers')
+      .insert(formatPool.entries.map((e) => ({
+        draft_id: draftId,
+        pokemon_id: e.id,
+        pokemon_name: e.name,
+        cost: e.cost,
+        is_legal: true,
+      })))
+    if (tiersErr) {
+      log.error('pokemon_tiers insert failed; rolling back draft', tiersErr)
+      await rollbackDraft()
+      return NextResponse.json({ error: 'Failed to store draft pool' }, { status: 500 })
     }
   }
 
