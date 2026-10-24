@@ -379,18 +379,21 @@ export async function deleteDraft(draftId: string, userId: string): Promise<void
   }
 
   // STEP 2: Soft delete the draft
+  // Column-level GRANT UPDATE on drafts (migration 20260510184215) excludes
+  // deleted_by, so writing it fails with 42501 for every host. RLS already
+  // restricts this update to host_id = clerk_user_id(), so deleted_by would
+  // only ever duplicate host_id. Don't send it.
   const { error: draftError } = await (supabase
     .from('drafts'))
     .update({
       deleted_at: new Date().toISOString(),
-      deleted_by: userId,
       updated_at: new Date().toISOString()
     })
     .eq('id', internalId)
 
   if (draftError) {
     log.error('Error soft-deleting draft:', draftError)
-    throw new Error('Failed to delete draft')
+    throw new Error(`Failed to delete draft: ${draftError.message}`)
   }
 
   log.info(`Draft ${draftId} soft-deleted by user ${userId}`)
