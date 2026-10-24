@@ -193,7 +193,9 @@ export function useWishlistSync({
             event: 'INSERT',
             schema: 'public',
             table: 'picks',
-            filter: `draft_id=eq.${draftId}`
+            // draftId is the room code; picks.draft_id is a uuid. A non-uuid
+            // filter value makes Realtime reject the whole channel subscription.
+            filter: `draft_id=eq.${draftUuid}`
           },
           async (payload) => {
             // When a Pokemon is picked, mark it as unavailable in all wishlists
