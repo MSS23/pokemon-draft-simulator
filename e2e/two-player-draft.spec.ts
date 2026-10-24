@@ -56,7 +56,7 @@ async function signIn(ctx: BrowserContext, who: 'e2e_host' | 'e2e_guest'): Promi
 }
 
 async function dismissOverlays(page: Page) {
-  for (const name of [/^skip$/i, /continue to draft/i, /continue/i, /got it/i]) {
+  for (const name of [/continue to draft/i, /got it/i]) {
     const b = page.getByRole('button', { name }).first()
     if (await b.isVisible().catch(() => false)) await b.click({ timeout: 2_000 }).catch(() => {})
   }
@@ -87,64 +87,81 @@ async function makePick(page: Page, label: string) {
 test('two accounts complete a snake draft end to end', async ({ browser }) => {
   const hostCtx = await browser.newContext()
   const guestCtx = await browser.newContext()
+  // First-login onboarding tour ("Choose Your Guide") is a modal that would block clicks.
+  for (const ctx of [hostCtx, guestCtx]) await ctx.addInitScript(() => { localStorage.setItem('tour:completed', '1'); localStorage.setItem('draft-tour-completed', '1') })
   const host = await signIn(hostCtx, 'e2e_host')
   const guest = await signIn(guestCtx, 'e2e_guest')
   console.log('[auth] both accounts signed in')
 
-  // Host creates the room through the same API the wizard uses.
-  const created = await host.evaluate(async (picks) => {
-    const res = await fetch('/api/draft/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'E2E Draft',
-        hostName: 'E2E Host',
-        teamName: 'E2E Host Team',
-        settings: {
-          maxTeams: 2,
-          draftType: 'points',
-          timeLimit: 0,
-          pokemonPerTeam: picks,
-          budgetPerTeam: 100,
-          formatId: 'vgc-reg-mc',
-          scoringSystem: 'budget',
-        },
-        isPublic: false,
-      }),
-    })
-    return { status: res.status, body: await res.json().catch(() => ({})) }
-  }, PICKS_PER_TEAM)
-  expect(created.status, `create draft: ${JSON.stringify(created.body)}`).toBe(200)
-  const code: string = created.body.roomCode
-  console.log(`[create] room ${code}`)
+  // Host creates the room through the same API the wizard uses. Set
+  // E2E_ROOM_CODE to resume an existing room instead (create is rate-limited).
+  let code = process.env.E2E_ROOM_CODE?.toUpperCase() ?? ''
+  if (!code) {
+    const created = await host.evaluate(async (picks) => {
+      const res = await fetch('/api/draft/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'E2E Draft',
+          hostName: 'E2E Host',
+          teamName: 'E2E Host Team',
+          settings: {
+            maxTeams: 2,
+            draftType: 'points',
+            timeLimit: 0,
+            pokemonPerTeam: picks,
+            budgetPerTeam: 100,
+            formatId: 'vgc-reg-mc',
+            scoringSystem: 'budget',
+          },
+          isPublic: false,
+        }),
+      })
+      return { status: res.status, body: await res.json().catch(() => ({})) }
+    }, PICKS_PER_TEAM)
+    expect(created.status, `create draft: ${JSON.stringify(created.body)}`).toBe(200)
+    code = created.body.roomCode
+    console.log(`[create] room ${code}`)
+  }
 
   await host.goto(`/draft/${code.toLowerCase()}?userName=E2E%20Host&teamName=E2E%20Host%20Team&isHost=true`)
-  await expect(host.getByText(/Share code/i)).toBeVisible({ timeout: 30_000 })
+  await expect(host.getByRole('heading', { name: code })).toBeVisible({ timeout: 30_000 })
   await shot(host, '1-host-lobby')
 
-  // Guest joins through the UI.
-  await guest.goto('/join-draft')
-  await guest.getByLabel('Room code').fill(code)
-  await guest.getByRole('button', { name: /find room/i }).click()
-  const teamName = guest.locator('#teamName')
-  await teamName.waitFor({ state: 'visible', timeout: 20_000 })
-  await teamName.fill('E2E Guest Team')
-  const userName = guest.locator('#userName')
-  if ((await userName.isVisible().catch(() => false)) && !(await userName.inputValue())) {
-    await userName.fill('E2E Guest')
+  if (process.env.E2E_ROOM_CODE) {
+    await guest.goto(`/draft/${code.toLowerCase()}`)
+    await expect(guest.getByRole('heading', { name: code })).toBeVisible({ timeout: 30_000 })
+    console.log('[resume] both in room', code)
+  } else {
+    // Guest joins through the UI.
+    await guest.goto('/join-draft')
+    await guest.getByLabel('Room code').fill(code)
+    await guest.getByRole('button', { name: /find room/i }).click()
+    const teamName = guest.locator('#teamName')
+    await teamName.waitFor({ state: 'visible', timeout: 20_000 })
+    await teamName.fill('E2E Guest Team')
+    const userName = guest.locator('#userName')
+    if ((await userName.isVisible().catch(() => false)) && !(await userName.inputValue())) {
+      await userName.fill('E2E Guest')
+    }
+    await shot(guest, '2-guest-join-form')
+    await guest.getByRole('button', { name: 'Join Draft' }).click()
+    await guest.waitForURL(new RegExp(`/draft/${code.toLowerCase()}`), { timeout: 30_000 })
+    await expect(guest.getByText(/Share code/i)).toBeVisible({ timeout: 30_000 })
+    console.log('[join] guest in lobby')
+    await shot(guest, '3-guest-lobby')
   }
-  await shot(guest, '2-guest-join-form')
-  await guest.getByRole('button', { name: 'Join Draft' }).click()
-  await guest.waitForURL(new RegExp(`/draft/${code.toLowerCase()}`), { timeout: 30_000 })
-  await expect(guest.getByText(/Share code/i)).toBeVisible({ timeout: 30_000 })
-  console.log('[join] guest in lobby')
-  await shot(guest, '3-guest-lobby')
 
-  // Host starts.
+  // Host starts. Give both realtime subscriptions a moment to register first.
+  await host.waitForTimeout(8_000)
   const start = host.getByRole('button', { name: /Start Draft/i })
-  await expect(start, 'start button appears once guest team is in').toBeVisible({ timeout: 30_000 })
-  await start.click()
-  console.log('[start] clicked')
+  if (process.env.E2E_ROOM_CODE && !(await start.waitFor({ state: 'visible', timeout: 30_000 }).then(() => true, () => false))) {
+    console.log('[start] skipped — draft already running')
+  } else {
+    await expect(start, 'start button appears once guest team is in').toBeVisible({ timeout: 30_000 })
+    await start.click()
+    console.log('[start] clicked')
+  }
   await host.waitForTimeout(3_000)
   await dismissOverlays(host)
   await dismissOverlays(guest)

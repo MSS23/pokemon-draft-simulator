@@ -135,7 +135,9 @@ export function useWishlistSync({
         // only participants of this draft can subscribe to wishlist events.
         // Per-user wishlist privacy is still enforced at the
         // public.wishlist_items SELECT policy layer (sec-p1).
-        .channel(`wishlist_${draftId}`, { config: { private: true } })
+        // Topic must carry the draft UUID: the realtime.messages policy
+        // authorises `wishlist_<uuid>`, not the room code.
+        .channel(`wishlist_${draftUuid}`, { config: { private: true } })
         .on(
           'postgres_changes',
           {

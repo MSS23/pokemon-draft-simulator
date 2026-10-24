@@ -481,6 +481,16 @@ export function useDraftActions({
     setIsStarting(true)
     try {
       await DraftService.startDraft(roomCode.toLowerCase())
+      // Don't rely on the realtime echo of our own write: the postgres_changes
+      // subscription can still be registering right after page load, and a
+      // missed event leaves the host stuck on "Waiting".
+      try {
+        DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
+        const freshState = await DraftService.getDraftState(roomCode.toLowerCase())
+        if (freshState) setDraftState(transformDraftState(freshState, userId))
+      } catch (refreshErr) {
+        log.warn('Failed to refresh state after start:', refreshErr)
+      }
       setShowOrderReveal(true)
       setTimeout(() => { setIsStarting(false) }, 1000)
     } catch (err) {
@@ -488,7 +498,7 @@ export function useDraftActions({
       notify.error('Failed to Start Draft', err instanceof Error ? err.message : 'Failed to start draft. Please try again.')
       setIsStarting(false)
     }
-  }, [draftState, roomCode, isStarting])
+  }, [draftState, roomCode, isStarting, setDraftState, transformDraftState, userId])
 
   const handlePauseDraft = useCallback(async () => {
     try {
