@@ -396,6 +396,12 @@ const arePropsEqual = (
   if (prevProps.size !== nextProps.size) return false
   if (prevProps.className !== nextProps.className) return false
   if (prevProps.draftedByTeamName !== nextProps.draftedByTeamName) return false
+  // The page swaps onViewDetails between "open details" (lobby / not your
+  // turn) and "open draft confirmation" (your turn). Both are stable
+  // useCallbacks, so comparing identity re-renders exactly when the click
+  // behaviour changes. Ignoring it left every card on the lobby handler after
+  // the draft started: the first pick click opened the details modal instead.
+  if (prevProps.onViewDetails !== nextProps.onViewDetails) return false
   if (!!prevProps.onPreDraft !== !!nextProps.onPreDraft) return false
   if (!!prevProps.onClearPreDraft !== !!nextProps.onClearPreDraft) return false
   return true
