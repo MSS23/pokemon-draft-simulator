@@ -349,7 +349,6 @@ export async function deleteDraft(draftId: string, userId: string): Promise<void
     throw new Error('Draft not found')
   }
 
-  const internalId = draftState.draft.id
 
   // STEP 1: Broadcast deletion event BEFORE soft-deleting
   // This ensures participants receive the notification before losing access
@@ -371,22 +370,14 @@ export async function deleteDraft(draftId: string, userId: string): Promise<void
     // Continue with deletion even if broadcast fails
   }
 
-  // STEP 2: Soft delete the draft
-  // Column-level GRANT UPDATE on drafts (migration 20260510184215) excludes
-  // deleted_by, so writing it fails with 42501 for every host. RLS already
-  // restricts this update to host_id = clerk_user_id(), so deleted_by would
-  // only ever duplicate host_id. Don't send it.
-  const { error: draftError } = await (supabase
-    .from('drafts'))
-    .update({
-      deleted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', internalId)
-
-  if (draftError) {
-    log.error('Error soft-deleting draft:', draftError)
-    throw new Error(`Failed to delete draft: ${draftError.message}`)
+  // STEP 2: Soft delete via the server. The live RLS policy on drafts rejects
+  // a browser UPDATE that sets deleted_at, so the route does it with the
+  // service role after checking the caller is the host.
+  const res = await fetch(`/api/draft/${encodeURIComponent(draftState.draft.room_code ?? draftId)}`, { method: 'DELETE' })
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string }
+    log.error('Error soft-deleting draft:', body)
+    throw new Error(`Failed to delete draft: ${body.error ?? res.statusText}`)
   }
 
   log.info(`Draft ${draftId} soft-deleted by user ${userId}`)
