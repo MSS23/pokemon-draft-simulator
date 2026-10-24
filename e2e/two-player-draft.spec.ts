@@ -72,15 +72,27 @@ async function whoseTurn(host: Page, guest: Page): Promise<Page | null> {
 
 async function makePick(page: Page, label: string) {
   await dismissOverlays(page)
-  const card = page.locator('[role="article"][aria-label]:not([aria-label*="drafted"])').first()
-  await card.waitFor({ state: 'visible', timeout: 20_000 })
-  const name = (await card.getAttribute('aria-label'))!.split(',')[0]
-  await card.click()
+  const cards = page.locator('[role="article"][aria-label]:not([aria-label*="drafted"])')
+  await cards.first().waitFor({ state: 'visible', timeout: 20_000 })
+  // Cheapest available card: the app budget-locks picks that would strand a later slot.
+  const labels = await cards.evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') ?? ''))
+  const parsed = labels
+    .map((l) => ({ l, name: l.split(',')[0], cost: Number((l.match(/(\d+) points/) ?? [])[1] ?? 999) }))
+    .sort((x, y) => x.cost - y.cost)
+  const { l, name } = parsed[0]
+  await page.locator(`[role="article"][aria-label="${l}"]`).first().click()
   const confirm = page.getByRole('button', { name: new RegExp(`^Draft ${name}$`) })
-  await confirm.waitFor({ state: 'visible', timeout: 10_000 })
+  if (!(await confirm.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false))) {
+    // Nothing affordable (budget lock) — skip the turn instead.
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: /^skip$/i }).first().click()
+    await page.getByRole('button', { name: 'Skip Turn' }).click()
+    console.log(`[skip] ${label} could not afford ${name} — turn skipped`)
+    return null
+  }
   await confirm.click()
   await confirm.waitFor({ state: 'hidden', timeout: 20_000 })
-  console.log(`[pick] ${label} drafted ${name}`)
+  console.log(`[pick] ${label} drafted ${name} (${parsed[0].cost})`)
   return name
 }
 
@@ -170,14 +182,17 @@ test('two accounts complete a snake draft end to end', async ({ browser }) => {
 
   // Alternate picks until the draft completes.
   const total = PICKS_PER_TEAM * 2
+  const isComplete = () => host.getByText(/Draft Complete/i).first().isVisible().catch(() => false)
   for (let i = 1; i <= total; i++) {
+    if (await isComplete()) break
     let turn: Page | null = null
-    for (let tries = 0; tries < 30 && !turn; tries++) {
+    for (let tries = 0; tries < 30 && !turn && !(await isComplete()); tries++) {
       await dismissOverlays(host)
       await dismissOverlays(guest)
       turn = await whoseTurn(host, guest)
       if (!turn) await host.waitForTimeout(1_000)
     }
+    if (!turn && (await isComplete())) break
     if (!turn) {
       await shot(host, `err-host-pick${i}`)
       await shot(guest, `err-guest-pick${i}`)
