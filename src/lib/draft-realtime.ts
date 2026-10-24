@@ -225,16 +225,20 @@ export class DraftRealtimeManager {
           this.reconnectAttempts = 0
           this.callbacks.onConnectionChange({ status: 'connected' })
 
-          // If this is a RE-subscribe (we were connected before and dropped),
-          // events during the outage were missed — trigger a full state refetch.
-          if (this.hasConnectedBefore) {
-            log.info('Re-subscribed after reconnect — requesting state resync')
+          // Rows written between the page's initial state fetch and this
+          // subscription (first subscribe takes ~5s after load; a reconnect
+          // can miss a whole outage) are never delivered — always resync once
+          // subscribed. Short delay covers the gap until Walrus confirms
+          // ("Subscribed to PostgreSQL" arrives ~250ms after SUBSCRIBED).
+          log.info(this.hasConnectedBefore ? 'Re-subscribed after reconnect — requesting state resync' : 'Subscribed — requesting initial resync')
+          setTimeout(() => {
+            if (this.abortController.signal.aborted) return
             try {
               this.callbacks.onResync?.()
             } catch (err) {
               log.warn('onResync callback threw:', err)
             }
-          }
+          }, 1000)
           this.hasConnectedBefore = true
 
           // Track presence
