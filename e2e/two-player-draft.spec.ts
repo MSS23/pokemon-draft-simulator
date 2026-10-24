@@ -210,6 +210,9 @@ test('two accounts complete a snake draft end to end', async ({ browser }) => {
 
   // Host deletes the draft from the dashboard (regression for the deleted_by grant bug).
   await host.goto('/dashboard')
+  // Finished drafts live under the "Completed" tab; the dashboard opens on "Active".
+  const completedTab = host.getByRole('tab', { name: /Completed/i })
+  if (await completedTab.waitFor({ state: 'visible', timeout: 15_000 }).then(() => true, () => false)) await completedTab.click()
   const del = host.locator('button[title="Delete draft"]').first()
   await del.waitFor({ state: 'attached', timeout: 30_000 })
   await del.click({ force: true })
