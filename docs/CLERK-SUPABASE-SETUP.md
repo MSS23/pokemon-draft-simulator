@@ -4,19 +4,28 @@ This one-time configuration lets Supabase validate Clerk session tokens so
 PostgREST, Realtime, and Postgres RLS can identify signed-in users through
 `auth.jwt() ->> 'sub'` and `public.clerk_user_id()`.
 
-The legacy Clerk `supabase` JWT template was deprecated in April 2025. Do not
-create or request that template. A missing template returns 404 and can create
-a retry storm on every Supabase request.
+The legacy Clerk `supabase` JWT template (signed with the Supabase JWT secret)
+was deprecated in April 2025. Do not create or request *that* template.
 
-## 1. Activate Clerk's Supabase integration
+## 1. Give the Clerk token a `role: authenticated` claim
 
-1. Open the Clerk dashboard for the production Clerk instance.
-2. Open the Supabase integration setup and select **Activate Supabase integration**.
-3. Copy the Clerk instance domain shown by Clerk.
+PostgREST only assumes the `authenticated` Postgres role (and every grant/RLS
+policy built on it) when the Clerk token carries `role: authenticated`. The
+plain session token does not. The app therefore requests a plain Clerk JWT
+template named `supabase-authenticated` (see
+`src/lib/clerk-supabase-template.ts`) whose only custom claim is
+`{"role": "authenticated"}`. It is signed with Clerk's normal key, so Supabase's
+Clerk third-party provider accepts it unchanged. It must exist on **every**
+Clerk instance the app runs against (dev and prod); create it with:
 
-Activation adds the `role: authenticated` claim to normal Clerk session
-tokens. The application retrieves this token with `getToken()` and never
-shares the Supabase JWT secret with Clerk.
+```
+clerk api /jwt_templates --app <app id> --instance prod -X POST   -d '{"name":"supabase-authenticated","claims":{"role":"authenticated"},"lifetime":60,"allowed_clock_skew":5}'
+```
+
+Alternatively, activating Clerk's Supabase integration
+(dashboard.clerk.com/setup/supabase, with the **Production** instance selected)
+adds the same claim to the plain session token; the template is then redundant
+but harmless.
 
 ## 2. Register Clerk in Supabase
 

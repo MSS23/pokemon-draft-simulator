@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { createClerkSupabaseClientServer } from '@/lib/supabase-server'
 import { createLogger } from '@/lib/logger'
+import { CLERK_SUPABASE_JWT_TEMPLATE } from '@/lib/clerk-supabase-template'
 
 // Needs the Clerk-authenticated server Supabase client. Node-only, never cached.
 export const runtime = 'nodejs'
@@ -46,15 +47,15 @@ export async function GET() {
   try {
     // Postgres grants (make_draft_pick, UPDATE drafts, ...) are issued to the
     // `authenticated` role. PostgREST only assumes that role when the Clerk
-    // token carries `role: authenticated`, which Clerk's Supabase integration
-    // adds. Without it every signed-in request silently runs as `anon`, so
-    // whoami() can succeed while every write fails with 42501.
-    const token = await (await auth()).getToken()
+    // token carries `role: authenticated`, which the JWT template adds.
+    // Without it every signed-in request silently runs as `anon`, so whoami()
+    // can succeed while every write fails with 42501.
+    const token = await (await auth()).getToken({ template: CLERK_SUPABASE_JWT_TEMPLATE })
     const role = token ? decodeRole(token) : null
     if (role !== 'authenticated') {
       log.error('JWT bridge DOWN: session token has no role=authenticated claim', { role })
       return NextResponse.json(
-        { bridge: 'down', reason: 'session token missing role=authenticated — activate the Supabase integration in the Clerk dashboard' },
+        { bridge: 'down', reason: `token missing role=authenticated — JWT template "${CLERK_SUPABASE_JWT_TEMPLATE}" missing on this Clerk instance?` },
         { status: 200, headers: { 'Cache-Control': 'no-store' } }
       )
     }

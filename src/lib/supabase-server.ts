@@ -17,6 +17,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { CLERK_SUPABASE_JWT_TEMPLATE } from './clerk-supabase-template'
 import { auth } from '@clerk/nextjs/server'
 import type { Database } from './supabase'
 
@@ -44,7 +45,7 @@ export async function createClerkSupabaseClientServer(): Promise<SupabaseClient<
   let cachedToken: string | null = null
   try {
     const { getToken } = await auth()
-    cachedToken = await getToken()
+    cachedToken = await getToken({ template: CLERK_SUPABASE_JWT_TEMPLATE })
   } catch {
     cachedToken = null
   }

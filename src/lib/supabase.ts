@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { CLERK_SUPABASE_JWT_TEMPLATE } from './clerk-supabase-template'
 import type { DraftSettings, LeagueSettings, SpectatorEventMetadata } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
 
@@ -1560,11 +1561,11 @@ async function getClerkSupabaseToken(): Promise<string | null> {
   const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk
   if (!clerk?.session) return null
   try {
-    // Clerk's custom "supabase" JWT template was deprecated in April 2025.
-    // Requesting that missing template causes a 404 + retry storm for every
-    // PostgREST call. The cached session token is what Supabase's native Clerk
-    // third-party provider expects.
-    return await clerk.session.getToken()
+    // The plain session token has no `role` claim, so PostgREST would run every
+    // request as `anon`. The template adds `role: authenticated`; Clerk caches
+    // template tokens like session tokens, so this is not an extra round-trip
+    // per PostgREST call.
+    return await clerk.session.getToken({ template: CLERK_SUPABASE_JWT_TEMPLATE })
   } catch {
     return null
   }
