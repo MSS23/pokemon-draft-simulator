@@ -59,10 +59,11 @@ import { draftSounds } from '@/lib/draft-sounds'
 const log = createLogger('DraftPage')
 
 // Heavy components - lazy load with loading states
-const DraftConfirmationModal = dynamic(() => import('@/components/draft/DraftConfirmationModal'), {
-  ssr: false,
-  loading: () => <div className="h-64 bg-muted rounded-lg animate-pulse" />
-})
+// Static import on purpose: as a next/dynamic component the first confirmation
+// dialog opened after the lobby→draft transition rendered a detached (zombie)
+// subtree — React never delivered the confirm click, so the first pick of
+// every draft silently did nothing until the user clicked again.
+import DraftConfirmationModal from '@/components/draft/DraftConfirmationModal'
 
 const DraftControls = dynamic(() => import('@/components/draft/DraftControls'), {
   ssr: false,
