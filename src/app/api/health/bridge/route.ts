@@ -9,6 +9,15 @@ export const dynamic = 'force-dynamic'
 
 const log = createLogger('api/health/bridge')
 
+function decodeRole(jwt: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString('utf8')) as { role?: string }
+    return payload.role ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Clerk -> Supabase JWT bridge probe (TIER-0).
  *
@@ -35,6 +44,21 @@ export async function GET() {
   }
 
   try {
+    // Postgres grants (make_draft_pick, UPDATE drafts, ...) are issued to the
+    // `authenticated` role. PostgREST only assumes that role when the Clerk
+    // token carries `role: authenticated`, which Clerk's Supabase integration
+    // adds. Without it every signed-in request silently runs as `anon`, so
+    // whoami() can succeed while every write fails with 42501.
+    const token = await (await auth()).getToken()
+    const role = token ? decodeRole(token) : null
+    if (role !== 'authenticated') {
+      log.error('JWT bridge DOWN: session token has no role=authenticated claim', { role })
+      return NextResponse.json(
+        { bridge: 'down', reason: 'session token missing role=authenticated — activate the Supabase integration in the Clerk dashboard' },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      )
+    }
+
     const db = await createClerkSupabaseClientServer()
     const { data: resolved, error } = await db.rpc('whoami')
 
