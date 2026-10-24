@@ -1550,15 +1550,26 @@ if (typeof window !== 'undefined') {
  * The callback is non-throwing — if Clerk isn't loaded (SSR, anon visitor,
  * or no active session) we return null and Supabase falls back to the anon key.
  */
+let clerkNeverLoaded = false
+
 async function getClerkSupabaseToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null
-  // window.Clerk is set by ClerkProvider; ?. handles "not loaded yet"
   type ClerkLike = {
+    loaded?: boolean
     session?: {
       getToken: (opts?: { template?: string }) => Promise<string | null>
     }
   }
-  const clerk = (window as unknown as { Clerk?: ClerkLike }).Clerk
+  const w = window as unknown as { Clerk?: ClerkLike }
+  // Clerk JS boots after first paint. Without this wait the page's first
+  // PostgREST calls go out with the anon key, a private draft returns no rows
+  // and the UI latches "Draft room not found" even though the user is signed in.
+  // ponytail: 50ms poll up to 5s, then give up for the session (anon/guest mode).
+  for (let i = 0; i < 100 && !w.Clerk?.loaded && !clerkNeverLoaded; i++) {
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  if (!w.Clerk?.loaded) clerkNeverLoaded = true
+  const clerk = w.Clerk
   if (!clerk?.session) return null
   try {
     // The plain session token has no `role` claim, so PostgREST would run every
