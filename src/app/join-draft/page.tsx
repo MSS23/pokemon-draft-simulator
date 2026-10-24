@@ -55,34 +55,18 @@ function JoinDraftForm() {
 
     setIsJoining(true);
     try {
-      const { DraftService } = await import("@/lib/draft-service");
-      const draftState = await DraftService.getDraftState(
-        formData.roomCode.toLowerCase(),
+      // Server-side lookup: RLS hides private drafts from users who have not
+      // joined yet, so a client query cannot find them by code.
+      const res = await fetch(
+        `/api/draft/join?roomCode=${encodeURIComponent(formData.roomCode.trim())}`,
       );
-
-      if (!draftState) {
+      if (!res.ok) {
         setError("Draft room not found. Please check the room code.");
         return;
       }
-
-      const hostParticipant = draftState.participants.find((p) => p.is_host);
-      const hasPassword = !!draftState.draft.has_password;
-
-      setRequiresPassword(hasPassword);
-      setDraftInfo({
-        roomCode: formData.roomCode.toUpperCase(),
-        maxTeams: draftState.draft.max_teams,
-        currentTeams: draftState.teams.length,
-        draftType: draftState.draft.format,
-        timeLimit: draftState.draft.settings?.timeLimit || 60,
-        pokemonPerTeam: draftState.draft.settings?.pokemonPerTeam || 6,
-        createdBy: hostParticipant?.display_name || "Unknown",
-        status:
-          draftState.draft.status === "setup"
-            ? "waiting"
-            : draftState.draft.status,
-        hasPassword,
-      });
+      const info = await res.json();
+      setRequiresPassword(!!info.hasPassword);
+      setDraftInfo(info);
     } catch (error) {
       log.error("Failed to lookup draft:", error);
       setError("Draft room not found. Please check the room code.");

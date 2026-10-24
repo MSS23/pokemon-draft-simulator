@@ -15,6 +15,45 @@ interface JoinDraftBody {
   asSpectator?: boolean
 }
 
+/**
+ * Room preview for the join page. RLS hides private drafts from non-members,
+ * but anyone holding the room code must be able to see the room before
+ * joining it (the POST below already lets them join). Service role, minimal
+ * non-sensitive fields only.
+ */
+export async function GET(request: NextRequest) {
+  const roomCode = request.nextUrl.searchParams.get('roomCode')?.trim().toLowerCase()
+  if (!roomCode || !/^[a-z0-9]{6}$/.test(roomCode)) {
+    return NextResponse.json({ error: 'Enter a valid 6-character room code.' }, { status: 400 })
+  }
+  const { data } = await createServiceRoleClient()
+    .from('drafts')
+    .select('room_code, status, format, max_teams, has_password, settings, teams(id), participants(display_name, is_host)')
+    .ilike('room_code', roomCode)
+    .is('deleted_at', null)
+    .maybeSingle()
+  // Generated types lack the drafts->participants relation (same cast as getDraftState).
+  const draft = data as unknown as {
+    room_code: string; status: string; format: string; max_teams: number; has_password: boolean | null
+    settings: unknown; teams: { id: string }[]; participants: { display_name: string | null; is_host: boolean }[]
+  } | null
+  if (!draft) {
+    return NextResponse.json({ error: 'Draft room not found.' }, { status: 404 })
+  }
+  const settings = (draft.settings ?? {}) as { timeLimit?: number; pokemonPerTeam?: number }
+  return NextResponse.json({
+    roomCode: draft.room_code.toUpperCase(),
+    maxTeams: draft.max_teams,
+    currentTeams: draft.teams.length,
+    draftType: draft.format,
+    timeLimit: settings.timeLimit ?? 60,
+    pokemonPerTeam: settings.pokemonPerTeam ?? 6,
+    createdBy: draft.participants.find((p) => p.is_host)?.display_name || 'Unknown',
+    status: draft.status === 'setup' ? 'waiting' : draft.status,
+    hasPassword: !!draft.has_password,
+  })
+}
+
 export async function POST(request: NextRequest) {
   const { userId } = await auth()
   if (!userId) {
