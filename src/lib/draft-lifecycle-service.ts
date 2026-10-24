@@ -5,6 +5,7 @@
  * and deleting drafts, plus team/timer management.
  */
 import { supabase } from './supabase'
+import { broadcastOnDraftChannel } from './draft-broadcast'
 import { UserSessionService } from '@/lib/user-session'
 import type { DraftRow, TeamRow, ParticipantRow } from '@/types/supabase-helpers'
 import { createLogger } from '@/lib/logger'
@@ -356,23 +357,15 @@ export async function deleteDraft(draftId: string, userId: string): Promise<void
     // private: true — gated by realtime.messages RLS (migration 029).
     // The host calling delete is by construction a participant of this draft,
     // so the policy allows the broadcast.
-    const channel = supabase.channel(`draft:${draftId}`, { config: { private: true } })
-    await channel.send({
-      type: 'broadcast',
-      event: 'draft_deleted',
-      payload: {
-        draftId,
-        deletedBy: userId,
-        deletedAt: new Date().toISOString(),
-        message: 'This draft has been deleted'
-      }
+    await broadcastOnDraftChannel(draftId, 'draft_deleted', {
+      draftId,
+      deletedBy: userId,
+      deletedAt: new Date().toISOString(),
+      message: 'This draft has been deleted'
     })
 
     // Give time for message to propagate
     await new Promise(resolve => setTimeout(resolve, 500))
-
-    // Unsubscribe the channel
-    await channel.unsubscribe()
   } catch (error) {
     log.warn('Failed to broadcast deletion event:', error)
     // Continue with deletion even if broadcast fails

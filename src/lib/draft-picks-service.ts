@@ -5,6 +5,7 @@
  * advancing turns, and auto-skipping.
  */
 import { supabase } from './supabase'
+import { broadcastOnDraftChannel } from './draft-broadcast'
 import { generateSnakeDraftOrder } from '@/utils/draft'
 import { getFormatById, DEFAULT_FORMAT } from '@/lib/formats'
 import { createFormatRulesEngine as createNewFormatRulesEngine } from '@/domain/rules'
@@ -47,26 +48,13 @@ async function sendPickBroadcast(
     timestamp: Date.now()
   }
 
-  // Use the same channel name as DraftRealtimeManager for this draft.
-  // private: true — realtime.messages RLS (migration 029) gates this topic
-  // to draft participants only.
-  const channel = supabase.channel(`draft:${draftId}`, { config: { private: true } })
-
   try {
-    await channel.send({
-      type: 'broadcast',
-      event: 'pick_made',
-      payload
-    })
+    await broadcastOnDraftChannel(draftId, 'pick_made', payload)
     log.info('[SUPA-04] Broadcast pick_made sent for draft:', draftId)
   } catch (err) {
     // Broadcast failure is non-fatal — postgres_changes still delivers the event
     // as a fallback (picks table subscription stays active for this reason)
     log.warn('[SUPA-04] Broadcast send failed (postgres_changes fallback active):', err)
-  } finally {
-    // IMPORTANT: This is a fire-and-forget channel — remove it immediately
-    // to avoid channel accumulation. Do not store a reference.
-    supabase.removeChannel(channel)
   }
 }
 
