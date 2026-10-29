@@ -171,20 +171,22 @@ async function tryWishlistAutoPick(
   teamId: string,
   expectedTurn: number
 ): Promise<string | null> {
-  const { data: participant } = await db
+  // A team can have more than one participant (co-owners); use every
+  // participant's wishlist rather than .maybeSingle(), which errors on 2+ rows.
+  const { data: participants } = await db
     .from('participants')
     .select('id')
     .eq('draft_id', draftId)
     .eq('team_id', teamId)
-    .maybeSingle()
 
-  if (!participant) return null
+  const participantIds = (participants ?? []).map((p) => p.id)
+  if (participantIds.length === 0) return null
 
   const { data: wishlist } = await db
     .from('wishlist_items')
     .select('pokemon_id, pokemon_name, cost, priority')
     .eq('draft_id', draftId)
-    .eq('participant_id', participant.id)
+    .in('participant_id', participantIds)
     .eq('is_available', true)
     .order('priority', { ascending: true })
 

@@ -25,56 +25,11 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
-  // Optimize bundle size with code splitting
+  // Chunking is left to Next's defaults: a hand-rolled `vendor` cacheGroup
+  // (chunks: 'all', fixed name) put every node_modules package, including
+  // lazily imported ones, into one ~475 KB chunk loaded on every route.
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Split chunks for better caching
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            default: false,
-            vendors: false,
-            // Vendor chunk for node_modules
-            vendor: {
-              name: 'vendor',
-              chunks: 'all',
-              test: /node_modules/,
-              priority: 20,
-            },
-            // Common chunk for shared components
-            common: {
-              name: 'common',
-              minChunks: 2,
-              chunks: 'all',
-              priority: 10,
-              reuseExistingChunk: true,
-              enforce: true,
-            },
-            // Separate chunks for large libraries
-            react: {
-              test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
-              name: 'react',
-              chunks: 'all',
-              priority: 30,
-            },
-            supabase: {
-              test: /[\\/]node_modules[\\/](@supabase)[\\/]/,
-              name: 'supabase',
-              chunks: 'all',
-              priority: 25,
-            },
-            radixui: {
-              test: /[\\/]node_modules[\\/](@radix-ui)[\\/]/,
-              name: 'radixui',
-              chunks: 'all',
-              priority: 24,
-            },
-          },
-        },
-      }
-
       // Bundle analyzer (only when ANALYZE=true)
       if (process.env.ANALYZE === 'true') {
         // eslint-disable-next-line @typescript-eslint/no-require-imports

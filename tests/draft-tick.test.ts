@@ -47,6 +47,7 @@ function makeMockDb(config: MockDbConfig) {
       const chain = () => builder
       builder.select = chain
       builder.eq = chain
+      builder.in = chain
       builder.order = () => Promise.resolve(result)
       builder.single = () => Promise.resolve(result)
       builder.maybeSingle = () => Promise.resolve(result)
@@ -142,11 +143,27 @@ describe('processDraftTick', () => {
       { count: 4 },                       // team count
       { data: { budget_remaining: 100 } }, // budget lookup
     ]
-    dbConfig.tables.participants = [{ data: { id: 'part-1' } }]
+    dbConfig.tables.participants = [{ data: [{ id: 'part-1' }] }]
     dbConfig.tables.wishlist_items = [{ data: [
       { pokemon_id: '25', pokemon_name: 'Pikachu', cost: 10, priority: 1 },
     ] }]
     dbConfig.tables.picks = [{ data: [] }] // nothing drafted yet
+    dbConfig.rpc.get_current_team_id = { data: 'team-1' }
+    dbConfig.rpc.system_make_pick = { data: { success: true, pickId: 'pick-1' } }
+
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('auto_picked')
+    expect(res.detail).toBe('Pikachu')
+  })
+
+  it('auto-picks for a team with two participants (co-owners)', async () => {
+    dbConfig.tables.drafts = [{ data: activeSnake() }]
+    dbConfig.tables.teams = [{ count: 4 }, { data: { budget_remaining: 100 } }]
+    dbConfig.tables.participants = [{ data: [{ id: 'part-1' }, { id: 'part-2' }] }]
+    dbConfig.tables.wishlist_items = [{ data: [
+      { pokemon_id: '25', pokemon_name: 'Pikachu', cost: 10, priority: 1 },
+    ] }]
+    dbConfig.tables.picks = [{ data: [] }]
     dbConfig.rpc.get_current_team_id = { data: 'team-1' }
     dbConfig.rpc.system_make_pick = { data: { success: true, pickId: 'pick-1' } }
 
@@ -161,7 +178,7 @@ describe('processDraftTick', () => {
       { count: 4 },
       { data: { budget_remaining: 5 } }, // can't afford the 10-cost wishlist mon
     ]
-    dbConfig.tables.participants = [{ data: { id: 'part-1' } }]
+    dbConfig.tables.participants = [{ data: [{ id: 'part-1' }] }]
     dbConfig.tables.wishlist_items = [{ data: [
       { pokemon_id: '25', pokemon_name: 'Pikachu', cost: 10, priority: 1 },
     ] }]
@@ -176,7 +193,7 @@ describe('processDraftTick', () => {
   it('skips (not auto-picks) when the only wishlist mon is already drafted', async () => {
     dbConfig.tables.drafts = [{ data: activeSnake() }]
     dbConfig.tables.teams = [{ count: 4 }, { data: { budget_remaining: 100 } }]
-    dbConfig.tables.participants = [{ data: { id: 'part-1' } }]
+    dbConfig.tables.participants = [{ data: [{ id: 'part-1' }] }]
     dbConfig.tables.wishlist_items = [{ data: [
       { pokemon_id: '25', pokemon_name: 'Pikachu', cost: 10, priority: 1 },
     ] }]
