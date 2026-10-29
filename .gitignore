@@ -104,3 +104,6 @@ cleanup-*.bat
 # agent tooling (local, not app code)
 .agents/
 .codex/
+
+# Claude Code agent worktrees
+.claude/worktrees/
