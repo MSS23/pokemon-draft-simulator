@@ -277,9 +277,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Persist authoritative per-species costs. make_draft_pick/system_make_pick
-  // read pokemon_tiers first and only fall back to the client-submitted cost
-  // when no row exists, so without this a participant could pick at any price.
+  // Persist authoritative per-species costs. make_draft_pick, system_make_pick
+  // and nominate_auction price picks from pokemon_tiers and reject species
+  // with no row, so a built-in draft without these rows cannot be drafted.
   if (formatPool && formatPool.entries.length > 0) {
     const { error: tiersErr } = await supabase
       .from('pokemon_tiers')
