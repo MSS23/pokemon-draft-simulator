@@ -66,3 +66,13 @@ pointed at `SUPABASE_TEST_DB_URL` / `SUPABASE_TEST_SERVICE_ROLE_KEY`, using
 unit run and only executes in a dedicated CI job with test-DB secrets.
 
 > Do NOT point this at production. It creates and mutates drafts.
+
+### G. No pokemon_tiers row means no pick (migration 20261029120000)
+1. Seed a built-in-format draft (no `custom_format_id`) with `allowedPokemonIds = ["25"]` and **no** `pokemon_tiers` rows.
+2. `resolve_draft_pick_rule(draft, '25', 'Pikachu', 0)` returns **no row**; `make_draft_pick` fails.
+3. Seed `pokemon_tiers` (`'150','Mewtwo',20`) and (`'25','Pikachu',3`): `resolve_draft_pick_rule(draft,'150','Pikachu',0)` returns `source_cost = 20` (id wins, name ignored).
+
+### H. Auction opening bid cannot undercut the server cost
+1. Same draft as G with tier rows, `format='auction'`, caller owns the nominating team.
+2. `nominate_auction(draft,'150','Mewtwo',1)` → `{success:false, error:'Starting bid must be at least 20'}`.
+3. `nominate_auction(draft,'150','Mewtwo',20)` → `success:true`.

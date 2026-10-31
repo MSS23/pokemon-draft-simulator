@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
+import { isPasswordAttemptBlocked, recordPasswordFailure } from '@/lib/password-attempt-limit'
 
 const log = createLogger('api/draft/join')
 
@@ -96,12 +97,20 @@ export async function POST(request: NextRequest) {
     if (!body.password) {
       return NextResponse.json({ error: 'This draft requires a password.' }, { status: 401 })
     }
+    const attemptKey = `user:${userId}`
+    if (await isPasswordAttemptBlocked(attemptKey)) {
+      return NextResponse.json(
+        { error: 'Too many incorrect passwords. Try again in a minute.' },
+        { status: 429, headers: { 'Retry-After': '60' } },
+      )
+    }
     const { data: passwordRow } = await db
       .from('draft_passwords')
       .select('password')
       .eq('draft_id', draft.id)
       .maybeSingle()
     if (!passwordRow || !(await bcrypt.compare(body.password, passwordRow.password))) {
+      await recordPasswordFailure(attemptKey)
       return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 })
     }
   }

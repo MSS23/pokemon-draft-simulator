@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config'
 import path from 'path'
 
 export default defineConfig({
+  // Next compiles JSX with the automatic runtime; match it so .tsx tests run.
+  esbuild: { jsx: 'automatic' },
   test: {
     globals: true,
     environment: 'happy-dom',

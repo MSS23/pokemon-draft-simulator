@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Trash2, Search, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Trash2, Search, RefreshCw } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { notify } from '@/lib/notifications'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -29,9 +29,6 @@ export default function DraftManagementPanel() {
 
   // Dialog state
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; roomCode: string } | null>(null)
-  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false)
-  const [deleteAllFinalConfirmOpen, setDeleteAllFinalConfirmOpen] = useState(false)
-  const [deleteAllInput, setDeleteAllInput] = useState('')
 
   const loadDrafts = useCallback(async () => {
     if (!supabase) return
@@ -86,37 +83,6 @@ export default function DraftManagementPanel() {
     }
   }
 
-  async function executeDeleteAllDrafts() {
-    if (!supabase) return
-
-    setLoading(true)
-    const count = drafts.length
-
-    try {
-      await supabase.from('picks').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('teams').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('participants').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('pokemon_tiers').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('wishlist_items').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('auctions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('bid_history').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-
-      const { error } = await supabase
-        .from('drafts')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000')
-
-      if (error) throw error
-
-      notify.success('All Drafts Deleted', `${count} drafts have been removed`)
-      setDrafts([])
-    } catch (_err) {
-      notify.error('Delete Failed', 'Failed to delete all drafts')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const filteredDrafts = drafts.filter(draft =>
     draft.room_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
     draft.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -150,15 +116,6 @@ export default function DraftManagementPanel() {
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setDeleteAllConfirmOpen(true)}
-              disabled={loading || drafts.length === 0}
-              className="gap-2"
-            >
-              <AlertTriangle className="h-4 w-4" />
-              Delete All ({drafts.length})
             </Button>
           </div>
 
@@ -242,69 +199,6 @@ export default function DraftManagementPanel() {
           }
         }}
       />
-
-      {/* Delete all - first confirmation */}
-      <ConfirmDialog
-        open={deleteAllConfirmOpen}
-        onOpenChange={setDeleteAllConfirmOpen}
-        title="Delete All Drafts"
-        description={`This will permanently delete ALL ${drafts.length} drafts and their associated data. This cannot be undone.`}
-        confirmLabel="Continue"
-        variant="destructive"
-        onConfirm={() => {
-          setDeleteAllConfirmOpen(false)
-          setDeleteAllInput('')
-          setDeleteAllFinalConfirmOpen(true)
-        }}
-      />
-
-      {/* Delete all - final confirmation with typed input */}
-      {deleteAllFinalConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle className="text-destructive flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" />
-                Final Confirmation
-              </CardTitle>
-              <CardDescription>
-                Type <strong>DELETE ALL</strong> to confirm deletion of all {drafts.length} drafts.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                placeholder="Type DELETE ALL"
-                value={deleteAllInput}
-                onChange={(e) => setDeleteAllInput(e.target.value)}
-                autoFocus
-              />
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDeleteAllFinalConfirmOpen(false)
-                    setDeleteAllInput('')
-                    notify.info('Cancelled', 'Delete all operation cancelled')
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={deleteAllInput !== 'DELETE ALL'}
-                  onClick={() => {
-                    setDeleteAllFinalConfirmOpen(false)
-                    setDeleteAllInput('')
-                    executeDeleteAllDrafts()
-                  }}
-                >
-                  Delete All Drafts
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   )
 }
