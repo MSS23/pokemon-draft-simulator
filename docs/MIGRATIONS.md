@@ -3,23 +3,16 @@
 How schema changes reach the Supabase databases today. This is the process
 that actually runs. The CI workflows described in older docs do not.
 
-## Status of the automation (as of 2026-11-24)
+## Status of the automation (as of 2026-11-24, evening)
 
-- `.github/workflows/migrate.yml` and `.github/workflows/schema-drift.yml`
-  exist but have **never run green**. The repo secrets they need
-  (`SUPABASE_ACCESS_TOKEN`, `PROD_PROJECT_REF`, `PROD_DB_PASSWORD`, and the
-  staging pair) are not configured. Nothing applies migrations automatically
-  and nothing watches prod for drift.
-- Every migration on prod was applied **by hand**. A merged migration file is
-  not live until someone applies it. That gap is how `20261029120000` sat
-  unapplied for weeks and how the `auctions.current_bidder` drift reached prod.
-- Both workflows are **manual-only** (`workflow_dispatch`); no push or
-  schedule trigger fires them. To re-enable: set `SUPABASE_ACCESS_TOKEN`,
-  `PROD_PROJECT_REF`, `PROD_DB_PASSWORD`, `STAGING_PROJECT_REF` and
-  `STAGING_DB_PASSWORD`, create a reviewer-gated `production` environment,
-  then restore the push/schedule triggers as the comments at the top of each
-  workflow describe, and update step 2 below. Read
-  [`docs/ops/migration-ledger.md`](ops/migration-ledger.md) first.
+- `.github/workflows/migrate.yml` is live: every PR that touches
+  `supabase/migrations/` gets a `supabase db push --linked --dry-run` against
+  prod, and a merge to `main` runs the real `db push`. It needs the repo
+  secrets `SUPABASE_ACCESS_TOKEN`, `PROD_PROJECT_REF`, `PROD_DB_PASSWORD`.
+- The remote ledger was aligned to the folder the same day (76 files, 76
+  rows). History and the repair recipe: [`ops/migration-ledger.md`](ops/migration-ledger.md).
+- Agent workflow: `.claude/skills/migrate/SKILL.md`.
+- `schema-drift.yml` is still manual-only.
 
 ## Rules for a migration file
 
@@ -56,17 +49,11 @@ Apply to **staging first** when a staging project exists, then prod.
 
 1. Get the file reviewed and merged (or at least committed on the PR branch,
    so the applied SQL matches the repo byte for byte).
-2. Apply it with one of:
-   - **Supabase MCP** `apply_migration` (project ref, name = the file's slug,
-     query = the full file contents). This also records the migration in
-     `supabase_migrations.schema_migrations`, which `list_migrations` reads.
-   - **Supabase dashboard SQL editor**: paste the whole file and run it. This
-     does **not** write `supabase_migrations.schema_migrations`; only the
-     `_migrations` ledger row from the file records it.
-   - `make staging` (`supabase db push`) against staging, with
-     `STAGING_PROJECT_REF` and `STAGING_DB_PASSWORD` set.
-   - The `migrate.yml` workflow, run by hand (`workflow_dispatch`), once the
-     secrets above exist. It never runs on its own.
+2. Merge the PR. The `Migrate` workflow applies it to prod. Check the PR's
+   `Migrate` dry-run log first: it must list exactly the new file. For an
+   urgent apply before merge use MCP `apply_migration`, then repair the
+   ledger row to the filename version as `.claude/skills/migrate/SKILL.md`
+   describes, or the next CI push replays the file.
 3. Verify:
    - `SELECT name, applied_at FROM public._migrations ORDER BY applied_at DESC LIMIT 5;`
      shows the new row (MCP `list_migrations` also shows it if you used MCP).

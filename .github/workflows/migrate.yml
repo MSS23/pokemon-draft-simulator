@@ -1,50 +1,52 @@
 name: Migrate
 
-# BEFORE adding any secrets or running this against a project whose
-# migration ledger was not built by this workflow, read
-# docs/ops/migration-ledger.md. A bare `db push` against prod today would
-# replay old migrations (some DROP TABLE ... CASCADE) that the live ledger
-# does not list. Never "fix" remote-only versions with
-# `migration repair --status reverted`.
+# Applies supabase/migrations/ to production with the Supabase CLI.
+#
+#   pull_request  -> link prod, `supabase db push --linked --dry-run` (no writes).
+#                    The log must list exactly the files the PR adds.
+#   push to main  -> same dry run, then the real `supabase db push --linked`.
+#   workflow_dispatch -> dry run; set apply=true to push.
+#
+# Needs repo secrets SUPABASE_ACCESS_TOKEN, PROD_PROJECT_REF, PROD_DB_PASSWORD.
+# The remote ledger (supabase_migrations.schema_migrations) must already list
+# every file that is live, or db push replays it. How the ledger was aligned
+# and how to repair it after a hand/MCP apply: docs/ops/migration-ledger.md
+# and .claude/skills/migrate/SKILL.md.
 
-# Manual-only until the repo secrets (SUPABASE_ACCESS_TOKEN,
-# STAGING_PROJECT_REF/STAGING_DB_PASSWORD, PROD_PROJECT_REF/PROD_DB_PASSWORD)
-# and the reviewer-gated `production` environment exist. To re-enable the
-# staging auto-run, restore this trigger under `on:`:
-#   push:
-#     branches: [main]
-#     paths: ['supabase/migrations/**', '.github/workflows/migrate.yml']
 on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/migrate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - '.github/workflows/migrate.yml'
   workflow_dispatch:
     inputs:
-      target:
-        description: 'Target environment'
+      apply:
+        description: 'Run the real db push (false = dry run only)'
         required: true
-        default: 'staging'
-        type: choice
-        options:
-          - staging
-          - production
-      dry_run:
-        description: 'Only show what db push would apply (no writes)'
-        required: true
-        default: true
+        default: false
         type: boolean
 
+permissions:
+  contents: read
+
+# One production push at a time; never cancel one that is already running.
 concurrency:
-  group: migrate-${{ github.workflow }}-${{ github.event.inputs.target || 'staging' }}
+  group: migrate-production
   cancel-in-progress: false
 
 jobs:
-  # =====================================================================
-  # Staging — manual dispatch (push trigger disabled, see `on:` above).
-  # =====================================================================
-  staging:
-    if: |
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'staging')
+  migrate:
     runs-on: ubuntu-latest
-    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROD_PROJECT_REF: ${{ secrets.PROD_PROJECT_REF }}
+      PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
+      APPLY: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.event.inputs.apply == 'true') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,111 +54,31 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           github-token: ${{ github.token }}
-          version: latest
-
-      - name: Require secrets
-        run: |
-          for v in SUPABASE_ACCESS_TOKEN STAGING_PROJECT_REF STAGING_DB_PASSWORD; do
-            if [ -z "${!v}" ]; then
-              echo "::error::Secret $v is not set for the staging environment."
-              exit 1
-            fi
-          done
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          STAGING_PROJECT_REF: ${{ secrets.STAGING_PROJECT_REF }}
-          STAGING_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
-
-      - name: Link staging project
-        run: |
-          supabase link \
-            --project-ref "$STAGING_PROJECT_REF" \
-            --password "$STAGING_DB_PASSWORD"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          STAGING_PROJECT_REF:   ${{ secrets.STAGING_PROJECT_REF }}
-          STAGING_DB_PASSWORD:   ${{ secrets.STAGING_DB_PASSWORD }}
-
-      - name: Show pending migrations
-        run: supabase migration list --linked
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Dry run (what db push would apply)
-        run: supabase db push --linked --dry-run --password "$STAGING_DB_PASSWORD"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          STAGING_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
-
-      - name: Apply migrations to staging
-        if: github.event.inputs.dry_run != 'true'
-        run: supabase db push --linked --password "$STAGING_DB_PASSWORD"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          STAGING_DB_PASSWORD:   ${{ secrets.STAGING_DB_PASSWORD }}
-
-  # =====================================================================
-  # Production — manual dispatch only, gated by the `production`
-  # GitHub Environment which requires a reviewer (configure in repo
-  # Settings -> Environments -> production).
-  # =====================================================================
-  production:
-    if: |
-      github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.target == 'production'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          github-token: ${{ github.token }}
-          version: latest
+          # Same pin as ci.yml db-contract.
+          version: 3.4.0
 
       - name: Require secrets
         run: |
           for v in SUPABASE_ACCESS_TOKEN PROD_PROJECT_REF PROD_DB_PASSWORD; do
             if [ -z "${!v}" ]; then
-              echo "::error::Secret $v is not set for the production environment."
+              echo "::error::Repo secret $v is not set (Settings > Secrets and variables > Actions)."
               exit 1
             fi
           done
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROD_PROJECT_REF: ${{ secrets.PROD_PROJECT_REF }}
-          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
 
       - name: Link production project
-        run: |
-          supabase link \
-            --project-ref "$PROD_PROJECT_REF" \
-            --password "$PROD_DB_PASSWORD"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROD_PROJECT_REF:      ${{ secrets.PROD_PROJECT_REF }}
-          PROD_DB_PASSWORD:      ${{ secrets.PROD_DB_PASSWORD }}
+        run: supabase link --project-ref "$PROD_PROJECT_REF" --password "$PROD_DB_PASSWORD"
 
-      - name: Show pending migrations
-        run: supabase migration list --linked
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Dry-run schema diff (informational)
-        run: supabase db diff --linked --schema public || true
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      - name: Migration list (local vs remote)
+        run: supabase migration list --linked --password "$PROD_DB_PASSWORD"
 
       - name: Dry run (what db push would apply)
         run: supabase db push --linked --dry-run --password "$PROD_DB_PASSWORD"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROD_DB_PASSWORD: ${{ secrets.PROD_DB_PASSWORD }}
 
       - name: Apply migrations to production
-        if: github.event.inputs.dry_run != 'true'
+        if: env.APPLY == 'true'
         run: supabase db push --linked --password "$PROD_DB_PASSWORD"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          PROD_DB_PASSWORD:      ${{ secrets.PROD_DB_PASSWORD }}
+
+      - name: Verify remote is up to date
+        if: env.APPLY == 'true'
+        run: supabase db push --linked --dry-run --password "$PROD_DB_PASSWORD"
