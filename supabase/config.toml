@@ -57,6 +57,10 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
 
+[auth.third_party.clerk]
+enabled = true
+domain = "clerk.draftpokemon.com"
+
 [functions]
 # No edge functions today. Add per-function tables here when we do.
 
