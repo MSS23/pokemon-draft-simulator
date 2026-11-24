@@ -22,10 +22,14 @@ and rewrite RLS from older definitions.
   filename version. After each MCP apply, repair the row:
   `UPDATE supabase_migrations.schema_migrations SET version='<file version>',
   name='<file name>' WHERE version='<mcp stamp>';`
-- Still missing from the ledger (applied by hand before the ledger existed):
-  `00000000000000_bootstrap`, `20260324114022`..`20260510163223`,
+- The 37 repo versions that had no ledger row (applied by hand before the
+  ledger existed: `00000000000000_bootstrap`, `20260324114022`..`20260510163223`,
   `20260705120000`..`20260705120300`, `20260717120000`, `20260717130000`,
-  `20261024190000`. Step 3 below still applies to those.
+  `20261024190000`) were inserted as applied rows with
+  `created_by = 'repair 2026-11-24'` and no `statements`. The ledger now has
+  76 rows matching the 76 files one to one, so `supabase db push --linked
+  --dry-run` should report up to date. Steps 2-5 below are done; keep them
+  for the next time the two sides drift.
 
 ## Rules
 
