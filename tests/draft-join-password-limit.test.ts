@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 /**
- * /api/draft/join must give wrong draft passwords the same 5/min budget that
- * /api/draft/verify-password has, instead of the 30/min join bucket.
+ * /api/draft/join must give wrong draft passwords a 5/min budget instead of
+ * the 30/min join bucket (it is the only password check left).
  */
 
 let currentUser = 'user_a'
@@ -22,6 +22,7 @@ const rows: Record<string, unknown> = {
   draft_passwords: { password: 'hash' },
   user_profiles: null,
 }
+const draftFilters: string[] = []
 vi.mock('@/lib/supabase-server', () => ({
   createServiceRoleClient: () => ({
     from(table: string) {
@@ -29,6 +30,10 @@ vi.mock('@/lib/supabase-server', () => ({
       builder.select = () => builder
       builder.eq = () => builder
       builder.ilike = () => builder
+      builder.is = (col: string, val: unknown) => {
+        if (table === 'drafts') draftFilters.push(`${col}=${val}`)
+        return builder
+      }
       builder.maybeSingle = async () => ({ data: rows[table] ?? null, error: null })
       return builder
     },
@@ -73,5 +78,11 @@ describe('/api/draft/join password attempts', () => {
     for (let i = 0; i < 5; i += 1) await join('wrong')
     currentUser = 'someone_else'
     expect((await join('right-password')).status).toBe(200)
+  })
+
+  it('does not let anyone join a soft-deleted draft', async () => {
+    draftFilters.length = 0
+    await join('right-password')
+    expect(draftFilters).toContain('deleted_at=null')
   })
 })

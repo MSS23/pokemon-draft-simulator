@@ -511,7 +511,7 @@ export const isInRegionalDex = (pokemonId: string | number, regions: string[]): 
   }
 }
 
-interface PokemonIndexEntry {
+export interface PokemonIndexEntry {
   name: string
   nationalDex: number
   types: string[]
@@ -526,7 +526,7 @@ interface PokemonIndexEntry {
 
 type PokemonIndex = Record<string, PokemonIndexEntry>
 
-function pokemonFromIndex(
+export function pokemonFromIndex(
   pokemonData: PokemonIndexEntry,
   cost: number,
 ): Pokemon {

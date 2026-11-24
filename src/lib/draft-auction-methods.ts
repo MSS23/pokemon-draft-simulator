@@ -238,32 +238,16 @@ export async function extendAuctionTime(
   if (!draftState) {
     throw new Error('Draft not found')
   }
-  const internalId = draftState.draft.id
+  const { data: result, error } = await supabase.rpc('extend_auction', {
+    p_draft_id: draftState.draft.id,
+    p_auction_id: auctionId,
+    p_seconds: additionalSeconds,
+  })
 
-  const { data: auction, error: auctionError } = await supabase
-    .from('auctions')
-    .select('auction_end')
-    .eq('id', auctionId)
-    .eq('draft_id', internalId)
-    .single()
-
-  if (auctionError || !auction) {
-    throw new Error('Auction not found')
-  }
-
-  const newEndTime = new Date(new Date(auction.auction_end).getTime() + additionalSeconds * 1000)
-
-  const { error } = await supabase
-    .from('auctions')
-    .update({
-      auction_end: newEndTime.toISOString(),
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', auctionId)
-
-  if (error) {
-    log.error('Error extending auction time:', error)
-    throw new Error('Failed to extend auction time')
+  const res = result as { success?: boolean; error?: string } | null
+  if (error || !res?.success) {
+    log.error('Error extending auction time:', error ?? res?.error)
+    throw new Error(res?.error === 'Auction not found' ? 'Auction not found' : 'Failed to extend auction time')
   }
 }
 

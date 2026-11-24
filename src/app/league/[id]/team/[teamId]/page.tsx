@@ -28,7 +28,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useAuth } from '@/contexts/AuthContext'
 // UserSessionService used for guest ID fallback
 import { RosterCard } from '@/components/pokemon/RosterCard'
-import { usePokemonList } from '@/hooks/usePokemon'
+import { usePokemonIndexById } from '@/hooks/usePokemon'
 import {
   ArrowLeft,
   TrendingUp,
@@ -77,7 +77,7 @@ export default function TeamDetailPage() {
   const [accessChecked, setAccessChecked] = useState(false)
   const [viewerRole, setViewerRole] = useState<ViewerRole>('spectator')
   const [identityModalOpen, setIdentityModalOpen] = useState(false)
-  const { data: allPokemon } = usePokemonList()
+  const { data: pokemonById } = usePokemonIndexById()
 
   const [importedSets, setImportedSets] = useState<PokemonSet[]>([])
 
@@ -175,6 +175,7 @@ export default function TeamDetailPage() {
 
         const koStatsMap = new Map<string, { kills: number; deaths: number; matchesPlayed: number }>()
         for (const status of teamStatuses) {
+          if (!status.pickId) continue
           koStatsMap.set(status.pickId, {
             kills: status.totalKos,
             deaths: deathCounts.get(status.pickId) || 0,
@@ -572,7 +573,7 @@ export default function TeamDetailPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {picks.map(pick => {
                     const koStats = pokemonKOStats.get(pick.id)
-                    const pokemonData = allPokemon?.find(p => p.id === pick.pokemonId)
+                    const pokemonData = pokemonById?.get(pick.pokemonId)
                     return (
                       <RosterCard
                         key={pick.id}

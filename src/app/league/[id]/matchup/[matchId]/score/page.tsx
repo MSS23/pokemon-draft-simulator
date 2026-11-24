@@ -39,7 +39,7 @@ interface KOEvent {
   id: string
   scorerPickId: string | null
   scorerTeamId: string | null
-  victimPickId: string
+  victimPickId: string | null
   victimTeamId: string | null
   victimPokemonId: string
   victimPokemonName: string | null
@@ -589,7 +589,7 @@ function RosterColumn({
   }, [events])
   const defense = useMemo(() => {
     const m = new Map<string, number>()
-    events.forEach(e => m.set(e.victimPickId, (m.get(e.victimPickId) ?? 0) + 1))
+    events.forEach(e => { if (e.victimPickId) m.set(e.victimPickId, (m.get(e.victimPickId) ?? 0) + 1) })
     return m
   }, [events])
 

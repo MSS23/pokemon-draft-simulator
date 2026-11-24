@@ -324,7 +324,7 @@ export interface MatchPokemonKO {
   matchId: string
   gameNumber: number
   pokemonId: string // Pokemon species ID
-  pickId: string
+  pickId: string | null
   koCount: number // Times this Pokemon fainted in this game
   isDeath: boolean // Reserved for future use
   koDetails: {
@@ -340,7 +340,7 @@ export interface MatchPokemonKO {
 
 export interface TeamPokemonStatus {
   id: string
-  pickId: string
+  pickId: string | null
   teamId: string
   leagueId: string
   status: 'alive' | 'fainted' | 'dead'

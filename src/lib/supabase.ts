@@ -62,7 +62,7 @@ export type Database = {
           ruleset: string
           budget_per_team: number
           max_teams: number
-          status: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
+          status: 'setup' | 'active' | 'completed' | 'paused'
           current_turn: number | null
           current_round: number
           turn_started_at: string | null
@@ -87,7 +87,7 @@ export type Database = {
           ruleset?: string
           budget_per_team?: number
           max_teams?: number
-          status?: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
+          status?: 'setup' | 'active' | 'completed' | 'paused'
           current_turn?: number | null
           current_round?: number
           turn_started_at?: string | null
@@ -112,7 +112,7 @@ export type Database = {
           ruleset?: string
           budget_per_team?: number
           max_teams?: number
-          status?: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
+          status?: 'setup' | 'active' | 'completed' | 'paused'
           current_turn?: number | null
           current_round?: number
           turn_started_at?: string | null
@@ -291,6 +291,7 @@ export type Database = {
           pokemon_name: string
           nominated_by: string
           current_bid: number
+          starting_bid: number | null
           current_bidder: string | null
           auction_end: string
           status: 'active' | 'completed' | 'cancelled'
@@ -303,6 +304,7 @@ export type Database = {
           pokemon_name: string
           nominated_by: string
           current_bid?: number
+          starting_bid?: number | null
           current_bidder?: string | null
           auction_end: string
           status?: 'active' | 'completed' | 'cancelled'
@@ -315,6 +317,7 @@ export type Database = {
           pokemon_name?: string
           nominated_by?: string
           current_bid?: number
+          starting_bid?: number | null
           current_bidder?: string | null
           auction_end?: string
           status?: 'active' | 'completed' | 'cancelled'
@@ -476,7 +479,9 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          id: string
           user_id: string
+          is_admin: boolean | null
           created_at: string
           updated_at: string
           email: string | null
@@ -495,6 +500,7 @@ export type Database = {
           preferences: Record<string, unknown> | null
         }
         Insert: {
+          id?: string
           user_id: string
           created_at?: string
           updated_at?: string
@@ -514,6 +520,7 @@ export type Database = {
           preferences?: Record<string, unknown> | null
         }
         Update: {
+          id?: string
           user_id?: string
           created_at?: string
           updated_at?: string
@@ -903,10 +910,12 @@ export type Database = {
           team_b_id: string
           team_a_gives: string[]
           team_b_gives: string[]
-          status: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
+          status: 'proposed' | 'accepted' | 'rejected' | 'countered' | 'completed' | 'cancelled'
           proposed_by: string
           proposed_at: string
           responded_at: string | null
+          responded_by: string | null
+          counter_to_id: string | null
           completed_at: string | null
           notes: string | null
           commissioner_approved: boolean | null
@@ -923,10 +932,12 @@ export type Database = {
           team_b_id: string
           team_a_gives: string[]
           team_b_gives: string[]
-          status?: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
+          status?: 'proposed' | 'accepted' | 'rejected' | 'countered' | 'completed' | 'cancelled'
           proposed_by: string
           proposed_at?: string
           responded_at?: string | null
+          responded_by?: string | null
+          counter_to_id?: string | null
           completed_at?: string | null
           notes?: string | null
           commissioner_approved?: boolean | null
@@ -943,10 +954,12 @@ export type Database = {
           team_b_id?: string
           team_a_gives?: string[]
           team_b_gives?: string[]
-          status?: 'proposed' | 'accepted' | 'rejected' | 'completed' | 'cancelled'
+          status?: 'proposed' | 'accepted' | 'rejected' | 'countered' | 'completed' | 'cancelled'
           proposed_by?: string
           proposed_at?: string
           responded_at?: string | null
+          responded_by?: string | null
+          counter_to_id?: string | null
           completed_at?: string | null
           notes?: string | null
           commissioner_approved?: boolean | null
@@ -992,7 +1005,7 @@ export type Database = {
           id: string
           match_id: string
           game_number: number
-          pick_id: string
+          pick_id: string | null
           pokemon_id: string
           ko_count: number
           is_death: boolean
@@ -1010,7 +1023,7 @@ export type Database = {
           id?: string
           match_id: string
           game_number: number
-          pick_id: string
+          pick_id: string | null
           pokemon_id: string
           ko_count?: number
           is_death?: boolean
@@ -1042,12 +1055,27 @@ export type Database = {
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'match_pokemon_kos_pick_id_fkey'
+            columns: ['pick_id']
+            isOneToOne: false
+            referencedRelation: 'picks'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'match_pokemon_kos_scorer_pick_id_fkey'
+            columns: ['scorer_pick_id']
+            isOneToOne: false
+            referencedRelation: 'picks'
+            referencedColumns: ['id']
+          },
+        ]
       }
       team_pokemon_status: {
         Row: {
           id: string
-          pick_id: string
+          pick_id: string | null
           pokemon_id: string
           pokemon_name: string
           team_id: string
@@ -1065,7 +1093,7 @@ export type Database = {
         }
         Insert: {
           id?: string
-          pick_id: string
+          pick_id: string | null
           pokemon_id: string
           pokemon_name: string
           team_id: string
@@ -1096,6 +1124,39 @@ export type Database = {
           death_date?: string | null
           death_details?: Record<string, unknown> | null
           notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          platform: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          platform?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          platform?: string
           created_at?: string
           updated_at?: string
         }
@@ -1319,7 +1380,7 @@ export type Database = {
         Row: {
           draft_id: string
           draft_name: string
-          status: 'setup' | 'active' | 'completed' | 'paused' | 'deleted'
+          status: 'setup' | 'active' | 'completed' | 'paused'
           format: 'snake' | 'auction'
           ruleset: string
           room_code: string | null
@@ -1371,6 +1432,38 @@ export type Database = {
       }
     }
     Functions: {
+      reset_draft: {
+        Args: { p_draft_id: string }
+        Returns: { success: boolean; error?: string }
+      }
+      start_draft: {
+        Args: { p_draft_id: string; p_shuffle?: boolean }
+        Returns: { started: boolean; reason?: string }
+      }
+      shuffle_draft_order: {
+        Args: { p_draft_id: string }
+        Returns: { success: boolean; error?: string; order?: Array<{ teamId: string; draftOrder: number }> }
+      }
+      remove_team: {
+        Args: { p_draft_id: string; p_team_id: string }
+        Returns: undefined
+      }
+      extend_auction: {
+        Args: { p_draft_id: string; p_auction_id: string; p_seconds: number }
+        Returns: { success: boolean; auctionEnd?: string; error?: string }
+      }
+      confirm_match_side: {
+        Args: { p_match_id: string; p_side: 'home' | 'away'; p_submission: Record<string, unknown> }
+        Returns: { notes: Record<string, unknown>; status: 'pending' | 'confirmed' | 'disputed' }
+      }
+      force_advance_week: {
+        Args: { p_league_id: string }
+        Returns: { currentWeek: number; status: string }
+      }
+      delete_user_data: {
+        Args: { p_user_id: string }
+        Returns: Record<string, number>
+      }
       update_team_budget: {
         Args: { team_id: string; cost_to_subtract: number }
         Returns: undefined
@@ -1527,6 +1620,51 @@ export type Database = {
         Args: Record<string, never>
         Returns: string | null
       }
+      respond_to_trade: {
+        Args: { p_trade_id: string; p_response: 'accepted' | 'rejected' | 'countered' }
+        Returns: undefined
+      }
+      cancel_trade: {
+        Args: { p_trade_id: string }
+        Returns: undefined
+      }
+      approve_trade: {
+        Args: { p_trade_id: string; p_approved: boolean; p_notes?: string | null }
+        Returns: undefined
+      }
+      process_waiver_claim: {
+        Args: {
+          p_league_id: string
+          p_team_id: string
+          p_pokemon_id: string
+          p_pokemon_name: string
+          p_pokemon_cost: number
+          p_drop_pick_id: string | null
+        }
+        Returns: string
+      }
+      initialize_league_standings: {
+        Args: { p_league_id: string }
+        Returns: undefined
+      }
+      submit_team_sheet: {
+        Args: { p_draft_id: string; p_team_id: string; p_sheet: Record<string, unknown> }
+        Returns: undefined
+      }
+      submit_match_side: {
+        Args: { p_match_id: string; p_side: 'home' | 'away'; p_submission: Record<string, unknown> }
+        Returns: Record<string, unknown> | null
+      }
+      tally_match_score: {
+        Args: { p_match_id: string }
+        Returns: {
+          home_team_id: string
+          away_team_id: string
+          home_score: number
+          away_score: number
+          ko_count: number
+        }[]
+      }
     }
     Enums: Record<string, never>
   }
@@ -1551,6 +1689,8 @@ if (typeof window !== 'undefined') {
  * or no active session) we return null and Supabase falls back to the anon key.
  */
 let clerkNeverLoaded = false
+
+let bridgeWarned = false
 
 async function getClerkSupabaseToken(): Promise<string | null> {
   if (typeof window === 'undefined') return null
@@ -1577,7 +1717,14 @@ async function getClerkSupabaseToken(): Promise<string | null> {
     // template tokens like session tokens, so this is not an extra round-trip
     // per PostgREST call.
     return await clerk.session.getToken({ template: CLERK_SUPABASE_JWT_TEMPLATE })
-  } catch {
+  } catch (error) {
+    // A signed-in user whose token mint failed is silently running as anon.
+    // Tell them once per page load; a null token (no session) is not an error.
+    if (!bridgeWarned) {
+      bridgeWarned = true
+      log.error('Clerk to Supabase token mint failed; requests fall back to anon', error)
+      void import('sonner').then(({ toast }) => toast.error('Session sync failed, please refresh')).catch(() => {})
+    }
     return null
   }
 }

@@ -79,6 +79,8 @@ export function getEnv(key: string, fallback: string = ''): string {
  * Throws in production when required vars are missing.
  */
 export function validateEnv(): { isValid: boolean; missing: string[] } {
+  reportMissingServerEnv()
+
   if (envResult.success) {
     return { isValid: true, missing: [] }
   }
@@ -107,4 +109,17 @@ export function validateEnv(): { isValid: boolean; missing: string[] } {
   }
 
   return { isValid: false, missing }
+}
+
+// Server secrets each break only the routes that use them, so log loudly
+// instead of throwing from the root layout (which would 500 every page).
+// Names live after the typeof-window guard so the client build drops them.
+export function reportMissingServerEnv(): string[] {
+  if (typeof window !== 'undefined') return []
+  if (!env.app.isProduction || process.env.NEXT_PHASE === 'phase-production-build') return []
+  const missing = ['SUPABASE_SERVICE_ROLE_KEY', 'CLERK_SECRET_KEY', 'CRON_SECRET'].filter((key) => !process.env[key])
+  if (missing.length > 0) {
+    log.error(`Missing server environment variables: ${missing.join(', ')}`)
+  }
+  return missing
 }

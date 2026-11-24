@@ -500,6 +500,8 @@ export class MatchKOService {
     victimTeamId: string
     turnNumber?: number
     recordedBy?: string | null
+    /** Victim is permanently eliminated (nuzlocke): feeds the weekly Fallen Warrior highlight. */
+    isDeath?: boolean
   }): Promise<{ id: string }> {
     if (!supabase) throw new Error('Supabase client not initialized')
 
@@ -525,7 +527,7 @@ export class MatchKOService {
       turn_number: params.turnNumber ?? null,
       recorded_by: params.recordedBy ?? null,
       ko_count: 1,
-      is_death: false,
+      is_death: params.isDeath ?? false,
     }
 
     const { data, error } = await supabase
@@ -535,6 +537,10 @@ export class MatchKOService {
       .single()
     if (error || !data) {
       throw new Error(`Failed to record KO: ${error?.message ?? 'unknown'}`)
+    }
+
+    if (params.isDeath) {
+      await this.markPokemonDead(params.victimPickId, params.matchId)
     }
 
     return { id: data.id }
@@ -579,7 +585,7 @@ export class MatchKOService {
         scorer_team_id: params.scorerTeamId,
         recorded_by: params.recordedBy ?? null,
         ko_count: params.kills,
-        is_death: false,
+        is_death: false, // kill rows have no victim, so they are never deaths
       } as never)
     if (error) {
       throw new Error(`Failed to record kill tally: ${error.message}`)
@@ -664,7 +670,7 @@ export class MatchKOService {
     turnNumber: number | null
     scorerPickId: string | null
     scorerTeamId: string | null
-    victimPickId: string
+    victimPickId: string | null
     victimTeamId: string | null
     victimPokemonId: string
     victimPokemonName: string | null

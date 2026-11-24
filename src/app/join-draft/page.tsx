@@ -106,23 +106,7 @@ function JoinDraftForm() {
       const { DraftService } = await import("@/lib/draft-service");
       const { grantDraftAccess } = await import("@/lib/draft-access");
 
-      // Verify password if required
-      if (requiresPassword) {
-        const passwordValid = await DraftService.verifyDraftPassword({
-          roomCode: formData.roomCode,
-          password: formData.password,
-        });
-
-        if (!passwordValid) {
-          setError("Incorrect password");
-          setIsJoining(false);
-          return;
-        }
-      }
-
-      // Grant access to this draft in the user's session
-      grantDraftAccess(formData.roomCode, false);
-
+      // /api/draft/join checks the password server-side (401/429 surface via the catch below).
       if (joinAsSpectator) {
         // Join as spectator (no team)
         await DraftService.joinAsSpectator({
@@ -132,6 +116,7 @@ function JoinDraftForm() {
           password: formData.password,
         });
 
+        grantDraftAccess(formData.roomCode, false);
         router.push(`/draft/${formData.roomCode.toLowerCase()}?spectator=true`);
       } else {
         // Join as participant with team
@@ -142,6 +127,8 @@ function JoinDraftForm() {
           displayName: userDisplayName,
           password: formData.password,
         });
+
+        grantDraftAccess(formData.roomCode, false);
 
         // Check if auto-joined as spectator (draft was full/started)
         if (result.asSpectator) {
@@ -218,11 +205,14 @@ function JoinDraftForm() {
     loadUserProfile();
   }, [user, authLoading]);
 
+  // Depend on the id, not the user object: a new object identity per render
+  // would re-run the lookup on every render.
+  const userId = user?.id;
   useEffect(() => {
-    if (formData.roomCode && !authLoading && user) {
+    if (formData.roomCode && !authLoading && userId) {
       lookupDraft();
     }
-  }, [formData.roomCode, authLoading, user, lookupDraft]);
+  }, [formData.roomCode, authLoading, userId, lookupDraft]);
 
   const isFormValid =
     userDisplayName.trim() &&
