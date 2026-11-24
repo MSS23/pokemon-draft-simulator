@@ -7,7 +7,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { generateRoomCode } from '@/lib/room-utils'
 import { validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
@@ -31,11 +31,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'You must be signed in to create a tournament.' }, { status: 401 })
   }
 
-  // 2. Validate Supabase config
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !supabaseServiceKey) {
-    log.error('Service role key not configured', { hasUrl: !!supabaseUrl, hasKey: !!supabaseServiceKey })
+  // 2. Privileged client (throws when the service role key is missing)
+  let supabase: ReturnType<typeof createServiceRoleClient>
+  try {
+    supabase = createServiceRoleClient()
+  } catch {
+    log.error('Service role key not configured')
     return NextResponse.json(
       { error: 'Server is missing SUPABASE_SERVICE_ROLE_KEY. Set it in Vercel project env vars.' },
       { status: 503 },
@@ -67,11 +68,6 @@ export async function POST(request: NextRequest) {
   if (!body.formatId) {
     return NextResponse.json({ error: 'formatId is required' }, { status: 400 })
   }
-
-  // 4. Privileged client
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
   const roomCode = generateRoomCode()
 

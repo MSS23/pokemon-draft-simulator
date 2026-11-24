@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { createTournament, startTournament, type Tournament } from '@/lib/tournament-service'
 import { createLogger } from '@/lib/logger'
+import { syncBracketRows } from '@/app/api/tournament/bracket-sync'
 
 const log = createLogger('api/tournament/start')
 
@@ -47,28 +48,51 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Only the tournament host can start it.' }, { status: 403 })
   }
 
-  const { data: teams, error: teamsError } = await db
-    .from('teams')
-    .select('id, name, draft_order')
-    .eq('draft_id', league.draft_id)
-    .order('draft_order')
-
-  if (teamsError) {
-    log.error('Tournament team lookup failed', { leagueId: league.id, error: teamsError.message })
-    return NextResponse.json({ error: 'Could not load tournament players.' }, { status: 500 })
-  }
-  if (!teams || teams.length < 2) {
-    return NextResponse.json({ error: 'At least 2 players are required to start.' }, { status: 400 })
-  }
-  if (teams.length > 32) {
-    return NextResponse.json({ error: 'Tournaments support at most 32 players.' }, { status: 400 })
-  }
-
   let tournament: Tournament
   let alreadyStarted = false
   const convertedToSingle = league.status === 'scheduled' && settings.tournamentType === 'double-elimination'
 
   if (league.status === 'scheduled') {
+    // Close the lobby BEFORE reading teams: join_draft_atomic only seats players
+    // while drafts.status = 'setup', so nobody can join after our teams read and
+    // end up holding a team with no bracket slot.
+    const { error: closeError } = await db
+      .from('drafts')
+      .update({ status: 'completed' })
+      .eq('id', league.draft_id)
+      .eq('status', 'setup')
+    if (closeError) {
+      log.error('Tournament lobby close failed', { leagueId: league.id, error: closeError.message })
+      return NextResponse.json({ error: 'Could not start the tournament.' }, { status: 500 })
+    }
+    // Any failure before the bracket is claimed must reopen the lobby, or a
+    // 1-player 400 would lock everyone out for good.
+    const reopenLobby = () => db
+      .from('drafts')
+      .update({ status: 'setup' })
+      .eq('id', league.draft_id)
+      .eq('status', 'completed')
+
+    const { data: teams, error: teamsError } = await db
+      .from('teams')
+      .select('id, name, draft_order')
+      .eq('draft_id', league.draft_id)
+      .order('draft_order')
+
+    if (teamsError) {
+      await reopenLobby()
+      log.error('Tournament team lookup failed', { leagueId: league.id, error: teamsError.message })
+      return NextResponse.json({ error: 'Could not load tournament players.' }, { status: 500 })
+    }
+    if (!teams || teams.length < 2) {
+      await reopenLobby()
+      return NextResponse.json({ error: 'At least 2 players are required to start.' }, { status: 400 })
+    }
+    if (teams.length > 32) {
+      await reopenLobby()
+      return NextResponse.json({ error: 'Tournaments support at most 32 players.' }, { status: 400 })
+    }
+
     const participants = teams.map((team, index) => ({
       id: team.id,
       teamId: team.id,
@@ -97,6 +121,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (updateError) {
+      await reopenLobby()
       log.error('Tournament start update failed', { leagueId: league.id, error: updateError.message })
       return NextResponse.json({ error: 'Could not start the tournament.' }, { status: 500 })
     }
@@ -109,6 +134,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
       const currentSettings = (current?.settings ?? {}) as Record<string, unknown>
       if (current?.status !== 'active' || !currentSettings.tournament) {
+        await reopenLobby()
         return NextResponse.json({ error: 'Tournament state changed. Refresh and try again.' }, { status: 409 })
       }
       tournament = currentSettings.tournament as unknown as Tournament
@@ -121,54 +147,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tournament has already finished or cannot be started.' }, { status: 409 })
   }
 
-  const leagueTeams = teams.map((team, index) => ({
-    league_id: league.id,
-    team_id: team.id,
-    seed: index + 1,
-  }))
-  const { error: leagueTeamsError } = await db
-    .from('league_teams')
-    .upsert(leagueTeams, { onConflict: 'league_id,team_id', ignoreDuplicates: true })
-
-  if (leagueTeamsError) {
-    log.error('Tournament roster reconciliation failed', { leagueId: league.id, error: leagueTeamsError.message })
-    return NextResponse.json({ error: 'Tournament started, but its roster could not be prepared. Try again.' }, { status: 500 })
-  }
-
   const matchFormat = typeof settings.matchFormat === 'string' ? settings.matchFormat : 'best_of_3'
-  const playableMatches = tournament.rounds.flatMap(round =>
-    round.matches
-      .filter(match => match.participant1?.teamId && match.participant2?.teamId && match.participant2.name !== 'BYE')
-      .map((match, index) => ({
-        league_id: league.id,
-        week_number: round.roundNumber,
-        match_number: index + 1,
-        home_team_id: match.participant1!.teamId!,
-        away_team_id: match.participant2!.teamId!,
-        status: 'scheduled' as const,
-        home_score: 0,
-        away_score: 0,
-        winner_team_id: null,
-        battle_format: matchFormat,
-        scheduled_date: null,
-        notes: JSON.stringify({ bracketMatchId: match.id }),
-      })),
-  )
-
-  if (playableMatches.length > 0) {
-    const { error: matchesError } = await db
-      .from('matches')
-      .upsert(playableMatches, {
-        onConflict: 'league_id,week_number,home_team_id,away_team_id',
-        ignoreDuplicates: true,
-      })
-    if (matchesError) {
-      log.error('Tournament match reconciliation failed', { leagueId: league.id, error: matchesError.message })
-      return NextResponse.json({ error: 'Tournament started, but matches could not be prepared. Try again.' }, { status: 500 })
-    }
+  const { error: syncError } = await syncBracketRows(db, league.id, tournament, matchFormat)
+  if (syncError) {
+    log.error('Tournament reconciliation failed', { leagueId: league.id, error: syncError })
+    return NextResponse.json({ error: 'Tournament started, but its roster or matches could not be prepared. Try again.' }, { status: 500 })
   }
 
-  await db.from('drafts').update({ status: 'completed' }).eq('id', league.draft_id)
+  // Lobbies started by older code may still be open on a reconcile retry.
+  await db.from('drafts').update({ status: 'completed' }).eq('id', league.draft_id).eq('status', 'setup')
 
   return NextResponse.json({ success: true, alreadyStarted, convertedToSingle, leagueId: league.id })
 }

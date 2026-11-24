@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { auth, clerkClient } from '@clerk/nextjs/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { createLogger } from '@/lib/logger'
+import { deleteUserData } from '@/lib/user-data-deletion'
 
 const log = createLogger('UserDeleteAPI')
 
@@ -11,56 +12,38 @@ export async function DELETE() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
   // SEC-AUDIT: account deletion must never fall back to the anon key.
   // Anon-key writes are gated by RLS and would silently leave orphan rows
   // (participants, wishlist_items) in violation of the user's deletion
   // request. Refuse loudly instead of doing a partial wipe.
-  if (!supabaseUrl || !supabaseServiceKey) {
-    log.error('Account deletion requires SUPABASE_SERVICE_ROLE_KEY', {
-      hasUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-    })
+  let db: ReturnType<typeof createServiceRoleClient>
+  try {
+    db = createServiceRoleClient()
+  } catch {
+    log.error('Account deletion requires SUPABASE_SERVICE_ROLE_KEY')
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 })
   }
 
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
-
+  // One transaction (delete_user_data RPC), idempotent, so a user who gets a
+  // 500 can simply retry.
   try {
-    // Anonymize teams owned by this user (don't delete - preserves draft history)
-    await supabase
-      .from('teams')
-      .update({ owner_id: 'deleted-user', name: 'Deleted User' })
-      .eq('owner_id', userId)
-
-    // Delete user-specific data (use allSettled so one failure doesn't block others)
-    const results = await Promise.allSettled([
-      supabase.from('user_profiles').delete().eq('user_id', userId),
-      supabase.from('participants').delete().eq('user_id', userId),
-      supabase.from('wishlist_items').delete().eq('participant_id', userId),
-    ])
-    const failures = results.filter(r => r.status === 'rejected')
-    if (failures.length > 0) {
-      log.warn('Some user data deletions failed', { userId, failureCount: failures.length })
-    }
-
-    // Delete Clerk user account
-    try {
-      const clerk = await clerkClient()
-      await clerk.users.deleteUser(userId)
-    } catch (deleteError) {
-      log.error('Failed to delete Clerk user:', deleteError)
-      // Continue anyway - data is already cleaned up
-    }
-
-    return NextResponse.json({ success: true })
+    await deleteUserData(db, userId)
   } catch (err) {
-    log.error('Account deletion error:', err)
-    return NextResponse.json(
-      { error: 'Failed to delete account' },
-      { status: 500 }
-    )
+    log.error('Account deletion failed during data cleanup', { error: err instanceof Error ? err.message : String(err) })
+    return NextResponse.json({ error: 'Failed to delete account' }, { status: 500 })
   }
+
+  // Clerk last: if it fails the session still exists and the user can retry.
+  try {
+    const clerk = await clerkClient()
+    await clerk.users.deleteUser(userId)
+  } catch (err) {
+    // 404 = already deleted by an earlier attempt.
+    if ((err as { status?: number } | null)?.status !== 404) {
+      log.error('Failed to delete Clerk user', { error: err instanceof Error ? err.message : String(err) })
+      return NextResponse.json({ error: 'Failed to delete account' }, { status: 500 })
+    }
+  }
+
+  return NextResponse.json({ success: true })
 }
