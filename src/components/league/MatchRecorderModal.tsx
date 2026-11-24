@@ -86,6 +86,8 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submissionResult, setSubmissionResult] = useState<'pending' | 'confirmed' | 'disputed' | null>(null)
+  // Set when the result is confirmed but the bracket update failed; retry re-reports only.
+  const [bracketRetry, setBracketRetry] = useState<{ winnerId: string; score: { home: number; away: number } } | null>(null)
 
   const totalGames = match.battleFormat === 'best_of_1' ? 1 : match.battleFormat === 'best_of_5' ? 5 : 3
   const winsNeeded = Math.ceil((totalGames + 1) / 2)
@@ -268,10 +270,13 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
   }
 
   /** Save replay URLs into the match notes JSON */
+  const filledReplayUrls = () =>
+    Object.fromEntries(Object.entries(replayUrls).filter(([, url]) => url.trim()))
+
+  // Commissioner/host path only: participants lost direct UPDATE on matches in
+  // migration 050, so their replay links go through submitMatchResult instead.
   const saveReplayUrls = async () => {
-    const filteredUrls = Object.fromEntries(
-      Object.entries(replayUrls).filter(([, url]) => url.trim())
-    )
+    const filteredUrls = filledReplayUrls()
     if (Object.keys(filteredUrls).length === 0 || !supabase) return
 
     try {
@@ -315,20 +320,20 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
           homeScore,
           awayScore,
           winnerTeamId: matchWinner,
-        })
-
-        // Save replay URLs regardless of confirmation status
-        await saveReplayUrls()
+        }, filledReplayUrls())
 
         setSubmissionResult(result.status)
 
         // If confirmed (both teams agreed), also record KOs
         if (result.status === 'confirmed') {
           if (advanceTournamentBracket && matchWinner) {
-            await KnockoutService.reportResult(match.leagueId, match.id, matchWinner, {
-              home: homeScore,
-              away: awayScore,
-            })
+            const score = { home: homeScore, away: awayScore }
+            try {
+              await KnockoutService.reportResult(match.leagueId, match.id, matchWinner, score)
+            } catch (err) {
+              log.error('Bracket update failed after confirmation:', err)
+              setBracketRetry({ winnerId: matchWinner, score })
+            }
           }
           await recordKOs(matchWinner)
           onSuccess()
@@ -368,6 +373,21 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
     } catch (err) {
       log.error('Failed to record match:', err)
       setError(err instanceof Error ? err.message : 'Failed to record match')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleRetryBracket = async () => {
+    if (!bracketRetry) return
+    setIsSubmitting(true)
+    try {
+      // The report route is idempotent, so a retry only finishes the bracket sync.
+      await KnockoutService.reportResult(match.leagueId, match.id, bracketRetry.winnerId, bracketRetry.score)
+      setBracketRetry(null)
+      onSuccess()
+    } catch (err) {
+      log.error('Bracket retry failed:', err)
     } finally {
       setIsSubmitting(false)
     }
@@ -661,6 +681,18 @@ export const MatchRecorderModal = memo(function MatchRecorderModal({
                   <AlertDescription>
                     <strong>Match confirmed!</strong> Both teams submitted matching results.
                     The match has been recorded.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {submissionResult === 'confirmed' && bracketRetry && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="space-y-2">
+                    <p>The bracket was not updated, so the winner has not advanced yet.</p>
+                    <Button size="sm" variant="outline" onClick={handleRetryBracket} disabled={isSubmitting}>
+                      {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Retry bracket update
+                    </Button>
                   </AlertDescription>
                 </Alert>
               )}

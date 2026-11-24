@@ -69,38 +69,7 @@ const currentTeam = useDraftStore(state =>
 - WebSocket subscriptions for multiplayer updates
 - Graceful degradation when Supabase not configured
 
-**Connection Management**: [src/lib/connection-manager.ts](src/lib/connection-manager.ts)
-- Handles reconnection logic with exponential backoff
-- Tracks connection health and latency
-- Auto-recovery from disconnects
-
-**Optimistic Updates**: [src/lib/optimistic-updates.ts](src/lib/optimistic-updates.ts)
-- Instant UI feedback before server confirmation
-- Automatic rollback on errors
-- Conflict resolution for concurrent updates
-
-**Critical Performance Pattern:**
-```typescript
-// ✅ Always check if Supabase is configured
-if (!supabase) {
-  throw new Error('Supabase not available')
-}
-
-// ✅ Use optimistic updates for user actions
-async function makePick(pokemonId: string) {
-  // 1. Update local state immediately
-  useDraftStore.getState().addPick(teamId, pick)
-
-  // 2. Call Supabase mutation
-  const { error } = await supabase.from('picks').insert(pick)
-
-  // 3. Revert on error
-  if (error) {
-    useDraftStore.getState().removePick(pick.id)
-    throw error
-  }
-}
-```
+**Writes go through RPCs, never table writes.** Clients have no INSERT/UPDATE grant on `picks` and no INSERT on `teams` or `pokemon_tiers`. Make a pick with `makePick()` in [src/lib/draft-picks-service.ts](src/lib/draft-picks-service.ts), which calls the `make_draft_pick` RPC (see "Server-authoritative draft engine" below and "Optimistic Updates Pattern").
 
 ### Draft Flow Architecture
 
@@ -133,7 +102,9 @@ async function makePick(pokemonId: string) {
 - Checks: legendary/mythical/paradox bans, regional dex, stat totals
 - Cost calculation based on BST (Base Stat Total) or tier system
 
-**Key Format: VGC 2024 Regulation H**
+**Default format: Pokémon Champions Regulation M-C** (`DEFAULT_FORMAT = 'vgc-reg-mc'` in [src/lib/formats.ts](src/lib/formats.ts); Champions allowlists in [src/data/champions-regulations.ts](src/data/champions-regulations.ts)). M-B, M-A, VGC A-I, Smogon tiers and custom CSV pricing are also supported.
+
+**VGC 2024 Regulation H** (legacy, still tested)
 - Bans ALL legendaries, mythicals, and paradox Pokémon — including Ogerpon, Loyal Three, Treasures of Ruin, Terapagos
 - Paldea/Kitakami/Blueberry dex only
 - Defined in [src/lib/formats.ts](src/lib/formats.ts) and [data/formats/reg_h.json](data/formats/reg_h.json)
@@ -154,7 +125,7 @@ async function makePick(pokemonId: string) {
 
 **Database Types**: All tables typed in [src/lib/supabase.ts](src/lib/supabase.ts) as `Database['public']['Tables']`
 
-**Row Level Security (RLS)**: See [FIX-RLS-POLICIES.md](FIX-RLS-POLICIES.md) for policy configuration
+**Row Level Security (RLS)**: policies and RPCs live only in [supabase/migrations/](supabase/migrations/). How to add and apply one: [docs/MIGRATIONS.md](docs/MIGRATIONS.md)
 
 ### Component Architecture
 
@@ -197,7 +168,7 @@ async function makePick(pokemonId: string) {
 
 **Wishlist System** ([src/lib/wishlist-service.ts](src/lib/wishlist-service.ts)):
 - Priority-based auto-pick queue
-- `useAutoPick` hook ([src/hooks/useAutoPick.ts](src/hooks/useAutoPick.ts)) - Countdown timer for auto-selection
+- Auto-pick from the wishlist runs server-side in `src/lib/draft-tick.ts` (see below)
 - `useWishlistSync` - Real-time sync across participants
 
 **Auth & Session Management** (Clerk + guest cookie):
@@ -215,11 +186,8 @@ Do NOT drive picks/auctions/turn-timeouts purely client-side. The engine is serv
 ### Custom Hooks
 
 **Draft Hooks:**
-- `useConnectionManager` - Supabase connection lifecycle
-- `useReconnection` - Handle disconnects/reconnects
 - `useOptimisticUpdates` - Client-side state updates
 - `useTurnNotifications` - Turn change alerts
-- `useAutoPick` - Wishlist auto-pick countdown
 
 **Pokémon Hooks:**
 - `usePokemon` - Fetch/cache Pokémon data
@@ -369,9 +337,9 @@ const virtualizer = useVirtualizer({
 
 **Dynamic imports for heavy features:**
 ```typescript
-// ✅ Lazy load AI assistant (reduces initial bundle)
-const AIDraftAssistant = dynamic(() =>
-  import('@/components/draft/AIDraftAssistant'),
+// ✅ Lazy load heavy draft UI (reduces initial bundle)
+const AuctionBiddingInterface = dynamic(() =>
+  import('@/components/draft/AuctionBiddingInterface'),
   { ssr: false }
 )
 ```
@@ -423,25 +391,18 @@ if (error) {
 ### Optimistic Updates Pattern
 
 ```typescript
-// 1. Update local state immediately
-const optimisticPick = { id: tempId, pokemonId, teamId, cost }
+import { makePick } from '@/lib/draft-picks-service'
+
+// 1. Update local state immediately (display only)
 useDraftStore.getState().addPick(teamId, optimisticPick)
 
-// 2. Call server mutation
 try {
-  const { data, error } = await supabase
-    .from('picks')
-    .insert(pick)
-    .select()
-    .single()
-
-  if (error) throw error
-
-  // 3. Replace optimistic with real data
-  useDraftStore.getState().updatePick(tempId, data)
+  // 2. Server-authoritative pick: make_draft_pick RPC checks turn, budget,
+  //    tier caps and uniqueness, and prices built-in formats from pokemon_tiers
+  await makePick(draftId, userId, pokemonId, pokemonName, displayedCost)
 } catch (error) {
-  // 4. Revert on error
-  useDraftStore.getState().removePick(tempId)
+  // 3. Revert on error; realtime then delivers the real row
+  useDraftStore.getState().removePick(optimisticPick.id)
   toast.error('Failed to make pick')
 }
 ```
@@ -522,7 +483,7 @@ npm test tests/format-reg-h.test.ts
 
 ### Budget System
 
-- **Configurable budget per team** (50-200 points, default: 100)
+- **Configurable budget per team** (presets 50-500, custom 10-5000, default: 100)
 - Pokémon costs based on BST (Base Stat Total) or custom format overrides
 - **Must validate** `budgetRemaining >= cost` before pick
 - Budget validation occurs in `makePick()` - throws error if insufficient
@@ -533,7 +494,7 @@ npm test tests/format-reg-h.test.ts
 
 **Budget per Team Configuration:**
 - Set during draft creation in [src/app/create-draft/page.tsx](src/app/create-draft/page.tsx#L35)
-- Options: 50, 75, 100, 120, 150, 200 points
+- Presets: 50, 75, 100, 120, 150, 200, 300, 500 points; custom input accepts 10-5000
 - Stored in `drafts.budget_per_team` column
 - Each team starts with `budget_remaining = budget_per_team`
 
@@ -584,7 +545,7 @@ npm test tests/format-reg-h.test.ts
    SELECT * FROM pg_policies WHERE tablename = 'drafts';
    ```
 
-2. **Verify subscription setup** in `useConnectionManager`
+2. **Verify subscription setup** in the realtime hooks (`useDraftActions`, `useDraftAuction`, `useWishlistSync`)
    ```typescript
    console.log('Subscription status:', subscription.state)
    ```
@@ -774,16 +735,21 @@ const sidebarActivities = useMemo(() => {
 
 ## Environment Setup
 
-Required `.env.local` variables:
+Required `.env.local` variables (names only; copy `.env.example`):
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=          # server routes only, never in browser code
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CRON_SECRET=                        # /api/cron/draft-tick
+NEXT_PUBLIC_SITE_URL=
 
 # Optional: Sentry (error tracking)
-SENTRY_DSN=your-sentry-dsn
+NEXT_PUBLIC_SENTRY_DSN=
 ```
 
-Database schema in `supabase-schema.sql` - run in Supabase SQL editor to set up tables.
+Schema: `supabase/migrations/` is the only source of truth. Never paste a schema file into the SQL editor; follow [docs/MIGRATIONS.md](docs/MIGRATIONS.md).
 
 ## Troubleshooting
 
@@ -868,7 +834,3 @@ Database schema in `supabase-schema.sql` - run in Supabase SQL editor to set up 
 - [React Performance](https://react.dev/learn/render-and-commit)
 - [PokeAPI](https://pokeapi.co/)
 
----
-
-**Last Updated**: 2026-07-05
-**Version**: 0.1.1 (see package.json)

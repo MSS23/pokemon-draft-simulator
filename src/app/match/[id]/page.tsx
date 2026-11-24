@@ -205,7 +205,13 @@ export default function MatchDetailPage() {
             {/* Showdown Replays */}
             {(() => {
               const notes = typeof match.notes === 'string' ? LeagueService.parseMatchNotes(match.notes) : match.notes
-              const urls = notes?.replayUrls as Record<string, string> | undefined
+              // Participant links live in each side's submission; commissioner links at top level.
+              const subs = (notes?.submissions ?? {}) as Record<string, { replayUrls?: Record<string, string> }>
+              const urls: Record<string, string> = {
+                ...subs.home?.replayUrls,
+                ...subs.away?.replayUrls,
+                ...(notes?.replayUrls as Record<string, string> | undefined),
+              }
               if (!urls || Object.keys(urls).length === 0) return null
               return (
                 <div className="flex flex-col items-center gap-1 mt-3">

@@ -1,8 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
 // When E2E_BASE_URL is set (e.g. Vercel preview URL), Playwright targets that
-// remote URL directly. Otherwise it launches its own production build of the
-// Next.js app on localhost:3000.
+// remote URL directly. Otherwise it serves the existing production build on
+// localhost:3000, so run `node node_modules/next/dist/bin/next build` first
+// (CI's Build step already does). Calling next directly avoids `npm run`, whose
+// shell breaks on paths containing '&'.
 const externalBaseURL = process.env.E2E_BASE_URL
 const baseURL = externalBaseURL || 'http://localhost:3000'
 
@@ -32,9 +34,9 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: 'npm run build && npm run start',
+          command: 'node node_modules/next/dist/bin/next start -p 3000',
           url: 'http://localhost:3000',
-          timeout: 120_000,
+          timeout: 180_000,
           reuseExistingServer: !process.env.CI,
         },
       }),

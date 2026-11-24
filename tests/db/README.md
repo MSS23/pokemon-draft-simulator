@@ -1,4 +1,24 @@
-# Database integration tests (draft engine concurrency)
+# Database integration tests
+
+## Schema contract (implemented: `schema-contract.test.ts`)
+
+Checks that every table/view column in the `Database` type of
+`src/lib/supabase.ts`, and every literal `.rpc('name', {...})` call in `src/`,
+exists in a real database with a compatible type / parameter names. It reads
+PostgREST's OpenAPI document (`GET /rest/v1/`), so it needs no `pg` driver.
+The parser is unit-tested offline in the normal `vitest run`; the live checks
+skip unless these are set:
+
+| Env | Enables |
+| --- | --- |
+| `SUPABASE_TEST_URL` + `SUPABASE_TEST_SERVICE_ROLE_KEY` | contract check (read-only, safe on any project) |
+| `SUPABASE_TEST_URL` + `SUPABASE_TEST_ANON_KEY` | anon cannot EXECUTE `make_draft_pick` / `system_*` (refused on prod) |
+
+Local stack: `supabase start`, then take `API_URL`, `SERVICE_ROLE_KEY` and
+`ANON_KEY` from `supabase status -o env` and run
+`node node_modules/vitest/vitest.mjs run tests/db`.
+
+## Draft engine concurrency (cases A-H below: not implemented yet)
 
 The unit suite (`tests/draft-tick.test.ts`, `tests/draft-service.test.ts`,
 `tests/auction-service.test.ts`) mocks Supabase and cannot exercise the

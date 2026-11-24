@@ -107,3 +107,13 @@ cleanup-*.bat
 
 # Claude Code agent worktrees
 .claude/worktrees/
+
+# Supabase CLI local state (linked project ref, pooler URL)
+supabase/.temp/
+
+# One-off script outputs that hold user emails (PII). Never commit.
+scripts/broadcast-*
+clerk-users-export.csv
+
+# Single-use Clerk sign-in tickets for the signed-in e2e spec. Never commit.
+e2e-tokens*.json

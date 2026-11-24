@@ -496,7 +496,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold">My Drafts</h2>
                 {drafts.length > 0 && (
-                  <span className="text-[11px] font-medium text-muted-foreground/60 tabular-nums">{drafts.length} total</span>
+                  <span className="text-[11px] font-medium text-muted-foreground tabular-nums">{drafts.length} total</span>
                 )}
               </div>
 

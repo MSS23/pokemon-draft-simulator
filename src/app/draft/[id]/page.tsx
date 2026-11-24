@@ -121,6 +121,7 @@ interface DraftUIState {
     pickTiers: Array<string | null>
   }>
   participants: Array<{
+    id?: string
     userId: string | null
     team_id: string | null
     display_name: string
@@ -343,6 +344,7 @@ export default function DraftRoomPage() {
       userTeamId,
       teams,
       participants: dbState.participants.map(p => ({
+        id: p.id,
         userId: p.user_id,
         team_id: p.team_id,
         display_name: p.display_name,
@@ -452,6 +454,8 @@ export default function DraftRoomPage() {
     onRefreshNeeded: async () => {
       if (!roomCode) return
       if (actions.pickInFlightRef.current) {
+        // Replayed by useDraftActions once the pick settles.
+        actions.pendingRefreshRef.current = true
         log.info('Skipping realtime refresh — pick in flight')
         return
       }
@@ -691,16 +695,18 @@ export default function DraftRoomPage() {
   // --- Wishlist Pokemon IDs from Zustand ---
   const storeWishlistItemsById = useDraftStore(state => state.wishlistItemsById)
   const storeWishlistByParticipant = useDraftStore(state => state.wishlistItemsByParticipantId)
+  // wishlist_items.participant_id is participants.id (uuid), not the Clerk id.
+  const userParticipantId = draftState?.participants.find(p => p.userId === userId)?.id
   const wishlistPokemonIds = useMemo(() => {
-    if (!userId) return EMPTY_ARRAY
-    const itemIds = storeWishlistByParticipant[userId]
+    if (!userParticipantId) return EMPTY_ARRAY
+    const itemIds = storeWishlistByParticipant[userParticipantId]
     if (!itemIds || itemIds.length === 0) return EMPTY_ARRAY
     const ids = itemIds
       .map(id => storeWishlistItemsById[id])
       .filter(item => item && item.isAvailable)
       .map(item => item.pokemonId)
     return ids.length > 0 ? ids : EMPTY_ARRAY
-  }, [userId, storeWishlistByParticipant, storeWishlistItemsById])
+  }, [userParticipantId, storeWishlistByParticipant, storeWishlistItemsById])
 
   // Memoize DraftResults teams
   const completedDraftTeams = useMemo(() => {
@@ -1232,11 +1238,11 @@ export default function DraftRoomPage() {
         <div id="tour-wishlist" className={cn(
           draftState?.status === 'drafting' && activeTab !== 'pokemon' && 'hidden md:block'
         )}>
-        {!isSpectator && draftState?.userTeamId && userId && (
+        {!isSpectator && draftState?.userTeamId && userParticipantId && (
           <EnhancedErrorBoundary>
             <WishlistManager
               draftId={roomCode.toLowerCase()}
-              participantId={userId}
+              participantId={userParticipantId}
               userTeam={userTeam}
               currentBudget={userTeam?.budgetRemaining || 100}
               usedBudget={(userTeam?.picks.length || 0) * 10}

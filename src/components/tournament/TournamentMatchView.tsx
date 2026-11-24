@@ -179,6 +179,8 @@ export const TournamentMatchView = memo(function TournamentMatchView({
   const [resultStep, setResultStep] = useState<'view' | 'record'>('view')
   const [games, setGames] = useState<{ game: number; winner: string | null }[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Set when the result is confirmed but the bracket update failed; retry re-reports only.
+  const [bracketRetry, setBracketRetry] = useState<{ winnerId: string; score: { home: number; away: number } } | null>(null)
 
   const battleFormat = match.battleFormat || 'best_of_3'
   const maxGames = battleFormat === 'best_of_1' ? 1 : battleFormat === 'best_of_3' ? 3 : 5
@@ -212,10 +214,15 @@ export const TournamentMatchView = memo(function TournamentMatchView({
         { homeScore: finalHomeScore, awayScore: finalAwayScore, winnerTeamId: winnerId }
       )
       if (result.status === 'confirmed') {
-        await KnockoutService.reportResult(match.leagueId, match.id, winnerId, {
-          home: finalHomeScore,
-          away: finalAwayScore,
-        })
+        const score = { home: finalHomeScore, away: finalAwayScore }
+        try {
+          await KnockoutService.reportResult(match.leagueId, match.id, winnerId, score)
+        } catch (err) {
+          log.error('Bracket update failed after confirmation:', err)
+          setBracketRetry({ winnerId, score })
+          notify.error('Bracket Not Updated', 'The result is confirmed. Retry to advance the winner.')
+          return
+        }
         notify.success('Result Confirmed', 'The winner advanced in the bracket')
       } else if (result.status === 'disputed') {
         notify.warning('Result Disputed', 'The submitted results do not match')
@@ -231,6 +238,24 @@ export const TournamentMatchView = memo(function TournamentMatchView({
       setIsSubmitting(false)
     }
   }, [seriesOver, currentUserTeamId, homeWins, awayWins, match, onResultRecorded, onClose])
+
+  const handleRetryBracket = useCallback(async () => {
+    if (!bracketRetry) return
+    setIsSubmitting(true)
+    try {
+      // The report route is idempotent, so a retry only finishes the bracket sync.
+      await KnockoutService.reportResult(match.leagueId, match.id, bracketRetry.winnerId, bracketRetry.score)
+      setBracketRetry(null)
+      notify.success('Result Confirmed', 'The winner advanced in the bracket')
+      onResultRecorded()
+      onClose()
+    } catch (err) {
+      log.error('Bracket retry failed:', err)
+      notify.error('Bracket Not Updated', err instanceof Error ? err.message : 'Could not update the bracket')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }, [bracketRetry, match, onResultRecorded, onClose])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -448,12 +473,14 @@ export const TournamentMatchView = memo(function TournamentMatchView({
                   {/* Submit */}
                   {seriesOver && (
                     <Button
-                      onClick={handleSubmitResult}
+                      onClick={bracketRetry ? handleRetryBracket : handleSubmitResult}
                       disabled={isSubmitting}
                       className="w-full h-11 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold text-sm border-0 shadow-lg shadow-green-900/30"
                     >
                       {isSubmitting ? (
                         <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Submitting...</>
+                      ) : bracketRetry ? (
+                        <>Retry bracket update</>
                       ) : (
                         <>
                           <Trophy className="w-4 h-4 mr-2" />

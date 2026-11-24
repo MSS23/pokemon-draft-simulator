@@ -1,9 +1,10 @@
 # ⚠️ Legacy migrations — DO NOT APPLY
 
 The **only** source of truth for the database schema is
-[`supabase/migrations/`](../supabase/migrations/) (timestamped files, applied by
-`.github/workflows/migrate.yml` — staging auto, production behind manual
-approval). A daily `schema-drift` workflow diffs production against that tree.
+[`supabase/migrations/`](../supabase/migrations/) (timestamped files). They are
+applied **by hand**; the `migrate.yml` and `schema-drift.yml` workflows are not
+configured and have never run green. How to add and apply a migration:
+[`docs/MIGRATIONS.md`](../docs/MIGRATIONS.md).
 
 Everything under [`_archive/`](./_archive/) is **historical / superseded** and is
 kept only for reference. **Never run any of it against any database.** Notable
@@ -21,5 +22,6 @@ footguns in there:
 The previous version of this file walked through running `RESET_DATABASE.sql` on
 a live project — that guidance was wrong and has been removed.
 
-**To change the schema:** add a new timestamped file to `supabase/migrations/`.
-Do not edit or re-run anything in this directory.
+**To change the schema:** add a new timestamped file to `supabase/migrations/`
+and follow [`docs/MIGRATIONS.md`](../docs/MIGRATIONS.md). Do not edit or re-run
+anything in this directory.

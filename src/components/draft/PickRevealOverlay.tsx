@@ -118,13 +118,22 @@ export function PickRevealOverlay({ teams, pokemon, enabled }: PickRevealOverlay
     return () => clearTimeout(t)
   }, [event])
 
-  if (!event) return null
+  // Stays mounted so screen readers hear the text change; a live region inserted with its content is often skipped.
+  const announcement = (
+    <div role="status" aria-live="polite" className="sr-only">
+      {event ? `${event.teamName} drafted ${event.pokemonName}` : ''}
+    </div>
+  )
+
+  if (!event) return announcement
 
   const color = getTeamColor({ id: event.teamId, draftOrder: event.teamDraftOrder })
   const artwork = getOfficialArtworkUrl(event.pokemonId)
   const fallback = getPokemonSpriteUrl(event.pokemonId)
 
   return (
+    <>
+    {announcement}
     <button
       type="button"
       aria-label="Dismiss pick announcement"
@@ -211,6 +220,7 @@ export function PickRevealOverlay({ teams, pokemon, enabled }: PickRevealOverlay
         Click to dismiss
       </div>
     </button>
+    </>
   )
 }
 

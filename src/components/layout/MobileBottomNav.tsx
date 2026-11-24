@@ -39,6 +39,8 @@ export function MobileBottomNav() {
             <Link
               key={label}
               href={href}
+              aria-label={label}
+              aria-current={isActive ? 'page' : undefined}
               className="flex flex-col items-center justify-center gap-1 flex-1 h-full"
             >
               <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[hsl(var(--brand-from))] to-[hsl(var(--brand-to))] flex items-center justify-center shadow-energy">
@@ -52,11 +54,12 @@ export function MobileBottomNav() {
           <Link
             key={label}
             href={href}
+            aria-current={isActive ? 'page' : undefined}
             className={cn(
               'flex flex-col items-center justify-center gap-1 flex-1 h-full text-[10px] font-semibold transition-colors',
               isActive
                 ? 'text-primary'
-                : 'text-muted-foreground/60 hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             )}
           >
             <Icon className="h-5 w-5" aria-hidden="true" />

@@ -1,18 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { Sora, JetBrains_Mono } from "next/font/google";
-import Script from "next/script";
 import { headers } from "next/headers";
 import "./globals.css";
 import { ClerkAppearanceProvider } from "@/components/providers/ClerkAppearanceProvider";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { HydrationFixProvider } from "@/components/providers/HydrationFixProvider";
 import { ErrorBoundaryProvider } from "@/components/providers/ErrorBoundaryProvider";
 import { ImagePreferenceProvider } from "@/contexts/ImagePreferenceContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { TourProvider } from "@/components/tour/TourProvider";
-import { HydrationErrorFilter } from "./hydration-error-filter";
 import { PerformanceMonitorProvider } from "@/components/providers/PerformanceMonitorProvider";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
 import { FloatingFeedbackButton } from "@/components/feedback/FloatingFeedbackButton";
@@ -87,31 +84,21 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // SEC-02: Read per-request nonce set by middleware for CSP compliance
-  const headersList = await headers()
-  const nonce = headersList.get('x-nonce') ?? ''
-  // nonce is available for <Script nonce={nonce}> or <script nonce={nonce}> tags
+  // SEC-02: reading headers keeps the layout dynamic so Next applies the middleware CSP nonce
+  // (x-nonce) to its own scripts; pass headersList.get('x-nonce') to any <Script> added here.
+  await headers()
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <Script
-          src="/hydration-fix.js"
-          strategy="beforeInteractive"
-          nonce={nonce}
-        />
-      </head>
       <body
         className={`${sora.variable} ${jetbrainsMono.variable} font-sans antialiased`}
         style={{ fontFamily: 'var(--font-sora), system-ui, sans-serif' }}
         suppressHydrationWarning
       >
-        <HydrationErrorFilter />
         <ClerkAppearanceProvider>
         <AnalyticsProvider>
         <PerformanceMonitorProvider>
           <ErrorBoundaryProvider>
-            <HydrationFixProvider>
               <ThemeProvider
                 defaultTheme="system"
                 storageKey="pokemon-draft-theme"
@@ -120,9 +107,15 @@ export default async function RootLayout({
                   <AuthProvider>
                     <Toaster position="top-center" richColors />
                     <QueryProvider>
+                      <a
+                        href="#main"
+                        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded focus:bg-background focus:px-3 focus:py-2 focus:ring-2"
+                      >
+                        Skip to content
+                      </a>
                       <Header />
                       <TourProvider />
-                      <main className="min-h-[calc(100vh-3rem)]">{children}</main>
+                      <main id="main" tabIndex={-1} className="min-h-[calc(100vh-3rem)]">{children}</main>
                       <footer className="border-t border-border/50 py-5 text-center text-xs text-slate-600 dark:text-slate-400 px-4">
                         <div className="flex items-center justify-center gap-5 flex-wrap">
                           <a href="/terms" className="hover:text-slate-900 dark:hover:text-slate-100 transition-colors duration-150">Terms</a>
@@ -135,7 +128,6 @@ export default async function RootLayout({
                   </AuthProvider>
                 </ImagePreferenceProvider>
               </ThemeProvider>
-            </HydrationFixProvider>
           </ErrorBoundaryProvider>
         </PerformanceMonitorProvider>
         </AnalyticsProvider>

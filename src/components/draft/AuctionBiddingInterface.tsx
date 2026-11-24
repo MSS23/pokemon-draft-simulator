@@ -54,22 +54,28 @@ interface AuctionBiddingInterfaceProps {
 }
 
 // Animated number that counts up/down
-function AnimatedBidNumber({ value }: { value: number }) {
+function AnimatedBidNumber({ value, reducedMotion }: { value: number; reducedMotion: boolean }) {
   const motionValue = useMotionValue(value)
   const rounded = useTransform(motionValue, (v) => Math.round(v))
   const display = useTransform(rounded, (v) => `$${v}`)
   const prevValue = useRef(value)
 
   useEffect(() => {
+    // animate() is imperative, so MotionConfig reducedMotion cannot skip it.
+    if (reducedMotion) {
+      motionValue.set(value)
+      prevValue.current = value
+      return
+    }
     const controls = animate(motionValue, value, {
       duration: 0.4,
       ease: 'easeOut',
     })
     prevValue.current = value
     return controls.stop
-  }, [value, motionValue])
+  }, [value, motionValue, reducedMotion])
 
-  return <motion.span>{display}</motion.span>
+  return <motion.span aria-hidden="true">{display}</motion.span>
 }
 
 // "SOLD!" overlay animation
@@ -524,12 +530,12 @@ export default function AuctionBiddingInterface({
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
               Current Bid
             </div>
-            <div
-              className="text-5xl md:text-6xl font-black text-foreground"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              <AnimatedBidNumber value={currentAuction.current_bid} />
+            <div className="text-5xl md:text-6xl font-black text-foreground">
+              {/* Live region holds the final value only, never the tween's intermediate frames. */}
+              <span className="sr-only" aria-live="polite" aria-atomic="true">
+                {`$${currentAuction.current_bid}`}
+              </span>
+              <AnimatedBidNumber value={currentAuction.current_bid} reducedMotion={reducedMotion} />
             </div>
             {currentBidder && (
               <motion.div

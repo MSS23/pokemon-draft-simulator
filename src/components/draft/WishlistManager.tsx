@@ -24,6 +24,7 @@ import {
   useSortable,
 } from '@/hooks/useDragAndDrop'
 import { CSS } from '@dnd-kit/utilities'
+import { toast } from 'sonner'
 import { useWishlistSync } from '@/hooks/useWishlistSync'
 import { useBudgetValidation } from '@/hooks/useBudgetValidation'
 import BudgetWarnings from './BudgetWarnings'
@@ -72,8 +73,11 @@ export default function WishlistManager({
   const nextPick = availableItems.length > 0 ? availableItems[0] : null
   const isOverBudget = budgetValidation.isOverBudget
 
+  // No optimistic state here: the list comes from the store via realtime, so a failure only needs surfacing.
   const handleRemoveItem = async (pokemonId: string) => {
-    await removeFromWishlist(pokemonId)
+    if (!(await removeFromWishlist(pokemonId))) {
+      toast.error('Could not remove from wishlist', { id: 'wishlist-remove' })
+    }
   }
 
   const handleToggleAvailability = (_itemId: string, _isAvailable: boolean) => {
@@ -90,8 +94,10 @@ export default function WishlistManager({
     activeId,
   } = useDragAndDrop<WishlistItem>({
     items: userWishlist,
-    onReorder: (reorderedItems) => {
-      reorderWishlistItems(reorderedItems)
+    onReorder: async (reorderedItems) => {
+      if (!(await reorderWishlistItems(reorderedItems))) {
+        toast.error('Could not save wishlist order', { id: 'wishlist-reorder' })
+      }
     }
   })
 

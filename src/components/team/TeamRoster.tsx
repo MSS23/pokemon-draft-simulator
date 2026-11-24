@@ -4,7 +4,6 @@ import { useMemo, useState, memo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Crown, User, Layers, Grid2x2 } from 'lucide-react'
-import { usePokemonList } from '@/hooks/usePokemon'
 import { Pokemon, TierDefinition } from '@/types'
 import { cn } from '@/lib/utils'
 import { getPokemonAnimatedUrl, getPokemonAnimatedBackupUrl, getTypeColor } from '@/utils/pokemon'
@@ -12,6 +11,7 @@ import { PokeballIcon } from '@/components/ui/pokeball-icon'
 import { getTeamColor } from '@/utils/team-colors'
 import { getPokemonTier, getTierUsage } from '@/lib/tier-utils'
 import RosterCardStack from './RosterCardStack'
+import { usePokemonIndexById } from '@/hooks/usePokemon'
 
 interface TeamRosterProps {
   team: {
@@ -41,18 +41,22 @@ const TeamRoster = memo(function TeamRoster({
   scoringSystem,
   tierConfig,
 }: TeamRosterProps) {
-  const { data: allPokemon } = usePokemonList()
+  const { data: pokemonById } = usePokemonIndexById()
   const teamColor = getTeamColor(team.draftOrder - 1)
   const isTiered = scoringSystem === 'tiered' && tierConfig?.tiers?.length
   const [viewMode, setViewMode] = useState<'grid' | 'cards'>('grid')
   const tierUsage = useMemo(() => getTierUsage(team.pickTiers || []), [team.pickTiers])
 
   const teamPokemon = useMemo(() => {
-    if (!allPokemon || !team.picks.length) return []
+    if (!pokemonById || !team.picks.length) return []
     return team.picks
-      .map(pickId => allPokemon.find(p => p.id === pickId))
-      .filter((p): p is Pokemon => p !== undefined)
-  }, [allPokemon, team.picks])
+      .map((pickId, i) => {
+        const p = pokemonById.get(pickId)
+        // The index carries no format cost; show what the team actually paid.
+        return p && { ...p, cost: team.pickCosts?.[i] ?? 0 }
+      })
+      .filter((p): p is Pokemon => !!p)
+  }, [pokemonById, team.picks, team.pickCosts])
 
   return (
     <Card className={cn(

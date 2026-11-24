@@ -25,7 +25,11 @@ clerk api /jwt_templates --app <app id> --instance prod -X POST   -d '{"name":"s
 Alternatively, activating Clerk's Supabase integration
 (dashboard.clerk.com/setup/supabase, with the **Production** instance selected)
 adds the same claim to the plain session token; the template is then redundant
-but harmless.
+but harmless. The code still requests the template, so keep it either way.
+
+Finally, copy the instance's **Frontend API URL** from the Clerk dashboard
+(**API Keys**, or the domain shown by the Supabase integration page). Step 2
+needs it.
 
 ## 2. Register Clerk in Supabase
 
@@ -39,10 +43,17 @@ Both dashboards must point at the same production Clerk instance used by
 
 ## 3. Verify the deployed client code
 
-- `src/lib/supabase.ts` passes `window.Clerk.session.getToken()` through the
-  Supabase client's `accessToken` callback.
-- `src/lib/supabase-server.ts` uses `(await auth()).getToken()` for server-side
-  Clerk-authenticated requests.
+- `src/lib/supabase.ts` passes
+  `window.Clerk.session.getToken({ template: CLERK_SUPABASE_JWT_TEMPLATE })`
+  through the Supabase client's `accessToken` callback.
+- `src/lib/supabase-server.ts` uses
+  `(await auth()).getToken({ template: CLERK_SUPABASE_JWT_TEMPLATE })` for
+  server-side Clerk-authenticated requests.
+- `CLERK_SUPABASE_JWT_TEMPLATE` is `'supabase-authenticated'`
+  (`src/lib/clerk-supabase-template.ts`). Dropping the template argument is
+  safe only on an instance where the Clerk Supabase integration is active;
+  otherwise the token lacks `role: authenticated` and PostgREST treats the
+  user as `anon`.
 - Trusted server workflows use `createServiceRoleClient()` only after Clerk
   authentication and authorization have already succeeded.
 
@@ -75,10 +86,26 @@ the deployment uses the matching production Clerk keys.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Clerk `/tokens/supabase` returns 404 | Deployed code still requests the deprecated template | Deploy code that calls `getToken()` with no template |
+| Clerk `/tokens/supabase` returns 404 | Deployed code still requests the deprecated `supabase` template | Deploy current code, which requests `supabase-authenticated` |
+| Clerk `/tokens/supabase-authenticated` returns 404 | The template is missing on this Clerk instance | Create it (section 1). Only if the Clerk Supabase integration is active on that instance may the code call `getToken()` with no template instead |
 | Supabase returns 401/403 for signed-in users | Clerk is not registered as a Supabase third-party provider | Repeat steps 1 and 2 for the production instances |
 | `whoami()` returns null | Supabase received no valid Clerk session token | Check `/api/health/bridge`, environment keys, and provider domain |
 | Server route writes fail | Route uses an anonymous/browser client | Use `createClerkSupabaseClientServer()` or an authenticated service-role workflow |
 | Guest writes fail | The flow bypasses the server-authoritative guest endpoint/RPC | Route the action through its cookie-authenticated server endpoint |
 
 Do not log bearer tokens or expose `SUPABASE_SERVICE_ROLE_KEY` to browser code.
+
+## Account-deletion webhook (`/api/webhooks/clerk`)
+
+Users deleted in the Clerk dashboard (not through `/api/user/delete`) are
+wiped by `POST /api/webhooks/clerk`, which runs the same `delete_user_data`
+RPC. Clerk only delivers once both of these exist:
+
+1. Vercel env: `CLERK_WEBHOOK_SIGNING_SECRET` (the endpoint's signing secret).
+   `verifyWebhook()` reads exactly this name; `CLERK_WEBHOOK_SECRET` is ignored.
+2. Clerk dashboard > Webhooks: an endpoint for
+   `https://<prod-domain>/api/webhooks/clerk` subscribed to `user.deleted`.
+
+Middleware needs no change: `/api/webhooks` is not auth-gated and falls under
+the default 100/min API rate limit. A bad signature returns 400; a missing
+service-role key returns 503 so Clerk retries.

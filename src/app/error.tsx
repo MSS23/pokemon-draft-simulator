@@ -1,5 +1,6 @@
 'use client'
 
+import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react'
@@ -13,10 +14,8 @@ export default function Error({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log to error reporting service in production
-    if (process.env.NODE_ENV === 'production') {
-      // Sentry or similar would capture this automatically
-    }
+    // Errors caught by a boundary are not rethrown, so Sentry's global handler never sees them.
+    Sentry.captureException(error)
   }, [error])
 
   return (
