@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next'
 import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/supabase'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // trim(): the production env value carries a trailing newline
@@ -83,12 +84,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   if (supabaseUrl && supabaseKey && supabaseUrl !== 'your-supabase-project-url') {
     try {
-      const supabase = createClient(supabaseUrl, supabaseKey)
+      const supabase = createClient<Database>(supabaseUrl, supabaseKey)
 
-      // Public leagues
+      // Only leagues whose parent draft is public; private league UUIDs act as capability URLs.
       const { data: leagues } = await supabase
         .from('leagues')
-        .select('id, updated_at')
+        .select('id, updated_at, drafts!inner(is_public)')
+        .eq('drafts.is_public', true)
         .order('updated_at', { ascending: false })
         .limit(500)
 

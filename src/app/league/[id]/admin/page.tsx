@@ -28,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { UserSessionService } from '@/lib/user-session'
 import { createLogger } from '@/lib/logger'
 import { notify } from '@/lib/notifications'
+import { waiverDeadlineToIso, waiverDeadlineToLocalInput } from './waiver-deadline'
 
 const log = createLogger('CommissionerPage')
 
@@ -92,7 +93,7 @@ export default function CommissionerPage() {
       // Initialize commissioner settings from league settings
       const settings = leagueData.settings || {}
       setRosterLocked(!!settings.rosterLocked)
-      setWaiverDeadline((settings.waiverDeadline as string) || '')
+      setWaiverDeadline(waiverDeadlineToLocalInput(settings.waiverDeadline as string | undefined))
       setAllowInSeasonWaivers(!!settings.allowInSeasonWaivers)
       setMatches(matchesData)
       setStandings(standingsData)
@@ -282,7 +283,7 @@ export default function CommissionerPage() {
     if (!supabase || !leagueId || !league) return
     setSavingWaiverDeadline(true)
     try {
-      const updatedSettings = { ...league.settings, waiverDeadline }
+      const updatedSettings = { ...league.settings, waiverDeadline: waiverDeadlineToIso(waiverDeadline) }
       const { error } = await supabase
         .from('leagues')
         .update({ settings: updatedSettings })

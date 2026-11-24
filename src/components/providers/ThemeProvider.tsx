@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { MotionConfig } from 'framer-motion'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('ThemeProvider')
@@ -91,7 +92,8 @@ export function ThemeProvider({
   // Use CSS to handle initial flash instead
   return (
     <ThemeProviderContext.Provider value={value}>
-      {children}
+      {/* Honour prefers-reduced-motion for every framer-motion animation app-wide. */}
+      <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </ThemeProviderContext.Provider>
   )
 }

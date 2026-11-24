@@ -125,10 +125,14 @@ export function OnTheClockHero({
         borderColor: `rgb(${teamColor.rgb} / 0.7)`,
         background: `linear-gradient(115deg, ${teamColor.gradient} 0%, #0b1220 55%, #050816 100%)`,
       }}
-      role="status"
-      aria-live="polite"
-      aria-label={`${currentTeam?.name ?? 'Team'} is on the clock${isPaused ? ' — paused' : ''}`}
     >
+      {/* Turn-only live region: the wrapper used to be live and re-announced every clock tick. */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {isUserTurn
+          ? `Your turn, round ${round}`
+          : `${currentTeam?.name ?? 'Team'} is on the clock, round ${round}`}
+        {isPaused ? ', paused' : ''}
+      </div>
       {/* shimmer / scanline accent */}
       <div
         aria-hidden="true"

@@ -9,7 +9,7 @@ import PokemonCard from '@/components/pokemon/PokemonCard'
 import PokemonDetailsModal from '@/components/pokemon/PokemonDetailsModal'
 import { Search, Filter, Eye, Users } from 'lucide-react'
 import { Pokemon } from '@/types'
-import { usePokemonList } from '@/hooks/usePokemon'
+import { usePokemonListByFormat } from '@/hooks/usePokemon'
 import { getFormatById } from '@/lib/formats'
 import { FormatRulesEngine } from '@/domain/rules/format-rules-engine'
 
@@ -47,7 +47,8 @@ export default function SpectatorDraftGrid({ draftData, onPokemonView }: Spectat
   const [detailsPokemon, setDetailsPokemon] = useState<Pokemon | null>(null)
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
 
-  const { data: allPokemon, isLoading } = usePokemonList()
+  // Static per-format catalogue; the old usePokemonList fired ~800 requests and stopped at dex 400.
+  const { data: allPokemon, isLoading } = usePokemonListByFormat(draftData.settings?.formatId || 'vgc-reg-h')
 
   // Get format rules for filtering
   const [format, setFormat] = useState(() => getFormatById(draftData.settings?.formatId || 'vgc-reg-h'))

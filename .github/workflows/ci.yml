@@ -8,7 +8,12 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04, which Playwright's chromium
+    # install does not support yet. Bump once @playwright/test supports it.
+    runs-on: ubuntu-24.04
+    env:
+      # Fork PRs get no secrets; the smoke steps skip instead of failing them.
+      HAS_E2E_CLERK: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY != '' && secrets.E2E_CLERK_SECRET_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -26,13 +31,17 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npm run test:run
+        run: npx vitest run --coverage --coverage.reporter=text-summary
 
+      # The smoke step serves this build, so it needs the Clerk dev-instance
+      # keys (pk_test/sk_test only): NEXT_PUBLIC_* is inlined at build time.
       - name: Build
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key-for-build
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
 
       # Informational only. New advisories against transitive deps land
       # weekly and used to turn main red (and skip lint/test/build) with no
@@ -43,24 +52,34 @@ jobs:
         continue-on-error: true
 
       # ---------------------------------------------------------------
-      # Playwright e2e
+      # Playwright guest smoke (blocking)
       #
-      # When the Vercel deployment for this commit emits a preview URL
-      # into E2E_BASE_URL (set by the Vercel GitHub integration via
-      # repository variables), Playwright targets the preview directly.
-      # Otherwise it falls back to its built-in webServer which serves
-      # `npm run build && npm run start` on localhost:3000.
+      # playwright.config.ts's webServer serves the Build step's output with
+      # `next start` (no second build). Without Clerk keys clerkMiddleware
+      # returns 500 on every page, so the webServer never becomes ready; the
+      # step needs the E2E_CLERK_* repo secrets from a Clerk development
+      # instance.
+      #
+      # The signed-in spec (e2e/two-player-draft.spec.ts) needs single-use
+      # Clerk sign-in tokens and a real backend; it self-skips without
+      # E2E_TOKENS_FILE and is run manually against a deployment.
       # ---------------------------------------------------------------
+      - name: Smoke skipped (no Clerk secrets)
+        if: env.HAS_E2E_CLERK != 'true'
+        run: echo "::warning::E2E_CLERK_PUBLISHABLE_KEY / E2E_CLERK_SECRET_KEY not available (fork PR or unset); Playwright smoke skipped."
+
       - name: Install Playwright (chromium)
+        if: env.HAS_E2E_CLERK == 'true'
         run: npx playwright install --with-deps chromium
 
-      - name: Playwright e2e
-        run: npx playwright test
+      - name: Playwright smoke
+        if: env.HAS_E2E_CLERK == 'true'
+        run: npx playwright test e2e/smoke.spec.ts
         env:
-          E2E_BASE_URL: ${{ vars.VERCEL_PREVIEW_URL }}
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-key-for-build
-        continue-on-error: true
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
 
       - name: Upload Playwright report
         if: always()
@@ -72,3 +91,86 @@ jobs:
             test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # -----------------------------------------------------------------
+  # DB contract (advisory)
+  #
+  # Applies every migration to an empty local Supabase stack, then checks the
+  # tables and RPCs the app depends on exist (psql), and runs the
+  # tests/db schema contract + anon grant checks against the local API. Advisory until the migration
+  # ledger cleanup (docs/ops/migration-ledger.md) and the draft_passwords
+  # migration land; then drop continue-on-error and require it.
+  # When the DB_CONTRACT_READONLY_URL secret is set (a read-only role on
+  # prod), the same contract also runs against the live database.
+  # -----------------------------------------------------------------
+  db-contract:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    env:
+      HAS_PROD_RO_URL: ${{ secrets.DB_CONTRACT_READONLY_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase (applies supabase/migrations)
+        run: supabase start -x studio,imgproxy,inbucket,edge-runtime,logflare,vector
+
+      - name: Export test env
+        run: |
+          supabase status -o env | tr -d '"' | sed -n 's/^API_URL=/SUPABASE_TEST_URL=/p; s/^SERVICE_ROLE_KEY=/SUPABASE_TEST_SERVICE_ROLE_KEY=/p; s/^ANON_KEY=/SUPABASE_TEST_ANON_KEY=/p' >> "$GITHUB_ENV"
+
+      - name: Write contract SQL
+        run: |
+          cat > "$RUNNER_TEMP/contract.sql" <<'SQL'
+          \set ON_ERROR_STOP on
+          DO $$
+          DECLARE
+            missing text[] := '{}';
+            t text;
+          BEGIN
+            FOREACH t IN ARRAY ARRAY[
+              'drafts','teams','picks','participants','pokemon_tiers','auctions',
+              'bid_history','wishlist_items','user_profiles','draft_passwords',
+              'leagues','league_teams','matches','standings','trades','waiver_claims'
+            ] LOOP
+              IF to_regclass('public.' || t) IS NULL THEN
+                missing := missing || ('table ' || t);
+              END IF;
+            END LOOP;
+            FOREACH t IN ARRAY ARRAY[
+              'clerk_user_id','make_draft_pick','resolve_auction',
+              'system_make_pick','system_advance_turn','join_draft_atomic'
+            ] LOOP
+              IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                             WHERE n.nspname = 'public' AND p.proname = t) THEN
+                missing := missing || ('function ' || t);
+              END IF;
+            END LOOP;
+            IF array_length(missing, 1) > 0 THEN
+              RAISE EXCEPTION 'schema contract missing: %', array_to_string(missing, ', ');
+            END IF;
+          END $$;
+          SQL
+
+      - name: Contract on fresh DB
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f "$RUNNER_TEMP/contract.sql"
+
+      - name: Contract on prod (read-only)
+        if: env.HAS_PROD_RO_URL == 'true'
+        run: psql "$DB_URL" -f "$RUNNER_TEMP/contract.sql"
+        env:
+          DB_URL: ${{ secrets.DB_CONTRACT_READONLY_URL }}
+
+      - name: Schema contract + grants (tests/db)
+        run: npx vitest run tests/db

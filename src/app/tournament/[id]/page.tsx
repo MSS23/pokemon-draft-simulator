@@ -276,6 +276,48 @@ export default function TournamentPage() {
     }
   }, [user, tournamentId, loadData])
 
+  // F-03: start's active branch idempotently reconciles league_teams and matches with the bracket.
+  const [isResyncing, setIsResyncing] = useState(false)
+  const handleResync = useCallback(async () => {
+    setIsResyncing(true)
+    try {
+      const response = await fetch('/api/tournament/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leagueId: tournamentId }),
+      })
+      const result = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) throw new Error(result.error || 'Could not re-sync bracket')
+      notify.success('Bracket Re-synced', 'Teams and matches reconciled with the bracket')
+      await loadData(false)
+    } catch (err) {
+      log.error('Failed to re-sync bracket:', err)
+      notify.error('Failed', err instanceof Error ? err.message : 'Could not re-sync bracket')
+    } finally {
+      setIsResyncing(false)
+    }
+  }, [tournamentId, loadData])
+
+  // F-03: a DB match can be completed while its bracket match is still pending; re-report the DB winner to heal it.
+  const [healingMatchId, setHealingMatchId] = useState<string | null>(null)
+  const handleHealMatch = useCallback(async (match: Match & { homeTeam: Team; awayTeam: Team }) => {
+    if (!match.winnerTeamId) return
+    setHealingMatchId(match.id)
+    try {
+      await KnockoutService.reportResult(tournamentId, match.id, match.winnerTeamId, {
+        home: match.homeScore,
+        away: match.awayScore,
+      })
+      notify.success('Match Recorded', 'Bracket updated')
+      await loadData(false)
+    } catch (err) {
+      log.error('Failed to heal bracket match:', err)
+      notify.error('Failed', err instanceof Error ? err.message : 'Could not record result')
+    } finally {
+      setHealingMatchId(null)
+    }
+  }, [tournamentId, loadData])
+
   const handleRecordMatch = useCallback((match: Match & { homeTeam: Team; awayTeam: Team }) => {
     setHomeTeamPicks(teamPicks[match.homeTeamId] || [])
     setAwayTeamPicks(teamPicks[match.awayTeamId] || [])
@@ -543,6 +585,12 @@ export default function TournamentPage() {
               {tournamentType ? tournamentType.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Knockout'} &middot; {league.teams.length} players &middot; {currentRoundName}
             </p>
           </div>
+          {isCommissioner && league.status === 'active' && (
+            <Button variant="outline" size="sm" className="shrink-0 text-xs" onClick={handleResync} disabled={isResyncing}>
+              {isResyncing ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+              Re-sync bracket
+            </Button>
+          )}
           {roomCode && (
             <Button variant="ghost" size="sm" className="shrink-0 font-mono text-xs" onClick={handleCopyCode}>
               {copiedCode ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
@@ -743,6 +791,12 @@ export default function TournamentPage() {
                     (m.participant1?.teamId === match.awayTeamId && m.participant2?.teamId === match.homeTeamId)
                   )
                 )
+                const bracketPending = !!roundInfo?.matches.some(m =>
+                  m.status !== 'completed' && (
+                    (m.participant1?.teamId === match.homeTeamId && m.participant2?.teamId === match.awayTeamId) ||
+                    (m.participant1?.teamId === match.awayTeamId && m.participant2?.teamId === match.homeTeamId)
+                  )
+                )
 
                 return (
                   <div key={match.id} className="flex items-center justify-between p-2.5 border rounded-lg">
@@ -771,6 +825,17 @@ export default function TournamentPage() {
                         {match.awayTeam.name}
                       </span>
                       <div className={`w-1.5 h-5 rounded-full shrink-0 ${awayColors?.bg || 'bg-muted'}`} />
+                      {isCommissioner && bracketPending && match.winnerTeamId && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs h-7 shrink-0"
+                          onClick={() => handleHealMatch(match)}
+                          disabled={healingMatchId === match.id}
+                        >
+                          Record Result
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )

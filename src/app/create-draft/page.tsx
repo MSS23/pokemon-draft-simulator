@@ -49,7 +49,6 @@ import {
   getPopularFormats,
   DEFAULT_FORMAT,
 } from "@/lib/formats";
-import { useHydrationFix } from "@/lib/hydration-fix";
 import CSVUpload from "@/components/draft/CSVUpload";
 import {
   exportFormatWithProgress,
@@ -161,8 +160,6 @@ export default function CreateDraftPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const tierRosterSize = getTierRosterSize(tierConfig);
-
-  useHydrationFix();
 
   // Pre-fill user data when authenticated
   useEffect(() => {

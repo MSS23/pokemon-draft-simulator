@@ -13,7 +13,7 @@ import { test, expect, type ConsoleMessage, type Page } from '@playwright/test'
  */
 
 interface CollectedErrors {
-  consoleErrors: string[]
+  consoleErrors: Array<{ text: string; url: string }>
   consoleWarnings: string[]
   pageErrors: string[]
 }
@@ -34,6 +34,8 @@ const CONSOLE_ERROR_IGNORE = [
   /failed to load resource.*401/i,
   /failed to load resource.*404/i,
   /failed to load resource.*403/i,
+  // PostgREST answers .single() on a missing row with 406 (bogus-id pages).
+  /failed to load resource.*406/i,
   /the resource .* was preloaded/i,
   /downloadable font/i,
   /favicon/i,
@@ -43,11 +45,11 @@ const CONSOLE_ERROR_IGNORE = [
   /clerk.*publishable/i,
   /\[hmr\]/i,
   /fast refresh/i,
-  // PostHog / analytics noise
+  // PostHog / Vercel analytics noise
   /posthog/i,
-  /analytics/i,
-  // Network errors (we don't have full backend)
-  /net::err/i,
+  /vercel.*(analytics|insights)|_vercel\/insights/i,
+  // Network errors (we don't have full backend). net::ERR_* is only ignored
+  // for third-party URLs; see isFatalConsoleError.
   /fetch failed/i,
   /networkerror/i,
   // Dev-server chunk loading noise (the dev server is currently
@@ -61,9 +63,21 @@ const CONSOLE_ERROR_IGNORE = [
   /loading chunk \d+ failed/i,
 ]
 
-function isFatalConsoleError(text: string): boolean {
-  return !CONSOLE_ERROR_IGNORE.some((re) => re.test(text))
+function isFirstParty(url: string, page: Page): boolean {
+  try {
+    return new URL(url).origin === new URL(page.url()).origin
+  } catch {
+    return false
+  }
 }
+
+function isFatalConsoleError(err: { text: string; url: string }, page: Page): boolean {
+  if (/net::err/i.test(err.text)) return isFirstParty(err.url, page)
+  return !CONSOLE_ERROR_IGNORE.some((re) => re.test(err.text))
+}
+
+// Text rendered by src/app/error.tsx / global-error.tsx and Next's crash page.
+const ERROR_BOUNDARY = /something went wrong|application error/i
 
 function attachErrorListeners(page: Page): CollectedErrors {
   const collected: CollectedErrors = {
@@ -75,7 +89,7 @@ function attachErrorListeners(page: Page): CollectedErrors {
   page.on('console', (msg: ConsoleMessage) => {
     const text = msg.text()
     if (msg.type() === 'error') {
-      collected.consoleErrors.push(text)
+      collected.consoleErrors.push({ text, url: msg.location().url })
     } else if (msg.type() === 'warning') {
       collected.consoleWarnings.push(text)
     }
@@ -88,7 +102,13 @@ function attachErrorListeners(page: Page): CollectedErrors {
   return collected
 }
 
-function assertNoFatalErrors(collected: CollectedErrors, label: string) {
+async function assertNoFatalErrors(page: Page, collected: CollectedErrors, label: string) {
+  // A caught render error shows the boundary instead of firing pageerror.
+  const body = (await page.locator('body').textContent()) ?? ''
+  if (ERROR_BOUNDARY.test(body)) {
+    throw new Error(`[${label}] rendered an error boundary: ${body.slice(0, 200)}`)
+  }
+
   // Page errors are always fatal (uncaught exceptions in client code).
   if (collected.pageErrors.length > 0) {
     throw new Error(
@@ -97,14 +117,16 @@ function assertNoFatalErrors(collected: CollectedErrors, label: string) {
     )
   }
 
-  const fatalConsole = collected.consoleErrors.filter(isFatalConsoleError)
+  const fatalConsole = collected.consoleErrors.filter((e) => isFatalConsoleError(e, page))
   if (fatalConsole.length > 0) {
     throw new Error(
       `[${label}] ${fatalConsole.length} fatal console error(s):\n  - ` +
-        fatalConsole.join('\n  - ')
+        fatalConsole.map((e) => `${e.text} (${e.url})`).join('\n  - ')
     )
   }
 }
+
+const CLERK_EXPECTED = !!process.env.E2E_BASE_URL || !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 
 async function gotoAndCollect(
   page: Page,
@@ -138,7 +160,7 @@ test.describe('Smoke: public pages', () => {
     const ctaPattern = /get started|sign in|sign up|create|join|watch/i
     await expect(body).toContainText(ctaPattern, { timeout: 5_000 })
 
-    assertNoFatalErrors(errors, 'landing /')
+    await assertNoFatalErrors(page, errors, 'landing /')
   })
 
   test('Sign in /sign-in renders Clerk or email input', async ({ page }) => {
@@ -165,13 +187,16 @@ test.describe('Smoke: public pages', () => {
         .catch(() => false),
     ])
 
-    if (!clerkLoaded) {
-      // Clerk may be sandboxed or unreachable; just check page didn't crash.
-      const html = await page.content()
-      expect(html.length).toBeGreaterThan(500)
+    // Deployed targets and local runs with a Clerk key must render the widget.
+    // Only a local build without NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY (CI's
+    // placeholder build) cannot, and then the page shell must still render.
+    if (CLERK_EXPECTED) {
+      expect(clerkLoaded, 'Clerk sign-in widget did not attach').toBe(true)
+    } else if (!clerkLoaded) {
+      await expect(page.locator('body')).toContainText(/draft league/i)
     }
 
-    assertNoFatalErrors(errors, 'sign-in')
+    await assertNoFatalErrors(page, errors, 'sign-in')
   })
 
   test('Join draft /join-draft has a room-code input', async ({ page }) => {
@@ -203,7 +228,7 @@ test.describe('Smoke: public pages', () => {
       ).toBeTruthy()
     }
 
-    assertNoFatalErrors(errors, 'join-draft')
+    await assertNoFatalErrors(page, errors, 'join-draft')
   })
 
   test('Lobby /lobby loads', async ({ page }) => {
@@ -216,7 +241,7 @@ test.describe('Smoke: public pages', () => {
     const body = await page.locator('body').textContent()
     expect(body && body.length).toBeGreaterThan(20)
 
-    assertNoFatalErrors(errors, 'lobby')
+    await assertNoFatalErrors(page, errors, 'lobby')
   })
 
   test('Watch drafts /watch-drafts loads', async ({ page }) => {
@@ -229,7 +254,7 @@ test.describe('Smoke: public pages', () => {
     const body = await page.locator('body').textContent()
     expect(body && body.length).toBeGreaterThan(20)
 
-    assertNoFatalErrors(errors, 'watch-drafts')
+    await assertNoFatalErrors(page, errors, 'watch-drafts')
   })
 
   for (const slug of ['/about', '/privacy', '/terms', '/feedback']) {
@@ -243,7 +268,7 @@ test.describe('Smoke: public pages', () => {
       const body = await page.locator('body').textContent()
       expect(body && body.length).toBeGreaterThan(20)
 
-      assertNoFatalErrors(errors, slug)
+      await assertNoFatalErrors(page, errors, slug)
     })
   }
 })
@@ -258,22 +283,13 @@ test.describe('Smoke: auth-gated routes (unauthenticated)', () => {
     expect(status).toBeGreaterThanOrEqual(200)
     expect(status).toBeLessThan(500)
 
-    const redirectedToAuth = /sign-in|login/i.test(finalUrl)
-    if (redirectedToAuth) {
-      expect(finalUrl).toMatch(/sign-in|login/i)
-    } else {
-      // No redirect -> page should show an auth-required message
-      // OR render the form (some setups allow guest).
-      const body = (await page.locator('body').textContent()) ?? ''
-      const hasAuthGate = /sign in|log in|authent|account|required/i.test(body)
-      const hasForm = /draft name|create.*draft|format/i.test(body)
-      expect(
-        hasAuthGate || hasForm,
-        `Expected auth gate or form on /create-draft, got: ${body.slice(0, 200)}`
-      ).toBeTruthy()
+    // Signed out: either middleware redirects to sign-in or the page shows
+    // its gate (src/app/create-draft/page.tsx "Sign In to Create a Draft").
+    if (!/\/sign-in/i.test(finalUrl)) {
+      await expect(page.locator('body')).toContainText(/sign in to create a draft/i, { timeout: 10_000 })
     }
 
-    assertNoFatalErrors(errors, 'create-draft')
+    await assertNoFatalErrors(page, errors, 'create-draft')
   })
 
   test('Create tournament /create-tournament redirects or gates', async ({
@@ -293,7 +309,7 @@ test.describe('Smoke: auth-gated routes (unauthenticated)', () => {
       expect(hasAuthGate || hasForm).toBeTruthy()
     }
 
-    assertNoFatalErrors(errors, 'create-tournament')
+    await assertNoFatalErrors(page, errors, 'create-tournament')
   })
 })
 
@@ -310,10 +326,9 @@ test.describe('Smoke: bogus IDs do not crash', () => {
     expect(status).toBeGreaterThanOrEqual(200)
     expect(status).toBeLessThan(500)
 
-    const body = await page.locator('body').textContent()
-    expect(body && body.length).toBeGreaterThan(20)
+    await expect(page.locator('body')).toContainText(/draft room not found|failed to load draft room/i, { timeout: 15_000 })
 
-    assertNoFatalErrors(errors, 'draft/AAAAAA')
+    await assertNoFatalErrors(page, errors, 'draft/AAAAAA')
   })
 
   test(`Bogus league /league/${NIL_UUID} does not crash`, async ({ page }) => {
@@ -323,10 +338,9 @@ test.describe('Smoke: bogus IDs do not crash', () => {
     expect(status).toBeGreaterThanOrEqual(200)
     expect(status).toBeLessThan(500)
 
-    const body = await page.locator('body').textContent()
-    expect(body && body.length).toBeGreaterThan(20)
+    await expect(page.locator('body')).toContainText(/league not found|failed to load league|go home/i, { timeout: 15_000 })
 
-    assertNoFatalErrors(errors, 'league/nil')
+    await assertNoFatalErrors(page, errors, 'league/nil')
   })
 
   test(`Bogus tournament /tournament/${NIL_UUID} does not crash`, async ({
@@ -338,10 +352,9 @@ test.describe('Smoke: bogus IDs do not crash', () => {
     expect(status).toBeGreaterThanOrEqual(200)
     expect(status).toBeLessThan(500)
 
-    const body = await page.locator('body').textContent()
-    expect(body && body.length).toBeGreaterThan(20)
+    await expect(page.locator('body')).toContainText(/tournament unavailable/i, { timeout: 15_000 })
 
-    assertNoFatalErrors(errors, 'tournament/nil')
+    await assertNoFatalErrors(page, errors, 'tournament/nil')
   })
 
   test(`Bogus spectator /spectate/${NIL_UUID} does not crash`, async ({
@@ -353,9 +366,32 @@ test.describe('Smoke: bogus IDs do not crash', () => {
     expect(status).toBeGreaterThanOrEqual(200)
     expect(status).toBeLessThan(500)
 
-    const body = await page.locator('body').textContent()
-    expect(body && body.length).toBeGreaterThan(20)
+    await expect(page.locator('body')).toContainText(/draft room not found|invalid room code format|back to list/i, { timeout: 15_000 })
 
-    assertNoFatalErrors(errors, 'spectate/nil')
+    await assertNoFatalErrors(page, errors, 'spectate/nil')
+  })
+})
+
+test.describe('Smoke: API', () => {
+  test('GET /api/health returns a health document', async ({ request }) => {
+    const res = await request.get('/api/health')
+    // 503 is the route's own "unhealthy" answer; anything else is a crash.
+    expect([200, 503]).toContain(res.status())
+    const body = await res.json()
+    expect(['healthy', 'degraded', 'unhealthy']).toContain(body.status)
+    expect(body.checks).toHaveProperty('database')
+  })
+
+  test('POST /api/guest/session issues an httpOnly guest cookie', async ({ request }) => {
+    const res = await request.post('/api/guest/session')
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(body.userId).toMatch(/^guest-/)
+    const cookie = res
+      .headersArray()
+      .find((h) => h.name.toLowerCase() === 'set-cookie' && h.value.startsWith('guest-session-id='))
+    expect(cookie?.value, 'guest-session-id cookie').toMatch(/^guest-session-id=guest-[^;]+;/)
+    expect(cookie?.value).toMatch(/;\s*HttpOnly/i)
+    expect(cookie?.value).toMatch(/;\s*SameSite=Lax/i)
   })
 })

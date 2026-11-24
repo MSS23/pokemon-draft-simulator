@@ -2,9 +2,10 @@
 
 This runbook walks through the one-time dashboard work needed to wire up
 the staging environment. The repo already contains the scaffolding
-(`supabase/`, `.github/workflows/migrate.yml`, `Makefile`,
-`STAGING_SETUP.md`) — what follows is the manual work you need to do on
-the Supabase, Clerk, Vercel, and GitHub dashboards.
+(`supabase/`, `Makefile`, and the not-yet-configured
+`.github/workflows/migrate.yml`). What follows is the manual work you need
+to do on the Supabase, Clerk, Vercel, and GitHub dashboards. Migrations are
+applied by hand today; see [MIGRATIONS.md](MIGRATIONS.md).
 
 Estimated total time: 45–60 minutes.
 
@@ -37,8 +38,11 @@ Estimated total time: 45–60 minutes.
    make staging
    ```
 
-   Or trigger the `Migrate` GitHub workflow once secrets are configured
-   (step 6 below).
+   `make staging` is `supabase db push`. It does not create
+   `public._migrations`; create that table first (see
+   [MIGRATIONS.md](MIGRATIONS.md#known-divergence-between-prod-and-this-tree)).
+   The `Migrate` GitHub workflow can do this only after the secrets in
+   section 4 exist; it has never run green.
 6. Seed the staging DB with fixture data:
 
    ```bash
@@ -55,15 +59,23 @@ Estimated total time: 45–60 minutes.
 3. From **API Keys**, copy:
    - **Publishable key** (`pk_test_...`) → `STAGING_CLERK_PK`
    - **Secret key** (`sk_test_...`) → `STAGING_CLERK_SK`
-4. Re-create the `supabase` JWT template so Clerk-signed JWTs are
-   accepted by the staging Supabase project:
-   - Open **JWT Templates → New template → Supabase**.
-   - Set **Signing key** to the staging Supabase JWT secret (from
-     Supabase **Project Settings → API → JWT Settings → JWT Secret**).
-   - Set the template name to `supabase` (must match the prod template
-     name — the app code reads `clerk.session.getToken({ template: 'supabase' })`).
-   - Save.
-5. Add authorized parties so Clerk accepts requests from your dev hosts:
+4. Create the `supabase-authenticated` JWT template on this Clerk dev
+   instance. The app requests it by that name
+   (`src/lib/clerk-supabase-template.ts`). Its only claim is
+   `role: authenticated`, and it is signed with Clerk's own key. Do **not**
+   use the deprecated `supabase` template or the Supabase JWT secret.
+
+   ```
+   clerk api /jwt_templates --app <app id> --instance dev -X POST   -d '{"name":"supabase-authenticated","claims":{"role":"authenticated"},"lifetime":60,"allowed_clock_skew":5}'
+   ```
+
+   Copy the instance's **Frontend API URL** (Clerk **API Keys** page) for
+   the next step.
+5. Register this Clerk instance with the staging Supabase project:
+   **Authentication → Sign In / Providers → Third-party auth → Clerk**, paste
+   the Frontend API domain, and save. Details:
+   [CLERK-SUPABASE-SETUP.md](CLERK-SUPABASE-SETUP.md).
+6. Add authorized parties so Clerk accepts requests from your dev hosts:
    - Open **Domains → Authorized parties**.
    - Add `http://localhost:3000`, `https://*.vercel.app`, and (when DNS
      is set up) `https://staging.draftpokemon.com`.
@@ -158,7 +170,7 @@ preview URL per commit:
    any branch you like.
 3. Add the DNS CNAME record (`cname.vercel-dns.com`) at your registrar.
 4. Add `https://staging.draftpokemon.com` to Clerk **Authorized
-   parties** (§2.5).
+   parties** (§2.6).
 
 ---
 
@@ -198,6 +210,8 @@ After all of the above:
       approval.
 - [ ] Open the latest Vercel preview, sign in → no CSP/JWT errors and
       Clerk session works.
+- [ ] Signed in on the preview, `GET /api/health/bridge` returns
+      `{"bridge":"up"}`.
 - [ ] `make schema-diff` from a clean checkout → reports `clean`.
 
 ---
@@ -210,5 +224,7 @@ After all of the above:
 - The `production` GitHub Environment also gates anything else you
   later add with `environment: production` in `.github/workflows/`.
 - The `Schema Drift Check` workflow (`.github/workflows/schema-drift.yml`)
-  runs daily at 11:00 UTC and opens a GitHub issue if PROD diverges
-  from `main`. Re-run it manually after applying any out-of-band SQL.
+  is scheduled daily at 11:00 UTC but cannot succeed until the
+  `PROD_*` secrets in section 4 exist; it has never run green. Until then,
+  run `make schema-diff` by hand after applying SQL. See
+  [MIGRATIONS.md](MIGRATIONS.md).

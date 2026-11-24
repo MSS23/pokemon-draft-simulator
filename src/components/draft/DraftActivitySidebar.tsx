@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, memo } from 'react'
+import { useState, useMemo, memo, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { X, History } from 'lucide-react'
@@ -103,6 +103,19 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
     return groups
   }, [filteredActivities])
 
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  // Move focus into the drawer and let Escape close it while open.
+  useEffect(() => {
+    if (!isOpen) return
+    closeButtonRef.current?.focus()
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, onClose])
+
   return (
     <>
       {/* Backdrop */}
@@ -115,6 +128,12 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
 
       {/* Sidebar */}
       <div
+        role="dialog"
+        aria-modal={isOpen}
+        aria-labelledby="draft-activity-title"
+        // React 18 has no typed `inert`; '' sets the attribute, omitting it clears it.
+        // Keeps the off-screen drawer out of the tab order while closed.
+        {...(isOpen ? {} : { inert: '' as unknown as boolean })}
         className={cn(
           'fixed top-0 right-0 h-full w-full sm:w-[380px] bg-background border-l shadow-2xl z-50 transition-transform duration-300 ease-in-out',
           isOpen ? 'translate-x-0' : 'translate-x-full'
@@ -125,15 +144,15 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
           <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <div className="flex items-center gap-2.5">
               <History className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold tracking-tight">Draft Activity</h2>
+              <h2 id="draft-activity-title" className="text-sm font-semibold tracking-tight">Draft Activity</h2>
               {activities.length > 0 && (
                 <span className="text-xs text-muted-foreground tabular-nums">
                   {activities.length} picks
                 </span>
               )}
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-10 w-10">
-              <X className="h-5 w-5" />
+            <Button ref={closeButtonRef} variant="ghost" size="icon" onClick={onClose} className="h-10 w-10" aria-label="Close activity">
+              <X className="h-5 w-5" aria-hidden="true" />
             </Button>
           </div>
 
@@ -163,7 +182,7 @@ const DraftActivitySidebar = memo(function DraftActivitySidebar({
               {filteredActivities.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
                   <p className="text-sm text-muted-foreground">No picks yet</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Picks will appear here as they happen</p>
+                  <p className="text-xs text-muted-foreground mt-1">Picks will appear here as they happen</p>
                 </div>
               ) : (
                 <div className="space-y-3">

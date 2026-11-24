@@ -20,7 +20,7 @@ export default function GlobalError({
         <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'system-ui' }}>
           <h2>Something went wrong</h2>
           <p style={{ color: '#666', marginBottom: '1rem' }}>
-            An unexpected error occurred. The team has been notified.
+            An unexpected error occurred. Please try again.
           </p>
           <button
             onClick={() => reset()}

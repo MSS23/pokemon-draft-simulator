@@ -398,6 +398,8 @@ export default function PokemonGrid({
                   variant="outline"
                   size="lg"
                   onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                  aria-label={activeFilterCount > 0 ? `Filters, ${activeFilterCount} active` : 'Filters'}
+                  aria-expanded={showFiltersPanel}
                   className="h-12 px-3 sm:px-4"
                 >
                   <Filter className="h-4 w-4 sm:mr-2" />

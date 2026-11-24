@@ -155,8 +155,11 @@ export default function SettingsPage() {
         twitch_channel: profile.twitch_channel,
         nationality: profile.nationality || null,
         updated_at: new Date().toISOString(),
-      })
-      if (dbError) throw dbError
+      }, { onConflict: 'user_id' }) // PK is id; without this the upsert INSERTs and hits user_profiles_user_id_key
+      if (dbError) {
+        if (dbError.code === '23505') { toast.error('That username is already taken'); return }
+        throw dbError
+      }
 
       toast.success('Profile saved!')
     } catch (err) {
@@ -170,11 +173,16 @@ export default function SettingsPage() {
   async function handleSavePrefs() {
     if (!supabase || !profile) return
     setSavingPrefs(true)
-    await supabase
+    const { error } = await supabase
       .from('user_profiles')
       .update({ preferences: { notifications, privacy }, updated_at: new Date().toISOString() })
       .eq('user_id', profile.user_id)
     setSavingPrefs(false)
+    if (error) {
+      createLogger('SettingsPage').error('Save preferences error:', error)
+      toast.error('Failed to save preferences')
+      return
+    }
     toast.success('Preferences saved')
   }
 

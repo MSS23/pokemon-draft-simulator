@@ -111,6 +111,8 @@ const PokemonCard = ({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Keys bubbling from the nested action buttons must keep their native activation.
+    if (e.target !== e.currentTarget) return
     if (isDisabled || isDrafted) return
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
@@ -197,7 +199,7 @@ const PokemonCard = ({
               "touch-manipulation active:scale-90",
               isInWishlist
                 ? "bg-gradient-to-r from-pink-500 to-red-500 text-white hover:from-pink-600 hover:to-red-600"
-                : "bg-white/80 text-gray-500 hover:bg-white hover:text-pink-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                : "bg-white/80 text-gray-500 hover:bg-white hover:text-pink-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100"
             )}
             title={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
           >
@@ -224,7 +226,7 @@ const PokemonCard = ({
               "touch-manipulation active:scale-90",
               isPreDrafted
                 ? "bg-gradient-to-r from-purple-500 to-violet-500 text-white hover:from-purple-600 hover:to-violet-600"
-                : "bg-white/80 text-gray-500 hover:bg-white hover:text-purple-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+                : "bg-white/80 text-gray-500 hover:bg-white hover:text-purple-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100"
             )}
             title={isPreDrafted ? "Clear pre-draft" : "Pre-draft this Pokémon"}
           >
@@ -352,7 +354,7 @@ const PokemonCard = ({
               "shadow-md border border-white/20",
               "touch-manipulation active:scale-90",
               "bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700",
-              "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+              "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100"
             )}
             title={`Draft ${pokemon.name}`}
           >

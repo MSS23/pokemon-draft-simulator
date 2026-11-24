@@ -1,5 +1,6 @@
 'use client'
 
+import * as Sentry from '@sentry/nextjs'
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ export default function LeagueError({
 }) {
   useEffect(() => {
     log.error('League error:', error)
+    Sentry.captureException(error)
   }, [error])
 
   return (

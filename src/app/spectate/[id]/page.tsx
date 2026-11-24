@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Eye, RefreshCw, Monitor } from "lucide-react";
-import { usePokemonList } from "@/hooks/usePokemon";
 import { useDraftStateWithRealtime } from "@/hooks/useDraftRealtime";
 import { DraftConnectionStatusBadge } from "@/components/draft/ConnectionStatus";
 import SpectatorDraftGrid from "@/components/spectator/SpectatorDraftGrid";
@@ -36,8 +35,6 @@ export default function SpectateRoomPage() {
       timestamp: string;
     }>
   >([]);
-
-  usePokemonList();
 
   // Generate a spectator user ID for presence tracking
   const spectatorId = useMemo(() => {
@@ -93,7 +90,7 @@ export default function SpectateRoomPage() {
     ? "Invalid room code format. Room codes should be 6 characters (e.g., CC7A5I)"
     : loadError?.message || (!draftState && !isLoading ? "Draft room not found" : null));
 
-  if (isLoading) {
+  if (isLoading && validatedRoomCode) {
     return (
       <SidebarLayout>
         <div className="min-h-screen bg-background flex items-center justify-center">

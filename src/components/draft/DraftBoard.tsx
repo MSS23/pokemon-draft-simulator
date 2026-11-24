@@ -205,7 +205,7 @@ export function DraftBoard({
                                 'font-mono text-[10px]',
                                 cell.isCurrent
                                   ? 'text-primary font-bold animate-pulse'
-                                  : 'text-muted-foreground/60'
+                                  : 'text-muted-foreground'
                               )}
                             >
                               {cell.isCurrent ? 'NOW' : `#${cell.pickNumber}`}

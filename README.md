@@ -49,9 +49,11 @@ Required env: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
 `CLERK_SECRET_KEY`, `CRON_SECRET` (cron route), `NEXT_PUBLIC_SITE_URL`.
 Everything else in `.env.example` is optional.
 
-**Database.** The only schema source of truth is `supabase/migrations/`
-(applied by `.github/workflows/migrate.yml`: staging automatically, production
-behind manual approval). A fresh project can be built by running that folder
+**Database.** The only schema source of truth is `supabase/migrations/`.
+Migrations are applied by hand (Supabase MCP `apply_migration` or the SQL
+editor), staging first; the `migrate.yml` and `schema-drift.yml` workflows are
+manual-only (`workflow_dispatch`) and stay off until their secrets and a
+reviewer-gated `production` environment exist. Runbook: [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md). A fresh project can be built by running that folder
 in order — `00000000000000_bootstrap.sql` refuses to run on an existing
 database. Never run anything in `migrations/_archive/`. Clerk ↔ Supabase auth
 setup: [`docs/CLERK-SUPABASE-SETUP.md`](docs/CLERK-SUPABASE-SETUP.md);
@@ -82,8 +84,9 @@ tests/              Vitest suites     e2e/  Playwright
 docs/               setup guides, change logs, archived audits, reviews
 ```
 
-More detail for contributors and agents: [`CLAUDE.md`](CLAUDE.md). Latest
-review and open suggestions: [`docs/REVIEW-2026-10-10.md`](docs/REVIEW-2026-10-10.md).
+More detail for contributors and agents: [`CLAUDE.md`](CLAUDE.md). Review of
+2026-10-10 with the status of each suggestion:
+[`docs/REVIEW-2026-10-10.md`](docs/REVIEW-2026-10-10.md).
 
 ## License
 
