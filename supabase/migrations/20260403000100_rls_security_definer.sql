@@ -81,7 +81,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.teams
     WHERE id = p_team_id
-      AND user_id = public.requesting_user_id()
+      AND owner_id = public.requesting_user_id()
   )
 $$;
 

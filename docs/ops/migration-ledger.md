@@ -24,7 +24,7 @@ from older definitions.
 ## Steps
 
 1. Fix the duplicate version first (bucket B, migration files):
-   `20260403_rls_indexes.sql` and `20260403_rls_security_definer.sql` share
+   `20260403000000_rls_indexes.sql` and `20260403000100_rls_security_definer.sql` share
    version `20260403`. Rename them to unique 14-digit versions. Do the ledger
    repair after the rename, because the rename changes the version keys.
 2. Compare the two sides:

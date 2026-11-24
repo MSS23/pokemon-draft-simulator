@@ -44,6 +44,20 @@ END $bootstrap_guard$;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Migration ledger (live shape). Files from 20260510151248 on INSERT into it.
+CREATE TABLE IF NOT EXISTS _migrations (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  applied_by TEXT DEFAULT CURRENT_USER,
+  checksum TEXT,
+  rollback_sql TEXT,
+  execution_time_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_migrations_applied_at ON _migrations(applied_at);
+CREATE INDEX IF NOT EXISTS idx_migrations_name ON _migrations(name);
+
 -- ============================================
 -- CORE DRAFT TABLES
 -- ============================================
@@ -60,17 +74,29 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 );
 
 -- Custom formats (user-created Pokemon pricing templates)
+-- Live column shape. creator_id/costs are legacy columns that early migrations
+-- still reference; 20261124150900_live_schema_capture backfills and drops them.
 CREATE TABLE IF NOT EXISTS custom_formats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  creator_id TEXT NOT NULL,
+  creator_id TEXT,
   name TEXT NOT NULL,
   description TEXT,
-  costs JSONB NOT NULL,
+  costs JSONB,
   ban_list TEXT[] DEFAULT '{}',
   is_public BOOLEAN DEFAULT FALSE,
   usage_count INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  pokemon_pricing JSONB NOT NULL DEFAULT '{}'::jsonb,
+  total_pokemon INTEGER DEFAULT 0,
+  min_cost INTEGER DEFAULT 0,
+  max_cost INTEGER DEFAULT 0,
+  avg_cost NUMERIC DEFAULT 0,
+  created_by_user_id TEXT,
+  created_by_display_name TEXT NOT NULL DEFAULT 'Unknown',
+  times_used INTEGER DEFAULT 0,
+  last_used_at TIMESTAMPTZ,
+  deleted_at TIMESTAMPTZ
 );
 
 -- Drafts (main draft sessions)
@@ -173,6 +199,16 @@ CREATE TABLE IF NOT EXISTS bid_history (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   auction_id UUID REFERENCES auctions(id) ON DELETE CASCADE,
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,
+  bidder_name TEXT NOT NULL
+);
+
+-- Legacy bids table (still present on live; later migrations alter its RLS)
+CREATE TABLE IF NOT EXISTS bids (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  auction_id UUID,
+  team_id UUID,
   amount INTEGER NOT NULL,
   bidder_name TEXT NOT NULL
 );
@@ -398,7 +434,7 @@ CREATE TABLE IF NOT EXISTS trades (
   team_a_gives TEXT[] NOT NULL DEFAULT '{}',
   team_b_gives TEXT[] NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed', 'accepted', 'rejected', 'completed', 'cancelled')),
-  proposed_by UUID NOT NULL,
+  proposed_by TEXT NOT NULL,
   proposed_at TIMESTAMPTZ DEFAULT NOW(),
   responded_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
@@ -434,12 +470,11 @@ SELECT
   t.created_at, t.updated_at,
   COALESCE(ta.name, 'Unknown') AS team_a_name,
   COALESCE(tb.name, 'Unknown') AS team_b_name,
-  COALESCE(tp.name, 'Unknown') AS proposed_by_name,
+  COALESCE(t.proposed_by, 'Unknown') AS proposed_by_name,
   COALESCE(l.name, 'Unknown') AS league_name
 FROM trades t
 LEFT JOIN teams ta ON ta.id = t.team_a_id
 LEFT JOIN teams tb ON tb.id = t.team_b_id
-LEFT JOIN teams tp ON tp.id = t.proposed_by
 LEFT JOIN leagues l ON l.id = t.league_id;
 
 -- ============================================
@@ -448,7 +483,7 @@ LEFT JOIN leagues l ON l.id = t.league_id;
 
 CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
 
-CREATE INDEX IF NOT EXISTS idx_custom_formats_creator_id ON custom_formats(creator_id);
+CREATE INDEX IF NOT EXISTS idx_custom_formats_created_by ON custom_formats(created_by_user_id);
 CREATE INDEX IF NOT EXISTS idx_custom_formats_public ON custom_formats(is_public) WHERE is_public = TRUE;
 
 CREATE INDEX IF NOT EXISTS idx_drafts_room_code ON drafts(room_code);
@@ -527,12 +562,11 @@ CREATE INDEX IF NOT EXISTS idx_match_pokemon_kos_match ON match_pokemon_kos(matc
 CREATE INDEX IF NOT EXISTS idx_match_pokemon_kos_team ON match_pokemon_kos(team_id);
 
 CREATE INDEX IF NOT EXISTS idx_trades_league_id ON trades(league_id);
-CREATE INDEX IF NOT EXISTS idx_trades_offering_team ON trades(offering_team_id);
-CREATE INDEX IF NOT EXISTS idx_trades_receiving_team ON trades(receiving_team_id);
+CREATE INDEX IF NOT EXISTS idx_trades_team_a ON trades(team_a_id);
+CREATE INDEX IF NOT EXISTS idx_trades_team_b ON trades(team_b_id);
 CREATE INDEX IF NOT EXISTS idx_trades_status ON trades(status);
 
 CREATE INDEX IF NOT EXISTS idx_trade_approvals_trade_id ON trade_approvals(trade_id);
-CREATE INDEX IF NOT EXISTS idx_trade_approvals_team_id ON trade_approvals(team_id);
 
 -- ============================================
 -- FUNCTIONS
