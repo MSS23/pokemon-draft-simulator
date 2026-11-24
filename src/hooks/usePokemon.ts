@@ -6,7 +6,9 @@ import {
   fetchPokemonByType,
   fetchPokemonForFormat,
   fetchPokemonForCustomFormat,
-  pokemonQueries
+  pokemonFromIndex,
+  pokemonQueries,
+  type PokemonIndexEntry,
 } from '@/lib/pokemon-api'
 import { Pokemon } from '@/types'
 import { createLogger } from '@/lib/logger'
@@ -177,4 +179,31 @@ export const usePokemonCache = () => {
     getCachedPokemon,
     getCachedPokemonList,
   }
+}
+// Rosters must resolve every drafted id (any dex number, any format), so this
+// reads the static National Dex index once with no legality filter instead of
+// the 400-request fetchPokemonList loop.
+async function fetchPokemonIndexById(): Promise<Map<string, Pokemon>> {
+  const manifestRes = await fetch('/data/format-manifest.json')
+  if (!manifestRes.ok) throw new Error('Pokemon catalogue manifest unavailable')
+  const { pokemonIndexHash } = await manifestRes.json() as { pokemonIndexHash: string }
+  const indexRes = await fetch(`/data/pokemon_index_${pokemonIndexHash}.json`)
+  if (!indexRes.ok) throw new Error('Pokemon catalogue unavailable')
+  const index = await indexRes.json() as Record<string, PokemonIndexEntry>
+
+  const byId = new Map<string, Pokemon>()
+  for (const entry of Object.values(index)) {
+    const pokemon = pokemonFromIndex(entry, 0)
+    byId.set(pokemon.id, pokemon)
+  }
+  return byId
+}
+
+export function usePokemonIndexById() {
+  return useQuery({
+    queryKey: ['pokemon', 'index-by-id'],
+    queryFn: fetchPokemonIndexById,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
 }

@@ -128,6 +128,7 @@ import {
   deleteDraftResults as _deleteDraftResults,
   getPublicDrafts as _getPublicDrafts,
 } from './draft-history-service'
+import { syncServerClockOffset } from '@/lib/server-clock'
 
 // ─── Logger ────────────────────────────────────────────────────────────────
 const log = createLogger('DraftService')
@@ -259,86 +260,6 @@ export class DraftService {
   }
 
   /**
-   * Verify draft password via server-side API route.
-   * The hash never leaves the server in production (browser context).
-   * Falls back to direct comparison in SSR/test contexts where fetch
-   * to localhost is unavailable.
-   */
-  static async verifyDraftPassword({ roomCode, password }: { roomCode: string; password: string }): Promise<boolean> {
-    // In browser context, use the API route so the hash stays server-side
-    if (typeof window !== 'undefined') {
-      try {
-        const res = await fetch('/api/draft/verify-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roomCode, password }),
-        })
-
-        if (res.ok) {
-          const data = await res.json()
-          return data.valid === true
-        }
-
-        // 4xx — application error (Draft not found, malformed body, etc.).
-        // Re-throw so callers can surface a useful message.
-        if (res.status >= 400 && res.status < 500) {
-          const data = await res.json().catch(() => ({}))
-          throw new Error(data.error || 'Failed to verify password')
-        }
-
-        // 5xx — API route is broken or unavailable. Fall through to direct
-        // comparison so the host can still join their own draft.
-        log.warn(`Password API returned ${res.status}; falling back to direct comparison`)
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : ''
-        const isAppError = errMsg.includes('Failed to verify password') ||
-          errMsg.includes('Draft not found')
-        if (isAppError) {
-          throw err
-        }
-        const errName = err instanceof Error ? err.name : ''
-        log.warn(`API route unreachable (${errName}), falling back to direct comparison`)
-      }
-    }
-
-    // SSR / test fallback. The bcrypt hash lives in public.draft_passwords
-    // (service-role-only, RLS-locked — see migration 028). The anon-key
-    // client used here cannot read that table, so this fallback only works
-    // when the route handler is unreachable but the caller has direct DB
-    // access (effectively: tests with mocked supabase). In production
-    // browser context the API route above is always used.
-    if (!supabase) {
-      throw new Error('Supabase is not configured')
-    }
-
-    const { data: draft, error } = await supabase
-      .from('drafts')
-      .select('id, has_password')
-      .eq('room_code', roomCode.toLowerCase())
-      .single()
-
-    if (error || !draft) {
-      throw new Error('Draft not found')
-    }
-
-    if (!draft.has_password) {
-      return true
-    }
-
-    const { data: pwRow, error: pwErr } = await supabase
-      .from('draft_passwords')
-      .select('password')
-      .eq('draft_id', draft.id)
-      .single()
-
-    if (pwErr || !pwRow) {
-      return false
-    }
-
-    return await bcrypt.compare(password, pwRow.password)
-  }
-
-  /**
    * Helper to query drafts by room code (which is used as the logical draft ID)
    */
   private static getDraftQuery(roomCode: string) {
@@ -350,30 +271,11 @@ export class DraftService {
    * This prevents client-side timer drift
    */
   static async getServerTime(_roomCodeOrDraftId?: string): Promise<ServerTime> {
-    try {
-      // drafts.updated_at is mutation time, not current server time. Sync with
-      // a dedicated no-store endpoint so device-clock drift cannot distort the
-      // visible countdown.
-      const response = await fetch('/api/time', { cache: 'no-store' })
-      if (!response.ok) throw new Error(`Clock sync failed (${response.status})`)
-      const payload = await response.json() as { serverTime?: number }
-      if (!Number.isFinite(payload.serverTime)) throw new Error('Clock sync returned invalid time')
-
-      return {
-        serverTime: payload.serverTime as number,
-        pickEndsAt: null,
-        auctionEndsAt: null,
-        turnStartedAt: null
-      }
-    } catch (error) {
-      log.error('Error fetching server time:', error)
-      return {
-        serverTime: Date.now(),
-        pickEndsAt: null,
-        auctionEndsAt: null,
-        turnStartedAt: null
-      }
-    }
+    // drafts.updated_at is mutation time, not current server time. The offset
+    // comes from the shared server-clock cache, which calls the no-store
+    // /api/time endpoint at most once per 5 minutes for the whole page.
+    const offsetMs = await syncServerClockOffset()
+    return { serverTime: Date.now() + offsetMs, pickEndsAt: null, auctionEndsAt: null, turnStartedAt: null }
   }
 
   static async createDraft({ name, hostId, hostName, teamName, settings, isPublic, description, tags, password, customFormat }: CreateDraftParams): Promise<{ roomCode: string; draftId: string }> {

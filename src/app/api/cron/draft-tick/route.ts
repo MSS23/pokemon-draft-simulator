@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
       .from('drafts')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'active')
+      // Soft-deleted drafts keep status='active'; never auto-pick for them.
+      .is('deleted_at', null)
 
     if (countError) {
       log.error('Failed to count active drafts', { error: countError.message })
@@ -54,6 +56,7 @@ export async function GET(request: NextRequest) {
       .from('drafts')
       .select('id')
       .eq('status', 'active')
+      .is('deleted_at', null)
       .order('id', { ascending: true })
       .range(rangeStart, rangeStart + MAX_DRAFTS_PER_RUN - 1)
 

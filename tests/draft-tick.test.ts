@@ -12,8 +12,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
  * database and are out of scope for this unit suite.
  */
 
+const mockLog = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }))
 vi.mock('@/lib/logger', () => ({
-  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+  createLogger: () => mockLog,
 }))
 
 // The mock service-role client is configured per-test via `dbConfig`.
@@ -22,12 +23,13 @@ vi.mock('@/lib/supabase-server', () => ({
   createServiceRoleClient: () => makeMockDb(dbConfig),
 }))
 
-import { processDraftTick } from '@/lib/draft-tick'
+import { processDraftTick, logTickError } from '@/lib/draft-tick'
 
 interface MockResult { data?: unknown; count?: number; error?: { message: string } | null }
 interface MockDbConfig {
   tables: Record<string, MockResult[]>
   rpc: Record<string, MockResult>
+  rpcCalls?: string[]
 }
 
 /**
@@ -58,6 +60,7 @@ function makeMockDb(config: MockDbConfig) {
       return builder
     },
     rpc(name: string) {
+      config.rpcCalls?.push(name)
       const r = config.rpc[name] ?? { data: null }
       return Promise.resolve(r)
     },
@@ -77,7 +80,7 @@ const activeSnake = (overrides: Record<string, unknown> = {}) => ({
 
 describe('processDraftTick', () => {
   beforeEach(() => {
-    dbConfig = { tables: {}, rpc: {} }
+    dbConfig = { tables: {}, rpc: {}, rpcCalls: [] }
   })
 
   it('does nothing when the draft is not active', async () => {
@@ -203,5 +206,66 @@ describe('processDraftTick', () => {
 
     const res = await processDraftTick('draft-1')
     expect(res.action).toBe('skipped')
+  })
+
+  it('does nothing for a soft-deleted draft that still has status active', async () => {
+    dbConfig.tables.drafts = [{ data: activeSnake({ deleted_at: new Date().toISOString() }) }]
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('not_active')
+    expect(dbConfig.rpcCalls).toEqual([])
+  })
+
+  const expiredWithWishlist = () => {
+    dbConfig.tables.drafts = [{ data: activeSnake() }] // 100s elapsed, 60s limit: inside grace
+    dbConfig.tables.teams = [{ count: 4 }, { data: { budget_remaining: 100 } }]
+    dbConfig.tables.participants = [{ data: [{ id: 'part-1' }] }]
+    dbConfig.tables.wishlist_items = [{ data: [
+      { pokemon_id: '25', pokemon_name: 'Pikachu', cost: 10, priority: 1 },
+    ] }]
+    dbConfig.tables.picks = [{ data: [] }]
+    dbConfig.rpc.get_current_team_id = { data: 'team-1' }
+    dbConfig.rpc.system_advance_turn = { data: { success: true, skipped: true, newTurn: 4 } }
+  }
+
+  it('does not skip the turn when system_make_pick errors transiently', async () => {
+    expiredWithWishlist()
+    dbConfig.rpc.system_make_pick = { error: { message: 'timeout' } }
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('none')
+    expect(dbConfig.rpcCalls).not.toContain('system_advance_turn')
+  })
+
+  it('does not skip the turn when the wishlist query errors', async () => {
+    expiredWithWishlist()
+    dbConfig.tables.wishlist_items = [{ data: null, error: { message: 'pool exhausted' } }]
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('none')
+    expect(dbConfig.rpcCalls).not.toContain('system_advance_turn')
+  })
+
+  it('does not skip the turn when the budget lookup errors', async () => {
+    expiredWithWishlist()
+    dbConfig.tables.teams = [{ count: 4 }, { data: null, error: { message: '503' } }]
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('none')
+    expect(dbConfig.rpcCalls).not.toContain('system_advance_turn')
+  })
+
+  it('skips anyway once an auto-pick error persists past the grace window', async () => {
+    expiredWithWishlist()
+    dbConfig.tables.drafts = [{ data: activeSnake({ turn_started_at: new Date(Date.now() - 200_000).toISOString() }) }]
+    dbConfig.rpc.system_make_pick = { error: { message: 'function does not exist' } }
+    const res = await processDraftTick('draft-1')
+    expect(res.action).toBe('skipped')
+  })
+
+  it('logs a repeated identical tick error at warn, a new one at error', () => {
+    mockLog.error.mockClear()
+    mockLog.warn.mockClear()
+    logTickError('system_advance_turn', 'draft-log', 'boom')
+    logTickError('system_advance_turn', 'draft-log', 'boom')
+    logTickError('system_advance_turn', 'draft-log', 'other')
+    expect(mockLog.error).toHaveBeenCalledTimes(2)
+    expect(mockLog.warn).toHaveBeenCalledTimes(1)
   })
 })

@@ -22,6 +22,25 @@ import { createLogger } from '@/lib/logger'
 
 const log = createLogger('draftTick')
 
+// Cron retries a broken draft every minute. Log a new error at error level,
+// and the same error again for the same draft and step at warn level only.
+// shortcut: per-instance memory, so each cold start logs once at error; move
+// to a durable drafts.tick_error_until backoff if logs still flood.
+const lastTickError = new Map<string, string>()
+const MAX_TRACKED_TICK_ERRORS = 1000
+
+/** @internal exported for tests */
+export function logTickError(step: string, draftId: string, message: string, extra: Record<string, unknown> = {}): void {
+  const key = `${draftId}:${step}`
+  if (lastTickError.get(key) === message) {
+    log.warn(`${step} failed (repeat)`, { draftId, error: message, ...extra })
+    return
+  }
+  if (lastTickError.size >= MAX_TRACKED_TICK_ERRORS) lastTickError.clear()
+  lastTickError.set(key, message)
+  log.error(`${step} failed`, { draftId, error: message, ...extra })
+}
+
 export interface TickResult {
   draftId: string
   action: 'none' | 'auction_resolved' | 'auto_picked' | 'skipped' | 'nomination_skipped' | 'not_expired' | 'not_active'
@@ -37,14 +56,15 @@ export async function processDraftTick(draftId: string): Promise<TickResult> {
 
   const { data: draft, error: draftError } = await db
     .from('drafts')
-    .select('id, status, format, current_turn, current_round, turn_started_at, settings')
+    .select('id, status, format, current_turn, current_round, turn_started_at, settings, deleted_at')
     .eq('id', draftId)
     .single()
 
   if (draftError || !draft) {
     return { draftId, action: 'not_active', detail: 'Draft not found' }
   }
-  if (draft.status !== 'active') {
+  // Soft-deleted drafts can still carry status='active'; never progress them.
+  if (draft.status !== 'active' || draft.deleted_at) {
     return { draftId, action: 'not_active' }
   }
 
@@ -77,7 +97,7 @@ export async function processDraftTick(draftId: string): Promise<TickResult> {
         p_expected_turn: draft.current_turn,
       })
       if (skipError) {
-        log.error('system_skip_nomination failed', { draftId, error: skipError.message })
+        logTickError('system_skip_nomination', draftId, skipError.message)
         return { draftId, action: 'none', detail: skipError.message }
       }
       const skipped = skipResult as { skipped?: boolean; reason?: string } | null
@@ -92,7 +112,7 @@ export async function processDraftTick(draftId: string): Promise<TickResult> {
       p_auction_id: auction.id,
     })
     if (error) {
-      log.error('resolve_auction failed', { draftId, error: error.message })
+      logTickError('resolve_auction', draftId, error.message)
       return { draftId, action: 'none', detail: error.message }
     }
     const resolved = (result as { resolved?: boolean; reason?: string } | null)
@@ -142,8 +162,14 @@ export async function processDraftTick(draftId: string): Promise<TickResult> {
 
   // Try to auto-pick the highest-priority affordable, un-drafted wishlist mon.
   const autoPick = await tryWishlistAutoPick(db, draft.id, currentTeamId as string, expectedTurn)
-  if (autoPick) {
-    return { draftId, action: 'auto_picked', detail: autoPick }
+  if (autoPick.kind === 'picked') {
+    return { draftId, action: 'auto_picked', detail: autoPick.name }
+  }
+  // A transient query/RPC failure must not cost the team its pick: leave the
+  // turn for the next tick to retry. After the grace window, skip anyway so a
+  // deterministic error cannot stall the draft forever.
+  if (autoPick.kind === 'error' && elapsedSec < timeLimit + AUTO_PICK_ERROR_GRACE_SEC) {
+    return { draftId, action: 'none', detail: autoPick.message }
   }
 
   // Nothing to auto-pick — skip the turn.
@@ -152,7 +178,7 @@ export async function processDraftTick(draftId: string): Promise<TickResult> {
     p_expected_turn: expectedTurn,
   })
   if (skipErr) {
-    log.error('system_advance_turn failed', { draftId, error: skipErr.message })
+    logTickError('system_advance_turn', draftId, skipErr.message)
     return { draftId, action: 'none', detail: skipErr.message }
   }
   return { draftId, action: 'skipped' }
@@ -160,29 +186,38 @@ export async function processDraftTick(draftId: string): Promise<TickResult> {
 
 type ServiceDb = ReturnType<typeof createServiceRoleClient>
 
+const AUTO_PICK_ERROR_GRACE_SEC = 60
+
+type AutoPickResult =
+  | { kind: 'picked'; name: string }
+  | { kind: 'empty' }
+  | { kind: 'error'; message: string }
+
 /**
  * Attempt the first affordable, legal-by-availability, un-drafted wishlist item
- * for the given team via the trusted system_make_pick RPC. Returns the picked
- * Pokemon name on success, or null if nothing could be picked.
+ * for the given team via the trusted system_make_pick RPC. Distinguishes
+ * "nothing pickable" (empty) from a failed query/RPC (error), so a transient
+ * failure is retried instead of skipping the turn.
  */
 async function tryWishlistAutoPick(
   db: ServiceDb,
   draftId: string,
   teamId: string,
   expectedTurn: number
-): Promise<string | null> {
+): Promise<AutoPickResult> {
   // A team can have more than one participant (co-owners); use every
   // participant's wishlist rather than .maybeSingle(), which errors on 2+ rows.
-  const { data: participants } = await db
+  const { data: participants, error: partErr } = await db
     .from('participants')
     .select('id')
     .eq('draft_id', draftId)
     .eq('team_id', teamId)
+  if (partErr) return { kind: 'error', message: partErr.message }
 
   const participantIds = (participants ?? []).map((p) => p.id)
-  if (participantIds.length === 0) return null
+  if (participantIds.length === 0) return { kind: 'empty' }
 
-  const { data: wishlist } = await db
+  const { data: wishlist, error: wishErr } = await db
     .from('wishlist_items')
     .select('pokemon_id, pokemon_name, cost, priority')
     .eq('draft_id', draftId)
@@ -190,19 +225,22 @@ async function tryWishlistAutoPick(
     .eq('is_available', true)
     .order('priority', { ascending: true })
 
-  if (!wishlist || wishlist.length === 0) return null
+  if (wishErr) return { kind: 'error', message: wishErr.message }
+  if (!wishlist || wishlist.length === 0) return { kind: 'empty' }
 
-  const { data: team } = await db
+  const { data: team, error: teamErr } = await db
     .from('teams')
     .select('budget_remaining')
     .eq('id', teamId)
     .single()
-  const budget = team?.budget_remaining ?? 0
+  if (teamErr || !team) return { kind: 'error', message: teamErr?.message ?? 'Team not found' }
+  const budget = team.budget_remaining ?? 0
 
-  const { data: existingPicks } = await db
+  const { data: existingPicks, error: picksErr } = await db
     .from('picks')
     .select('pokemon_id')
     .eq('draft_id', draftId)
+  if (picksErr) return { kind: 'error', message: picksErr.message }
   const drafted = new Set((existingPicks ?? []).map((p) => p.pokemon_id))
 
   for (const item of wishlist) {
@@ -218,16 +256,16 @@ async function tryWishlistAutoPick(
       p_expected_turn: expectedTurn,
     })
     if (error) {
-      log.error('system_make_pick failed', { draftId, teamId, error: error.message })
-      return null
+      logTickError('system_make_pick', draftId, error.message, { teamId })
+      return { kind: 'error', message: error.message }
     }
     const pickResult = result as { success?: boolean; error?: string } | null
     if (pickResult?.success) {
-      return item.pokemon_name
+      return { kind: 'picked', name: item.pokemon_name }
     }
     // A full tier or stale wishlist row should not block lower-priority legal
     // choices. Stop only when another tick already moved this turn.
-    if (pickResult?.error?.toLowerCase().includes('turn')) return null
+    if (pickResult?.error?.toLowerCase().includes('turn')) return { kind: 'empty' }
   }
-  return null
+  return { kind: 'empty' }
 }

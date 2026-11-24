@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
     // Older draft rooms use lowercase codes while tournament rooms use
     // uppercase. Room codes are user-facing and intentionally case-insensitive.
     .ilike('room_code', roomCode)
+    .is('deleted_at', null)
     .maybeSingle()
 
   if (draftError || !draft) {
@@ -182,6 +183,15 @@ export async function POST(request: NextRequest) {
     const message = data?.error || 'Could not join this draft.'
     const status = message.includes('already taken') ? 409 : message.includes('not found') ? 404 : 400
     return NextResponse.json({ error: message }, { status })
+  }
+
+  // The lobby can close between the status check above and the RPC, which then
+  // seats the late joiner as a spectator. Tell them why instead of silently spectating.
+  if (isTournament && !asSpectator && data.asSpectator === true) {
+    const { data: league } = await db.from('leagues').select('status').eq('id', leagueId ?? '').maybeSingle()
+    if (league && league.status !== 'scheduled') {
+      return NextResponse.json({ error: 'This tournament has already started.' }, { status: 409 })
+    }
   }
 
   return NextResponse.json({

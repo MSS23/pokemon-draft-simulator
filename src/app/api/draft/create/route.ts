@@ -13,45 +13,19 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
-import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
 import { generateRoomCode } from '@/lib/room-utils'
 import { DEFAULT_FORMAT } from '@/lib/formats'
 import { getServerFormatPool, type ServerFormatPool } from '@/lib/server-format-pool'
-import { validateName } from '@/lib/profanity'
+import { containsProfanity, validateName } from '@/lib/profanity'
 import { createLogger } from '@/lib/logger'
 import { getPokemonTier, validateTierConfig } from '@/lib/tier-utils'
+import { createDraftRequestSchema, validateRequestBody } from '@/lib/schemas'
+import { createServiceRoleClient } from '@/lib/supabase-server'
+import type { Database } from '@/lib/supabase'
 import type { TierDefinition } from '@/types'
 
 const log = createLogger('api/draft/create')
-
-interface CreateDraftBody {
-  name?: string
-  hostName: string
-  teamName: string
-  settings: {
-    maxTeams: number
-    draftType: 'tiered' | 'points' | 'auction'
-    timeLimit: number
-    pokemonPerTeam: number
-    budgetPerTeam?: number
-    formatId?: string
-    scoringSystem?: 'budget' | 'tiered'
-    tierConfig?: { tiers: TierDefinition[] }
-    createLeague?: boolean
-    splitIntoConferences?: boolean
-    leagueWeeks?: number
-  }
-  isPublic?: boolean
-  description?: string | null
-  tags?: string[] | null
-  password?: string | null
-  customFormat?: {
-    name: string
-    description: string
-    pokemonPricing: Record<string, number>
-  }
-}
 
 export async function POST(request: NextRequest) {
   // 1. Authenticate via Clerk
@@ -60,14 +34,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'You must be signed in to create a draft.' }, { status: 401 })
   }
 
-  // 2. Validate Supabase config
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !supabaseServiceKey) {
-    log.error('Service role key not configured', {
-      hasUrl: !!supabaseUrl,
-      hasKey: !!supabaseServiceKey,
-    })
+  // 2. Build the privileged (typed) Supabase client
+  let supabase: ReturnType<typeof createServiceRoleClient>
+  try {
+    supabase = createServiceRoleClient()
+  } catch {
+    log.error('Service role key not configured')
     return NextResponse.json(
       { error: 'Server is missing SUPABASE_SERVICE_ROLE_KEY. Set it in Vercel project env vars.' },
       { status: 503 },
@@ -75,16 +47,17 @@ export async function POST(request: NextRequest) {
   }
 
   // 3. Parse + validate the body
-  let body: CreateDraftBody
+  let raw: unknown
   try {
-    body = (await request.json()) as CreateDraftBody
+    raw = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-
-  if (!body || typeof body !== 'object' || !body.settings) {
-    return NextResponse.json({ error: 'Missing settings object' }, { status: 400 })
+  const parsed = validateRequestBody(createDraftRequestSchema, raw)
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 })
   }
+  const body = parsed.data
 
   const hostNameCheck = validateName(body.hostName, { fieldLabel: 'Host name', maxLength: 50 })
   if (!hostNameCheck.ok) {
@@ -95,15 +68,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: teamNameCheck.reason }, { status: 400 })
   }
 
-  const s = body.settings
-  if (!['tiered', 'points', 'auction'].includes(s.draftType)) {
-    return NextResponse.json({ error: 'Invalid draft type' }, { status: 400 })
+  // name, description and tags are shown on the public /watch-drafts list.
+  const draftName = body.name?.trim() || `${body.hostName.trim()}'s Draft`
+  const draftNameCheck = validateName(draftName, { fieldLabel: 'Draft name', maxLength: 100 })
+  if (!draftNameCheck.ok) {
+    return NextResponse.json({ error: draftNameCheck.reason }, { status: 400 })
   }
+  if (containsProfanity(body.description) || body.tags?.some((t) => containsProfanity(t))) {
+    return NextResponse.json({ error: 'Description or tags contain inappropriate language' }, { status: 400 })
+  }
+
+  const s = body.settings
+  const tierConfig = s.tierConfig as { tiers: TierDefinition[] } | null | undefined
   if (!Number.isFinite(s.maxTeams) || s.maxTeams < 2 || s.maxTeams > 32) {
     return NextResponse.json({ error: 'maxTeams must be between 2 and 32' }, { status: 400 })
   }
   const tierValidation = s.draftType === 'tiered'
-    ? validateTierConfig(s.tierConfig?.tiers || [])
+    ? validateTierConfig(tierConfig?.tiers || [])
     : null
   if (tierValidation && !tierValidation.valid) {
     return NextResponse.json({ error: tierValidation.errors[0] }, { status: 400 })
@@ -111,13 +92,14 @@ export async function POST(request: NextRequest) {
 
   const pokemonPerTeam = tierValidation?.rosterSize ?? s.pokemonPerTeam
   const minPokemon = s.draftType === 'auction' || s.draftType === 'tiered' ? 1 : 6
-  if (!Number.isInteger(pokemonPerTeam) || pokemonPerTeam < minPokemon || pokemonPerTeam > 30) {
+  if (typeof pokemonPerTeam !== 'number' || pokemonPerTeam < minPokemon || pokemonPerTeam > 30) {
     return NextResponse.json(
       { error: `pokemonPerTeam must be between ${minPokemon} and 30` },
       { status: 400 },
     )
   }
-  if (s.budgetPerTeam !== undefined && (s.budgetPerTeam < 10 || s.budgetPerTeam > 5000)) {
+  const budgetPerTeam = s.budgetPerTeam ?? 100
+  if (s.budgetPerTeam != null && (s.budgetPerTeam < 10 || s.budgetPerTeam > 5000)) {
     return NextResponse.json({ error: 'budgetPerTeam must be between 10 and 5000' }, { status: 400 })
   }
 
@@ -130,13 +112,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Every custom Pokemon needs an integer point value from 0 to 5000.' }, { status: 400 })
     }
 
-    if (tierValidation && s.tierConfig) {
+    if (tierValidation && tierConfig) {
       const perTier = entries.reduce<Record<string, number>>((counts, [, cost]) => {
-        const tier = getPokemonTier(cost, s.tierConfig!.tiers)
+        const tier = getPokemonTier(cost, tierConfig.tiers)
         if (tier) counts[tier.name] = (counts[tier.name] || 0) + 1
         return counts
       }, {})
-      const shortTier = s.tierConfig.tiers.find(tier =>
+      const shortTier = tierConfig.tiers.find(tier =>
         tier.slotsPerTeam > 0 && (perTier[tier.name] || 0) < tier.slotsPerTeam * s.maxTeams
       )
       if (shortTier) {
@@ -146,11 +128,6 @@ export async function POST(request: NextRequest) {
       }
     }
   }
-
-  // 4. Build the privileged Supabase client
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
   let roomCode = generateRoomCode()
   const isAuction = s.draftType === 'auction'
@@ -197,13 +174,13 @@ export async function POST(request: NextRequest) {
   }
 
   // 6. Insert the draft row
-  const draftInsert: Record<string, unknown> = {
+  const draftInsert: Database['public']['Tables']['drafts']['Insert'] = {
     room_code: roomCode.toLowerCase(),
-    name: body.name || `${body.hostName}'s Draft`,
+    name: draftName,
     host_id: userId,
     format: dbFormat,
     max_teams: s.maxTeams,
-    budget_per_team: isTiered ? 99999 : (s.budgetPerTeam ?? 100),
+    budget_per_team: isTiered ? 99999 : budgetPerTeam,
     status: 'setup',
     current_round: 1,
     settings: {
@@ -214,14 +191,14 @@ export async function POST(request: NextRequest) {
       allowedPokemonIds,
       draftType: s.draftType,
       scoringSystem,
-      tierConfig: s.tierConfig,
-      createLeague: s.createLeague,
-      splitIntoConferences: s.splitIntoConferences,
-      leagueWeeks: s.leagueWeeks,
+      tierConfig: tierConfig ?? undefined,
+      createLeague: s.createLeague ?? undefined,
+      splitIntoConferences: s.splitIntoConferences ?? undefined,
+      leagueWeeks: s.leagueWeeks ?? undefined,
     },
   }
 
-  if (body.isPublic !== undefined) draftInsert.is_public = !!body.isPublic
+  if (body.isPublic != null) draftInsert.is_public = body.isPublic
   if (body.description) draftInsert.description = body.description
   if (body.tags) draftInsert.tags = body.tags
   if (body.password) draftInsert.has_password = true
@@ -305,7 +282,7 @@ export async function POST(request: NextRequest) {
       name: body.teamName,
       owner_id: userId,
       draft_order: 1,
-      budget_remaining: isTiered ? 99999 : (s.budgetPerTeam ?? 100),
+      budget_remaining: isTiered ? 99999 : budgetPerTeam,
     })
     .select('id')
     .single()

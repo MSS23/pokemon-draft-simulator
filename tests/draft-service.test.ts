@@ -205,6 +205,18 @@ const mockParticipantsDb = [
   },
 ]
 
+// Chainable query-builder stub: every filter returns itself and the chain
+// resolves to `result` when awaited, whatever filters the code adds.
+function chainable(result: unknown, update?: ReturnType<typeof vi.fn>) {
+  const b: any = {}
+  for (const m of ['eq', 'in', 'select', 'delete']) b[m] = vi.fn(() => b)
+  b.update = update ?? vi.fn(() => b)
+  if (update) update.mockImplementation(() => b)
+  b.then = (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
+    Promise.resolve(result).then(onF, onR)
+  return b
+}
+
 describe('DraftService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -527,33 +539,15 @@ describe('DraftService', () => {
       })
     })
 
-    it('should start draft and set status to active', async () => {
-      const mockUpdate = vi.fn().mockReturnThis()
-      const mockEq = vi.fn().mockReturnThis()
-      // Second .eq() call returns the final resolved value
-      mockEq.mockReturnValue({
-        eq: vi.fn().mockResolvedValue({
-          data: null,
-          error: null,
-        }),
-      })
-
-      vi.mocked(supabase).from.mockReturnValue({
-        update: mockUpdate,
-      } as any)
-
-      mockUpdate.mockReturnValue({
-        eq: mockEq,
-      })
+    it('should start draft through the start_draft RPC', async () => {
+      vi.mocked(supabase as any).rpc.mockResolvedValue({ data: { started: true }, error: null })
 
       await DraftService.startDraft('TEST01')
 
-      expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: 'active',
-          current_turn: 1,
-        })
-      )
+      expect((supabase as any).rpc).toHaveBeenCalledWith('start_draft', {
+        p_draft_id: mockDraftDb.id,
+        p_shuffle: true,
+      })
     })
 
     it('should throw error if draft not found', async () => {
@@ -680,79 +674,6 @@ describe('DraftService', () => {
     })
   })
 
-  describe('verifyDraftPassword', () => {
-    // Helper: stub `supabase.from(...)` so the first call (drafts) returns
-    // the draft row and the second call (draft_passwords) returns the hash.
-    // Mirrors the post-migration flow where the bcrypt hash lives in
-    // public.draft_passwords (RLS-locked, service-role-only).
-    const stubDraftAndPasswordFetch = (
-      draftRow: { id: string; has_password: boolean } | null,
-      passwordRow: { password: string } | null,
-    ) => {
-      const draftsSingle = vi.fn().mockResolvedValue({
-        data: draftRow,
-        error: draftRow ? null : { message: 'not found' },
-      })
-      const draftsEq = vi.fn(() => ({ single: draftsSingle }))
-      const draftsSelect = vi.fn(() => ({ eq: draftsEq }))
-
-      const pwSingle = vi.fn().mockResolvedValue({
-        data: passwordRow,
-        error: passwordRow ? null : { message: 'not found' },
-      })
-      const pwEq = vi.fn(() => ({ single: pwSingle }))
-      const pwSelect = vi.fn(() => ({ eq: pwEq }))
-
-      vi.mocked(supabase).from.mockImplementation((table: string) => {
-        if (table === 'drafts') return { select: draftsSelect } as any
-        if (table === 'draft_passwords') return { select: pwSelect } as any
-        return {} as any
-      })
-    }
-
-    it('should return true for correct password', async () => {
-      stubDraftAndPasswordFetch(
-        { id: 'draft-1', has_password: true },
-        { password: 'hashed_correct-password' },
-      )
-
-      const result = await DraftService.verifyDraftPassword({
-        roomCode: 'TEST01',
-        password: 'correct-password',
-      })
-
-      expect(result).toBe(true)
-    })
-
-    it('should return false for incorrect password', async () => {
-      stubDraftAndPasswordFetch(
-        { id: 'draft-1', has_password: true },
-        { password: 'hashed_correct-password' },
-      )
-
-      const result = await DraftService.verifyDraftPassword({
-        roomCode: 'TEST01',
-        password: 'wrong-password',
-      })
-
-      expect(result).toBe(false)
-    })
-
-    it('should return true if draft has no password', async () => {
-      stubDraftAndPasswordFetch(
-        { id: 'draft-1', has_password: false },
-        null,
-      )
-
-      const result = await DraftService.verifyDraftPassword({
-        roomCode: 'TEST01',
-        password: 'any-password',
-      })
-
-      expect(result).toBe(true)
-    })
-  })
-
   describe('pauseDraft', () => {
     it('should pause draft', async () => {
       // Mock getDraftState
@@ -763,19 +684,10 @@ describe('DraftService', () => {
         picks: [],
       })
 
-      const mockUpdate = vi.fn().mockReturnThis()
-      const mockEq = vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      })
-
-      vi.mocked(supabase).from.mockReturnValue({
-        update: mockUpdate,
-      } as any)
-
-      mockUpdate.mockReturnValue({
-        eq: mockEq,
-      })
+      const mockUpdate = vi.fn()
+      vi.mocked(supabase).from.mockImplementation(() =>
+        chainable({ data: [{ id: 'draft-1' }], error: null }, mockUpdate)
+      )
 
       await DraftService.pauseDraft('draft-1')
 
@@ -797,19 +709,10 @@ describe('DraftService', () => {
         picks: [],
       })
 
-      const mockUpdate = vi.fn().mockReturnThis()
-      const mockEq = vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      })
-
-      vi.mocked(supabase).from.mockReturnValue({
-        update: mockUpdate,
-      } as any)
-
-      mockUpdate.mockReturnValue({
-        eq: mockEq,
-      })
+      const mockUpdate = vi.fn()
+      vi.mocked(supabase).from.mockImplementation(() =>
+        chainable({ data: [{ id: 'draft-1' }], error: null }, mockUpdate)
+      )
 
       await DraftService.endDraft('draft-1')
 
@@ -831,40 +734,12 @@ describe('DraftService', () => {
       })
     })
 
-    it('should reset draft to setup status', async () => {
-      const mockDelete = vi.fn().mockReturnThis()
-      const mockUpdate = vi.fn().mockReturnThis()
-      const mockEq = vi.fn().mockResolvedValue({
-        data: null,
-        error: null,
-      })
-
-      vi.mocked(supabase).from.mockImplementation((table: string) => {
-        if (table === 'picks' || table === 'auctions' || table === 'bid_history') {
-          return {
-            delete: mockDelete,
-          } as any
-        }
-        return {
-          update: mockUpdate,
-        } as any
-      })
-
-      mockDelete.mockReturnValue({
-        eq: mockEq,
-      })
-
-      mockUpdate.mockReturnValue({
-        eq: mockEq,
-      })
+    it('should reset draft through the reset_draft RPC', async () => {
+      vi.mocked(supabase as any).rpc.mockResolvedValue({ data: { success: true }, error: null })
 
       await DraftService.resetDraft('draft-1')
 
-      expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: 'setup',
-        })
-      )
+      expect((supabase as any).rpc).toHaveBeenCalledWith('reset_draft', { p_draft_id: mockDraftDb.id })
     })
   })
 })

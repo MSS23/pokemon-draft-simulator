@@ -2,8 +2,8 @@ import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
 /**
- * Failed draft-password attempts: 5 per minute per caller, the same budget
- * /api/draft/verify-password gets in middleware. Only failures are counted, so
+ * Failed draft-password attempts on /api/draft/join: 5 per minute per caller
+ * (the standalone verify-password oracle was removed). Only failures are counted, so
  * a correct password always gets through once the caller is under the limit.
  */
 export const PASSWORD_FAILURE_LIMIT = 5

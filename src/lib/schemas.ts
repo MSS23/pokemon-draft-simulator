@@ -11,8 +11,6 @@ import { z } from 'zod'
 // ============================================================================
 
 const uuidSchema = z.string().uuid()
-const pokemonIdSchema = z.string().min(1).max(50)
-const displayNameSchema = z.string().min(1).max(50).trim()
 
 // ============================================================================
 // API Route Schemas
@@ -24,39 +22,43 @@ export const analyzeTeamSchema = z.object({
   leagueId: uuidSchema,
 })
 
-/** Draft creation payload (used by DraftService) */
-export const createDraftSchema = z.object({
-  name: z.string().min(1).max(100).trim(),
-  format: z.string().min(1).max(50),
-  draftType: z.enum(['tiered', 'points', 'auction']),
-  teamCount: z.number().int().min(2).max(32),
-  budgetPerTeam: z.number().int().min(10).max(5000),
-  pokemonPerTeam: z.number().int().min(1).max(30),
-  timeLimit: z.number().int().min(15).max(300).optional(),
-  isPublic: z.boolean().optional().default(false),
-})
-
-/** Make pick payload */
-export const makePickSchema = z.object({
-  draftId: uuidSchema,
-  teamId: uuidSchema,
-  pokemonId: pokemonIdSchema,
-  pokemonName: z.string().min(1).max(100),
-  cost: z.number().int().min(0),
-})
-
-/** Place bid payload */
-export const placeBidSchema = z.object({
-  auctionId: uuidSchema,
-  teamId: uuidSchema,
-  bidAmount: z.number().int().min(1),
-})
-
-/** Join draft payload */
-export const joinDraftSchema = z.object({
-  draftId: uuidSchema,
-  displayName: displayNameSchema,
-  userId: z.string().optional(),
+/**
+ * POST /api/draft/create. Mirrors the create-draft page payload: nullable
+ * optionals (the page sends null), timeLimit 0 = no limit, up to 1 hour, and
+ * unknown settings keys stripped rather than rejected. Range checks that need
+ * cross-field context (pokemonPerTeam vs draftType, tier caps) stay in the route.
+ */
+export const createDraftRequestSchema = z.object({
+  name: z.string().max(100).nullish(),
+  hostName: z.string(),
+  teamName: z.string(),
+  settings: z.object({
+    maxTeams: z.number().int(),
+    draftType: z.enum(['tiered', 'points', 'auction']),
+    timeLimit: z.number().int().refine(
+      (t) => t === 0 || (t >= 15 && t <= 3600),
+      'timeLimit must be 0 (no limit) or 15-3600 seconds',
+    ),
+    pokemonPerTeam: z.number().int().nullish(),
+    budgetPerTeam: z.number().int().nullish(),
+    formatId: z.string().max(100).nullish(),
+    scoringSystem: z.enum(['budget', 'tiered']).nullish(),
+    tierConfig: z.object({ tiers: z.array(z.record(z.string(), z.unknown())) }).nullish(),
+    createLeague: z.boolean().nullish(),
+    splitIntoConferences: z.boolean().nullish(),
+    // parseInt('') on the page becomes NaN, which JSON sends as null.
+    leagueWeeks: z.number().int().min(1).max(52).nullish(),
+  }),
+  isPublic: z.boolean().nullish(),
+  description: z.string().max(500).nullish(),
+  tags: z.array(z.string().max(30)).max(10).nullish(),
+  // bcrypt only hashes the first 72 bytes.
+  password: z.string().min(1).max(72).nullish(),
+  customFormat: z.object({
+    name: z.string().min(1).max(100),
+    description: z.string().max(500),
+    pokemonPricing: z.record(z.string(), z.number()),
+  }).nullish(),
 })
 
 /** POST /api/feedback */

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { syncShowdownData } from '@/services/showdown-sync'
 import { auth } from '@clerk/nextjs/server'
-import { createClient } from '@supabase/supabase-js'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { createLogger } from '@/lib/logger'
 
 const log = createLogger('FormatsSyncRoute')
@@ -21,21 +21,18 @@ export const dynamic = 'force-dynamic'
  * call cannot validate Clerk JWTs and was effectively a permanent 401.
  */
 async function verifyAdmin(_request: NextRequest): Promise<{ authorized: boolean; error?: string }> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!supabaseUrl || !supabaseServiceKey) {
+  let supabase: ReturnType<typeof createServiceRoleClient>
+  try {
+    // Service-role read is necessary because user_profiles.is_admin is the
+    // source of truth and we need to bypass RLS to verify it.
+    supabase = createServiceRoleClient()
+  } catch {
     log.error('Admin gate misconfigured — service role key missing')
     return { authorized: false, error: 'Service unavailable' }
   }
 
   const { userId } = await auth()
   if (!userId) return { authorized: false, error: 'Authentication required' }
-
-  // Service-role read is necessary because user_profiles.is_admin is the
-  // source of truth and we need to bypass RLS to verify it.
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
 
   const { data: profile, error } = await supabase
     .from('user_profiles')

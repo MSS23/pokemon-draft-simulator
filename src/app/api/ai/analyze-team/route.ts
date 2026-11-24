@@ -11,9 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { unstable_cache } from 'next/cache'
 import { AIAnalysisService } from '@/lib/ai-analysis-service'
-import { AIAccessControl } from '@/lib/ai-access-control'
 import { LeagueStatsService } from '@/lib/league-stats-service'
-import { supabase } from '@/lib/supabase'
+import { createServiceRoleClient } from '@/lib/supabase-server'
 import { auth } from '@clerk/nextjs/server'
 import { analyzeTeamSchema, validateRequestBody } from '@/lib/schemas'
 import { createLogger } from '@/lib/logger'
@@ -27,10 +26,8 @@ const log = createLogger('AnalyzeTeamAPI')
 // Access control is intentionally NOT cached — runs per-request below.
 const getCachedAnalysis = unstable_cache(
   async (teamId: string) => {
-    if (!supabase) throw new Error('Supabase not available')
-
     const [picksResult, stats] = await Promise.all([
-      supabase.from('picks').select('*').eq('team_id', teamId),
+      createServiceRoleClient().from('picks').select('*').eq('team_id', teamId),
       LeagueStatsService.getAdvancedTeamStats(teamId),
     ])
 
@@ -63,7 +60,9 @@ export async function POST(request: NextRequest) {
     // checks. Use Clerk auth() directly — the canonical pattern used by
     // the rest of the codebase (e.g. /api/formats/sync).
     const { userId } = await auth()
-    const authenticatedUserId: string | undefined = userId ?? undefined
+    if (!userId) {
+      return NextResponse.json({ error: 'Authentication required', userRole: 'guest' }, { status: 401 })
+    }
 
     const body = await request.json()
     const validation = validateRequestBody(analyzeTeamSchema, body)
@@ -77,27 +76,30 @@ export async function POST(request: NextRequest) {
 
     const { teamId, leagueId } = validation.data
 
-    // Check authorization with explicit user ID
-    const accessCheck = await AIAccessControl.canAnalyzeTeam({
-      teamId,
-      leagueId,
-      userId: authenticatedUserId,
-    })
-
-    if (!accessCheck.allowed) {
-      return NextResponse.json(
-        {
-          error: accessCheck.reason || 'Unauthorized',
-          userRole: accessCheck.userRole
-        },
-        { status: 403 }
-      )
+    // Service role: the browser client is anon on the server, so private
+    // leagues would look missing. The team must belong to the league's draft,
+    // or a member of league A could analyze any team in league B.
+    const db = createServiceRoleClient()
+    const [{ data: league }, { data: team }] = await Promise.all([
+      db.from('leagues').select('draft_id').eq('id', leagueId).maybeSingle(),
+      db.from('teams').select('draft_id').eq('id', teamId).maybeSingle(),
+    ])
+    if (!league) {
+      return NextResponse.json({ error: 'League not found' }, { status: 403 })
     }
-
-    if (!supabase) {
+    if (!team || team.draft_id !== league.draft_id) {
+      return NextResponse.json({ error: 'Team is not in this league' }, { status: 403 })
+    }
+    const { data: ownTeams } = await db
+      .from('teams')
+      .select('id')
+      .eq('draft_id', league.draft_id)
+      .eq('owner_id', userId)
+      .limit(1)
+    if (!ownTeams?.length) {
       return NextResponse.json(
-        { error: 'Database not available' },
-        { status: 500 }
+        { error: 'Only league participants can analyze teams', userRole: 'spectator' },
+        { status: 403 }
       )
     }
 
@@ -113,7 +115,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     log.error('Error in analyze-team API:', error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

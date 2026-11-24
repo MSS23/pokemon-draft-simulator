@@ -20,7 +20,6 @@ const eslintConfig = [
       "public/sw.js",
       "public/workbox-*.js",
       "public/worker-*.js",
-      "public/hydration-fix.js",
       "scripts/**",
     ],
   },

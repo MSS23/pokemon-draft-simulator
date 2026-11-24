@@ -20,9 +20,11 @@ async function getDraftStateLazy(draftId: string): Promise<DraftState | null> {
   return DraftService.getDraftState(draftId)
 }
 
-async function invalidateCacheLazy(draftId?: string): Promise<void> {
+// Clears the whole draft-state cache: one draft is cached under both its room
+// code and its uuid, so deleting a single key leaves the other one stale.
+async function invalidateCacheLazy(): Promise<void> {
   const { DraftService } = await import('./draft-service')
-  DraftService.invalidateDraftStateCache(draftId)
+  DraftService.invalidateDraftStateCache()
 }
 
 /**
@@ -108,72 +110,32 @@ export async function startDraft(roomCodeOrDraftId: string): Promise<void> {
     return
   }
 
-  // Check if draft order needs to be shuffled
-  // Only auto-shuffle if the host hasn't manually shuffled (check settings flag)
-  const draftOrderShuffled = draftState.draft.settings?.draftOrderShuffled || false
-  const needsShuffle = !draftOrderShuffled
+  // Host check, validation, auto-shuffle (unless the host already shuffled) and
+  // the setup -> active transition all happen atomically server-side.
+  const { data: result, error } = await supabase.rpc('start_draft', {
+    p_draft_id: draftUuid,
+    p_shuffle: true,
+  })
 
-  if (needsShuffle) {
-    log.info('Auto-shuffling draft order (not manually shuffled)')
-
-    // Generate randomized order
-    const randomizedOrder = teams.map((_: TeamRow, index: number) => index + 1)
-    for (let i = randomizedOrder.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [randomizedOrder[i], randomizedOrder[j]] = [randomizedOrder[j], randomizedOrder[i]]
-    }
-
-    // Update each team with new randomized draft order
-    const updatePromises = teams.map((team: TeamRow, index: number) =>
-      supabase
-        .from('teams')
-        .update({ draft_order: randomizedOrder[index] })
-        .eq('id', team.id)
-    )
-
-    const results = await Promise.all(updatePromises)
-
-    // Check for errors in shuffle updates
-    const shuffleErrors = results.filter(r => r.error)
-    if (shuffleErrors.length > 0) {
-      log.error('Error shuffling teams:', shuffleErrors)
-      throw new Error('Failed to shuffle team draft order')
-    }
-
-    log.info('Team draft order shuffled successfully')
-  }
-
-  // Prepare updated settings (mark as shuffled if we just shuffled)
-  const updatedSettings = needsShuffle
-    ? {
-        ...(draftState.draft.settings || {}),
-        draftOrderShuffled: true
-      }
-    : draftState.draft.settings
-
-  // Atomically set draft to active with first turn AND update settings in single operation
-  // This reduces subscription triggers from 2 to 1, preventing race conditions
-  const { error } = await supabase
-    .from('drafts')
-    .update({
-      status: 'active',
-      current_turn: 1,
-      turn_started_at: new Date().toISOString(),
-      settings: updatedSettings,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', draftUuid)
-    .eq('status', 'setup') // Only update if still in setup (prevent race conditions)
+  await invalidateCacheLazy()
 
   if (error) {
-    log.error('Error updating draft status:', error)
+    log.error('Error starting draft:', error)
 
-    // Check if it's an RLS policy error
     if (error.code === '42501' || error?.message?.includes('policy')) {
       throw new Error('Permission denied: You do not have permission to start this draft')
     }
+    if (error.message?.includes('cannot be started from status')) {
+      throw new Error('Draft is no longer in setup (it may already have been started). Refresh to see its current state.')
+    }
 
     throw new Error(`Failed to start draft: ${error?.message || 'Unknown error'}`)
+  }
+
+  // { started: false, reason: 'already active' }: a retry or another tab won the race.
+  if (!(result as { started?: boolean } | null)?.started) {
+    log.info('Draft already active, returning success (idempotent)')
+    return
   }
 
   try {
@@ -194,17 +156,24 @@ export async function pauseDraft(draftId: string): Promise<void> {
     throw new Error('Draft not found')
   }
 
-  const { error } = await (supabase
+  const { data: paused, error } = await (supabase
     .from('drafts'))
     .update({
       status: 'paused',
       updated_at: new Date().toISOString()
     })
     .eq('id', draftState.draft.id)
+    .eq('status', 'active')
+    .select('id')
+
+  await invalidateCacheLazy()
 
   if (error) {
     log.error('Error pausing draft:', error)
     throw new Error('Failed to pause draft')
+  }
+  if (!paused || paused.length === 0) {
+    throw new Error('Only an active draft can be paused')
   }
 }
 
@@ -220,7 +189,7 @@ export async function unpauseDraft(draftId: string): Promise<void> {
     throw new Error('Draft is not paused')
   }
 
-  const { error } = await (supabase
+  const { data: resumed, error } = await (supabase
     .from('drafts'))
     .update({
       status: 'active',
@@ -228,10 +197,17 @@ export async function unpauseDraft(draftId: string): Promise<void> {
       updated_at: new Date().toISOString()
     })
     .eq('id', draftState.draft.id)
+    .eq('status', 'paused')
+    .select('id')
+
+  await invalidateCacheLazy()
 
   if (error) {
     log.error('Error unpausing draft:', error)
     throw new Error('Failed to unpause draft')
+  }
+  if (!resumed || resumed.length === 0) {
+    throw new Error('Draft is not paused')
   }
 }
 
@@ -243,17 +219,25 @@ export async function endDraft(draftId: string): Promise<void> {
     throw new Error('Draft not found')
   }
 
-  const { error } = await (supabase
+  const { data: ended, error } = await (supabase
     .from('drafts'))
     .update({
       status: 'completed',
       updated_at: new Date().toISOString()
     })
     .eq('id', draftState.draft.id)
+    .in('status', ['active', 'paused'])
+    .select('id')
+
+  await invalidateCacheLazy()
 
   if (error) {
     log.error('Error ending draft:', error)
     throw new Error('Failed to end draft')
+  }
+  // 0 rows: the last pick already completed it, or it never started. Nothing to end.
+  if (!ended || ended.length === 0) {
+    log.info('endDraft: draft was not active or paused; no change', { draftId })
   }
 }
 
@@ -266,77 +250,18 @@ export async function resetDraft(draftId: string): Promise<void> {
     throw new Error('Draft not found')
   }
 
-  // Delete all picks
-  const { error: picksError } = await (supabase
-    .from('picks'))
-    .delete()
-    .eq('draft_id', draftState.draft.id)
+  // One transaction server-side: host check, picks/auctions/bids deleted,
+  // budgets/undos/wishlists reset, draft back to setup.
+  const { data: result, error } = await supabase.rpc('reset_draft', {
+    p_draft_id: draftState.draft.id,
+  })
 
-  if (picksError) {
-    log.error('Error deleting picks:', picksError)
-    throw new Error('Failed to delete picks')
-  }
+  await invalidateCacheLazy()
 
-  // Delete all auctions if any
-  const { error: auctionsError } = await (supabase
-    .from('auctions'))
-    .delete()
-    .eq('draft_id', draftState.draft.id)
-
-  if (auctionsError) {
-    log.error('Error deleting auctions:', auctionsError)
-    // Don't throw - auctions might not exist
-  }
-
-  // Delete all bid history if any
-  const { error: bidsError } = await (supabase
-    .from('bid_history'))
-    .delete()
-    .eq('draft_id', draftState.draft.id)
-
-  if (bidsError) {
-    log.error('Error deleting bids:', bidsError)
-    // Don't throw - bids might not exist
-  }
-
-  // Re-mark wishlisted Pokemon as available again (picks are gone now)
-  const { error: wishlistError } = await (supabase
-    .from('wishlist_items'))
-    .update({ is_available: true })
-    .eq('draft_id', draftState.draft.id)
-
-  if (wishlistError) {
-    log.error('Error resetting wishlists:', wishlistError)
-    // Don't throw - wishlists might not exist
-  }
-
-  // Reset team budgets and picks
-  const { error: teamsError } = await (supabase
-    .from('teams'))
-    .update({
-      budget_remaining: draftState.draft.budget_per_team
-    })
-    .eq('draft_id', draftState.draft.id)
-
-  if (teamsError) {
-    log.error('Error resetting teams:', teamsError)
-    throw new Error('Failed to reset teams')
-  }
-
-  // Reset draft status
-  const { error: draftError } = await (supabase
-    .from('drafts'))
-    .update({
-      status: 'setup',
-      current_turn: null,
-      current_round: 1,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', draftState.draft.id)
-
-  if (draftError) {
-    log.error('Error resetting draft:', draftError)
-    throw new Error('Failed to reset draft')
+  const res = result as { success?: boolean; error?: string } | null
+  if (error || !res?.success) {
+    log.error('Error resetting draft:', error ?? res?.error)
+    throw new Error(res?.error || 'Failed to reset draft')
   }
 }
 
@@ -477,40 +402,17 @@ export async function shuffleDraftOrder(roomCodeOrDraftId: string): Promise<void
     throw new Error('No teams in draft')
   }
 
-  // Randomize draft order using Fisher-Yates shuffle
-  const randomizedOrder = teams.map((_, index) => index + 1)
-  for (let i = randomizedOrder.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [randomizedOrder[i], randomizedOrder[j]] = [randomizedOrder[j], randomizedOrder[i]]
-  }
-
-  // Update each team with new randomized draft order
-  const updatePromises = teams.map((team, index) => {
-    log.info(`Updating team ${team.name} to draft_order ${randomizedOrder[index]}`)
-    return supabase
-      .from('teams')
-      .update({ draft_order: randomizedOrder[index] })
-      .eq('id', team.id)
+  const { data: result, error } = await supabase.rpc('shuffle_draft_order', {
+    p_draft_id: draftUuid,
   })
 
-  const results = await Promise.all(updatePromises)
-  log.info('Team updates completed:', results.map(r => ({ error: r.error, count: r.count })))
+  await invalidateCacheLazy()
 
-  // Update draft settings to mark as manually shuffled
-  const updatedSettings = {
-    ...(draftState.draft.settings || {}),
-    draftOrderShuffled: true
+  const res = result as { success?: boolean; error?: string } | null
+  if (error || !res?.success) {
+    log.error('Error shuffling draft order:', error ?? res?.error)
+    throw new Error(res?.error || 'Failed to shuffle team draft order')
   }
-
-  const { error: draftUpdateError } = await supabase
-    .from('drafts')
-    .update({
-      settings: updatedSettings,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', draftUuid)
-
-  log.info('Draft update:', { error: draftUpdateError, draftId: draftUuid })
 }
 
 /**
@@ -557,17 +459,19 @@ export async function removeTeam(draftId: string, teamId: string): Promise<void>
   if (!draftState) throw new Error('Draft not found')
   if (draftState.draft.status !== 'setup') throw new Error('Can only remove teams before the draft starts')
 
-  // Delete any picks for this team (shouldn't exist in waiting, but be safe)
-  await (supabase.from('picks')).delete().eq('team_id', teamId)
+  // remove_team is host-checked and atomic: participants, picks, the team's
+  // nominations and the team are deleted, then draft_order is renumbered 1..N.
+  const { error } = await supabase.rpc('remove_team', {
+    p_draft_id: draftState.draft.id,
+    p_team_id: teamId,
+  })
 
-  // Delete the team
-  const { error } = await (supabase.from('teams')).delete().eq('id', teamId)
+  await invalidateCacheLazy()
+
   if (error) {
     log.error('Error removing team:', error)
-    throw new Error('Failed to remove team')
+    throw new Error(error.code === '42501' ? 'Only the host can remove teams' : 'Failed to remove team')
   }
-
-  await invalidateCacheLazy(draftId)
   log.info(`Team ${teamId} removed from draft ${draftId}`)
 }
 
@@ -583,22 +487,25 @@ export async function updateTimerSetting(draftId: string, timerSeconds: number):
   const currentSettings = draftState.draft.settings || {}
   const draftStatus = draftState.draft.status
 
-  // If draft hasn't started yet, apply immediately
-  // Otherwise, apply on next turn
+  // The server tick reads settings.timeLimit directly and the pick RPCs never
+  // apply pendingTimerChange, so a mid-turn change takes effect at once. Restart
+  // the current turn's clock so a shorter timer cannot expire it instantly.
   const updatedSettings = {
     ...currentSettings,
     timeLimit: timerSeconds,
-    // Only mark as pending if draft is already active
-    ...(draftStatus === 'active' && { pendingTimerChange: timerSeconds })
   }
+  const now = new Date().toISOString()
 
   const { error } = await (supabase
     .from('drafts'))
     .update({
       settings: updatedSettings,
-      updated_at: new Date().toISOString()
+      ...(draftStatus === 'active' && { turn_started_at: now }),
+      updated_at: now
     })
     .eq('id', internalId)
+
+  await invalidateCacheLazy()
 
   if (error) {
     log.error('Error updating timer setting:', error)
@@ -647,6 +554,8 @@ export async function adjustTeamBudget(
     })
     .eq('id', teamId)
     .eq('draft_id', draftState.draft.id)
+
+  await invalidateCacheLazy()
 
   if (error) {
     log.error('Error adjusting team budget:', error)
