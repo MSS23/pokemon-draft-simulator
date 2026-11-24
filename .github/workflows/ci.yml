@@ -122,11 +122,11 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           github-token: ${{ github.token }}
-          # Pinned: CLI 3.4.0 rejects [inbucket] in config.toml ("Use local_smtp instead").
-          version: 3.3.0
+          # Pinned so a CLI release cannot silently break config.toml parsing.
+          version: 3.4.0
 
       - name: Start local Supabase (applies supabase/migrations)
-        run: supabase start --debug -x studio,imgproxy,inbucket,edge-runtime,logflare,vector
+        run: supabase start --debug -x studio,imgproxy,mailpit,edge-runtime,logflare,vector
 
       - name: Export test env
         run: |
