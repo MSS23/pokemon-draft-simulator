@@ -383,16 +383,21 @@ export class WeeklyHighlightsService {
       }
 
       // Check for Pokemon eliminations
-      const { data: rawDeaths } = await supabase
+      // match_pokemon_kos has two FKs to picks (pick_id, scorer_pick_id); an
+      // unhinted embed fails with PGRST201, so name the victim column.
+      const { data: rawDeaths, error: deathsError } = await supabase
         .from('match_pokemon_kos')
         .select(`
           pick_id,
           matches!inner(league_id, week_number),
-          picks!inner(pokemon_name, team_id, teams(name))
+          picks!pick_id!inner(pokemon_name, team_id, teams(name))
         `)
         .eq('matches.league_id', leagueId)
         .eq('matches.week_number', weekNumber)
         .eq('is_death', true)
+
+      // Log, not throw: the highlights built above should still be returned.
+      if (deathsError) log.error('Failed to load weekly eliminations:', deathsError)
 
       const deaths = (rawDeaths ?? []) as unknown as KOWithPick[]
 

@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { createServiceRoleClient } from '@/lib/supabase-server'
 import { reportMatchResult, type Tournament } from '@/lib/tournament-service'
 import { createLogger } from '@/lib/logger'
+import { syncBracketRows } from '@/app/api/tournament/bracket-sync'
 
 const log = createLogger('api/tournament/report')
 
@@ -44,8 +45,11 @@ export async function POST(request: NextRequest) {
   const db = createServiceRoleClient()
 
   const [{ data: league }, { data: match }] = await Promise.all([
-    db.from('leagues').select('id, draft_id, status, settings').eq('id', leagueId).maybeSingle(),
-    db.from('matches').select('id, league_id, home_team_id, away_team_id, status').eq('id', matchId).maybeSingle(),
+    db.from('leagues').select('id, draft_id, status, settings, updated_at').eq('id', leagueId).maybeSingle(),
+    db.from('matches')
+      .select('id, league_id, home_team_id, away_team_id, status, winner_team_id, home_score, away_score')
+      .eq('id', matchId)
+      .maybeSingle(),
   ])
 
   if (!league) return NextResponse.json({ error: 'Tournament not found.' }, { status: 404 })
@@ -56,9 +60,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Winner must be one of the two teams in the match.' }, { status: 400 })
   }
 
-  const settings = (league.settings ?? {}) as Record<string, unknown>
-  const tournament = settings.tournament as Tournament | undefined
-  if (!tournament) {
+  const initialSettings = (league.settings ?? {}) as Record<string, unknown>
+  if (!initialSettings.tournament) {
     return NextResponse.json({ error: 'No bracket exists for this tournament.' }, { status: 409 })
   }
 
@@ -69,7 +72,7 @@ export async function POST(request: NextRequest) {
     .in('id', [match.home_team_id, match.away_team_id])
   const isParticipant = (matchTeams ?? []).some(t => t.owner_id === userId)
 
-  let isCommissioner = settings.commissionerId === userId
+  let isCommissioner = initialSettings.commissionerId === userId
   if (!isCommissioner) {
     const { data: draft } = await db.from('drafts').select('host_id').eq('id', league.draft_id).maybeSingle()
     isCommissioner = draft?.host_id === userId
@@ -79,103 +82,120 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Only a player in this match or the host can report its result.' }, { status: 403 })
   }
 
-  // Locate the bracket match by its two participants
-  const bracketMatch = tournament.rounds
-    .flatMap(r => r.matches)
-    .find(m =>
-      (m.participant1?.teamId === match.home_team_id && m.participant2?.teamId === match.away_team_id) ||
-      (m.participant1?.teamId === match.away_team_id && m.participant2?.teamId === match.home_team_id)
-    )
-  if (!bracketMatch) {
-    return NextResponse.json({ error: 'Bracket match not found.' }, { status: 409 })
+  // A player may only advance a result both sides already confirmed (the
+  // dual-confirmation flow marks the row completed with the agreed winner);
+  // only the host can record an unconfirmed match. Players advance with the
+  // confirmed score, never one they supply here.
+  if (!isCommissioner && (match.status !== 'completed' || match.winner_team_id !== winnerId)) {
+    return NextResponse.json({ error: 'Both players must confirm this result before the bracket advances.' }, { status: 403 })
   }
-  if (bracketMatch.status === 'completed') {
-    return NextResponse.json({ error: 'This match has already been reported.' }, { status: 409 })
-  }
+  const finalScore = isCommissioner
+    ? { home: score.home, away: score.away }
+    : { home: match.home_score, away: match.away_score }
 
-  const p1IsHome = bracketMatch.participant1?.teamId === match.home_team_id
-  let updated: Tournament
-  try {
-    updated = reportMatchResult(tournament, bracketMatch.id, winnerId, {
-      participant1: p1IsHome ? score.home : score.away,
-      participant2: p1IsHome ? score.away : score.home,
-    })
-  } catch (err) {
-    log.error('Bracket advancement failed', { leagueId, matchId, error: err instanceof Error ? err.message : String(err) })
-    return NextResponse.json({ error: 'Could not advance the bracket.' }, { status: 500 })
-  }
-
-  // Persist the match result
-  const { error: matchError } = await db
-    .from('matches')
-    .update({
-      status: 'completed',
-      home_score: score.home,
-      away_score: score.away,
-      winner_team_id: winnerId,
-      completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', matchId)
-  if (matchError) {
-    log.error('Match update failed', { matchId, error: matchError.message })
-    return NextResponse.json({ error: 'Could not save the match result.' }, { status: 500 })
-  }
-
-  // Persist the advanced bracket
-  const currentRound = (() => {
-    for (const round of updated.rounds) {
-      if (round.matches.some(m => m.status === 'pending' || m.status === 'in-progress')) return round.roundNumber
+  // Compare-and-set on leagues.updated_at (also bumped by trigger on every
+  // write): two reports in one league must not overwrite each other's bracket.
+  let current: { settings: unknown; updated_at: string } = league
+  let updated: Tournament | null = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const settings = (current.settings ?? {}) as Record<string, unknown>
+    const tournament = settings.tournament as Tournament | undefined
+    if (!tournament) {
+      return NextResponse.json({ error: 'No bracket exists for this tournament.' }, { status: 409 })
     }
-    return updated.rounds.length
-  })()
 
-  const { error: saveError } = await db
-    .from('leagues')
-    .update({
-      current_week: currentRound,
-      status: updated.status === 'completed' ? 'completed' : 'active',
-      settings: { ...settings, tournament: JSON.parse(JSON.stringify(updated)) },
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', leagueId)
-  if (saveError) {
-    log.error('Bracket save failed', { leagueId, error: saveError.message })
-    return NextResponse.json({ error: 'Could not save the bracket.' }, { status: 500 })
+    const bracketMatch = tournament.rounds
+      .flatMap(r => r.matches)
+      .find(m =>
+        (m.participant1?.teamId === match.home_team_id && m.participant2?.teamId === match.away_team_id) ||
+        (m.participant1?.teamId === match.away_team_id && m.participant2?.teamId === match.home_team_id)
+      )
+    if (!bracketMatch) {
+      return NextResponse.json({ error: 'Bracket match not found.' }, { status: 409 })
+    }
+    if (bracketMatch.status === 'completed') {
+      if (bracketMatch.winner?.teamId !== winnerId) {
+        return NextResponse.json({ error: 'This match has already been reported.' }, { status: 409 })
+      }
+      // Same result already in the bracket: finish the row and next-round
+      // writes an earlier attempt may not have reached.
+      updated = tournament
+      break
+    }
+
+    const p1IsHome = bracketMatch.participant1?.teamId === match.home_team_id
+    let next: Tournament
+    try {
+      next = reportMatchResult(tournament, bracketMatch.id, winnerId, {
+        participant1: p1IsHome ? finalScore.home : finalScore.away,
+        participant2: p1IsHome ? finalScore.away : finalScore.home,
+      })
+    } catch (err) {
+      log.error('Bracket advancement failed', { leagueId, matchId, error: err instanceof Error ? err.message : String(err) })
+      return NextResponse.json({ error: 'Could not advance the bracket.' }, { status: 500 })
+    }
+
+    const currentRound = next.rounds
+      .find(r => r.matches.some(m => m.status === 'pending' || m.status === 'in-progress'))
+      ?.roundNumber ?? next.rounds.length
+
+    const { data: saved, error: saveError } = await db
+      .from('leagues')
+      .update({
+        current_week: currentRound,
+        status: next.status === 'completed' ? 'completed' : 'active',
+        settings: { ...settings, tournament: JSON.parse(JSON.stringify(next)) },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', leagueId)
+      .eq('updated_at', current.updated_at)
+      .select('id')
+      .maybeSingle()
+    if (saveError) {
+      log.error('Bracket save failed', { leagueId, error: saveError.message })
+      return NextResponse.json({ error: 'Could not save the bracket.' }, { status: 500 })
+    }
+    if (saved) {
+      updated = next
+      break
+    }
+
+    const { data: fresh } = await db.from('leagues').select('settings, updated_at').eq('id', leagueId).maybeSingle()
+    if (!fresh) return NextResponse.json({ error: 'Tournament not found.' }, { status: 404 })
+    current = fresh
+  }
+  if (!updated) {
+    return NextResponse.json({ error: 'The bracket changed while saving. Try again.' }, { status: 409 })
   }
 
-  // Create DB rows for newly-unlocked bracket matches
-  const { data: existingMatches } = await db
-    .from('matches')
-    .select('home_team_id, away_team_id')
-    .eq('league_id', leagueId)
-  const existingPairs = new Set(
-    (existingMatches ?? []).flatMap(m => [`${m.home_team_id}-${m.away_team_id}`, `${m.away_team_id}-${m.home_team_id}`])
-  )
-  const matchFormat = typeof settings.matchFormat === 'string' ? settings.matchFormat : 'best_of_3'
-  let matchNum = (existingMatches?.length || 0) + 1
-  const newMatches = updated.rounds.flatMap(round =>
-    round.matches
-      .filter(m => m.participant1?.teamId && m.participant2?.teamId && m.participant2.name !== 'BYE')
-      .filter(m => !existingPairs.has(`${m.participant1!.teamId}-${m.participant2!.teamId}`))
-      .map(m => ({
-        league_id: leagueId,
-        week_number: round.roundNumber,
-        match_number: matchNum++,
-        home_team_id: m.participant1!.teamId!,
-        away_team_id: m.participant2!.teamId!,
-        status: 'scheduled' as const,
-        home_score: 0,
-        away_score: 0,
-        winner_team_id: null,
-        battle_format: matchFormat,
-        scheduled_date: null,
-        notes: JSON.stringify({ bracketMatchId: m.id }),
-      }))
-  )
-  if (newMatches.length > 0) {
-    const { error: syncError } = await db.from('matches').insert(newMatches)
-    if (syncError) log.error('Failed to sync new bracket matches', { leagueId, error: syncError.message })
+  // Bracket first, then the row: losing the race above never leaves a
+  // completed match row whose bracket slot is still pending.
+  if (match.status !== 'completed' || match.winner_team_id !== winnerId) {
+    const { error: matchError } = await db
+      .from('matches')
+      .update({
+        status: 'completed',
+        home_score: finalScore.home,
+        away_score: finalScore.away,
+        winner_team_id: winnerId,
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', matchId)
+    if (matchError) {
+      log.error('Match update failed', { matchId, error: matchError.message })
+      return NextResponse.json({ error: 'Could not save the match result.' }, { status: 500 })
+    }
+  }
+
+  // Create rows for newly-unlocked bracket matches. Failing loudly is safe:
+  // a retry takes the idempotent "already in the bracket" path above.
+  const finalSettings = (current.settings ?? {}) as Record<string, unknown>
+  const matchFormat = typeof finalSettings.matchFormat === 'string' ? finalSettings.matchFormat : 'best_of_3'
+  const { error: syncError } = await syncBracketRows(db, leagueId, updated, matchFormat)
+  if (syncError) {
+    log.error('Failed to sync new bracket matches', { leagueId, error: syncError })
+    return NextResponse.json({ error: 'Result saved, but the next round could not be prepared. Try again.' }, { status: 500 })
   }
 
   return NextResponse.json({ success: true, tournament: updated })

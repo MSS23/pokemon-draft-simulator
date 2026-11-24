@@ -488,44 +488,52 @@ describe('LeagueService', () => {
       ).rejects.toThrow('Team is not part of this match')
     })
 
-    it('should return pending when only one team has submitted', async () => {
-      // submit_match_side RPC unavailable → legacy merge fallback
-      mockSupabase.rpc.mockResolvedValue({ data: null, error: { code: 'PGRST202', message: 'function not found' } })
-
-      // First call: match fetch
+    const matchRow = () => {
       const mockSingle = vi.fn().mockResolvedValue({
-        data: {
-          id: 'match-1',
-          home_team_id: 'team-1',
-          away_team_id: 'team-2',
-          notes: null,
-          league_id: 'league-1',
-        },
+        data: { id: 'match-1', home_team_id: 'team-1', away_team_id: 'team-2', notes: null, league_id: 'league-1', status: 'scheduled' },
         error: null,
       })
-      const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
-      const mockSelectFirst = vi.fn().mockReturnValue({ eq: mockEq })
+      mockSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: mockSingle }) }),
+        update: vi.fn(() => { throw new Error('no direct matches UPDATE (050)') }),
+      }))
+    }
 
-      // Second call: match update (save submission)
-      const mockUpdateEq = vi.fn().mockResolvedValue({ error: null })
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockUpdateEq })
-
-      let callCount = 0
-      mockSupabase.from.mockImplementation(() => {
-        callCount++
-        if (callCount === 1) {
-          return { select: mockSelectFirst }
-        }
-        return { update: mockUpdate }
-      })
+    it('submits through confirm_match_side and returns its status', async () => {
+      matchRow()
+      mockSupabase.rpc.mockResolvedValue({ data: { notes: {}, status: 'pending' }, error: null })
 
       const result = await LeagueService.submitMatchResult('match-1', 'team-1', {
         homeScore: 2,
         awayScore: 1,
         winnerTeamId: 'team-1',
-      })
+      }, { g1: 'https://replay.pokemonshowdown.com/x' })
 
       expect(result.status).toBe('pending')
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('confirm_match_side', {
+        p_match_id: 'match-1',
+        p_side: 'home',
+        p_submission: expect.objectContaining({
+          homeScore: 2, awayScore: 1, winnerTeamId: 'team-1',
+          replayUrls: { g1: 'https://replay.pokemonshowdown.com/x' },
+        }),
+      })
+    })
+
+    it('returns confirmed without client-side match writes when both sides agree', async () => {
+      matchRow()
+      mockSupabase.rpc.mockResolvedValue({ data: { notes: {}, status: 'confirmed' }, error: null })
+      const result = await LeagueService.submitMatchResult('match-1', 'team-2', { homeScore: 2, awayScore: 1, winnerTeamId: 'team-1' })
+      expect(result.status).toBe('confirmed')
+      expect((mockSupabase.rpc.mock.calls[0][1] as { p_side: string }).p_side).toBe('away')
+    })
+
+    it('surfaces the RPC error message', async () => {
+      matchRow()
+      mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'Match result has already been confirmed' } })
+      await expect(
+        LeagueService.submitMatchResult('match-1', 'team-1', { homeScore: 1, awayScore: 0, winnerTeamId: 'team-1' }),
+      ).rejects.toThrow('Match result has already been confirmed')
     })
   })
 

@@ -786,7 +786,8 @@ export class LeagueService {
       homeScore: number
       awayScore: number
       winnerTeamId: string | null
-    }
+    },
+    replayUrls?: Record<string, string>
   ): Promise<{ status: 'pending' | 'confirmed' | 'disputed' }> {
     if (!supabase) throw new Error('Supabase not configured')
 
@@ -805,96 +806,31 @@ export class LeagueService {
     if (match.status === 'completed') throw new Error('Match result has already been confirmed')
 
     const side = isHome ? 'home' : 'away'
-    const submission = {
+    const submission: Record<string, unknown> = {
       homeScore: result.homeScore,
       awayScore: result.awayScore,
       winnerTeamId: result.winnerTeamId,
       submittedAt: new Date().toISOString(),
     }
+    // Participants cannot UPDATE matches directly (migration 050), so replay
+    // links ride along in this side's submission.
+    if (replayUrls && Object.keys(replayUrls).length > 0) submission.replayUrls = replayUrls
 
-    // Atomic server-side merge: enforces side ownership and prevents two
-    // concurrent submissions from clobbering each other in matches.notes.
-    type Submission = typeof submission
-    let notes: Record<string, unknown>
-    const { data: mergedNotes, error: rpcError } = await supabase.rpc('submit_match_side' as never, {
+    // confirm_match_side merges this side atomically, enforces side ownership,
+    // and completes the match itself when both sides agree. The standings
+    // trigger recalculates on completion.
+    const { data, error: rpcError } = await supabase.rpc('confirm_match_side', {
       p_match_id: matchId,
       p_side: side,
       p_submission: submission,
-    } as never)
+    })
 
-    if (!rpcError && mergedNotes) {
-      notes = mergedNotes as Record<string, unknown>
-    } else if (rpcError && rpcError.code === 'PGRST202') {
-      // Migration not applied yet — legacy non-atomic merge
-      notes = this.parseMatchNotes(match.notes)
-      notes.submissions = { ...((notes.submissions as Record<string, Submission>) || {}), [side]: submission }
-    } else {
+    if (rpcError || !data) {
+      log.error('confirm_match_side failed:', rpcError)
       throw new Error(rpcError?.message || 'Failed to submit match result')
     }
 
-    const submissions = (notes.submissions || {}) as Record<string, Submission>
-    const otherSide = isHome ? 'away' : 'home'
-
-    // Check if the other team has already submitted
-    if (submissions[otherSide]) {
-      const otherResult = submissions[otherSide]
-      const resultsMatch =
-        otherResult.homeScore === result.homeScore &&
-        otherResult.awayScore === result.awayScore &&
-        otherResult.winnerTeamId === result.winnerTeamId
-
-      if (resultsMatch) {
-        // Both agree - auto-confirm match
-        await this.updateMatchResult(matchId, {
-          homeScore: result.homeScore,
-          awayScore: result.awayScore,
-          winnerTeamId: result.winnerTeamId,
-          status: 'completed',
-        })
-
-        // Update notes with confirmed status
-        const { error } = await supabase
-          .from('matches')
-          .update({
-            notes: JSON.stringify({ ...notes, submissions, confirmationStatus: 'confirmed' }),
-          })
-          .eq('id', matchId)
-        if (error) log.error('Failed to update match notes:', error)
-
-        // Update standings after confirmed match
-        try {
-          await this.updateStandings(match.league_id)
-        } catch (err) {
-          log.error('Failed to update standings after match confirmation:', err)
-        }
-
-        return { status: 'confirmed' }
-      } else {
-        // Results conflict - flag as disputed
-        const { error } = await supabase
-          .from('matches')
-          .update({
-            notes: JSON.stringify({ ...notes, submissions, confirmationStatus: 'disputed' }),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', matchId)
-        if (error) log.error('Failed to update match notes:', error)
-
-        return { status: 'disputed' }
-      }
-    }
-
-    // Only one submission so far - save and wait for other team
-    const { error } = await supabase
-      .from('matches')
-      .update({
-        notes: JSON.stringify({ ...notes, submissions, confirmationStatus: 'pending' }),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', matchId)
-    if (error) throw new Error('Failed to save submission')
-
-    return { status: 'pending' }
+    return { status: data.status }
   }
 
   /**
@@ -1688,152 +1624,23 @@ export class LeagueService {
   static async updateStandings(leagueId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not configured')
 
-    // standings has no client UPDATE policy — the SECURITY DEFINER RPC is the
-    // only write path that actually lands. The client-side computation below
-    // is kept only as a fallback for environments missing the migration.
+    // standings has no client UPDATE policy, so the SECURITY DEFINER RPC is the
+    // only write path that lands; a client-side fallback would silently write 0 rows.
     const { error: rpcError } = await supabase.rpc('recalculate_league_standings', {
       p_league_id: leagueId,
     })
-    if (!rpcError) {
-      // Cross-conference matches count for both conferences — keep the
-      // sibling conference's standings in sync too.
-      await this.recalcSiblingConference(leagueId)
-      return
-    }
-    log.warn('recalculate_league_standings RPC failed, falling back to client-side:', rpcError)
+    if (rpcError) throw new Error(`Failed to recalculate standings: ${rpcError.message}`)
 
-    // COST: settings/matches/standings rows are independent first reads —
-    // fire as one batch to cut 3 sequential round-trips down to 1.
-    const [settings, matchesResult, standingsResult] = await Promise.all([
-      this.getLeagueSettings(leagueId),
-      supabase
-        .from('matches')
-        .select('id, home_team_id, away_team_id, status, home_score, away_score, winner_team_id, completed_at')
-        .eq('league_id', leagueId)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: true }),
-      supabase
-        .from('standings')
-        .select('id, team_id')
-        .eq('league_id', leagueId),
-    ])
-
-    const pointsPerWin = settings.pointsPerWin ?? 3
-    const pointsPerDraw = settings.pointsPerDraw ?? 1
-
-    const { data: matches } = matchesResult
-    if (!matches) return
-
-    const { data: standingRows } = standingsResult
-    if (!standingRows || standingRows.length === 0) return
-
-    // Build a map of team stats
-    const teamStats = new Map<string, {
-      wins: number; losses: number; draws: number
-      pointsFor: number; pointsAgainst: number
-      results: ('W' | 'L' | 'D')[]
-    }>()
-
-    for (const row of standingRows) {
-      teamStats.set(row.team_id, {
-        wins: 0, losses: 0, draws: 0,
-        pointsFor: 0, pointsAgainst: 0,
-        results: [],
-      })
-    }
-
-    // Tally match results
-    for (const m of matches) {
-      const home = teamStats.get(m.home_team_id)
-      const away = teamStats.get(m.away_team_id)
-      if (!home || !away) continue
-
-      home.pointsFor += m.home_score
-      home.pointsAgainst += m.away_score
-      away.pointsFor += m.away_score
-      away.pointsAgainst += m.home_score
-
-      if (m.winner_team_id === m.home_team_id) {
-        home.wins++; home.results.push('W')
-        away.losses++; away.results.push('L')
-      } else if (m.winner_team_id === m.away_team_id) {
-        away.wins++; away.results.push('W')
-        home.losses++; home.results.push('L')
-      } else {
-        // Draw
-        home.draws++; home.results.push('D')
-        away.draws++; away.results.push('D')
-      }
-    }
-
-    // Compute streak from most recent results
-    const computeStreak = (results: ('W' | 'L' | 'D')[]): string | null => {
-      if (results.length === 0) return null
-      const last = results[results.length - 1]
-      let count = 0
-      for (let i = results.length - 1; i >= 0 && results[i] === last; i--) {
-        count++
-      }
-      return `${last}${count}`
-    }
-
-    // Sort teams for ranking: by wins desc, then point differential desc
-    const sortedTeams = [...teamStats.entries()]
-      .map(([teamId, stats]) => ({
-        teamId,
-        ...stats,
-        totalPoints: stats.wins * pointsPerWin + stats.draws * pointsPerDraw,
-        diff: stats.pointsFor - stats.pointsAgainst,
-      }))
-      .sort((a, b) => {
-        if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints
-        if (b.diff !== a.diff) return b.diff - a.diff
-        return b.wins - a.wins
-      })
-
-    // Update each standing row
-    const now = new Date().toISOString()
-    for (let i = 0; i < sortedTeams.length; i++) {
-      const t = sortedTeams[i]
-      const standingRow = standingRows.find(s => s.team_id === t.teamId)
-      if (!standingRow) continue
-
-      const { error } = await supabase
-        .from('standings')
-        .update({
-          wins: t.wins,
-          losses: t.losses,
-          draws: t.draws,
-          points_for: t.pointsFor,
-          points_against: t.pointsAgainst,
-          point_differential: t.diff,
-          rank: i + 1,
-          current_streak: computeStreak(t.results),
-          updated_at: now,
-        })
-        .eq('id', standingRow.id)
-
-      if (error) {
-        log.error(`Failed to update standing for team ${t.teamId}:`, error)
-      }
-    }
+    // Cross-conference matches count for both conferences — keep the
+    // sibling conference's standings in sync too.
+    await this.recalcSiblingConference(leagueId)
   }
 
   /**
-   * Recalculate standings from scratch using server-side RPC.
-   * Falls back to client-side recalculation if RPC is not available.
+   * Recalculate standings from scratch using the server-side RPC.
    */
   static async recalculateStandings(leagueId: string): Promise<void> {
-    if (!supabase) throw new Error('Supabase not configured')
-
-    const { error } = await supabase.rpc('recalculate_league_standings', {
-      p_league_id: leagueId,
-    })
-
-    if (error) {
-      log.warn('RPC recalculate_league_standings not available, falling back to client-side:', error)
-      await this.updateStandings(leagueId)
-    }
+    await this.updateStandings(leagueId)
   }
 
   /**

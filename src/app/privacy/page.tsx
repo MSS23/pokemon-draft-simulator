@@ -10,18 +10,18 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-12 max-w-3xl prose dark:prose-invert">
         <h1>Privacy Policy</h1>
-        <p className="text-muted-foreground">Last updated: March 2026</p>
+        <p className="text-muted-foreground">Last updated: November 2026</p>
 
         <h2>1. Data We Collect</h2>
         <h3>Account Data</h3>
         <ul>
-          <li><strong>Email &amp; password</strong> (if you create an account) — stored securely via Supabase Auth with bcrypt hashing.</li>
+          <li><strong>Email &amp; sign-in credentials</strong> (if you create an account) — handled by our authentication provider, Clerk. We never see or store your password.</li>
           <li><strong>Display name</strong> — chosen by you, visible to other draft participants.</li>
         </ul>
 
         <h3>Guest Sessions</h3>
         <ul>
-          <li>A locally-generated guest ID (e.g. <code>guest-timestamp-random</code>) stored in your browser&apos;s localStorage.</li>
+          <li>A random guest ID (<code>guest-&lt;uuid&gt;</code>) issued by our server and stored in an httpOnly cookie (<code>guest-session-id</code>, expires after 30 days). It is not readable by page scripts.</li>
           <li>No personal information is collected for guest users.</li>
         </ul>
 
@@ -33,7 +33,8 @@ export default function PrivacyPage() {
 
         <h3>Technical Data</h3>
         <ul>
-          <li><strong>Error reports</strong> — sent to Sentry for debugging (includes stack traces, browser info, URL). No personal data is intentionally included.</li>
+          <li><strong>Error reports</strong> — when error monitoring is enabled, sent to Sentry for debugging (stack traces, browser info, URL). Identifiers and tokens are scrubbed before sending.</li>
+          <li><strong>Feedback</strong> — messages you submit with the feedback button are forwarded to a private Discord channel so we can read them.</li>
           <li><strong>Connection timestamps</strong> — <code>last_seen</code> used for online/offline status during drafts.</li>
         </ul>
 
@@ -48,19 +49,25 @@ export default function PrivacyPage() {
         <p>All data is stored in Supabase (PostgreSQL) with Row Level Security policies. Data is hosted in Supabase&apos;s cloud infrastructure. We do not sell, share, or rent your data to third parties.</p>
 
         <h2>4. Cookies &amp; Local Storage</h2>
+        <p>We use these first-party cookies, which are needed for the Service to work:</p>
+        <ul>
+          <li>Clerk session cookies, which keep you signed in.</li>
+          <li>The httpOnly guest session cookie (<code>guest-session-id</code>) for guest users.</li>
+        </ul>
         <p>We use browser localStorage for:</p>
         <ul>
           <li>Theme preference (<code>pokemon-draft-theme</code>)</li>
-          <li>Guest user session ID</li>
-          <li>Draft participation records</li>
+          <li>Guest display name and draft participation records (display data only)</li>
           <li>Image display preference</li>
         </ul>
         <p>We do not use advertising or third-party tracking cookies.</p>
 
         <h2>5. Third-Party Services</h2>
         <ul>
-          <li><strong>Supabase</strong> — database, authentication, and real-time features.</li>
-          <li><strong>Sentry</strong> — error tracking and monitoring.</li>
+          <li><strong>Clerk</strong> — account sign-up, sign-in, and session management.</li>
+          <li><strong>Supabase</strong> — database and real-time features.</li>
+          <li><strong>Sentry</strong> — error tracking and monitoring (when enabled).</li>
+          <li><strong>Discord</strong> — receives feedback messages you choose to submit.</li>
           <li><strong>PokéAPI / Pokémon Showdown</strong> — Pokémon data and sprite images (no user data sent).</li>
           <li><strong>Vercel</strong> — hosting and deployment.</li>
         </ul>
@@ -76,7 +83,7 @@ export default function PrivacyPage() {
         <p>You have the right to:</p>
         <ul>
           <li><strong>Access</strong> your data — visit <Link href="/settings" className="text-primary hover:underline">Settings</Link> to download your data.</li>
-          <li><strong>Delete</strong> your account and associated data by contacting us.</li>
+          <li><strong>Delete</strong> your account and associated data yourself from the <Link href="/settings" className="text-primary hover:underline">Settings</Link> page.</li>
           <li><strong>Export</strong> your data in JSON format via the Settings page.</li>
         </ul>
 

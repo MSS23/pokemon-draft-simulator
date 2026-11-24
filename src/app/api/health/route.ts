@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
+import { reportMissingServerEnv } from '@/lib/env'
 
 // COST: thin liveness check — uptime monitors hit this every 30–60s. Edge
 // invocations are cheaper than Node, and a short s-maxage absorbs duplicate
@@ -15,6 +16,8 @@ interface HealthCheck {
   timestamp: string
   version: string
   uptime: number
+  // Public + cached: say a secret is missing, never which one.
+  config?: 'missing'
   checks: {
     database: ServiceCheck
     pokeapi: ServiceCheck
@@ -48,6 +51,11 @@ export async function GET() {
       database: { status: 'unconfigured' },
       pokeapi: { status: 'unconfigured' },
     },
+  }
+
+  if (reportMissingServerEnv().length > 0) {
+    health.status = 'degraded'
+    health.config = 'missing'
   }
 
   // Check database

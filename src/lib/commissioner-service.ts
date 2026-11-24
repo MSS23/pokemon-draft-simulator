@@ -5,7 +5,6 @@
  * - Match result overrides
  * - Force advance week
  * - Announcements
- * - Standings adjustments
  */
 
 import { supabase } from './supabase'
@@ -68,47 +67,15 @@ export class CommissionerService {
   static async forceAdvanceWeek(leagueId: string): Promise<void> {
     if (!supabase) throw new Error('Supabase not available')
 
-    const { data: league } = await supabase
-      .from('leagues')
-      .select('current_week, total_weeks')
-      .eq('id', leagueId)
-      .single()
+    // One transaction server-side: commissioner check, advance (or complete
+    // the league after the last week) and cancel the skipped week's matches.
+    const { data, error } = await supabase.rpc('force_advance_week', { p_league_id: leagueId })
 
-    if (!league) throw new Error('League not found')
-
-    // Cancel any incomplete matches for the current week
-    await supabase
-      .from('matches')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('league_id', leagueId)
-      .eq('week_number', league.current_week)
-      .eq('status', 'scheduled')
-
-    const nextWeek = league.current_week + 1
-
-    if (nextWeek > league.total_weeks) {
-      await supabase
-        .from('leagues')
-        .update({
-          status: 'completed',
-          end_date: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', leagueId)
-    } else {
-      await supabase
-        .from('leagues')
-        .update({
-          current_week: nextWeek,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', leagueId)
+    if (error || !data) {
+      throw new Error(`Failed to advance week: ${error?.code === '42501' ? 'not permitted' : error?.message || 'unknown error'}`)
     }
 
-    log.info(`League ${leagueId} force-advanced to week ${nextWeek}`)
+    log.info(`League ${leagueId} force-advanced to week ${data.currentWeek} (${data.status})`)
   }
 
   /**
@@ -204,42 +171,6 @@ export class CommissionerService {
       .eq('id', leagueId)
 
     if (error) throw new Error(`Failed to toggle pin: ${error?.message || 'Unknown error'}`)
-  }
-
-  /**
-   * Adjust team standings points manually
-   */
-  static async adjustStandingsPoints(
-    leagueId: string,
-    teamId: string,
-    winsAdjust: number,
-    lossesAdjust: number
-  ): Promise<void> {
-    if (!supabase) throw new Error('Supabase not available')
-
-    // Get current standing
-    const { data: standing } = await supabase
-      .from('standings')
-      .select('*')
-      .eq('league_id', leagueId)
-      .eq('team_id', teamId)
-      .single()
-
-    if (!standing) throw new Error('Standing not found')
-
-    const { error } = await supabase
-      .from('standings')
-      .update({
-        wins: standing.wins + winsAdjust,
-        losses: standing.losses + lossesAdjust,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('league_id', leagueId)
-      .eq('team_id', teamId)
-
-    if (error) throw new Error(`Failed to adjust standings: ${error?.message || 'Unknown error'}`)
-
-    log.info(`Standings adjusted for team ${teamId}: +${winsAdjust}W, +${lossesAdjust}L`)
   }
 
   /**

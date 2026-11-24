@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
 export interface MonitoringResponse {
@@ -11,7 +11,17 @@ export interface MonitoringResponse {
   dbStatus: 'up' | 'down' | 'unconfigured'
 }
 
-export async function GET() {
+// Internal ops data (instance channel count, DB latency): same Bearer CRON_SECRET
+// gate as /api/cron/draft-tick so the public cannot probe or hammer the DB.
+export async function GET(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET
+  if (!cronSecret) {
+    return NextResponse.json({ error: 'Not configured' }, { status: 503 })
+  }
+  if (request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   // Supabase not configured
   if (!supabase) {
     const response: MonitoringResponse = {
@@ -39,7 +49,8 @@ export async function GET() {
     const times: number[] = []
     for (let i = 0; i < probes; i++) {
       const t0 = Date.now()
-      await supabase.from('drafts').select('id').limit(1)
+      const { error } = await supabase.from('drafts').select('id').limit(1)
+      if (error) throw error
       times.push(Date.now() - t0)
     }
     avgQueryLatencyMs = Math.round(times.reduce((a, b) => a + b, 0) / times.length)

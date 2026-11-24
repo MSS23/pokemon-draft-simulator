@@ -28,8 +28,9 @@ function decodeRole(jwt: string): string | null {
  * calls the whoami() RPC and asserts it equals the Clerk userId.
  *
  *   - 200 { bridge: 'up' }        — signed in AND whoami() === Clerk userId
- *   - 200 { bridge: 'down', ... } — signed in but whoami() is null/mismatched
- *                                    (Clerk third-party auth is not configured)
+ *   - 503 { bridge: 'down', ... } — signed in but whoami() is null/mismatched
+ *                                    (Clerk third-party auth is not configured);
+ *                                    503 so status-code uptime checks alert
  *   - 401                         — not signed in (cannot probe)
  *
  * A `down` result while signed in is a P0 alert: writes are silently running in
@@ -56,7 +57,7 @@ export async function GET() {
       log.error('JWT bridge DOWN: session token has no role=authenticated claim', { role })
       return NextResponse.json(
         { bridge: 'down', reason: `token missing role=authenticated — JWT template "${CLERK_SUPABASE_JWT_TEMPLATE}" missing on this Clerk instance?` },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
       )
     }
 
@@ -67,7 +68,7 @@ export async function GET() {
       log.error('whoami RPC failed during bridge probe', { error: error.message })
       return NextResponse.json(
         { bridge: 'down', reason: 'whoami RPC error' },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 503, headers: { 'Cache-Control': 'no-store' } }
       )
     }
 
@@ -85,13 +86,13 @@ export async function GET() {
     })
     return NextResponse.json(
       { bridge: 'down', reason: resolved ? 'identity mismatch' : 'clerk_user_id() is null' },
-      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
     )
   } catch (err) {
     log.error('Bridge probe threw', { error: err instanceof Error ? err.message : String(err) })
     return NextResponse.json(
       { bridge: 'down', reason: 'probe exception' },
-      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
     )
   }
 }

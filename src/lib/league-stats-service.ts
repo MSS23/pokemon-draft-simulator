@@ -9,7 +9,8 @@
  * - Streak tracking
  */
 
-import { supabase } from './supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { supabase, type Database } from './supabase'
 import { createLogger } from '@/lib/logger'
 import type { TeamPokemonStatusRow } from '@/types/supabase-helpers'
 
@@ -584,11 +585,17 @@ export class LeagueStatsService {
   /**
    * Get advanced statistics for a team
    */
-  static async getAdvancedTeamStats(teamId: string): Promise<AdvancedTeamStats | null> {
-    const cached = this.getCache<AdvancedTeamStats>(`stats:${teamId}`)
+  static async getAdvancedTeamStats(
+    teamId: string,
+    // server callers pass a service-role client: the browser client is anon there and RLS hides private leagues
+    db: SupabaseClient<Database> | null = supabase
+  ): Promise<AdvancedTeamStats | null> {
+    // cache only default-client reads so an anon (RLS-filtered) result never shadows a service-role one
+    const useCache = db === supabase
+    const cached = useCache ? this.getCache<AdvancedTeamStats>(`stats:${teamId}`) : null
     if (cached) return cached
 
-    if (!supabase) {
+    if (!db) {
       throw new Error('Supabase not available')
     }
 
@@ -603,12 +610,12 @@ export class LeagueStatsService {
         picksResponse,
         pokemonStatusesResponse,
       ] = await Promise.all([
-        supabase
+        db
           .from('teams')
           .select('id, name')
           .eq('id', teamId)
           .single(),
-        supabase
+        db
           .from('standings')
           .select('wins, losses, draws, points_for, points_against')
           .eq('team_id', teamId)
@@ -617,16 +624,16 @@ export class LeagueStatsService {
           .order('updated_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase
+        db
           .from('matches')
           .select('id, home_team_id, away_team_id, home_score, away_score, winner_team_id')
           .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
           .eq('status', 'completed'),
-        supabase
+        db
           .from('picks')
           .select('id')
           .eq('team_id', teamId),
-        supabase
+        db
           .from('team_pokemon_status')
           .select('status')
           .eq('team_id', teamId),
@@ -642,11 +649,11 @@ export class LeagueStatsService {
 
       // Kills = scorer_pick_id (this team's Pokemon scored), faints = pick_id
       const [kosGivenResponse, kosTakenResponse] = await Promise.all([
-        supabase
+        db
           .from('match_pokemon_kos')
           .select('ko_count')
           .in('scorer_pick_id', pickIds),
-        supabase
+        db
           .from('match_pokemon_kos')
           .select('ko_count')
           .in('pick_id', pickIds),
@@ -711,7 +718,7 @@ export class LeagueStatsService {
         deadPokemon,
         healthyRosterPercentage: (activePokemon / totalPokemon) * 100
       } as AdvancedTeamStats
-      this.setCache(`stats:${teamId}`, result)
+      if (useCache) this.setCache(`stats:${teamId}`, result)
       return result
     } catch (error) {
       log.error('Error fetching advanced team stats:', error)
