@@ -6,11 +6,30 @@ The `Migrate` workflow (`.github/workflows/migrate.yml`) runs
 `supabase_migrations.schema_migrations` table.
 
 Production was built partly by hand (SQL editor / MCP `apply_migration`), so its
-ledger lists only some of the repo versions (21 of 46 at the 2026-11 audit).
-Missing versions include `00000000000000_bootstrap` and most of
-`20260324114022`..`20260510163223`. A plain `db push` would replay them. Some
-run `DROP TABLE IF EXISTS trades / trade_approvals CASCADE` and rewrite RLS
-from older definitions.
+ledger does not list every repo version. A plain `db push` would replay the
+missing ones. Some run `DROP TABLE IF EXISTS trades / trade_approvals CASCADE`
+and rewrite RLS from older definitions.
+
+## Status (2026-11-24)
+
+- Fresh-DB replay of every file in `supabase/migrations/` is green (CI
+  `db-contract` job, since PR #16).
+- Every ledger row from `20260510174552` onward matches a repo file by version
+  and name. The MCP-assigned versions were rewritten to the repo filenames,
+  and the nine remote-only rows (`supa_02_rls_indexes_backfill`, `023`..`030`)
+  were fetched into the repo verbatim (PR #18).
+- MCP `apply_migration` stamps the ledger with the current time, not the
+  filename version. After each MCP apply, repair the row:
+  `UPDATE supabase_migrations.schema_migrations SET version='<file version>',
+  name='<file name>' WHERE version='<mcp stamp>';`
+- The 37 repo versions that had no ledger row (applied by hand before the
+  ledger existed: `00000000000000_bootstrap`, `20260324114022`..`20260510163223`,
+  `20260705120000`..`20260705120300`, `20260717120000`, `20260717130000`,
+  `20261024190000`) were inserted as applied rows with
+  `created_by = 'repair 2026-11-24'` and no `statements`. The ledger now has
+  76 rows matching the 76 files one to one, so `supabase db push --linked
+  --dry-run` should report up to date. Steps 2-5 below are done; keep them
+  for the next time the two sides drift.
 
 ## Rules
 
@@ -23,10 +42,8 @@ from older definitions.
 
 ## Steps
 
-1. Fix the duplicate version first (bucket B, migration files):
-   `20260403000000_rls_indexes.sql` and `20260403000100_rls_security_definer.sql` share
-   version `20260403`. Rename them to unique 14-digit versions. Do the ledger
-   repair after the rename, because the rename changes the version keys.
+1. Done 2026-11-24: the duplicate version `20260403` was split into
+   `20260403000000_rls_indexes.sql` and `20260403000100_rls_security_definer.sql`.
 2. Compare the two sides:
    ```sh
    supabase link --project-ref "$PROD_PROJECT_REF" --password "$PROD_DB_PASSWORD"
