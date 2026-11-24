@@ -60,7 +60,16 @@
 -- 0. Sanity: ensure RLS is enabled on realtime.messages
 -- =====================================================================
 
-ALTER TABLE IF EXISTS realtime.messages ENABLE ROW LEVEL SECURITY;
+-- Repo note: on a fresh local stack the migration runner (postgres) does not own
+-- realtime.messages, so the ALTER below raises 42501. RLS is already enabled on
+-- that table by default; tolerate the privilege error instead of failing replay.
+DO $rls$
+BEGIN
+  ALTER TABLE IF EXISTS realtime.messages ENABLE ROW LEVEL SECURITY;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'realtime.messages: not owner, RLS left as-is';
+END
+$rls$;
 
 -- =====================================================================
 -- 1. Drop any prior policies from earlier attempts of this migration
