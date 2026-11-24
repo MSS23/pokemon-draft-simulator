@@ -1511,10 +1511,6 @@ export type Database = {
         Args: { p_draft_id: string; p_team_id: string }
         Returns: Record<string, unknown>
       }
-      get_draft_history: {
-        Args: { p_draft_id: string }
-        Returns: Record<string, unknown>[]
-      }
       record_draft_action: {
         Args: { p_draft_id: string; p_action_type: string; p_action_data: Record<string, unknown> }
         Returns: undefined

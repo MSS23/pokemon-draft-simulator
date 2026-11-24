@@ -18,7 +18,7 @@ CREATE TABLE trades (
   team_a_gives TEXT[] NOT NULL DEFAULT '{}',
   team_b_gives TEXT[] NOT NULL DEFAULT '{}',
   status TEXT NOT NULL DEFAULT 'proposed' CHECK (status IN ('proposed', 'accepted', 'rejected', 'completed', 'cancelled')),
-  proposed_by UUID NOT NULL,
+  proposed_by TEXT NOT NULL, -- Clerk user id; matches live column type
   proposed_at TIMESTAMPTZ DEFAULT NOW(),
   responded_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
@@ -71,12 +71,11 @@ SELECT
   t.updated_at,
   COALESCE(ta.name, 'Unknown') AS team_a_name,
   COALESCE(tb.name, 'Unknown') AS team_b_name,
-  COALESCE(tp.name, 'Unknown') AS proposed_by_name,
+  COALESCE(t.proposed_by, 'Unknown') AS proposed_by_name,
   COALESCE(l.name, 'Unknown') AS league_name
 FROM trades t
 LEFT JOIN teams ta ON ta.id = t.team_a_id
 LEFT JOIN teams tb ON tb.id = t.team_b_id
-LEFT JOIN teams tp ON tp.id = t.proposed_by
 LEFT JOIN leagues l ON l.id = t.league_id;
 
 -- ============================================

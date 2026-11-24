@@ -386,6 +386,18 @@ CREATE POLICY wishlist_items_delete_owner ON public.wishlist_items
     )
   );
 
+-- Live shape: insert policy no longer uses get_participant_user_id (dropped in 047).
+DROP POLICY IF EXISTS wishlist_items_insert_owner ON public.wishlist_items;
+CREATE POLICY wishlist_items_insert_owner ON public.wishlist_items
+  FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM participants p
+       WHERE p.id      = wishlist_items.participant_id
+         AND p.user_id = public.clerk_user_id()
+    )
+  );
+
 COMMENT ON TABLE public.wishlist_items IS
   'Private per-participant priority queue. Owner-only RLS — neither anon '
   'nor cross-tenant authenticated reads are allowed.';
