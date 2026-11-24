@@ -1,8 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextResponse, type NextRequest } from 'next/server'
-import { Ratelimit } from '@upstash/ratelimit'
-import { Redis } from '@upstash/redis'
+import { NextResponse } from 'next/server'
 import { handleCorsPreflightIfNeeded } from '@/lib/cors'
+import { applyRateLimit } from '@/lib/rate-limit'
 
 // ============================================================================
 // CSP NONCE — Per-request nonce for script-src (SEC-02)
@@ -85,103 +84,6 @@ function buildCSP(nonce: string): string {
 }
 
 // ============================================================================
-// RATE LIMITING — Upstash Redis (with in-memory fallback)
-// ============================================================================
-
-// In-memory fallback for when Redis is not configured
-class InMemoryRateLimiter {
-  private requests = new Map<string, number[]>()
-
-  isAllowed(key: string, limit: number, windowMs: number): boolean {
-    const now = Date.now()
-    const timestamps = this.requests.get(key) || []
-    const validTimestamps = timestamps.filter(t => now - t < windowMs)
-
-    if (validTimestamps.length >= limit) return false
-
-    validTimestamps.push(now)
-    this.requests.set(key, validTimestamps)
-
-    if (this.requests.size > 10000) {
-      for (const [entryKey, entryTimestamps] of this.requests) {
-        const valid = entryTimestamps.filter(t => now - t < windowMs)
-        if (valid.length === 0) this.requests.delete(entryKey)
-        else this.requests.set(entryKey, valid)
-      }
-    }
-    return true
-  }
-}
-
-const inMemoryLimiter = new InMemoryRateLimiter()
-
-// Upstash Redis rate limiters (per route pattern)
-const hasRedis = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
-
-let redis: Redis | null = null
-let upstashLimiters: Record<string, Ratelimit> | null = null
-
-try {
-  if (hasRedis) {
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-    })
-    upstashLimiters = {
-      drafts: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:drafts' }),
-      joins: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(30, '1 m'), prefix: 'rl:joins' }),
-      tournaments: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:tournaments' }),
-      passwordVerify: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:pw-verify' }),
-      picks: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(60, '1 m'), prefix: 'rl:picks' }),
-      bids: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(120, '1 m'), prefix: 'rl:bids' }),
-      export: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 h'), prefix: 'rl:export' }),
-      ai: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 h'), prefix: 'rl:ai' }),
-      user: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(5, '1 m'), prefix: 'rl:user' }),
-      sheets: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m'), prefix: 'rl:sheets' }),
-      feedback: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(3, '1 h'), prefix: 'rl:feedback' }),
-      wsConnect: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(10, '1 m'), prefix: 'rl:ws-connect' }),
-      default: new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(100, '1 m'), prefix: 'rl:api' }),
-    }
-  }
-} catch (err) {
-  console.error('[RateLimit] Failed to initialize Upstash Redis:', err)
-  redis = null
-  upstashLimiters = null
-}
-
-// SEC-AUDIT (vibe-security): Map matches REAL routes under src/app/api/**.
-// Order matters — `applyRateLimiting` walks this map and uses the first
-// matching prefix, so put narrower paths above broader ones.
-const RATE_LIMITS: Record<string, { limit: number; window: number; key?: keyof NonNullable<typeof upstashLimiters> }> = {
-  // Auth-sensitive: brute-force surface for short user-chosen draft passwords
-  '/api/draft/verify-password': { limit: 5, window: 60000, key: 'passwordVerify' },
-  '/api/draft/create': { limit: 10, window: 3600000, key: 'drafts' },
-  '/api/draft/join': { limit: 30, window: 60000, key: 'joins' },
-  '/api/tournament/create': { limit: 10, window: 3600000, key: 'tournaments' },
-  '/api/user/export': { limit: 5, window: 3600000, key: 'export' },
-  '/api/user': { limit: 5, window: 60000, key: 'user' },   // 5/min — tight: delete is destructive
-  '/api/ai': { limit: 10, window: 3600000, key: 'ai' },    // 10/hr — AI analysis is expensive
-  '/api/sheets': { limit: 10, window: 60000, key: 'sheets' }, // public proxy — prevent free use as a CSV fetcher
-  '/api/feedback': { limit: 3, window: 3600000, key: 'feedback' }, // Discord webhook spam guard
-  '/api/': { limit: 100, window: 60000, key: 'default' },
-}
-
-function getClientId(request: NextRequest): string {
-  // Use Clerk-injected user ID (set by clerkMiddleware) for authenticated requests.
-  // This is not spoofable — it comes from the verified JWT, not client headers or cookies.
-  const clerkUserId = request.headers.get('x-clerk-user-id')
-  if (clerkUserId) return `user:${clerkUserId}`
-
-  // IP-based fallback for unauthenticated requests (guests, public routes)
-  // x-forwarded-for may contain a comma-separated list — take the first (client) IP
-  const forwardedFor = request.headers.get('x-forwarded-for')
-  const ip = (forwardedFor ? forwardedFor.split(',')[0].trim() : null) ||
-             request.headers.get('x-real-ip') ||
-             'unknown'
-  return `ip:${ip}`
-}
-
-// ============================================================================
 // ROUTE MATCHERS
 // ============================================================================
 
@@ -234,70 +136,29 @@ const isPublicApiRoute = createRouteMatcher([
   '/api/sheets',        // Google Sheets proxy — public data
   '/api/formats',       // Format list reads — public catalog (not /formats/sync)
   '/api/guest/(.*)',    // SEC-06: guest session endpoint — must be public for unauthenticated guests
+  '/api/webhooks/(.*)', // Signed by the sender (Svix); verified in the route, never Clerk-session gated
 ])
 
 // ============================================================================
 // MIDDLEWARE
 // ============================================================================
 
-async function applyRateLimit(request: NextRequest, requestId: string): Promise<NextResponse | null> {
-  const { pathname } = request.nextUrl
-
-  if (!pathname.startsWith('/api/')) return null
-
-  const clientId = getClientId(request)
-
-  // Find matching rate limit config
-  let rateLimit = RATE_LIMITS['/api/']
-  for (const [path, config] of Object.entries(RATE_LIMITS)) {
-    if (pathname.startsWith(path) && path !== '/api/') {
-      rateLimit = config
-      break
-    }
-  }
-
-  const { limit, window: windowMs } = rateLimit
-  let isAllowed = true
-
-  // Use Upstash Redis if available, otherwise fall back to in-memory
-  if (upstashLimiters && rateLimit.key && rateLimit.key in upstashLimiters) {
-    try {
-      const result = await upstashLimiters[rateLimit.key].limit(clientId)
-      isAllowed = result.success
-    } catch (err) {
-      console.error('[RateLimit] Redis call failed, falling back to in-memory limiter:', err)
-      isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
-    }
-  } else {
-    // Use 3x the limit since in-memory state resets between serverless invocations
-    isAllowed = inMemoryLimiter.isAllowed(clientId, limit * 3, windowMs)
-  }
-
-  if (!isAllowed) {
-    return NextResponse.json(
-      {
-        error: 'Rate limit exceeded',
-        message: 'Too many requests. Please try again later.',
-        retryAfter: Math.ceil(windowMs / 1000),
-        requestId,
-      },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': String(Math.ceil(windowMs / 1000)),
-          'X-RateLimit-Limit': String(limit),
-          'X-RateLimit-Remaining': '0',
-          'X-Request-Id': requestId,
-        },
-      }
-    )
-  }
-
-  return null
+function authUnavailable(requestId: string): NextResponse {
+  return NextResponse.json(
+    { error: 'Authentication service unavailable', requestId },
+    { status: 503, headers: { 'Retry-After': '30', 'x-request-id': requestId } }
+  )
 }
 
 export default clerkMiddleware(
   async (auth, request) => {
+  // SEC-05: Strip CVE-2025-29927 exploitation vector at edge. Built before the
+  // try so the error path still forwards sanitized headers and a request id.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.delete('x-middleware-subrequest')
+  const requestId = requestHeaders.get('x-request-id') || crypto.randomUUID()
+  const requiresApiAuth = isAuthRequiredApiRoute(request) && !isPublicApiRoute(request)
+
   try {
     // SEC-04: Handle CORS preflight at edge — reject disallowed origins early
     if (request.method === 'OPTIONS' && request.nextUrl.pathname.startsWith('/api/')) {
@@ -305,36 +166,36 @@ export default clerkMiddleware(
       if (preflightResponse) return preflightResponse
     }
 
-    // SEC-05: Strip CVE-2025-29927 exploitation vector at edge
-    const requestHeaders = new Headers(request.headers)
-    requestHeaders.delete('x-middleware-subrequest')
-
-    // Generate request ID for tracing
-    const requestId = requestHeaders.get('x-request-id') || crypto.randomUUID()
-
     // SEC-02: Generate per-request nonce for CSP script-src
     const nonce = generateNonce()
     requestHeaders.set('x-nonce', nonce)
 
-    // Apply rate limiting to API routes
-    const rateLimitResponse = await applyRateLimit(request, requestId)
+    // Verified Clerk identity keys the rate limit and gates auth-required APIs.
+    let userId: string | null = null
+    let authFailed = false
+    if (request.nextUrl.pathname.startsWith('/api/')) {
+      try {
+        userId = (await auth()).userId
+      } catch (err) {
+        authFailed = true
+        console.warn('[Middleware] auth() failed; rate-limiting by IP:', err)
+      }
+    }
+
+    const rateLimitResponse = await applyRateLimit(request, requestId, userId)
     if (rateLimitResponse) return rateLimitResponse
 
     // SEC-01: Enforce Clerk auth on mutating/sensitive API routes at the edge.
-    if (isAuthRequiredApiRoute(request) && !isPublicApiRoute(request)) {
-      try {
-        const { userId } = await auth()
-        if (!userId) {
-          return NextResponse.json(
-            { error: 'Authentication required', requestId },
-            {
-              status: 401,
-              headers: { 'x-request-id': requestId },
-            }
-          )
-        }
-      } catch {
-        // Auth check failed — let the request through to route-level auth
+    if (requiresApiAuth) {
+      if (authFailed) return authUnavailable(requestId)
+      if (!userId) {
+        return NextResponse.json(
+          { error: 'Authentication required', requestId },
+          {
+            status: 401,
+            headers: { 'x-request-id': requestId },
+          }
+        )
       }
     }
 
@@ -362,9 +223,13 @@ export default clerkMiddleware(
 
     return response
   } catch (error) {
-    // Middleware must never crash — pass through on error
     console.error('[Middleware] Unhandled error:', error)
-    return NextResponse.next()
+    // Auth-required APIs fail closed; everything else stays up on the
+    // next.config baseline CSP rather than turning a Clerk blip into an outage.
+    if (requiresApiAuth) return authUnavailable(requestId)
+    const response = NextResponse.next({ request: { headers: requestHeaders } })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
   },
   {
@@ -389,7 +254,9 @@ export const config = {
      * - manifest.json (PWA manifest)
      * - sw.js (service worker)
      * - public folder files (images, icons, etc.)
+     * - data/ (static format packs) and api/time (clock sync): need neither
+     *   auth nor a CSP nonce, so skip the billed middleware invocation
      */
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icon-.*\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|data/|api/time$|favicon.ico|manifest.json|sw.js|icon-.*\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

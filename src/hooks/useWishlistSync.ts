@@ -34,7 +34,6 @@ export function useWishlistSync({
   )
   const userWishlist = useDraftStore(wishlistSelector)
   const channelRef = useRef<RealtimeChannel | null>(null)
-  const lastSyncRef = useRef<number>(0)
   const draftUuidRef = useRef<string | null>(null)
 
   // Helper function to get draft UUID from room code
@@ -105,7 +104,6 @@ export function useWishlistSync({
         }))
 
         setWishlistItems(wishlistItems)
-        lastSyncRef.current = Date.now()
       } catch (error) {
         log.error('Error loading initial wishlist:', error)
       }
@@ -118,18 +116,53 @@ export function useWishlistSync({
   useEffect(() => {
     if (!enabled || !draftId || !supabase) return
 
-    const setupSubscription = async () => {
-      // Clean up existing channel
-      if (channelRef.current) {
-        channelRef.current.unsubscribe()
-      }
+    let cancelled = false
+    let refetchTimer: ReturnType<typeof setTimeout> | null = null
 
+    const refetchWishlist = async () => {
+      try {
+        // Refetch all wishlist items to ensure consistency
+        if (!supabase || cancelled) return
+        const uuid = draftUuidRef.current || await getDraftUuid(draftId)
+        if (!uuid || cancelled) return
+        const { data, error } = await supabase
+          .from('wishlist_items')
+          .select('*')
+          .eq('draft_id', uuid)
+          .order('participant_id, priority')
+
+        if (error) {
+          log.error('Error syncing wishlist:', error)
+          return
+        }
+        if (cancelled) return
+
+        const updatedItems: WishlistItem[] = (data ?? []).map(item => ({
+          id: item.id,
+          draftId: item.draft_id,
+          participantId: item.participant_id,
+          pokemonId: item.pokemon_id,
+          pokemonName: item.pokemon_name,
+          priority: item.priority,
+          isAvailable: item.is_available,
+          cost: item.cost,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at
+        }))
+
+        setWishlistItems(updatedItems)
+      } catch (error) {
+        log.error('Error handling wishlist change:', error)
+      }
+    }
+
+    const setupSubscription = async () => {
       if (!supabase) return
-      
+
       // Get the actual draft UUID
       const draftUuid = await getDraftUuid(draftId)
-      if (!draftUuid) return
-      
+      if (!draftUuid || cancelled) return
+
       const channel = supabase
         // private: true — gated by realtime.messages RLS (migration 029):
         // only participants of this draft can subscribe to wishlist events.
@@ -146,45 +179,14 @@ export function useWishlistSync({
             table: 'wishlist_items',
             filter: `draft_id=eq.${draftUuid}`
           },
-          async (_payload) => {
-            // Debounce rapid changes
-            const now = Date.now()
-            if (now - lastSyncRef.current < 100) return
-            lastSyncRef.current = now
-
-            try {
-              // Refetch all wishlist items to ensure consistency
-              if (!supabase) return
-              const uuid = draftUuidRef.current || await getDraftUuid(draftId)
-              if (!uuid) return
-              const { data, error } = await supabase
-                .from('wishlist_items')
-                .select('*')
-                .eq('draft_id', uuid)
-                .order('participant_id, priority')
-
-              if (error) {
-                log.error('Error syncing wishlist:', error)
-                return
-              }
-
-              const updatedItems: WishlistItem[] = (data ?? []).map(item => ({
-                id: item.id,
-                draftId: item.draft_id,
-                participantId: item.participant_id,
-                pokemonId: item.pokemon_id,
-                pokemonName: item.pokemon_name,
-                priority: item.priority,
-                isAvailable: item.is_available,
-                cost: item.cost,
-                createdAt: item.created_at,
-                updatedAt: item.updated_at
-              }))
-
-              setWishlistItems(updatedItems)
-            } catch (error) {
-              log.error('Error handling wishlist change:', error)
-            }
+          () => {
+            // Trailing debounce: a burst of row changes ends in one refetch
+            // that sees the final state.
+            if (refetchTimer) clearTimeout(refetchTimer)
+            refetchTimer = setTimeout(() => {
+              refetchTimer = null
+              void refetchWishlist()
+            }, 150)
           }
         )
         .on(
@@ -213,9 +215,8 @@ export function useWishlistSync({
           if (status === 'SUBSCRIBED') {
             log.info(`Subscribed to wishlist changes for draft ${draftId}`)
           } else if (status === 'CHANNEL_ERROR') {
+            // realtime-js rejoins errored channels itself; no manual retry.
             log.error(`Wishlist subscription error for draft ${draftId}`)
-            // Retry subscription after delay
-            setTimeout(setupSubscription, 2000)
           }
         })
 
@@ -226,8 +227,12 @@ export function useWishlistSync({
 
     // Cleanup on unmount
     return () => {
+      cancelled = true
+      if (refetchTimer) clearTimeout(refetchTimer)
       if (channelRef.current) {
-        channelRef.current.unsubscribe()
+        // removeChannel (not just unsubscribe) so a remount does not get this
+        // stale channel back from supabase.channel(topic).
+        void supabase?.removeChannel(channelRef.current)
         channelRef.current = null
       }
     }

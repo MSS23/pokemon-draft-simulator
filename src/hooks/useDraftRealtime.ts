@@ -99,6 +99,9 @@ export function useDraftRealtime(
 
   // Refs
   const managerRef = useRef<DraftRealtimeManager | null>(null)
+  // supabase.channel(topic) hands back the existing same-topic channel, so a
+  // new manager must not subscribe until the previous one has removed it.
+  const cleanupPromiseRef = useRef<Promise<void>>(Promise.resolve())
   const lastTurnRef = useRef<number | null>(null)
   const lastStatusRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
@@ -215,7 +218,7 @@ export function useDraftRealtime(
 
     // Clean up any existing manager
     if (managerRef.current) {
-      managerRef.current.cleanup()
+      cleanupPromiseRef.current = managerRef.current.cleanup()
       managerRef.current = null
     }
 
@@ -230,8 +233,12 @@ export function useDraftRealtime(
 
     managerRef.current = manager
 
-    // Start subscription
-    manager.subscribe().catch((err) => {
+    // Public-draft spectators (anon or signed in) may join draft:<uuid> and
+    // auction-live:<uuid> read-only since migration 049; private drafts stay
+    // participant-only, so callers must keep their polling fallback.
+    // Start subscription once the previous manager's channel is gone
+    // (subscribe() is a no-op if this manager was cleaned up meanwhile).
+    cleanupPromiseRef.current.then(() => manager.subscribe()).catch((err) => {
       log.error('Subscription error:', err)
       handleError(err instanceof Error ? err : new Error(String(err)))
     })
@@ -240,7 +247,7 @@ export function useDraftRealtime(
     return () => {
       isMountedRef.current = false
       if (managerRef.current) {
-        managerRef.current.cleanup()
+        cleanupPromiseRef.current = managerRef.current.cleanup()
         managerRef.current = null
       }
     }
@@ -264,7 +271,8 @@ export function useDraftRealtime(
   const reconnect = useCallback(async () => {
     if (!managerRef.current || !draftId || !userId) return
 
-    await managerRef.current.cleanup()
+    cleanupPromiseRef.current = managerRef.current.cleanup()
+    await cleanupPromiseRef.current
 
     const manager = createDraftRealtimeManager(draftId, userId, {
       onDraftEvent: handleDraftEvent,
@@ -328,6 +336,8 @@ export function useDraftStateWithRealtime(
     if (!roomCode) return
 
     try {
+      // Realtime refreshes must not be served from the 2s state cache.
+      DraftService.invalidateDraftStateCache(roomCode)
       const state = await DraftService.getDraftState(roomCode)
       setDraftState(state)
       setLoadError(null)

@@ -73,6 +73,9 @@ const nextConfig: NextConfig = {
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://pokeapi.co https://raw.githubusercontent.com https://*.sentry.io https://*.ingest.sentry.io https://us.i.posthog.com https://vercel.live https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://clerk.draftpokemon.com https://api.clerk.com",
       "frame-src 'self' https://accounts.google.com https://discord.com https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+      // Framing is governed by CSP alone; a SAMEORIGIN X-Frame-Options header
+      // contradicted this. OBS Browser Source loads /spectate/*/broadcast as a
+      // top-level page, so it needs no frame allowance.
       "frame-ancestors 'none'",
       "worker-src 'self' blob:",
       "manifest-src 'self'",
@@ -89,10 +92,6 @@ const nextConfig: NextConfig = {
           {
             key: 'X-DNS-Prefetch-Control',
             value: 'on'
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
           },
           {
             key: 'X-Content-Type-Options',
@@ -208,11 +207,15 @@ const pwaConfig = withPWA({
       urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/'),
       handler: 'NetworkOnly',
     },
+    // Same-origin only: a cross-origin catch-all stored Authorization-bearing
+    // Supabase REST rows in Cache Storage. Renamed so entries cached under the
+    // old rule are never served again.
     {
-      urlPattern: /^https?.*/,
+      urlPattern: ({ sameOrigin, url }: { sameOrigin: boolean; url: URL }) =>
+        sameOrigin && !url.pathname.startsWith('/api/'),
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'offlineCache',
+        cacheName: 'offlineCache-v2',
         expiration: {
           maxEntries: 200,
           maxAgeSeconds: 24 * 60 * 60, // 24 hours

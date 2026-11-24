@@ -7,11 +7,8 @@ import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { draftSounds } from '@/lib/draft-sounds'
 import { getTimerColor, useReducedMotion } from '@/lib/draft-animations'
-import { DraftService } from '@/lib/draft-service'
-import {
-  calculateDeadlineTimeRemaining,
-  estimateServerClockOffset,
-} from '@/lib/draft-timer'
+import { calculateDeadlineTimeRemaining } from '@/lib/draft-timer'
+import { syncServerClockOffset } from '@/lib/server-clock'
 
 interface AuctionTimerProps {
   auctionEndTime: string | null
@@ -73,17 +70,12 @@ export default function AuctionTimer({
     if (!auctionEndTime || !isActive) return
     let cancelled = false
 
+    // Shared, cached clock sync (server-clock.ts) — one /api/time call per
+    // 5 minutes for the whole page, even though this re-runs per auction.
+    // The database still enforces expiry; the offset only drives the display.
     const syncClock = async () => {
-      try {
-        const startedAt = Date.now()
-        const result = await DraftService.getServerTime()
-        const receivedAt = Date.now()
-        if (!cancelled) {
-          setServerClockOffsetMs(estimateServerClockOffset(startedAt, receivedAt, result.serverTime))
-        }
-      } catch {
-        // The database still enforces expiry; device time is a display fallback.
-      }
+      const offset = await syncServerClockOffset()
+      if (!cancelled) setServerClockOffsetMs(offset)
     }
 
     syncClock()

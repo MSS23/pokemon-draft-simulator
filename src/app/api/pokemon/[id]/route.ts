@@ -42,8 +42,6 @@ export async function GET(
       signal: controller.signal,
     })
 
-    clearTimeout(timeoutId)
-
     if (!upstream.ok) {
       return NextResponse.json(
         { error: 'Pokemon not found' },
@@ -57,15 +55,20 @@ export async function GET(
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600',
+        // max-age lets the browser reuse the JSON for an hour, so repeat
+        // lookups of the same Pokemon never leave the device.
+        'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=3600',
         'CDN-Cache-Control': 'public, s-maxage=86400',
       },
     })
   } catch (_err) {
-    clearTimeout(timeoutId)
     return NextResponse.json(
       { error: 'PokeAPI unavailable' },
       { status: 502 }
     )
+  } finally {
+    // Cleared only after the body read: PokeAPI can send headers then stall
+    // the body, which would otherwise hang until the 25s edge limit.
+    clearTimeout(timeoutId)
   }
 }

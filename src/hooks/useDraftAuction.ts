@@ -4,10 +4,8 @@ import { DraftService } from '@/lib/draft-service'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
 import { supabase } from '@/lib/supabase'
-import {
-  calculateDeadlineTimeRemaining,
-  estimateServerClockOffset,
-} from '@/lib/draft-timer'
+import { calculateDeadlineTimeRemaining } from '@/lib/draft-timer'
+import { syncServerClockOffset } from '@/lib/server-clock'
 
 const log = createLogger('useDraftAuction')
 
@@ -135,7 +133,11 @@ export function useDraftAuction({
               }, 3000)
             }
           })
-          .subscribe()
+          .subscribe((status) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              log.error('auction-live subscribe failed', status)
+            }
+          })
       } catch (error) {
         log.warn('Could not subscribe to live auction state', error)
       }
@@ -159,17 +161,13 @@ export function useDraftAuction({
       deadline: currentAuction.auction_end,
       serverClockOffsetMs: serverClockOffsetMs.current,
     }))
+    // Shared, cached clock sync (server-clock.ts): re-running this effect on
+    // every bid no longer costs a /api/time call per client.
     const syncClock = async () => {
-      try {
-        const startedAt = Date.now()
-        const result = await DraftService.getServerTime(roomCode)
-        const receivedAt = Date.now()
-        if (!cancelled) {
-          serverClockOffsetMs.current = estimateServerClockOffset(startedAt, receivedAt, result.serverTime)
-          update()
-        }
-      } catch (error) {
-        log.warn('Auction clock sync failed; using device clock as fallback', error)
+      const offset = await syncServerClockOffset()
+      if (!cancelled) {
+        serverClockOffsetMs.current = offset
+        update()
       }
     }
 
