@@ -847,3 +847,7 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 ### Domain docs
 
 Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Migrations
+
+Schema changes follow `.claude/skills/migrate/SKILL.md` (`/migrate`): one new file in `supabase/migrations/`, PR dry run, merge-time apply by `.github/workflows/migrate.yml`. Applying by hand or via MCP without that skill's ledger-repair step makes the next CI push replay the file.
