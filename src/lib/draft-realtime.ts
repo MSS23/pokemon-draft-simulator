@@ -78,6 +78,8 @@ export class DraftRealtimeManager {
     userPresence: new Map()
   }
   private beforeUnloadHandler: (() => void) | null = null
+  private failed = false
+  private wakeHandler: (() => void) | null = null
 
   constructor(
     private draftId: string,
@@ -97,6 +99,7 @@ export class DraftRealtimeManager {
     }
 
     this.callbacks.onConnectionChange({ status: 'connecting' })
+    this.addWakeListeners()
 
     try {
       // Create a single channel for all draft events.
@@ -406,55 +409,76 @@ export class DraftRealtimeManager {
 
     log.info('Broadcast:', event, payload)
 
-    // Handle draft deletion specially
+    // Any participant may broadcast on this topic (realtime.messages policy),
+    // so broadcast payloads are untrusted: never act on their contents.
     if (event === 'draft_deleted') {
+      void this.confirmDraftDeleted()
+    }
+
+    // SUPA-04: pick/bid broadcasts only nudge a (debounced) refetch from the DB.
+    // Their payload is not forwarded, so a forged broadcast cannot inject a
+    // fake pick or bid; postgres_changes still delivers the real rows.
+    if (event === 'pick_made' || event === 'bid_placed') {
       this.callbacks.onDraftEvent({
-        table: 'drafts',
-        eventType: 'DELETE',
-        data: { id: this.draftId, deleted: true, ...(payload as Record<string, unknown>) },
+        table: event === 'pick_made' ? 'picks' : 'auctions',
+        eventType: '*',
+        data: {},
         timestamp: Date.now()
       })
     }
+  }
 
-    // SUPA-04: Pick broadcast — emit as a picks INSERT event.
-    // The event shape matches what postgres_changes would emit, so useDraftRealtime
-    // handles it identically without any changes to the hook.
-    if (event === 'pick_made') {
-      const pick = payload as Record<string, unknown>
-      this.callbacks.onDraftEvent({
-        table: 'picks',
-        eventType: 'INSERT',
-        data: {
-          draft_id: pick.draftId,
-          team_id: pick.teamId,
-          pokemon_id: pick.pokemonId,
-          pokemon_name: pick.pokemonName,
-          cost: pick.cost,
-          pick_order: pick.pickOrder,
-          round: pick.round
-        },
-        timestamp: (pick.timestamp as number) || Date.now()
-      })
+  /**
+   * A draft_deleted broadcast is sent BEFORE the server soft-deletes the row
+   * (draft-lifecycle-service deleteDraft), so re-read the row a few seconds
+   * later and only eject the user once the DB agrees.
+   */
+  private async confirmDraftDeleted(delays: number[] = [3000, 5000]): Promise<void> {
+    for (const delay of delays) {
+      await new Promise(resolve => setTimeout(resolve, delay))
+      if (this.abortController.signal.aborted) return
+      const { data, error } = await supabase
+        .from('drafts')
+        .select('deleted_at')
+        .eq('id', this.draftId)
+        .maybeSingle()
+      if (this.abortController.signal.aborted) return
+      // Row gone (or hidden by RLS) or soft-deleted: the deletion is real.
+      if (!error && (!data || data.deleted_at)) {
+        this.callbacks.onDraftEvent({
+          table: 'drafts',
+          eventType: 'DELETE',
+          data: { id: this.draftId, deleted: true },
+          timestamp: Date.now()
+        })
+        return
+      }
     }
+    log.warn('Ignoring draft_deleted broadcast: draft still exists')
+  }
 
-    // SUPA-04: Bid broadcast — emit as auctions UPDATE event (triggers state refresh)
-    if (event === 'bid_placed') {
-      const bid = payload as Record<string, unknown>
-      this.callbacks.onDraftEvent({
-        table: 'auctions',
-        eventType: 'UPDATE',
-        data: {
-          draft_id: bid.draftId,
-          id: bid.auctionId,
-          current_bid: bid.bidAmount,
-          // Column is `current_bidder` (was previously mislabeled
-          // `current_bidder_team_id`, which flashed a wrong high-bidder until the
-          // postgres_changes refetch corrected it).
-          current_bidder: bid.teamId
-        },
-        timestamp: (bid.timestamp as number) || Date.now()
-      })
+  /**
+   * After max reconnect attempts the manager stops retrying. Coming back
+   * online or to the tab is a cheap signal to try again from scratch.
+   */
+  private addWakeListeners(): void {
+    if (this.wakeHandler || typeof window === 'undefined') return
+    this.wakeHandler = () => {
+      if (!this.failed || this.abortController.signal.aborted) return
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      this.failed = false
+      this.reconnectAttempts = 0
+      void this.reconnect()
     }
+    window.addEventListener('online', this.wakeHandler)
+    document.addEventListener('visibilitychange', this.wakeHandler)
+  }
+
+  private removeWakeListeners(): void {
+    if (!this.wakeHandler || typeof window === 'undefined') return
+    window.removeEventListener('online', this.wakeHandler)
+    document.removeEventListener('visibilitychange', this.wakeHandler)
+    this.wakeHandler = null
   }
 
   /**
@@ -468,6 +492,7 @@ export class DraftRealtimeManager {
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       log.error('Max reconnection attempts reached')
+      this.failed = true
       this.callbacks.onConnectionChange({
         status: 'failed',
         error: 'Max reconnection attempts reached'
@@ -543,6 +568,7 @@ export class DraftRealtimeManager {
       window.removeEventListener('beforeunload', this.beforeUnloadHandler)
       this.beforeUnloadHandler = null
     }
+    this.removeWakeListeners()
 
     // Signal abort to stop all pending operations
     this.abortController.abort()

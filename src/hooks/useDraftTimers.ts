@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { DraftService } from '@/lib/draft-service'
 import { notify } from '@/lib/notifications'
 import { createLogger } from '@/lib/logger'
 import { draftSounds } from '@/lib/draft-sounds'
+import { calculatePickTimeRemaining } from '@/lib/draft-timer'
 import {
-  calculatePickTimeRemaining,
-  estimateServerClockOffset,
-} from '@/lib/draft-timer'
+  getServerClockOffsetMs,
+  syncServerClockOffset,
+  SERVER_CLOCK_MAX_AGE_MS,
+} from '@/lib/server-clock'
 
 const log = createLogger('useDraftTimers')
 
@@ -33,7 +34,7 @@ export function useDraftTimers({
   draftId,
   roomCode,
 }: UseDraftTimersParams): DraftTimersResult {
-  const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0)
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState(getServerClockOffsetMs)
   const [pickTimeRemaining, setPickTimeRemaining] = useState(() =>
     calculatePickTimeRemaining({ turnStartedAt, timeLimitSeconds: timeLimit }),
   )
@@ -99,28 +100,24 @@ export function useDraftTimers({
     }
   }, [pickTimeRemaining, isDrafting, timeLimit])
 
-  // Server time synchronization
+  // Server time synchronization — shared, cached page-wide (see server-clock.ts)
+  // so the whole draft page makes one /api/time call per 5 minutes, not one per
+  // hook per auction change.
   useEffect(() => {
     if (!roomCode) return
+    let cancelled = false
 
     const syncTime = async () => {
-      try {
-        const requestStartedAt = Date.now()
-        const result = await DraftService.getServerTime(roomCode.toLowerCase())
-        const responseReceivedAt = Date.now()
-        setServerClockOffsetMs(estimateServerClockOffset(
-          requestStartedAt,
-          responseReceivedAt,
-          result.serverTime,
-        ))
-      } catch (error) {
-        log.error('Failed to sync server time:', error)
-      }
+      const offset = await syncServerClockOffset()
+      if (!cancelled) setServerClockOffsetMs(offset)
     }
 
     syncTime()
-    const interval = setInterval(syncTime, 300000)
-    return () => clearInterval(interval)
+    const interval = setInterval(syncTime, SERVER_CLOCK_MAX_AGE_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [roomCode])
 
   // Auto-skip logic.
@@ -170,7 +167,13 @@ export function useDraftTimers({
     if (expiredTurnHandledRef.current === turnStartedAt) return
     expiredTurnHandledRef.current = turnStartedAt
 
-    const delay = isUserTurn ? 500 : 1000 + Math.random() * 2000
+    // COST: every connected client used to POST within 1–3s of expiry, so a
+    // timed-out turn cost one function invocation per participant. The realtime
+    // turn_started_at update cancels this timer (cleanup below), so giving
+    // non-turn clients a wider, later window means the on-turn client (or the
+    // first of the others) advances the draft and the rest never fire. The
+    // per-minute cron remains the backstop if nobody is connected.
+    const delay = isUserTurn ? 500 : 2500 + Math.random() * 4000
 
     autoSkipTimerRef.current = setTimeout(() => {
       handleAutoSkip()

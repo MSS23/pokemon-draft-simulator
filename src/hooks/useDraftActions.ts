@@ -29,6 +29,8 @@ interface DraftUIState {
     pickTiers: Array<string | null>
   }>
   participants: Array<{
+    /** participants.id (uuid); wishlist rows are keyed by it, not the user id */
+    id?: string
     userId: string | null
     team_id: string | null
     display_name: string
@@ -100,6 +102,8 @@ export interface DraftActionsResult {
   setJoinTeamName: (v: string) => void
   /** Ref for suppressing realtime refreshes during pick */
   pickInFlightRef: React.MutableRefObject<boolean>
+  /** Set when a realtime refresh was skipped during a pick; replayed once the pick settles */
+  pendingRefreshRef: React.MutableRefObject<boolean>
 }
 
 interface UseDraftActionsParams {
@@ -154,6 +158,7 @@ export function useDraftActions({
   const [joinTeamName, setJoinTeamName] = useState('')
 
   const pickInFlightRef = useRef(false)
+  const pendingRefreshRef = useRef(false)
 
   // Show draft order reveal when transitioning to drafting
   const prevStatusRef = useRef<string | null>(null)
@@ -181,6 +186,26 @@ export function useDraftActions({
     setIsDetailsOpen(true)
   }, [])
 
+  // wishlist_items.participant_id is participants.id (uuid), not the Clerk/guest user id.
+  const participantIdCacheRef = useRef<{ key: string; id: string } | null>(null)
+  const resolveParticipantId = useCallback(async (state: DraftUIState, uid: string): Promise<string | null> => {
+    const fromState = state.participants.find(p => p.userId === uid)?.id
+    if (fromState) return fromState
+    const key = `${state.draft.id}:${uid}`
+    if (participantIdCacheRef.current?.key === key) return participantIdCacheRef.current.id
+    const { supabase } = await import('@/lib/supabase')
+    if (!supabase) return null
+    const { data, error } = await supabase
+      .from('participants')
+      .select('id')
+      .eq('draft_id', state.draft.id)
+      .eq('user_id', uid)
+      .limit(1)
+    const id = (!error && data?.[0]?.id) || null
+    if (id) participantIdCacheRef.current = { key, id }
+    return id
+  }, [])
+
   // handleAddToWishlist
   const handleAddToWishlist = useCallback(async (pokemon: Pokemon) => {
     const currentDraftState = draftStateRef.current
@@ -196,8 +221,14 @@ export function useDraftActions({
       return
     }
 
+    const participantId = await resolveParticipantId(currentDraftState, currentUserId)
+    if (!participantId) {
+      currentNotify.error('Failed to Add', 'Could not add Pokémon to wishlist')
+      return
+    }
+
     const optimisticId = `optimistic-${Date.now()}`
-    const existingItems = useDraftStore.getState().wishlistItemsByParticipantId[currentUserId] || []
+    const existingItems = useDraftStore.getState().wishlistItemsByParticipantId[participantId] || []
     const maxPriority = existingItems.reduce((max, id) => {
       const item = useDraftStore.getState().wishlistItemsById[id]
       return item ? Math.max(max, item.priority) : max
@@ -205,7 +236,7 @@ export function useDraftActions({
     useDraftStore.getState().addWishlistItem({
       id: optimisticId,
       draftId: roomCode.toLowerCase(),
-      participantId: currentUserId,
+      participantId,
       pokemonId: pokemon.id,
       pokemonName: pokemon.name,
       priority: maxPriority + 1,
@@ -217,14 +248,16 @@ export function useDraftActions({
 
     try {
       const { WishlistService } = await import('@/lib/wishlist-service')
-      await WishlistService.addToWishlist(roomCode.toLowerCase(), currentUserId, pokemon)
+      // addToWishlist reports failure as null rather than throwing
+      const added = await WishlistService.addToWishlist(roomCode.toLowerCase(), participantId, pokemon)
+      if (!added) throw new Error('Wishlist insert failed')
       currentNotify.success('Added to Wishlist', `${pokemon.name} added to your wishlist`, { duration: 2000 })
     } catch (error) {
       useDraftStore.getState().removeWishlistItem(optimisticId)
       log.error('Error adding to wishlist:', error)
       currentNotify.error('Failed to Add', 'Could not add Pokémon to wishlist')
     }
-  }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef])
+  }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef, resolveParticipantId])
 
   // handleRemoveFromWishlist
   const handleRemoveFromWishlist = useCallback(async (pokemon: Pokemon) => {
@@ -235,7 +268,13 @@ export function useDraftActions({
 
     if (!currentDraftState?.userTeamId || !currentUserId || currentIsSpectator) return
 
-    const itemIds = useDraftStore.getState().wishlistItemsByParticipantId[currentUserId] || []
+    const participantId = await resolveParticipantId(currentDraftState, currentUserId)
+    if (!participantId) {
+      currentNotify.error('Failed to Remove', 'Could not remove Pokémon from wishlist')
+      return
+    }
+
+    const itemIds = useDraftStore.getState().wishlistItemsByParticipantId[participantId] || []
     const itemToRemove = itemIds.find(id => {
       const item = useDraftStore.getState().wishlistItemsById[id]
       return item && item.pokemonId === pokemon.id
@@ -248,7 +287,8 @@ export function useDraftActions({
 
     try {
       const { WishlistService } = await import('@/lib/wishlist-service')
-      await WishlistService.removeFromWishlist(roomCode.toLowerCase(), currentUserId, pokemon.id)
+      const removed = await WishlistService.removeFromWishlist(roomCode.toLowerCase(), participantId, pokemon.id)
+      if (!removed) throw new Error('Wishlist delete failed')
       currentNotify.success('Removed from Wishlist', `${pokemon.name} removed from your wishlist`, { duration: 2000 })
     } catch (error) {
       if (removedItem) {
@@ -257,7 +297,7 @@ export function useDraftActions({
       log.error('Error removing from wishlist:', error)
       currentNotify.error('Failed to Remove', 'Could not remove Pokémon from wishlist')
     }
-  }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef])
+  }, [roomCode, draftStateRef, userIdRef, isSpectatorRef, notifyRef, resolveParticipantId])
 
   // handleInitiateDraft - show confirmation modal
   const handleInitiateDraft = useCallback((pokemon: Pokemon) => {
@@ -373,10 +413,8 @@ export function useDraftActions({
       })
     }
 
-    // Mark Pokemon as drafted in wishlists (fire-and-forget)
-    import('@/lib/wishlist-service').then(({ WishlistService }) => {
-      WishlistService.markPokemonDrafted(roomCode.toLowerCase(), pokemon.id)
-    }).catch(() => {})
+    // Wishlist rows are marked drafted by useWishlistSync on the picks INSERT
+    // event, i.e. only once the server has accepted the pick.
 
     try {
       const pickCost = pokemon.cost || 1
@@ -445,6 +483,20 @@ export function useDraftActions({
     } finally {
       setIsDrafting(false)
       pickInFlightRef.current = false
+      // Another team's pick or a server tick may have landed while realtime
+      // refreshes were suppressed; catch up once.
+      if (pendingRefreshRef.current) {
+        pendingRefreshRef.current = false
+        try {
+          DraftService.invalidateDraftStateCache(roomCode.toLowerCase())
+          const freshState = await DraftService.getDraftState(roomCode.toLowerCase())
+          if (freshState) {
+            setDraftState(transformDraftState(freshState, userId))
+          }
+        } catch (refreshErr) {
+          log.warn('Failed to replay skipped refresh after pick:', refreshErr)
+        }
+      }
     }
   }, [isUserTurn, draftState, currentTeam, userTeam, userId, roomCode, shouldShowNotification, transformDraftState, isDrafting, setDraftState])
 
@@ -600,7 +652,7 @@ export function useDraftActions({
       const isActive = draftState?.status === 'drafting'
       await DraftService.updateTimerSetting(roomCode.toLowerCase(), seconds)
       if (isActive) {
-        notify.info('Timer Updated', `Turn timer will be set to ${seconds} seconds after the current pick completes`)
+        notify.info('Timer Updated', 'Timer updated — the current turn restarts with the new limit.')
       } else {
         notify.success('Timer Updated', `Turn timer set to ${seconds} seconds`)
       }
@@ -723,5 +775,6 @@ export function useDraftActions({
     joinTeamName,
     setJoinTeamName,
     pickInFlightRef,
+    pendingRefreshRef,
   }
 }
