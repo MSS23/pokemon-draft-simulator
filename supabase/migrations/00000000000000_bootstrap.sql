@@ -70,7 +70,18 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   avatar_url TEXT,
   preferences JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  -- live columns (added on prod outside migrations)
+  email TEXT,
+  username TEXT,
+  bio TEXT,
+  twitter_profile TEXT,
+  twitch_channel TEXT,
+  is_verified BOOLEAN DEFAULT FALSE,
+  total_drafts_created INTEGER DEFAULT 0,
+  total_drafts_participated INTEGER DEFAULT 0,
+  favorite_pokemon TEXT,
+  stats JSONB DEFAULT '{}'::jsonb
 );
 
 -- Custom formats (user-created Pokemon pricing templates)

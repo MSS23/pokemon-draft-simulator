@@ -50,11 +50,13 @@ DROP POLICY IF EXISTS "drafts_delete"  ON public.drafts;
 DROP POLICY IF EXISTS "Hosts can update their drafts" ON public.drafts;
 DROP POLICY IF EXISTS "Hosts can soft-delete their drafts" ON public.drafts;
 
+DROP POLICY IF EXISTS "drafts_update_host_only" ON public.drafts;
 CREATE POLICY "drafts_update_host_only"
   ON public.drafts FOR UPDATE
   USING (host_id = public.clerk_user_id())
   WITH CHECK (host_id = public.clerk_user_id());
 
+DROP POLICY IF EXISTS "drafts_delete_host_only" ON public.drafts;
 CREATE POLICY "drafts_delete_host_only"
   ON public.drafts FOR DELETE
   USING (host_id = public.clerk_user_id());
@@ -65,6 +67,7 @@ CREATE POLICY "drafts_delete_host_only"
 DROP POLICY IF EXISTS "teams_update" ON public.teams;
 DROP POLICY IF EXISTS "teams_delete" ON public.teams;
 
+DROP POLICY IF EXISTS "teams_update_owner_or_host" ON public.teams;
 CREATE POLICY "teams_update_owner_or_host"
   ON public.teams FOR UPDATE
   USING (
@@ -84,6 +87,7 @@ CREATE POLICY "teams_update_owner_or_host"
     )
   );
 
+DROP POLICY IF EXISTS "teams_delete_host_only" ON public.teams;
 CREATE POLICY "teams_delete_host_only"
   ON public.teams FOR DELETE
   USING (
@@ -100,6 +104,7 @@ CREATE POLICY "teams_delete_host_only"
 DROP POLICY IF EXISTS "participants_update" ON public.participants;
 DROP POLICY IF EXISTS "participants_delete" ON public.participants;
 
+DROP POLICY IF EXISTS "participants_update_self_or_host" ON public.participants;
 CREATE POLICY "participants_update_self_or_host"
   ON public.participants FOR UPDATE
   USING (
@@ -119,6 +124,7 @@ CREATE POLICY "participants_update_self_or_host"
     )
   );
 
+DROP POLICY IF EXISTS "participants_delete_host_only" ON public.participants;
 CREATE POLICY "participants_delete_host_only"
   ON public.participants FOR DELETE
   USING (
@@ -137,6 +143,7 @@ DROP POLICY IF EXISTS "picks_delete" ON public.picks;
 
 -- Picks aren't typically client-mutated; they go through make_draft_pick
 -- (SECURITY DEFINER, bypasses RLS). Lock direct UPDATE/DELETE to host.
+DROP POLICY IF EXISTS "picks_update_host_only" ON public.picks;
 CREATE POLICY "picks_update_host_only"
   ON public.picks FOR UPDATE
   USING (
@@ -154,6 +161,7 @@ CREATE POLICY "picks_update_host_only"
     )
   );
 
+DROP POLICY IF EXISTS "picks_delete_owner_or_host" ON public.picks;
 CREATE POLICY "picks_delete_owner_or_host"
   ON public.picks FOR DELETE
   USING (
@@ -176,6 +184,7 @@ CREATE POLICY "picks_delete_owner_or_host"
 DROP POLICY IF EXISTS "leagues_update" ON public.leagues;
 DROP POLICY IF EXISTS "leagues_delete" ON public.leagues;
 
+DROP POLICY IF EXISTS "leagues_update_host_or_commish" ON public.leagues;
 CREATE POLICY "leagues_update_host_or_commish"
   ON public.leagues FOR UPDATE
   USING (
@@ -201,6 +210,7 @@ CREATE POLICY "leagues_update_host_or_commish"
     )
   );
 
+DROP POLICY IF EXISTS "leagues_delete_host_only" ON public.leagues;
 CREATE POLICY "leagues_delete_host_only"
   ON public.leagues FOR DELETE
   USING (
@@ -217,6 +227,7 @@ CREATE POLICY "leagues_delete_host_only"
 DROP POLICY IF EXISTS "matches_update" ON public.matches;
 DROP POLICY IF EXISTS "matches_delete" ON public.matches;
 
+DROP POLICY IF EXISTS "matches_update_commish_or_participant" ON public.matches;
 CREATE POLICY "matches_update_commish_or_participant"
   ON public.matches FOR UPDATE
   USING (
@@ -253,6 +264,7 @@ CREATE POLICY "matches_update_commish_or_participant"
 -- DELETE is host/commissioner only — same predicate would apply but
 -- we forbid client-side delete entirely. Use the service role for
 -- match cancellation if needed.
+DROP POLICY IF EXISTS "matches_delete_commish_only" ON public.matches;
 CREATE POLICY "matches_delete_commish_only"
   ON public.matches FOR DELETE
   USING (
